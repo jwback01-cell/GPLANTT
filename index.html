@@ -843,6 +843,18 @@ tailwind.config = {
         <button class="tab-btn shrink-0"         data-tab="analysis" onclick="switchLedgerTab('analysis')">매출 분석</button>
       </div>
 
+      <!-- 이카운트 동기화 -->
+      <div class="flex items-center justify-between px-1 md:px-2 mt-4">
+        <div class="flex items-center gap-3">
+          <button onclick="syncEcountAll()" id="ecount-sync-btn" class="bg-brand-blue text-white px-5 py-2.5 rounded-full text-sm font-bold hover:-translate-y-0.5 transition-all shadow-md flex items-center gap-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+            이카운트 동기화
+          </button>
+          <span id="ecount-sync-status" class="text-xs text-brand-gray"></span>
+        </div>
+        <div id="ecount-sync-info" class="text-xs text-brand-gray"></div>
+      </div>
+
       <!-- 패널 스크롤 영역 -->
       <div class="flex-1 overflow-y-auto pr-0 md:pr-2 pb-10 flex flex-col gap-6 md:gap-8 pt-6 md:pt-8">
 
@@ -995,14 +1007,7 @@ tailwind.config = {
       <div id="ledger-panel-product" class="flex flex-col gap-6 py-4" style="display:none;">
         <div class="flex flex-col gap-2">
           <div class="flex flex-wrap items-center gap-3 px-1">
-            <div id="product-period-btns" class="flex gap-1 p-1 bg-brand-bg rounded-full border border-brand-border overflow-x-auto">
-              <button onclick="setDetailPeriod('product',0)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold bg-brand-black text-white transition-all">전체</button>
-              <button onclick="setDetailPeriod('product',1)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">1월</button>
-              <button onclick="setDetailPeriod('product',2)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">2월</button>
-              <button onclick="setDetailPeriod('product',3)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">3월</button>
-              <button onclick="setDetailPeriod('product',4)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">4월</button>
-              <button onclick="setDetailPeriod('product',5)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">5월</button>
-            </div>
+            <div id="product-period-btns" class="flex gap-1 p-1 bg-brand-bg rounded-full border border-brand-border overflow-x-auto"></div>
             <button onclick="toggleRangePicker('product')" id="product-range-toggle" class="flex items-center gap-1.5 shrink-0 px-3.5 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-gray hover:border-brand-black hover:text-brand-black transition-all">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
               직접 선택
@@ -1050,14 +1055,7 @@ tailwind.config = {
       <div id="ledger-panel-supplier" class="flex flex-col gap-6 py-4" style="display:none;">
         <div class="flex flex-col gap-2">
           <div class="flex flex-wrap items-center gap-3 px-1">
-            <div id="supplier-period-btns" class="flex gap-1 p-1 bg-brand-bg rounded-full border border-brand-border overflow-x-auto">
-              <button onclick="setDetailPeriod('supplier',0)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold bg-brand-black text-white transition-all">전체</button>
-              <button onclick="setDetailPeriod('supplier',1)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">1월</button>
-              <button onclick="setDetailPeriod('supplier',2)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">2월</button>
-              <button onclick="setDetailPeriod('supplier',3)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">3월</button>
-              <button onclick="setDetailPeriod('supplier',4)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">4월</button>
-              <button onclick="setDetailPeriod('supplier',5)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">5월</button>
-            </div>
+            <div id="supplier-period-btns" class="flex gap-1 p-1 bg-brand-bg rounded-full border border-brand-border overflow-x-auto"></div>
             <button onclick="toggleRangePicker('supplier')" id="supplier-range-toggle" class="flex items-center gap-1.5 shrink-0 px-3.5 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-gray hover:border-brand-black hover:text-brand-black transition-all">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
               직접 선택
@@ -1091,7 +1089,8 @@ tailwind.config = {
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',2,'num')">발주 횟수<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',3,'num')">매입 수량<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',4,'num')">총 매입액<span class="sort-icon"></span></th>
-                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',5,'num')">비중<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',5,'num')">이익<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',6,'num')">비중<span class="sort-icon"></span></th>
                 </tr>
               </thead>
               <tbody id="supplier-tbody"></tbody>
@@ -1104,14 +1103,7 @@ tailwind.config = {
       <div id="ledger-panel-channel" class="flex flex-col gap-6 py-4" style="display:none;">
         <div class="flex flex-col gap-2">
           <div class="flex flex-wrap items-center gap-3 px-1">
-            <div id="channel-period-btns" class="flex gap-1 p-1 bg-brand-bg rounded-full border border-brand-border overflow-x-auto">
-              <button onclick="setDetailPeriod('channel',0)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold bg-brand-black text-white transition-all">전체</button>
-              <button onclick="setDetailPeriod('channel',1)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">1월</button>
-              <button onclick="setDetailPeriod('channel',2)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">2월</button>
-              <button onclick="setDetailPeriod('channel',3)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">3월</button>
-              <button onclick="setDetailPeriod('channel',4)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">4월</button>
-              <button onclick="setDetailPeriod('channel',5)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">5월</button>
-            </div>
+            <div id="channel-period-btns" class="flex gap-1 p-1 bg-brand-bg rounded-full border border-brand-border overflow-x-auto"></div>
             <button onclick="toggleRangePicker('channel')" id="channel-range-toggle" class="flex items-center gap-1.5 shrink-0 px-3.5 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-gray hover:border-brand-black hover:text-brand-black transition-all">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
               직접 선택
@@ -1232,14 +1224,7 @@ tailwind.config = {
       <div id="ledger-panel-analysis" class="flex flex-col gap-6 py-4" style="display:none;">
         <div class="flex flex-col gap-2">
           <div class="flex flex-wrap items-center gap-3 px-1">
-            <div id="analysis-period-btns" class="flex gap-1 p-1 bg-brand-bg rounded-full border border-brand-border overflow-x-auto">
-              <button onclick="setDetailPeriod('analysis',0)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold bg-brand-black text-white transition-all">전체</button>
-              <button onclick="setDetailPeriod('analysis',1)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">1월</button>
-              <button onclick="setDetailPeriod('analysis',2)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">2월</button>
-              <button onclick="setDetailPeriod('analysis',3)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">3월</button>
-              <button onclick="setDetailPeriod('analysis',4)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">4월</button>
-              <button onclick="setDetailPeriod('analysis',5)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">5월</button>
-            </div>
+            <div id="analysis-period-btns" class="flex gap-1 p-1 bg-brand-bg rounded-full border border-brand-border overflow-x-auto"></div>
             <button onclick="toggleRangePicker('analysis')" id="analysis-range-toggle" class="flex items-center gap-1.5 shrink-0 px-3.5 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-gray hover:border-brand-black hover:text-brand-black transition-all">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
               직접 선택
@@ -1277,6 +1262,7 @@ tailwind.config = {
     </main>
   </div>
 </div>
+
 
 <!-- ══════════════════════════════════════════
      PAGE: PRODUCTS
@@ -4380,6 +4366,137 @@ function sortLedgerEntryByCol(colIdx, type) {
   });
   renderLedgerEntries();
 }
+// ══════════════════════════════════════════
+// ── 이카운트 ERP 연동 ──────────────────────
+// ══════════════════════════════════════════
+const ECOUNT = {
+  COM_CODE: '630430',
+  USER_ID: 'DAOLCO',
+  API_CERT_KEY: '50f914e2c78a64d0a90d3b179b4020e3e0',
+  ZONE: 'BA',
+  HOST: 'sboapiba.ecount.com',
+  SESSION_ID: null,
+};
+
+// 1) 이카운트 로그인 → SESSION_ID 발급
+async function ecountLogin() {
+  const res = await fetch(`https://${ECOUNT.HOST}/OAPI/V2/OAPILogin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      COM_CODE: ECOUNT.COM_CODE,
+      USER_ID: ECOUNT.USER_ID,
+      API_CERT_KEY: ECOUNT.API_CERT_KEY,
+      LAN_TYPE: 'ko-KR',
+      ZONE: ECOUNT.ZONE
+    })
+  });
+  const data = await res.json();
+  if (data.Status === 200 && data.Data?.Datas?.SESSION_ID) {
+    ECOUNT.SESSION_ID = data.Data.Datas.SESSION_ID;
+    return true;
+  }
+  throw new Error('이카운트 로그인 실패: ' + (data.Data?.message || ''));
+}
+
+// 2) 매출전표 조회
+async function ecountGetSales(dateFrom, dateTo) {
+  if (!ECOUNT.SESSION_ID) await ecountLogin();
+  const res = await fetch(`https://${ECOUNT.HOST}/OAPI/V2/Sale/GetListSaleSlip?SESSION_ID=${ECOUNT.SESSION_ID}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ BASE_DATE_FROM: dateFrom, BASE_DATE_TO: dateTo, RESULT_PAGE_NO: '1' })
+  });
+  const data = await res.json();
+  // API가 없을 수 있으므로 SaveSale로 조회된 데이터 대신 품목 목록 활용
+  return data;
+}
+
+// 3) 품목 목록 조회
+async function ecountGetProducts(pageNo) {
+  if (!ECOUNT.SESSION_ID) await ecountLogin();
+  const res = await fetch(`https://${ECOUNT.HOST}/OAPI/V2/InventoryBasic/GetBasicProductsList?SESSION_ID=${ECOUNT.SESSION_ID}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ RESULT_PAGE_NO: String(pageNo || 1) })
+  });
+  return await res.json();
+}
+
+// 4) 품목 단건 조회
+async function ecountGetProduct(prodCd) {
+  if (!ECOUNT.SESSION_ID) await ecountLogin();
+  const res = await fetch(`https://${ECOUNT.HOST}/OAPI/V2/InventoryBasic/ViewBasicProduct?SESSION_ID=${ECOUNT.SESSION_ID}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ PROD_CD: prodCd })
+  });
+  return await res.json();
+}
+
+// 5) 전체 동기화 (버튼 클릭 시)
+async function syncEcountAll() {
+  const btn = document.getElementById('ecount-sync-btn');
+  const status = document.getElementById('ecount-sync-status');
+  const info = document.getElementById('ecount-sync-info');
+
+  btn.disabled = true;
+  btn.classList.add('opacity-50');
+  status.textContent = '동기화 중...';
+
+  try {
+    // 1) 로그인
+    status.textContent = '이카운트 로그인 중...';
+    await ecountLogin();
+    status.textContent = '로그인 성공! 품목 데이터 가져오는 중...';
+
+    // 2) 품목 목록 가져오기 → 상품관리에 반영
+    const productsRes = await ecountGetProducts(1);
+    if (productsRes.Status === '200' && productsRes.Data?.Result) {
+      const ecountProducts = productsRes.Data.Result;
+      const totalCnt = productsRes.Data.TotalCnt || ecountProducts.length;
+
+      // 상품관리 데이터에 반영
+      const newProducts = ecountProducts.map(p => ({
+        id: Date.now() + Math.random(),
+        name: p.PROD_DES || '',
+        sku: p.PROD_CD || '',
+        category: p.CLASS_CD ? '이카운트' : '미분류',
+        stock: 0,
+        safety_stock: parseInt(p.SAFE_QTY) || 0,
+        auto_order: false,
+        in_price: parseFloat(p.IN_PRICE) || 0,
+        out_price: parseFloat(p.OUT_PRICE) || 0,
+      }));
+
+      // 기존 상품과 중복 제거 후 병합
+      const existingSkus = new Set(_allProducts.map(p => p.sku));
+      const added = newProducts.filter(p => !existingSkus.has(p.sku));
+      if (added.length > 0) {
+        _allProducts.push(...added);
+        renderProductsPage();
+      }
+
+      status.textContent = `동기화 완료!`;
+      info.textContent = `품목 ${totalCnt}개 조회 (신규 ${added.length}개 추가) · ${new Date().toLocaleTimeString()}`;
+
+      // 매출장부 장부입력 탭에도 표시할 수 있도록 이벤트 알림
+      if (typeof renderLedgerEntries === 'function' && _ledgerEntries.length > 0) {
+        renderLedgerEntries();
+      }
+    } else {
+      status.textContent = '품목 데이터 조회 실패';
+      info.textContent = productsRes.Errors?.[0]?.Message || '';
+    }
+
+  } catch (err) {
+    status.textContent = '동기화 실패: ' + err.message;
+    console.error('이카운트 동기화 오류:', err);
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('opacity-50');
+  }
+}
 
 function switchLedgerTab(tab) {
   ['monthly','period','product','supplier','channel','entry','analysis'].forEach(p => {
@@ -4564,7 +4681,34 @@ function renderPeriodChart() {
 
 // ── Detail Tab 기간 데이터 ────────────────────
 
-const DETAIL_PERIOD_LABEL = ['2026년 1~5월 누적','2026년 1월','2026년 2월','2026년 3월','2026년 4월','2026년 5월'];
+// 현재 월까지 동적으로 라벨/버튼 생성
+const _currentMonth = new Date().getMonth() + 1; // 1~12
+const DETAIL_PERIOD_LABEL = (function() {
+  const labels = ['2026년 1~' + _currentMonth + '월 누적'];
+  for (let m = 1; m <= _currentMonth; m++) labels.push('2026년 ' + m + '월');
+  return labels;
+})();
+
+function buildPeriodButtons(tabId) {
+  const container = document.getElementById(tabId + '-period-btns');
+  if (!container) return;
+  let html = `<button onclick="setDetailPeriod('${tabId}',0)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold bg-brand-black text-white transition-all">전체</button>`;
+  for (let m = 1; m <= _currentMonth; m++) {
+    html += `<button onclick="setDetailPeriod('${tabId}',${m})" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">${m}월</button>`;
+  }
+  container.innerHTML = html;
+}
+
+// 페이지 로드 시 모든 탭의 버튼 생성 + 라벨 초기화
+document.addEventListener('DOMContentLoaded', function() {
+  ['product','supplier','channel','analysis'].forEach(tab => {
+    buildPeriodButtons(tab);
+    const lblEl = document.getElementById(tab + '-period-label');
+    if (lblEl) lblEl.textContent = DETAIL_PERIOD_LABEL[0];
+    const tblEl = document.getElementById(tab + '-table-label');
+    if (tblEl) tblEl.textContent = DETAIL_PERIOD_LABEL[0];
+  });
+});
 
 // Product defs: name, purchaseRatio (fee 10% + delivery 4% of sales)
 const PRODUCT_DEFS = [
@@ -4653,7 +4797,8 @@ function _supplierData(idxs) {
   return SUPPLIER_DEFS.map((def, si) => {
     let orders = 0, qty = 0, amount = 0;
     idxs.forEach(mi => { orders += SUPPLIER_MONTHS[mi][si][0]; qty += SUPPLIER_MONTHS[mi][si][1]; amount += SUPPLIER_MONTHS[mi][si][2]; });
-    return { name: def.n, item: def.item, orders, qty, amount };
+    const profit = Math.round(amount * 0.25);
+    return { name: def.n, item: def.item, orders, qty, amount, profit };
   }).sort((a, b) => b.amount - a.amount);
 }
 function _channelData(idxs) {
@@ -4780,10 +4925,11 @@ function _getSupplierRowsFromEntries(m) {
   const map = {};
   entries.forEach(r => {
     const name = r['거래처명'] || '미분류';
-    if (!map[name]) map[name] = { name, item: r['품목명'] || '', orders: 0, qty: 0, amount: 0 };
+    if (!map[name]) map[name] = { name, item: r['품목명'] || '', orders: 0, qty: 0, amount: 0, profit: 0 };
     map[name].orders += 1;
     map[name].qty    += r['수량'] || 0;
     map[name].amount += (r['원가'] || 0) * (r['수량'] || 0);
+    map[name].profit += r['이익'] || 0;
   });
   return Object.values(map).sort((a, b) => b.amount - a.amount);
 }
@@ -4863,6 +5009,7 @@ function renderSupplierTab(m, idxs) {
       <td class="px-4 py-4 text-right">${_fmtW(r.orders)}</td>
       <td class="px-4 py-4 text-right">${_fmtW(r.qty)}</td>
       <td class="px-4 py-4 text-right font-bold">${_fmtW(r.amount)}</td>
+      <td class="px-4 py-4 text-right font-bold text-brand-green">${_fmtW(r.profit || 0)}</td>
       <td class="px-6 py-4 text-right"><span class="px-2.5 py-0.5 rounded-full ${badgeCls} text-xs font-bold">${pct}%</span></td>
     </tr>`;
   }).join('');
@@ -4890,9 +5037,9 @@ function renderChannelTab(m, idxs) {
   document.getElementById('channel-bars').innerHTML = rows.map(r => {
     const pct = totalSales > 0 ? (r.sales / totalSales * 100).toFixed(1) : '0.0';
     return `<div class="flex items-center gap-3">
-      <div class="w-24 shrink-0 text-sm font-semibold text-right text-brand-gray">${r.name}</div>
+      <div class="w-32 shrink-0 text-sm font-semibold text-right text-brand-gray truncate">${r.name}</div>
       <div class="flex-1 bg-brand-bg rounded-full h-3 overflow-hidden"><div class="h-3 rounded-full transition-all" style="width:${pct}%;background:${r.color}"></div></div>
-      <div class="w-28 text-sm font-bold text-right">${_fmtW(r.sales)}</div>
+      <div class="w-32 shrink-0 text-sm font-bold text-right text-brand-black font-pretendard">${_fmtW(r.sales)}</div>
     </div>`;
   }).join('');
 
