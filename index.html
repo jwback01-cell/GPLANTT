@@ -97,6 +97,12 @@ tailwind.config = {
   .tab-btn.active { color: #1A1A1A; }
   .tab-btn.active::after { content:''; position:absolute; bottom:-1px; left:0; right:0; height:2px; background:#1A1A1A; border-radius:2px; }
 
+  /* ── Sortable table headers ── */
+  th.sortable { cursor: pointer; user-select: none; transition: color .15s; }
+  th.sortable:hover { color: #1A1A1A; }
+  th.sortable .sort-icon { display: inline-block; margin-left: 4px; font-size: 10px; opacity: 0.4; }
+  th.sortable.sort-asc .sort-icon, th.sortable.sort-desc .sort-icon { opacity: 1; color: #1A1A1A; }
+
   /* ── Pill chart ── */
   .pill {
     flex: 1;
@@ -424,7 +430,7 @@ tailwind.config = {
         </button>
         <div class="flex items-center gap-2 font-black text-[1.15rem] tracking-tight cursor-pointer" onclick="navigate('dashboard')">
           <div class="w-3 h-3 bg-brand-black rounded-[3px]"></div>
-          GPALN
+          GPLAN
         </div>
       </div>
       <div class="flex items-center gap-4 md:gap-6">
@@ -493,9 +499,9 @@ tailwind.config = {
             <span class="font-semibold text-[1.1rem]">이번 달 총 매출</span>
           </div>
           <div class="flex items-end justify-between">
-            <div class="text-[1.8rem] md:text-[2rem] font-bold tracking-tight">1,240<span class="text-xl font-medium text-brand-gray ml-1">건</span></div>
-            <div class="text-brand-pink font-semibold text-sm bg-brand-pink-light/60 px-2.5 py-1 rounded-lg flex items-center gap-1">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m18 15-6-6-6 6"/></svg>12.4%
+            <div id="dashboard-month-revenue" class="text-[1.8rem] md:text-[2rem] font-bold tracking-tight">0</div>
+            <div id="dashboard-month-revenue-rate" class="text-brand-pink font-semibold text-sm bg-brand-pink-light/60 px-2.5 py-1 rounded-lg flex items-center gap-1">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m18 15-6-6-6 6"/></svg>0%
             </div>
           </div>
         </div>
@@ -507,8 +513,8 @@ tailwind.config = {
             <span class="font-semibold text-[1.1rem]">순이익(영업이익)</span>
           </div>
           <div class="flex items-end justify-between">
-            <div class="text-[1.8rem] md:text-[2rem] font-bold tracking-tight">₩42M</div>
-            <div class="text-brand-blue font-semibold text-sm bg-brand-blue-light/60 px-2.5 py-1 rounded-lg">목표 대비 98%</div>
+            <div id="dashboard-month-profit" class="text-[1.8rem] md:text-[2rem] font-bold tracking-tight">0</div>
+            <div id="dashboard-month-profit-rate" class="text-brand-blue font-semibold text-sm bg-brand-blue-light/60 px-2.5 py-1 rounded-lg">수익률 0%</div>
           </div>
         </div>
         <div onclick="navigate('products'); setStatFilter('low');" class="bg-white p-5 md:p-7 rounded-3xl panel hover:-translate-y-1 transition-transform duration-300 cursor-pointer">
@@ -600,13 +606,13 @@ tailwind.config = {
               <div class="border-t border-brand-border w-full flex-1"></div>
             </div>
             <div class="flex items-end gap-2 md:gap-3 border-b border-brand-border pb-3 h-[200px] md:h-[240px] z-10 relative" id="bar-chart">
-              <div class="pill group" style="height:0%" data-h="30"><div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-brand-black text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">₩12M</div></div>
-              <div class="pill group" style="height:0%" data-h="45"><div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-brand-black text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">₩18M</div></div>
-              <div class="pill group" style="height:0%" data-h="25"><div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-brand-black text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">₩10M</div></div>
-              <div class="pill group" style="height:0%" data-h="60"><div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-brand-black text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">₩24M</div></div>
-              <div class="pill group" style="height:0%" data-h="50"><div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-brand-black text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">₩20M</div></div>
-              <div class="pill active group" style="height:0%" data-h="90"><div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-brand-black text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">₩36M</div></div>
-              <div class="pill group" style="height:0%" data-h="40"><div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-brand-black text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">₩16M</div></div>
+              <div class="pill group" style="height:0%" data-h="30"><div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-brand-black text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">12,000,000</div></div>
+              <div class="pill group" style="height:0%" data-h="45"><div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-brand-black text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">18,000,000</div></div>
+              <div class="pill group" style="height:0%" data-h="25"><div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-brand-black text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">10,000,000</div></div>
+              <div class="pill group" style="height:0%" data-h="60"><div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-brand-black text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">24,000,000</div></div>
+              <div class="pill group" style="height:0%" data-h="50"><div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-brand-black text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">20,000,000</div></div>
+              <div class="pill active group" style="height:0%" data-h="90"><div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-brand-black text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">36,000,000</div></div>
+              <div class="pill group" style="height:0%" data-h="40"><div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-brand-black text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">16,000,000</div></div>
             </div>
             <div class="flex justify-between text-brand-gray text-[0.82rem] font-medium mt-3 px-1">
               <span class="flex-1 text-center">월</span><span class="flex-1 text-center">화</span><span class="flex-1 text-center">수</span><span class="flex-1 text-center">목</span><span class="flex-1 text-center">금</span><span class="flex-1 text-center text-brand-black font-bold">오늘</span><span class="flex-1 text-center">일</span>
@@ -638,6 +644,7 @@ tailwind.config = {
           <div class="w-9 h-9 rounded-full bg-brand-blue-light flex items-center justify-center text-brand-blue font-bold text-sm">M</div>
           <span class="font-semibold text-sm hidden md:block">마스터 계정</span>
         </div>
+        <div class="h-5 w-px bg-brand-border hidden md:block"></div>
         <button class="text-brand-gray hover:text-brand-black flex items-center gap-1.5 text-sm font-semibold transition-colors" onclick="logout()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
           <span class="hidden md:block">로그아웃</span>
@@ -792,12 +799,13 @@ tailwind.config = {
     <nav class="glass-nav rounded-full px-4 md:px-6 py-3.5 flex justify-between items-center max-w-[1600px] mx-auto w-full">
       <div class="flex items-center gap-3">
         <button class="hamburger p-2 rounded-lg hover:bg-brand-bg" onclick="toggleSidebar()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
-        <div class="flex items-center gap-2 font-black text-[1.15rem] tracking-tight cursor-pointer" onclick="navigate('dashboard')"><div class="w-3 h-3 bg-brand-black rounded-[3px]"></div>G
+        <div class="flex items-center gap-2 font-black text-[1.15rem] tracking-tight cursor-pointer" onclick="navigate('dashboard')"><div class="w-3 h-3 bg-brand-black rounded-[3px]"></div>GPLAN
       </div>
       </div>
       <div class="flex items-center gap-4 md:gap-6">
-        <div class="flex items-center gap-3 cursor-pointer hover:opacity-80"><div class="w-9 h-9 rounded-full bg-brand-blue-light flex items-center justify-center text-brand-blue font-bold text-sm">M</div><span class="font-semibold text-sm hidden md:block">마스터 계정</span></div>
-        <button class="text-brand-gray hover:text-brand-black flex items-center gap-1.5 text-sm font-semibold" onclick="logout()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg><span class="hidden md:block">로그아웃</span></button>
+        <div class="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"><div class="w-9 h-9 rounded-full bg-brand-blue-light flex items-center justify-center text-brand-blue font-bold text-sm">M</div><span class="font-semibold text-sm hidden md:block">마스터 계정</span></div>
+        <div class="h-5 w-px bg-brand-border hidden md:block"></div>
+        <button class="text-brand-gray hover:text-brand-black flex items-center gap-1.5 text-sm font-semibold transition-colors" onclick="logout()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg><span class="hidden md:block">로그아웃</span></button>
       </div>
     </nav>
   </header>
@@ -849,11 +857,11 @@ tailwind.config = {
               </div>
               <span class="font-semibold text-[1.05rem] md:text-[1.15rem]">이번 달 총 매출</span>
             </div>
-            <span class="text-brand-gray text-sm">2024년 5월</span>
+            <span id="ledger-month-label" class="text-brand-gray text-sm">2026년 5월</span>
           </div>
           <div class="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-2">
-            <div class="text-[2rem] md:text-[2.5rem] font-bold tracking-tight">₩42,850,000</div>
-            <div class="text-brand-blue font-semibold text-sm bg-brand-blue-light/60 px-3 py-1 rounded-lg">전월 대비 +8.4%</div>
+            <div id="ledger-month-revenue" class="text-[2rem] md:text-[2.5rem] font-bold tracking-tight">42,850,000</div>
+            <div id="ledger-month-rate" class="text-brand-blue font-semibold text-sm bg-brand-blue-light/60 px-3 py-1 rounded-lg">전월 대비 +8.4%</div>
           </div>
         </div>
         <div class="bg-white p-6 md:p-8 rounded-3xl panel">
@@ -864,11 +872,11 @@ tailwind.config = {
               </div>
               <span class="font-semibold text-[1.05rem] md:text-[1.15rem]">순이익 (영업이익)</span>
             </div>
-            <span class="text-brand-gray text-sm">수익률 32%</span>
+            <span id="ledger-profit-rate-label" class="text-brand-gray text-sm">수익률 32%</span>
           </div>
           <div class="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-2">
-            <div class="text-[2rem] md:text-[2.5rem] font-bold tracking-tight text-brand-green">₩13,712,000</div>
-            <div class="text-brand-green font-semibold text-sm bg-brand-green-light/60 px-3 py-1 rounded-lg">목표 달성 102%</div>
+            <div id="ledger-month-profit" class="text-[2rem] md:text-[2.5rem] font-bold tracking-tight text-brand-green">13,712,000</div>
+            <div id="ledger-profit-badge" class="text-brand-green font-semibold text-sm bg-brand-green-light/60 px-3 py-1 rounded-lg">목표 달성 102%</div>
           </div>
         </div>
       </section>
@@ -890,13 +898,13 @@ tailwind.config = {
                 <circle cx="18" cy="18" r="16" fill="none" stroke="#E91E63" stroke-width="4" stroke-dasharray="0 100" stroke-dashoffset="-75" class="donut-segment" data-dash="15 100"/>
                 <circle cx="18" cy="18" r="16" fill="none" stroke="#FF9800" stroke-width="4" stroke-dasharray="0 100" stroke-dashoffset="-90" class="donut-segment" data-dash="10 100"/>
               </svg>
-              <div class="absolute inset-0 flex flex-col items-center justify-center"><span class="text-brand-gray text-xs font-semibold">총 지출</span><span class="text-base md:text-lg font-bold">₩29M</span></div>
+              <div class="absolute inset-0 flex flex-col items-center justify-center"><span class="text-brand-gray text-xs font-semibold">총 지출</span><span class="text-base md:text-lg font-bold">29,000,000</span></div>
             </div>
             <div class="flex-1 grid grid-cols-1 gap-3 w-full">
-              <div class="flex items-center justify-between p-3 md:p-4 bg-brand-bg rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full bg-brand-black shrink-0"></div><span class="font-bold text-sm md:text-base">상품 매입가</span></div><div class="flex items-baseline gap-2"><span class="font-bold text-base md:text-lg">45%</span><span class="text-brand-gray text-xs md:text-sm hidden md:block">₩19,282,500</span></div></div>
-              <div class="flex items-center justify-between p-3 md:p-4 bg-brand-bg rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full bg-brand-blue shrink-0"></div><span class="font-bold text-sm md:text-base">마케팅 비용</span></div><div class="flex items-baseline gap-2"><span class="font-bold text-base md:text-lg">30%</span><span class="text-brand-gray text-xs md:text-sm hidden md:block">₩12,855,000</span></div></div>
-              <div class="flex items-center justify-between p-3 md:p-4 bg-brand-bg rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full bg-brand-pink shrink-0"></div><span class="font-bold text-sm md:text-base">물류 및 배송</span></div><div class="flex items-baseline gap-2"><span class="font-bold text-base md:text-lg">15%</span><span class="text-brand-gray text-xs md:text-sm hidden md:block">₩6,427,500</span></div></div>
-              <div class="flex items-center justify-between p-3 md:p-4 bg-brand-bg rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full bg-brand-orange shrink-0"></div><span class="font-bold text-sm md:text-base">택배비</span></div><div class="flex items-baseline gap-2"><span class="font-bold text-base md:text-lg">10%</span><span class="text-brand-gray text-xs md:text-sm hidden md:block">₩4,285,000</span></div></div>
+              <div class="flex items-center justify-between p-3 md:p-4 bg-brand-bg rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full bg-brand-black shrink-0"></div><span class="font-bold text-sm md:text-base">상품 매입가</span></div><div class="flex items-baseline gap-2"><span class="font-bold text-base md:text-lg">45%</span><span class="text-brand-gray text-xs md:text-sm hidden md:block">19,282,500</span></div></div>
+              <div class="flex items-center justify-between p-3 md:p-4 bg-brand-bg rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full bg-brand-blue shrink-0"></div><span class="font-bold text-sm md:text-base">마케팅 비용</span></div><div class="flex items-baseline gap-2"><span class="font-bold text-base md:text-lg">30%</span><span class="text-brand-gray text-xs md:text-sm hidden md:block">12,855,000</span></div></div>
+              <div class="flex items-center justify-between p-3 md:p-4 bg-brand-bg rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full bg-brand-pink shrink-0"></div><span class="font-bold text-sm md:text-base">물류 및 배송</span></div><div class="flex items-baseline gap-2"><span class="font-bold text-base md:text-lg">15%</span><span class="text-brand-gray text-xs md:text-sm hidden md:block">6,427,500</span></div></div>
+              <div class="flex items-center justify-between p-3 md:p-4 bg-brand-bg rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full bg-brand-orange shrink-0"></div><span class="font-bold text-sm md:text-base">택배비</span></div><div class="flex items-baseline gap-2"><span class="font-bold text-base md:text-lg">10%</span><span class="text-brand-gray text-xs md:text-sm hidden md:block">4,285,000</span></div></div>
             </div>
           </div>
         </div>
@@ -928,7 +936,7 @@ tailwind.config = {
             <button id="period-btn-monthly" onclick="setPeriodType('monthly')" class="px-4 py-2 rounded-full text-sm font-bold bg-brand-black text-white transition-all">월별</button>
             <button id="period-btn-quarterly" onclick="setPeriodType('quarterly')" class="px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">분기별</button>
           </div>
-          <span id="period-range-label" class="text-brand-gray text-sm font-semibold">2024년 1월 ~ 5월 누적</span>
+          <span id="period-range-label" class="text-brand-gray text-sm font-semibold">2026년 1월 ~ 5월 누적</span>
         </div>
         <!-- KPI 카드 -->
         <div id="period-kpi" class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4"></div>
@@ -966,14 +974,14 @@ tailwind.config = {
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
-                <tr class="bg-brand-bg text-brand-gray">
-                  <th class="text-left px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">기간</th>
-                  <th class="text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">총 매출</th>
-                  <th class="text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">매입 원가</th>
-                  <th class="text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">수수료</th>
-                  <th class="text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">택배비</th>
-                  <th class="text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">순이익</th>
-                  <th class="text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">수익률</th>
+                <tr class="bg-brand-bg text-brand-gray" id="period-thead-row">
+                  <th class="sortable text-left px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',0,'text')">기간<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',1,'num')">총 매출<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',2,'num')">매입 원가<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',3,'num')">수수료<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',4,'num')">택배비<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',5,'num')">순이익<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',6,'num')">수익률<span class="sort-icon"></span></th>
                 </tr>
               </thead>
               <tbody id="period-tbody"></tbody>
@@ -998,13 +1006,13 @@ tailwind.config = {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
               직접 선택
             </button>
-            <span id="product-period-label" class="text-brand-gray text-sm font-semibold ml-auto">2025년 1~5월 누적</span>
+            <span id="product-period-label" class="text-brand-gray text-sm font-semibold ml-auto">2026년 1~5월 누적</span>
           </div>
           <div id="product-range-picker" class="flex flex-wrap items-center gap-3 px-3 py-3 bg-white rounded-2xl border border-brand-border" style="display:none;">
             <div class="flex items-center gap-2 shrink-0">
-              <input type="date" id="product-range-start" value="2025-01-01" min="2025-01-01" max="2025-12-31" class="bg-brand-bg rounded-xl px-3 py-1.5 text-sm font-bold border border-brand-border outline-none cursor-pointer">
+              <input type="date" id="product-range-start" value="2026-01-01" min="2026-01-01" max="2026-12-31" class="bg-brand-bg rounded-xl px-3 py-1.5 text-sm font-bold border border-brand-border outline-none cursor-pointer">
               <span class="text-brand-gray font-bold">~</span>
-              <input type="date" id="product-range-end" value="2025-05-31" min="2025-01-01" max="2025-12-31" class="bg-brand-bg rounded-xl px-3 py-1.5 text-sm font-bold border border-brand-border outline-none cursor-pointer">
+              <input type="date" id="product-range-end" value="2026-05-31" min="2026-01-01" max="2026-12-31" class="bg-brand-bg rounded-xl px-3 py-1.5 text-sm font-bold border border-brand-border outline-none cursor-pointer">
             </div>
             <button onclick="applyDetailRange('product')" class="shrink-0 px-5 py-1.5 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-brand-black/80 transition-all">조회</button>
             <button onclick="toggleRangePicker('product')" class="ml-auto text-brand-gray hover:text-brand-black transition-all p-1 rounded-full hover:bg-brand-bg">
@@ -1016,19 +1024,19 @@ tailwind.config = {
         <div class="bg-white rounded-3xl panel overflow-hidden">
           <div class="px-6 py-4 border-b border-brand-border flex items-center justify-between">
             <div class="font-bold text-[15px]">상품별 매출 현황</div>
-            <div id="product-table-label" class="text-xs text-brand-gray font-medium">2025년 1~5월 누적</div>
+            <div id="product-table-label" class="text-xs text-brand-gray font-medium">2026년 1~5월 누적</div>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
-                <tr class="bg-brand-bg text-brand-gray">
+                <tr class="bg-brand-bg text-brand-gray" id="product-thead-row">
                   <th class="text-left px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">순위</th>
-                  <th class="text-left px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">상품명</th>
-                  <th class="text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">판매 수량</th>
-                  <th class="text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">총 매출</th>
-                  <th class="text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">매입 원가</th>
-                  <th class="text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">순이익</th>
-                  <th class="text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">수익률</th>
+                  <th class="sortable text-left px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',1,'text')">상품명<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',2,'num')">판매 수량<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',3,'num')">총 매출<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',4,'num')">매입 원가<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',5,'num')">순이익<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',6,'num')">수익률<span class="sort-icon"></span></th>
                 </tr>
               </thead>
               <tbody id="product-tbody"></tbody>
@@ -1053,13 +1061,13 @@ tailwind.config = {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
               직접 선택
             </button>
-            <span id="supplier-period-label" class="text-brand-gray text-sm font-semibold ml-auto">2025년 1~5월 누적</span>
+            <span id="supplier-period-label" class="text-brand-gray text-sm font-semibold ml-auto">2026년 1~5월 누적</span>
           </div>
           <div id="supplier-range-picker" class="flex flex-wrap items-center gap-3 px-3 py-3 bg-white rounded-2xl border border-brand-border" style="display:none;">
             <div class="flex items-center gap-2 shrink-0">
-              <input type="date" id="supplier-range-start" value="2025-01-01" min="2025-01-01" max="2025-12-31" class="bg-brand-bg rounded-xl px-3 py-1.5 text-sm font-bold border border-brand-border outline-none cursor-pointer">
+              <input type="date" id="supplier-range-start" value="2026-01-01" min="2026-01-01" max="2026-12-31" class="bg-brand-bg rounded-xl px-3 py-1.5 text-sm font-bold border border-brand-border outline-none cursor-pointer">
               <span class="text-brand-gray font-bold">~</span>
-              <input type="date" id="supplier-range-end" value="2025-05-31" min="2025-01-01" max="2025-12-31" class="bg-brand-bg rounded-xl px-3 py-1.5 text-sm font-bold border border-brand-border outline-none cursor-pointer">
+              <input type="date" id="supplier-range-end" value="2026-05-31" min="2026-01-01" max="2026-12-31" class="bg-brand-bg rounded-xl px-3 py-1.5 text-sm font-bold border border-brand-border outline-none cursor-pointer">
             </div>
             <button onclick="applyDetailRange('supplier')" class="shrink-0 px-5 py-1.5 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-brand-black/80 transition-all">조회</button>
             <button onclick="toggleRangePicker('supplier')" class="ml-auto text-brand-gray hover:text-brand-black transition-all p-1 rounded-full hover:bg-brand-bg">
@@ -1071,18 +1079,18 @@ tailwind.config = {
         <div class="bg-white rounded-3xl panel overflow-hidden">
           <div class="px-6 py-4 border-b border-brand-border flex items-center justify-between">
             <div class="font-bold text-[15px]">매입처별 거래 현황</div>
-            <div id="supplier-table-label" class="text-xs text-brand-gray font-medium">2025년 1~5월 누적</div>
+            <div id="supplier-table-label" class="text-xs text-brand-gray font-medium">2026년 1~5월 누적</div>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
-                <tr class="bg-brand-bg text-brand-gray">
-                  <th class="text-left px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">매입처</th>
-                  <th class="text-left px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">주요 품목</th>
-                  <th class="text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">발주 횟수</th>
-                  <th class="text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">매입 수량</th>
-                  <th class="text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">총 매입액</th>
-                  <th class="text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">비중</th>
+                <tr class="bg-brand-bg text-brand-gray" id="supplier-thead-row">
+                  <th class="sortable text-left px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',0,'text')">매입처<span class="sort-icon"></span></th>
+                  <th class="sortable text-left px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',1,'text')">주요 품목<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',2,'num')">발주 횟수<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',3,'num')">매입 수량<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',4,'num')">총 매입액<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',5,'num')">비중<span class="sort-icon"></span></th>
                 </tr>
               </thead>
               <tbody id="supplier-tbody"></tbody>
@@ -1107,13 +1115,13 @@ tailwind.config = {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
               직접 선택
             </button>
-            <span id="channel-period-label" class="text-brand-gray text-sm font-semibold ml-auto">2025년 1~5월 누적</span>
+            <span id="channel-period-label" class="text-brand-gray text-sm font-semibold ml-auto">2026년 1~5월 누적</span>
           </div>
           <div id="channel-range-picker" class="flex flex-wrap items-center gap-3 px-3 py-3 bg-white rounded-2xl border border-brand-border" style="display:none;">
             <div class="flex items-center gap-2 shrink-0">
-              <input type="date" id="channel-range-start" value="2025-01-01" min="2025-01-01" max="2025-12-31" class="bg-brand-bg rounded-xl px-3 py-1.5 text-sm font-bold border border-brand-border outline-none cursor-pointer">
+              <input type="date" id="channel-range-start" value="2026-01-01" min="2026-01-01" max="2026-12-31" class="bg-brand-bg rounded-xl px-3 py-1.5 text-sm font-bold border border-brand-border outline-none cursor-pointer">
               <span class="text-brand-gray font-bold">~</span>
-              <input type="date" id="channel-range-end" value="2025-05-31" min="2025-01-01" max="2025-12-31" class="bg-brand-bg rounded-xl px-3 py-1.5 text-sm font-bold border border-brand-border outline-none cursor-pointer">
+              <input type="date" id="channel-range-end" value="2026-05-31" min="2026-01-01" max="2026-12-31" class="bg-brand-bg rounded-xl px-3 py-1.5 text-sm font-bold border border-brand-border outline-none cursor-pointer">
             </div>
             <button onclick="applyDetailRange('channel')" class="shrink-0 px-5 py-1.5 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-brand-black/80 transition-all">조회</button>
             <button onclick="toggleRangePicker('channel')" class="ml-auto text-brand-gray hover:text-brand-black transition-all p-1 rounded-full hover:bg-brand-bg">
@@ -1129,19 +1137,19 @@ tailwind.config = {
         <div class="bg-white rounded-3xl panel overflow-hidden">
           <div class="px-6 py-4 border-b border-brand-border flex items-center justify-between">
             <div class="font-bold text-[15px]">판매처별 실적 상세</div>
-            <div id="channel-table-label" class="text-xs text-brand-gray font-medium">2025년 1~5월 누적</div>
+            <div id="channel-table-label" class="text-xs text-brand-gray font-medium">2026년 1~5월 누적</div>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
-                <tr class="bg-brand-bg text-brand-gray">
-                  <th class="text-left px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">판매처</th>
-                  <th class="text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">주문 건수</th>
-                  <th class="text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">총 매출</th>
-                  <th class="text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">수수료</th>
-                  <th class="text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">수수료율</th>
-                  <th class="text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">순이익</th>
-                  <th class="text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap">비중</th>
+                <tr class="bg-brand-bg text-brand-gray" id="channel-thead-row">
+                  <th class="sortable text-left px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('channel',0,'text')">판매처<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('channel',1,'num')">주문 건수<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('channel',2,'num')">총 매출<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('channel',3,'num')">수수료<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('channel',4,'num')">수수료율<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('channel',5,'num')">순이익<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('channel',6,'num')">비중<span class="sort-icon"></span></th>
                 </tr>
               </thead>
               <tbody id="channel-tbody"></tbody>
@@ -1151,13 +1159,72 @@ tailwind.config = {
       </div><!-- /ledger-panel-channel -->
 
       <!-- ── Panel: 장부 입력 ── -->
-      <div id="ledger-panel-entry" class="flex flex-col items-center justify-center gap-4 py-24 text-center" style="display:none;">
-        <div class="w-20 h-20 rounded-3xl bg-brand-bg flex items-center justify-center">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#C7C7CC" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      <div id="ledger-panel-entry" class="flex flex-col gap-6 py-4" style="display:none;">
+        <!-- 상단: 업로드 + 서식 다운로드 -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-1">
+          <div>
+            <div class="font-bold text-lg">장부 입력</div>
+            <div class="text-brand-gray text-sm mt-1">엑셀 파일을 업로드하여 매출 장부를 일괄 등록하세요.</div>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button onclick="downloadLedgerEntryTemplate()" class="px-4 py-2.5 rounded-full bg-white border border-brand-border text-sm font-semibold hover:bg-brand-bg flex items-center gap-2">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              서식 다운로드
+            </button>
+            <button onclick="openLedgerImportModal()" class="bg-brand-black text-white px-5 py-2.5 rounded-full text-sm font-bold hover:-translate-y-0.5 transition-transform shadow-md flex items-center gap-2">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 15 12 10 17 15"/><line x1="12" y1="10" x2="12" y2="22"/></svg>
+              엑셀 업로드
+            </button>
+          </div>
         </div>
-        <div class="font-bold text-lg">장부 입력</div>
-        <div class="text-brand-gray text-sm max-w-xs leading-relaxed">매출·매입·수수료·택배비를 날짜별로 직접 입력할 수 있습니다.</div>
-        <span class="text-xs font-bold text-brand-gray bg-brand-bg border border-brand-border px-4 py-2 rounded-full">준비 중</span>
+        <!-- 업로드된 데이터 요약 -->
+        <div id="ledger-entry-summary" class="hidden grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div class="bg-white p-4 rounded-2xl panel"><div class="text-brand-gray text-xs font-bold mb-1">총 수량</div><div id="entry-sum-count" class="text-xl font-bold">0개</div></div>
+          <div class="bg-white p-4 rounded-2xl panel"><div class="text-brand-gray text-xs font-bold mb-1">총 매출액</div><div id="entry-sum-sales" class="text-xl font-bold">0</div></div>
+          <div class="bg-white p-4 rounded-2xl panel"><div class="text-brand-gray text-xs font-bold mb-1">총 원가</div><div id="entry-sum-purchase" class="text-xl font-bold">0</div></div>
+          <div class="bg-white p-4 rounded-2xl panel"><div class="text-brand-gray text-xs font-bold mb-1">총 이익</div><div id="entry-sum-profit" class="text-xl font-bold text-brand-green">0</div></div>
+        </div>
+        <!-- 테이블 -->
+        <div id="ledger-entry-table-wrap" class="hidden bg-white rounded-3xl panel overflow-hidden">
+          <div class="px-6 py-4 border-b border-brand-border flex items-center justify-between">
+            <div class="font-bold text-[15px]">업로드된 장부 데이터</div>
+            <div class="flex items-center gap-2">
+              <span id="entry-row-count" class="text-xs text-brand-gray font-medium"></span>
+              <button onclick="clearLedgerEntries()" class="text-sm font-bold text-brand-pink hover:opacity-80">전체 삭제</button>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm whitespace-nowrap">
+              <thead>
+                <tr class="bg-brand-bg text-brand-gray" id="entry-thead-row">
+                  <th class="sortable text-left px-4 py-3 font-bold text-xs" onclick="sortLedgerTable('entry',0,'text')">거래처명<span class="sort-icon"></span></th>
+                  <th class="sortable text-left px-4 py-3 font-bold text-xs" onclick="sortLedgerTable('entry',1,'text')">사이트<span class="sort-icon"></span></th>
+                  <th class="sortable text-left px-4 py-3 font-bold text-xs" onclick="sortLedgerTable('entry',2,'text')">날짜<span class="sort-icon"></span></th>
+                  <th class="text-left px-4 py-3 font-bold text-xs hidden">사이트코드</th>
+                  <th class="text-left px-4 py-3 font-bold text-xs hidden">거래처코드</th>
+                  <th class="text-left px-4 py-3 font-bold text-xs hidden">택배코드</th>
+                  <th class="sortable text-left px-4 py-3 font-bold text-xs" onclick="sortLedgerTable('entry',6,'text')">품목코드<span class="sort-icon"></span></th>
+                  <th class="sortable text-left px-4 py-3 font-bold text-xs" onclick="sortLedgerTable('entry',7,'text')">품목명<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3 font-bold text-xs" onclick="sortLedgerTable('entry',8,'num')">수량<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3 font-bold text-xs" onclick="sortLedgerTable('entry',9,'num')">단가(vat포함)<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3 font-bold text-xs" onclick="sortLedgerTable('entry',10,'num')">택배비<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3 font-bold text-xs" onclick="sortLedgerTable('entry',11,'num')">택배비용<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3 font-bold text-xs" onclick="sortLedgerTable('entry',12,'num')">원가<span class="sort-icon"></span></th>
+                  <th class="sortable text-left px-4 py-3 font-bold text-xs" onclick="sortLedgerTable('entry',13,'text')">수령자명<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3 font-bold text-xs" onclick="sortLedgerTable('entry',14,'num')">이익<span class="sort-icon"></span></th>
+                </tr>
+              </thead>
+              <tbody id="ledger-entry-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <!-- 빈 상태 -->
+        <div id="ledger-entry-empty" class="flex flex-col items-center justify-center gap-4 py-16 text-center">
+          <div class="w-20 h-20 rounded-3xl bg-brand-bg flex items-center justify-center">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#C7C7CC" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </div>
+          <div class="text-brand-gray text-sm">엑셀 파일을 업로드하면 장부 데이터가 여기에 표시됩니다.</div>
+        </div>
       </div><!-- /ledger-panel-entry -->
 
       <!-- ── Panel: 매출 분석 ── -->
@@ -1176,13 +1243,13 @@ tailwind.config = {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
               직접 선택
             </button>
-            <span id="analysis-period-label" class="text-brand-gray text-sm font-semibold ml-auto">2025년 1~5월 누적</span>
+            <span id="analysis-period-label" class="text-brand-gray text-sm font-semibold ml-auto">2026년 1~5월 누적</span>
           </div>
           <div id="analysis-range-picker" class="flex flex-wrap items-center gap-3 px-3 py-3 bg-white rounded-2xl border border-brand-border" style="display:none;">
             <div class="flex items-center gap-2 shrink-0">
-              <input type="date" id="analysis-range-start" value="2025-01-01" min="2025-01-01" max="2025-12-31" class="bg-brand-bg rounded-xl px-3 py-1.5 text-sm font-bold border border-brand-border outline-none cursor-pointer">
+              <input type="date" id="analysis-range-start" value="2026-01-01" min="2026-01-01" max="2026-12-31" class="bg-brand-bg rounded-xl px-3 py-1.5 text-sm font-bold border border-brand-border outline-none cursor-pointer">
               <span class="text-brand-gray font-bold">~</span>
-              <input type="date" id="analysis-range-end" value="2025-05-31" min="2025-01-01" max="2025-12-31" class="bg-brand-bg rounded-xl px-3 py-1.5 text-sm font-bold border border-brand-border outline-none cursor-pointer">
+              <input type="date" id="analysis-range-end" value="2026-05-31" min="2026-01-01" max="2026-12-31" class="bg-brand-bg rounded-xl px-3 py-1.5 text-sm font-bold border border-brand-border outline-none cursor-pointer">
             </div>
             <button onclick="applyDetailRange('analysis')" class="shrink-0 px-5 py-1.5 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-brand-black/80 transition-all">조회</button>
             <button onclick="toggleRangePicker('analysis')" class="ml-auto text-brand-gray hover:text-brand-black transition-all p-1 rounded-full hover:bg-brand-bg">
@@ -1216,8 +1283,15 @@ tailwind.config = {
 <div id="page-products" class="page">
   <header class="w-full px-4 md:px-6 pt-5 pb-3 z-50 shrink-0">
     <nav class="glass-nav rounded-full px-4 md:px-6 py-3.5 flex justify-between items-center max-w-[1600px] mx-auto w-full">
-      <div class="flex items-center gap-3"><button class="hamburger p-2 rounded-lg hover:bg-brand-bg" onclick="toggleSidebar()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><div class="flex items-center gap-2 font-black text-[1.15rem] tracking-tight cursor-pointer" onclick="navigate('dashboard')"><div class="w-3 h-3 bg-brand-black rounded-[3px]"></div>GPALNv></div>
-      <div class="flex items-center gap-4 md:gap-6"><div class="flex items-center gap-3 cursor-pointer hover:opacity-80"><div class="w-9 h-9 rounded-full bg-brand-blue-light flex items-center justify-center text-brand-blue font-bold text-sm">M</div><span class="font-semibold text-sm hidden md:block">마스터 계정</span></div><button class="text-brand-gray hover:text-brand-black flex items-center gap-1.5 text-sm font-semibold" onclick="logout()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg><span class="hidden md:block">로그아웃</span></button></div>
+      <div class="flex items-center gap-3">
+        <button class="hamburger p-2 rounded-lg hover:bg-brand-bg transition-colors" onclick="toggleSidebar()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+        <div class="flex items-center gap-2 font-black text-[1.15rem] tracking-tight cursor-pointer" onclick="navigate('dashboard')"><div class="w-3 h-3 bg-brand-black rounded-[3px]"></div>GPLAN</div>
+      </div>
+      <div class="flex items-center gap-4 md:gap-6">
+        <div class="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"><div class="w-9 h-9 rounded-full bg-brand-blue-light flex items-center justify-center text-brand-blue font-bold text-sm">M</div><span class="font-semibold text-sm hidden md:block">마스터 계정</span></div>
+        <div class="h-5 w-px bg-brand-border hidden md:block"></div>
+        <button class="text-brand-gray hover:text-brand-black flex items-center gap-1.5 text-sm font-semibold transition-colors" onclick="logout()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg><span class="hidden md:block">로그아웃</span></button>
+      </div>
     </nav>
   </header>
   <div class="flex-1 flex gap-6 layout-gap px-4 md:px-6 pb-6 max-w-[1600px] mx-auto w-full overflow-hidden mt-2">
@@ -1259,11 +1333,10 @@ tailwind.config = {
         </div>
       </section>
       <!-- Stats -->
-      <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      <section class="grid grid-cols-3 gap-3 md:gap-4 p-1">
         <div id="stat-card-all" onclick="setStatFilter('all')" class="stat-card bg-white p-4 md:p-5 rounded-3xl panel flex items-center gap-3 md:gap-4 cursor-pointer hover:-translate-y-0.5 transition-all select-none ring-2 ring-brand-black"><div class="w-10 md:w-12 h-10 md:h-12 rounded-[14px] bg-brand-border flex items-center justify-center shrink-0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" stroke-width="2"><path d="M5 8h14M5 8a2 2 0 0 1 0-4h14a2 2 0 0 1 0 4M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/></svg></div><div><div class="text-brand-gray text-xs font-medium">전체 상품수</div><div id="stat-total" class="text-lg md:text-xl font-bold">3개</div></div></div>
         <div id="stat-card-low" onclick="setStatFilter('low')" class="stat-card bg-white p-4 md:p-5 rounded-3xl panel flex items-center gap-3 md:gap-4 cursor-pointer hover:-translate-y-0.5 transition-all select-none"><div class="w-10 md:w-12 h-10 md:h-12 rounded-[14px] bg-brand-pink-light flex items-center justify-center shrink-0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E91E63" stroke-width="2"><path d="M12 9v4M12 17h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg></div><div><div class="text-brand-pink text-xs font-bold">품절 임박</div><div id="stat-low" class="text-lg md:text-xl font-bold">1개</div></div></div>
         <div id="stat-card-auto" onclick="setStatFilter('auto')" class="stat-card bg-white p-4 md:p-5 rounded-3xl panel flex items-center gap-3 md:gap-4 cursor-pointer hover:-translate-y-0.5 transition-all select-none"><div class="w-10 md:w-12 h-10 md:h-12 rounded-[14px] bg-brand-blue-light flex items-center justify-center shrink-0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2196F3" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div><div class="text-brand-gray text-xs font-medium">자동 발주 활성</div><div id="stat-auto" class="text-lg md:text-xl font-bold">2개</div></div></div>
-        <div class="bg-white p-4 md:p-5 rounded-3xl panel flex items-center gap-3 md:gap-4"><div class="w-10 md:w-12 h-10 md:h-12 rounded-[14px] bg-brand-orange-light flex items-center justify-center shrink-0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF9800" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div><div><div class="text-brand-gray text-xs font-medium">입고 예정</div><div class="text-lg md:text-xl font-bold">3건</div></div></div>
       </section>
       <!-- Alert banner -->
       <div class="bg-brand-orange-light border border-brand-orange/20 rounded-2xl p-4 flex items-start gap-3">
@@ -1281,8 +1354,16 @@ tailwind.config = {
             <option>카테고리 전체</option><option>지플랜</option><option>서울리빙</option><option>서울리빙 그 외</option><option>서울리빙 의류</option><option>디지털</option><option>올바른</option>
           </select>
         </div>
+        <!-- 전체 선택 / 선택 삭제 -->
+        <div class="flex items-center justify-between px-4 md:px-6 py-3 border-b border-brand-border">
+          <div class="flex items-center gap-3 md:gap-4">
+            <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="product-select-all" class="w-4 h-4 rounded" onchange="toggleSelectAllProducts()"><span id="product-select-all-label" class="text-sm font-bold text-brand-gray">전체 선택 (0개)</span></label>
+            <button onclick="deleteSelectedProducts()" class="text-sm font-bold text-brand-pink hover:opacity-80 flex items-center gap-1">선택 삭제</button>
+          </div>
+        </div>
         <!-- 헤더 -->
-        <div class="grid border-b border-brand-border bg-white px-4 md:px-6 py-3 select-none" style="grid-template-columns: 1fr 100px 100px 100px 80px 40px;">
+        <div class="grid border-b border-brand-border bg-white px-4 md:px-6 py-3 select-none" style="grid-template-columns: 36px 1fr 100px 100px 100px 80px 40px;">
+          <div></div>
           <div class="text-xs font-bold text-brand-gray uppercase tracking-wider cursor-pointer hover:text-brand-black transition-colors flex items-center gap-1" onclick="sortProducts('name')">상품 정보<span id="sort-icon-name" class="text-[10px]"></span></div>
           <div class="text-xs font-bold text-brand-gray uppercase tracking-wider text-right cursor-pointer hover:text-brand-black transition-colors flex items-center justify-end gap-1" onclick="sortProducts('stock')">현재 재고<span id="sort-icon-stock" class="text-[10px]"></span></div>
           <div class="text-xs font-bold text-brand-gray uppercase tracking-wider text-right cursor-pointer hover:text-brand-black transition-colors flex items-center justify-end gap-1" onclick="sortProducts('safety')">안전 재고<span id="sort-icon-safety" class="text-[10px]"></span></div>
@@ -1310,8 +1391,15 @@ tailwind.config = {
 <div id="page-accounts" class="page">
   <header class="w-full px-4 md:px-6 pt-5 pb-3 z-50 shrink-0">
     <nav class="glass-nav rounded-full px-4 md:px-6 py-3.5 flex justify-between items-center max-w-[1600px] mx-auto w-full">
-      <div class="flex items-center gap-3"><button class="hamburger p-2 rounded-lg hover:bg-brand-bg" onclick="toggleSidebar()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><div class="flex items-center gap-2 font-black text-[1.15rem] tracking-tight cursor-pointer" onclick="navigate('dashboard')"><div class="w-3 h-3 bg-brand-black rounded-[3px]"></div>GPLANv></div>
-      <div class="flex items-center gap-4 md:gap-6"><div class="flex items-center gap-3 cursor-pointer hover:opacity-80"><div class="w-9 h-9 rounded-full bg-brand-blue-light flex items-center justify-center text-brand-blue font-bold text-sm">M</div><span class="font-semibold text-sm hidden md:block">마스터 계정</span></div><button class="text-brand-gray hover:text-brand-black flex items-center gap-1.5 text-sm font-semibold" onclick="logout()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg><span class="hidden md:block">로그아웃</span></button></div>
+      <div class="flex items-center gap-3">
+        <button class="hamburger p-2 rounded-lg hover:bg-brand-bg transition-colors" onclick="toggleSidebar()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+        <div class="flex items-center gap-2 font-black text-[1.15rem] tracking-tight cursor-pointer" onclick="navigate('dashboard')"><div class="w-3 h-3 bg-brand-black rounded-[3px]"></div>GPLAN</div>
+      </div>
+      <div class="flex items-center gap-4 md:gap-6">
+        <div class="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"><div class="w-9 h-9 rounded-full bg-brand-blue-light flex items-center justify-center text-brand-blue font-bold text-sm">M</div><span class="font-semibold text-sm hidden md:block">마스터 계정</span></div>
+        <div class="h-5 w-px bg-brand-border hidden md:block"></div>
+        <button class="text-brand-gray hover:text-brand-black flex items-center gap-1.5 text-sm font-semibold transition-colors" onclick="logout()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg><span class="hidden md:block">로그아웃</span></button>
+      </div>
     </nav>
   </header>
   <div class="flex-1 flex gap-6 layout-gap px-4 md:px-6 pb-6 max-w-[1600px] mx-auto w-full overflow-hidden mt-2">
@@ -1338,10 +1426,20 @@ tailwind.config = {
           <h1 class="text-[1.8rem] md:text-[2.25rem] font-bold tracking-tight mb-2">계정 보관함 🔐</h1>
           <p class="text-brand-gray text-base md:text-[1.1rem]">사이트별 아이디와 비밀번호를 안전하게 저장하고 관리하세요.</p>
         </div>
-        <button onclick="openAddAccountDrawer()" class="bg-brand-black text-white px-5 md:px-6 py-3 md:py-3.5 rounded-full text-sm font-bold hover:-translate-y-0.5 transition-all shadow-btn flex items-center gap-2 whitespace-nowrap">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
-          계정 추가
-        </button>
+        <div class="flex flex-wrap gap-2 md:gap-3">
+          <button onclick="openAccountImportModal()" class="px-4 py-2.5 rounded-full bg-white border border-brand-border text-sm font-semibold hover:bg-brand-bg flex items-center gap-2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 15 12 10 17 15"/><line x1="12" y1="10" x2="12" y2="22"/></svg>
+            엑셀 가져오기
+          </button>
+          <button onclick="exportAccountsExcel()" class="px-4 py-2.5 rounded-full bg-white border border-brand-border text-sm font-semibold hover:bg-brand-bg flex items-center gap-2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            엑셀 내보내기
+          </button>
+          <button onclick="openAddAccountDrawer()" class="bg-brand-black text-white px-5 md:px-6 py-3 md:py-3.5 rounded-full text-sm font-bold hover:-translate-y-0.5 transition-all shadow-btn flex items-center gap-2 whitespace-nowrap">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+            계정 추가
+          </button>
+        </div>
       </section>
 
       <div class="bg-white p-5 md:p-8 rounded-4xl panel flex flex-col gap-5 md:gap-6">
@@ -1364,8 +1462,8 @@ tailwind.config = {
         <!-- Security notice -->
         <div class="flex items-start justify-between px-1 md:px-2">
           <div class="flex items-center gap-3 md:gap-4 flex-wrap">
-            <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="w-4 h-4 rounded"><span class="text-sm font-bold text-brand-gray">전체 선택 (12개)</span></label>
-            <button class="text-sm font-bold text-brand-pink hover:opacity-80 flex items-center gap-1">선택 삭제</button>
+            <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="account-select-all" class="w-4 h-4 rounded" onchange="toggleSelectAllAccounts()"><span id="account-select-all-label" class="text-sm font-bold text-brand-gray">전체 선택 (0개)</span></label>
+            <button onclick="deleteSelectedAccounts()" class="text-sm font-bold text-brand-pink hover:opacity-80 flex items-center gap-1">선택 삭제</button>
           </div>
           <div class="tooltip-wrap">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2" class="cursor-help"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
@@ -1424,7 +1522,7 @@ tailwind.config = {
           <p class="font-bold text-brand-gray">검색 결과가 없습니다</p>
           <p id="account-no-result-msg" class="text-sm text-brand-gray"></p>
         </div>
-        <div class="flex justify-center pt-2"><div class="flex items-center gap-1"><button class="w-8 h-8 rounded-lg flex items-center justify-center text-brand-gray hover:bg-brand-bg">1</button><button class="w-8 h-8 rounded-lg flex items-center justify-center bg-brand-black text-white font-bold">2</button><button class="w-8 h-8 rounded-lg flex items-center justify-center text-brand-gray hover:bg-brand-bg">3</button><button class="w-8 h-8 rounded-lg flex items-center justify-center text-brand-gray hover:bg-brand-bg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></button></div></div>
+        <div id="account-pagination" class="p-4 border-t border-brand-border flex justify-center gap-2"></div>
       </div>
     </main>
   </div>
@@ -1616,6 +1714,121 @@ tailwind.config = {
   </div>
 </div>
 
+<!-- Ledger Entry Import Modal -->
+<div id="ledger-import-modal-backdrop" class="import-modal-backdrop" onclick="if(event.target===event.currentTarget)closeLedgerImportModal()">
+  <div class="import-modal">
+    <div class="flex items-center justify-between p-6 pb-5 border-b border-brand-border shrink-0">
+      <div>
+        <h2 class="text-xl font-bold">장부 엑셀 업로드 📥</h2>
+        <p class="text-brand-gray text-sm mt-0.5">엑셀 파일을 업로드하여 장부를 등록하세요.</p>
+      </div>
+      <button onclick="closeLedgerImportModal()" class="w-10 h-10 rounded-full bg-brand-bg hover:bg-brand-border flex items-center justify-center transition-colors shrink-0">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
+      <div id="ledger-import-step-upload">
+        <p class="text-sm text-brand-gray mb-4">서식 파일을 다운로드하여 데이터를 입력한 뒤 업로드하세요.</p>
+        <div id="ledger-drop-zone" class="drop-zone">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#C7C7CC" stroke-width="1.5" class="mx-auto mb-3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          <p class="font-bold text-[15px] text-brand-black">파일을 여기에 드래그하거나 클릭하여 선택</p>
+          <p class="text-brand-gray text-sm mt-1">.xlsx, .xls 파일만 지원합니다</p>
+        </div>
+        <input type="file" id="ledger-excel-file-input" accept=".xlsx,.xls" class="hidden">
+        <div id="ledger-import-upload-error" class="hidden mt-4 bg-brand-pink-light/60 border border-brand-pink-light rounded-xl p-3.5 flex items-start gap-2.5 text-brand-pink">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="mt-0.5 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span id="ledger-import-upload-error-msg" class="text-sm font-semibold"></span>
+        </div>
+      </div>
+      <div id="ledger-import-step-preview" class="hidden flex flex-col gap-4">
+        <div class="flex items-center gap-3 p-3.5 bg-brand-bg rounded-2xl">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00C853" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <span id="ledger-import-filename" class="font-bold text-sm flex-1 truncate"></span>
+          <span id="ledger-import-rowcount" class="text-brand-gray text-sm shrink-0 font-medium"></span>
+        </div>
+        <div class="text-sm text-brand-gray">미리보기에서 데이터를 확인한 후 등록 버튼을 눌러주세요.</div>
+      </div>
+    </div>
+    <div class="p-6 pt-4 border-t border-brand-border flex gap-3 shrink-0">
+      <button onclick="closeLedgerImportModal()" class="flex-1 py-3.5 rounded-full border border-brand-border font-semibold text-sm hover:bg-brand-bg transition-colors">취소</button>
+      <button id="ledger-import-confirm-btn" onclick="confirmLedgerImport()" class="hidden flex-1 py-3.5 rounded-full bg-brand-black text-white font-bold text-sm hover:bg-[#333] hover:-translate-y-0.5 transition-all shadow-md">장부 등록하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- Account Import Modal -->
+<div id="account-import-modal-backdrop" class="import-modal-backdrop" onclick="handleAccountImportBackdropClick(event)">
+  <div class="import-modal">
+    <div class="flex items-center justify-between p-6 pb-5 border-b border-brand-border shrink-0">
+      <div>
+        <h2 class="text-xl font-bold">계정 엑셀 가져오기 📥</h2>
+        <p class="text-brand-gray text-sm mt-0.5">엑셀 파일을 업로드하여 계정을 일괄 등록하세요.</p>
+      </div>
+      <button onclick="closeAccountImportModal()" class="w-10 h-10 rounded-full bg-brand-bg hover:bg-brand-border flex items-center justify-center transition-colors shrink-0">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
+      <div id="account-import-step-upload">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <p class="text-sm text-brand-gray">아래 형식에 맞는 엑셀 파일을 업로드하세요. * 표시는 필수 항목입니다.</p>
+          <button onclick="downloadAccountImportTemplate()" class="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full border border-brand-border text-sm font-semibold hover:bg-brand-bg transition-colors whitespace-nowrap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            서식 파일 다운로드
+          </button>
+        </div>
+        <div class="bg-brand-bg rounded-2xl p-4 mb-5">
+          <p class="font-bold text-sm mb-2.5">필수 열 형식</p>
+          <div class="flex flex-wrap gap-2 text-xs">
+            <span class="px-2.5 py-1.5 bg-white rounded-lg border border-brand-border font-mono font-bold">사이트명 *</span>
+            <span class="px-2.5 py-1.5 bg-white rounded-lg border border-brand-border font-mono font-bold">아이디 *</span>
+            <span class="px-2.5 py-1.5 bg-white rounded-lg border border-brand-border font-mono text-brand-gray">사이트 URL</span>
+            <span class="px-2.5 py-1.5 bg-white rounded-lg border border-brand-border font-mono font-bold">비밀번호 *</span>
+            <span class="px-2.5 py-1.5 bg-white rounded-lg border border-brand-border font-mono text-brand-gray">카테고리</span>
+            <span class="px-2.5 py-1.5 bg-white rounded-lg border border-brand-border font-mono text-brand-gray">메모</span>
+          </div>
+        </div>
+        <div id="account-drop-zone" class="drop-zone">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#C7C7CC" stroke-width="1.5" class="mx-auto mb-3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          <p class="font-bold text-[15px] text-brand-black">파일을 여기에 드래그하거나 클릭하여 선택</p>
+          <p class="text-brand-gray text-sm mt-1">.xlsx, .xls 파일만 지원합니다</p>
+        </div>
+        <input type="file" id="account-excel-file-input" accept=".xlsx,.xls" class="hidden">
+        <div id="account-import-upload-error" class="hidden mt-4 bg-brand-pink-light/60 border border-brand-pink-light rounded-xl p-3.5 flex items-start gap-2.5 text-brand-pink">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="mt-0.5 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span id="account-import-upload-error-msg" class="text-sm font-semibold"></span>
+        </div>
+      </div>
+      <div id="account-import-step-preview" class="hidden flex flex-col gap-4">
+        <div class="flex items-center gap-3 p-3.5 bg-brand-bg rounded-2xl">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00C853" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <span id="account-import-filename" class="font-bold text-sm flex-1 truncate"></span>
+          <span id="account-import-rowcount" class="text-brand-gray text-sm shrink-0 font-medium"></span>
+          <button onclick="resetAccountImport()" class="text-sm text-brand-gray hover:text-brand-black font-semibold transition-colors shrink-0">파일 변경</button>
+        </div>
+        <div class="overflow-x-auto rounded-2xl border border-brand-border">
+          <table class="w-full text-sm text-left">
+            <thead>
+              <tr class="bg-brand-bg">
+                <th class="px-4 py-3 font-bold text-xs text-brand-gray uppercase">사이트명</th>
+                <th class="px-4 py-3 font-bold text-xs text-brand-gray uppercase">아이디</th>
+                <th class="px-4 py-3 font-bold text-xs text-brand-gray uppercase">사이트 URL</th>
+                <th class="px-4 py-3 font-bold text-xs text-brand-gray uppercase">카테고리</th>
+                <th class="px-4 py-3 font-bold text-xs text-brand-gray uppercase">메모</th>
+              </tr>
+            </thead>
+            <tbody id="account-import-preview-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="p-6 pt-4 border-t border-brand-border flex gap-3 shrink-0">
+      <button onclick="closeAccountImportModal()" class="flex-1 py-3.5 rounded-full border border-brand-border font-semibold text-sm hover:bg-brand-bg transition-colors">취소</button>
+      <button id="account-import-confirm-btn" onclick="confirmAccountImport()" class="hidden flex-1 py-3.5 rounded-full bg-brand-black text-white font-bold text-sm hover:bg-[#333] hover:-translate-y-0.5 transition-all shadow-md">계정 등록하기</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add Account Drawer -->
 <div id="add-account-backdrop" class="product-drawer-backdrop" onclick="closeAddAccountDrawer()"></div>
 <div id="add-account-drawer" class="product-drawer">
@@ -1652,6 +1865,11 @@ tailwind.config = {
       <div class="flex flex-col gap-2">
         <label class="text-sm font-bold">아이디 <span class="text-brand-pink">*</span></label>
         <input id="new-account-id" type="text" placeholder="예) shop_admin_01" class="drawer-input">
+      </div>
+      <!-- 사이트 URL -->
+      <div class="flex flex-col gap-2">
+        <label class="text-sm font-bold">사이트 URL <span class="text-brand-gray font-normal">(선택)</span></label>
+        <input id="new-account-url" type="url" placeholder="예) https://sell.smartstore.naver.com" class="drawer-input">
       </div>
       <!-- 비밀번호 -->
       <div class="flex flex-col gap-2">
@@ -1780,9 +1998,10 @@ function navigate(page) {
   }
   updateNavItems(page);
   closeSidebar();
-  if (page === 'dashboard') animateBars();
-  if (page === 'ledger') animateDonut();
+  if (page === 'dashboard') { syncDashboardRevenue(); animateBars(); }
+  if (page === 'ledger') { syncDashboardRevenue(); animateDonut(); }
   if (page === 'products') loadProductsFromDB();
+  if (page === 'accounts') filterAccounts();
 }
 
 function updateNavItems(activePage) {
@@ -1902,6 +2121,64 @@ document.getElementById('pw-toggle').addEventListener('click', function() {
 });
 
 // ── Bar chart animation ──────────────────────
+function syncDashboardRevenue() {
+  const data = _buildMonthlyDataFromEntries() || PERIOD_MONTHLY_DATA;
+  if (!data || data.length === 0) return;
+
+  const current = data[data.length - 1];
+  const prev    = data.length >= 2 ? data[data.length - 2] : null;
+
+  const fmt = n => n.toLocaleString('ko-KR');
+  const rate = prev && prev.sales > 0
+    ? (((current.sales - prev.sales) / prev.sales) * 100).toFixed(1)
+    : 0;
+  const isUp = rate >= 0;
+
+  // 대시보드 카드
+  const dashRevEl   = document.getElementById('dashboard-month-revenue');
+  const dashRateEl  = document.getElementById('dashboard-month-revenue-rate');
+  if (dashRevEl) dashRevEl.textContent = fmt(current.sales);
+  if (dashRateEl) {
+    const arrow = isUp
+      ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m18 15-6-6-6 6"/></svg>'
+      : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m6 9 6 6 6-6"/></svg>';
+    dashRateEl.innerHTML = arrow + Math.abs(rate) + '%';
+  }
+
+  // 매출장부 매출 카드
+  const ledgerRevEl   = document.getElementById('ledger-month-revenue');
+  const ledgerRateEl  = document.getElementById('ledger-month-rate');
+  const ledgerLabelEl = document.getElementById('ledger-month-label');
+  if (ledgerRevEl)   ledgerRevEl.textContent   = fmt(current.sales);
+  if (ledgerRateEl)  ledgerRateEl.textContent  = '전월 대비 ' + (isUp ? '+' : '') + rate + '%';
+  if (ledgerLabelEl) ledgerLabelEl.textContent = '2026년 ' + current.label;
+
+  // ── 순이익 동기화 ──
+  const curProfit  = current.sales - current.purchase - current.fee - current.delivery;
+  const profitRate = current.sales > 0 ? Math.round((curProfit / current.sales) * 100) : 0;
+
+  let prevProfit = 0, profitChange = 0;
+  if (prev) {
+    prevProfit = prev.sales - prev.purchase - prev.fee - prev.delivery;
+    profitChange = prevProfit > 0 ? (((curProfit - prevProfit) / prevProfit) * 100).toFixed(1) : 0;
+  }
+  const profitUp = profitChange >= 0;
+
+  // 대시보드 순이익 카드
+  const dashProfitEl     = document.getElementById('dashboard-month-profit');
+  const dashProfitRateEl = document.getElementById('dashboard-month-profit-rate');
+  if (dashProfitEl) dashProfitEl.textContent = fmt(curProfit);
+  if (dashProfitRateEl) dashProfitRateEl.textContent = '수익률 ' + profitRate + '%';
+
+  // 매출장부 순이익 카드
+  const ledgerProfitEl      = document.getElementById('ledger-month-profit');
+  const ledgerProfitRateEl  = document.getElementById('ledger-profit-rate-label');
+  const ledgerProfitBadgeEl = document.getElementById('ledger-profit-badge');
+  if (ledgerProfitEl)     ledgerProfitEl.textContent     = fmt(curProfit);
+  if (ledgerProfitRateEl) ledgerProfitRateEl.textContent = '수익률 ' + profitRate + '%';
+  if (ledgerProfitBadgeEl) ledgerProfitBadgeEl.textContent = '전월 대비 ' + (profitUp ? '+' : '') + profitChange + '%';
+}
+
 function animateBars() {
   const pills = document.querySelectorAll('#bar-chart .pill');
   pills.forEach((pill, i) => {
@@ -1913,6 +2190,50 @@ function animateBars() {
 
 // ── Donut animation ──────────────────────────
 function animateDonut() {
+  // 장부 입력 데이터로 도넛 차트 업데이트
+  const monthly = _buildMonthlyDataFromEntries();
+  if (monthly && monthly.length > 0) {
+    const totalSales    = monthly.reduce((s,d) => s + d.sales, 0);
+    const totalPurchase = monthly.reduce((s,d) => s + d.purchase, 0);
+    const totalFee      = monthly.reduce((s,d) => s + d.fee, 0);
+    const totalDelivery = monthly.reduce((s,d) => s + d.delivery, 0);
+    const totalExpense  = totalPurchase + totalFee + totalDelivery;
+
+    const pctPurchase = totalExpense > 0 ? Math.round(totalPurchase / totalExpense * 100) : 0;
+    const pctFee      = totalExpense > 0 ? Math.round(totalFee / totalExpense * 100) : 0;
+    const pctDelivery = totalExpense > 0 ? Math.round(totalDelivery / totalExpense * 100) : 0;
+    const pctOther    = Math.max(0, 100 - pctPurchase - pctFee - pctDelivery);
+
+    const segments = document.querySelectorAll('.donut-segment');
+    if (segments.length >= 4) {
+      const circ = 100;
+      segments[0].dataset.dash = pctPurchase + ' ' + circ;
+      segments[1].dataset.dash = pctFee + ' ' + circ;
+      segments[1].setAttribute('stroke-dashoffset', -pctPurchase);
+      segments[2].dataset.dash = pctDelivery + ' ' + circ;
+      segments[2].setAttribute('stroke-dashoffset', -(pctPurchase + pctFee));
+      segments[3].dataset.dash = pctOther + ' ' + circ;
+      segments[3].setAttribute('stroke-dashoffset', -(pctPurchase + pctFee + pctDelivery));
+    }
+
+    const fmtW = n => Math.round(n / 1000).toLocaleString('ko-KR');
+    const center = document.querySelector('.donut-segment')?.closest('.relative')?.querySelector('.absolute');
+    if (center) center.innerHTML = `<span class="text-brand-gray text-xs font-semibold">총 지출</span><span class="text-base md:text-lg font-bold">${fmtW(totalExpense)}</span>`;
+
+    const items = document.querySelectorAll('#ledger-panel-monthly .grid.grid-cols-1.gap-3 > div');
+    if (items.length >= 4) {
+      const labels = ['상품 매입가','수수료','물류 및 배송','기타'];
+      const pcts = [pctPurchase, pctFee, pctDelivery, pctOther];
+      const vals = [totalPurchase, totalFee, totalDelivery, totalExpense - totalPurchase - totalFee - totalDelivery];
+      items.forEach((item, i) => {
+        const pctEl = item.querySelector('.font-bold.text-base, .font-bold.md\\:text-lg');
+        const valEl = item.querySelector('.text-brand-gray.text-xs, .text-brand-gray.md\\:text-sm');
+        if (pctEl) pctEl.textContent = pcts[i] + '%';
+        if (valEl) valEl.textContent = vals[i].toLocaleString('ko-KR');
+      });
+    }
+  }
+
   setTimeout(() => {
     document.querySelectorAll('.donut-segment').forEach(seg => {
       seg.style.strokeDasharray = seg.dataset.dash;
@@ -2273,7 +2594,7 @@ async function loadProductsFromDB() {
     if (!session) return;
     const user = session.user;
 
-    let { data, error } = await _supabase.from('products').select('*').eq('user_id', user.id).order('created_at');
+    let { data, error } = await _supabase.from('products').select('*').order('created_at');
     if (error) console.error('products load error:', error);
 
     if (!data || data.length === 0) {
@@ -2283,7 +2604,7 @@ async function loadProductsFromDB() {
         { user_id: user.id, name: '어반 레더 벨트 다크 브라운', sku: 'BT-LTH-DB-01', category: '지플랜', stock: 88, safety_stock: 20, auto_order: false },
       ];
       await _supabase.from('products').insert(defaults);
-      const res = await _supabase.from('products').select('*').eq('user_id', user.id).order('created_at');
+      const res = await _supabase.from('products').select('*').order('created_at');
       data = res.data || [];
     }
 
@@ -2388,7 +2709,8 @@ function renderProductsPage() {
       ? '<span class="px-2.5 md:px-3 py-1 rounded-full text-xs font-bold bg-brand-pink-light text-brand-pink">부족</span>'
       : '<span class="px-2.5 md:px-3 py-1 rounded-full text-xs font-bold bg-brand-blue-light text-brand-blue">정상</span>';
     var stockClass = isLow ? 'input-stock warn' : 'input-stock';
-    return '<div class="grid items-center px-4 md:px-6 py-4 md:py-5 border-b border-[#F9F9FB] hover:bg-brand-bg transition-colors" data-db-id="' + p.id + '" style="grid-template-columns: 1fr 100px 100px 100px 80px 40px;">' +
+    return '<div class="grid items-center px-4 md:px-6 py-4 md:py-5 border-b border-[#F9F9FB] hover:bg-brand-bg transition-colors" data-db-id="' + p.id + '" style="grid-template-columns: 36px 1fr 100px 100px 100px 80px 40px;">' +
+      '<div class="flex items-center"><input type="checkbox" class="product-row-cb w-4 h-4 rounded border-brand-border" data-product-id="' + p.id + '" onchange="updateProductSelectLabel()"></div>' +
       '<div class="flex items-center gap-3 md:gap-4">' +
         '<div class="w-12 md:w-14 h-12 md:h-14 rounded-xl ' + bg + ' ' + fg + ' flex items-center justify-center font-bold shrink-0">' + escHtml(initials) + '</div>' +
         '<div><div class="font-bold text-sm mb-0.5">' + escHtml(p.name) + '</div>' +
@@ -2413,6 +2735,35 @@ function renderProductsPage() {
   }).join('');
 
   renderProductPagination(totalPages);
+  updateProductSelectLabel();
+}
+
+function updateProductSelectLabel() {
+  const cbs = document.querySelectorAll('#product-list-body .product-row-cb');
+  const total = cbs.length;
+  const checked = [...cbs].filter(cb => cb.checked).length;
+  const label = document.getElementById('product-select-all-label');
+  const selectAll = document.getElementById('product-select-all');
+  if (label) label.textContent = '전체 선택 (' + total + '개)';
+  if (selectAll) selectAll.checked = total > 0 && checked === total;
+}
+
+function toggleSelectAllProducts() {
+  const selectAll = document.getElementById('product-select-all');
+  document.querySelectorAll('#product-list-body .product-row-cb').forEach(cb => {
+    cb.checked = selectAll.checked;
+  });
+}
+
+async function deleteSelectedProducts() {
+  const checked = [...document.querySelectorAll('#product-list-body .product-row-cb:checked')];
+  if (checked.length === 0) return;
+  if (!confirm('선택한 ' + checked.length + '개 상품을 삭제하시겠습니까?')) return;
+  const ids = checked.map(cb => Number(cb.dataset.productId));
+  for (const id of ids) {
+    await _supabase.from('products').delete().eq('id', id);
+  }
+  await loadProductsFromDB();
 }
 
 function updateProductStats() {
@@ -2672,11 +3023,14 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
-// ── Account Category Filter ──────────────────
+// ── Account Category Filter & Pagination ─────
 let activeAccountCat = '전체';
+let _accountPage = 1;
+const _accountsPerPage = 10;
 
 function setAccountFilter(cat) {
   activeAccountCat = cat;
+  _accountPage = 1;
   document.querySelectorAll('.account-cat-btn').forEach(btn => {
     if (btn.dataset.cat === cat) {
       btn.classList.add('bg-brand-black', 'text-white');
@@ -2692,9 +3046,11 @@ function setAccountFilter(cat) {
 function filterAccounts() {
   const query  = (document.getElementById('account-search')?.value || '').trim().toLowerCase();
   const catAll = activeAccountCat === '전체';
-  let visible  = 0;
 
-  document.querySelectorAll('#account-list > div').forEach(item => {
+  const allItems = [...document.querySelectorAll('#account-list > div')];
+
+  // 필터링
+  const matched = allItems.filter(item => {
     const nameEl  = item.querySelector('.font-bold');
     const idEl    = item.querySelector('.text-brand-gray.text-sm');
     const badge   = item.querySelector('.rounded-md.bg-brand-border');
@@ -2704,18 +3060,23 @@ function filterAccounts() {
 
     const matchQuery = !query || name.includes(query) || id.includes(query);
     const matchCat   = catAll || itemCat === activeAccountCat;
-
-    if (matchQuery && matchCat) {
-      item.style.display = '';
-      visible++;
-    } else {
-      item.style.display = 'none';
-    }
+    return matchQuery && matchCat;
   });
 
+  // 페이지네이션 계산
+  const totalPages = Math.max(1, Math.ceil(matched.length / _accountsPerPage));
+  if (_accountPage > totalPages) _accountPage = totalPages;
+  const startIdx = (_accountPage - 1) * _accountsPerPage;
+  const pageItems = matched.slice(startIdx, startIdx + _accountsPerPage);
+
+  // 표시/숨김
+  allItems.forEach(item => item.style.display = 'none');
+  pageItems.forEach(item => item.style.display = '');
+
+  // 검색 결과 없음
   const noResult = document.getElementById('account-no-result');
   const noMsg    = document.getElementById('account-no-result-msg');
-  if (visible === 0) {
+  if (matched.length === 0) {
     if (query && !catAll) noMsg.textContent = `"${query}" · ${activeAccountCat}`;
     else if (query)       noMsg.textContent = `"${query}"에 대한 계정을 찾을 수 없습니다.`;
     else                  noMsg.textContent = `${activeAccountCat} 카테고리에 등록된 계정이 없습니다.`;
@@ -2725,7 +3086,78 @@ function filterAccounts() {
     noResult.classList.add('hidden');
     noResult.style.display = '';
   }
+
+  renderAccountPagination(totalPages);
+  updateAccountSelectLabel();
 }
+
+function renderAccountPagination(totalPages) {
+  const container = document.getElementById('account-pagination');
+  if (!container) return;
+  if (totalPages <= 1) { container.innerHTML = ''; return; }
+
+  const prevDisabled = _accountPage <= 1;
+  const nextDisabled = _accountPage >= totalPages;
+
+  let html = `<button onclick="goAccountPage(${_accountPage - 1})" class="w-8 h-8 rounded-lg flex items-center justify-center ${prevDisabled ? 'opacity-30 cursor-default' : 'hover:bg-brand-border'}" ${prevDisabled ? 'disabled' : ''}>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>`;
+
+  for (let p = 1; p <= totalPages; p++) {
+    if (p === _accountPage) {
+      html += `<button class="w-8 h-8 rounded-lg flex items-center justify-center bg-brand-black text-white font-bold text-sm">${p}</button>`;
+    } else {
+      html += `<button onclick="goAccountPage(${p})" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-brand-border font-bold text-sm text-brand-gray">${p}</button>`;
+    }
+  }
+
+  html += `<button onclick="goAccountPage(${_accountPage + 1})" class="w-8 h-8 rounded-lg flex items-center justify-center ${nextDisabled ? 'opacity-30 cursor-default' : 'hover:bg-brand-border'}" ${nextDisabled ? 'disabled' : ''}>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></button>`;
+
+  container.innerHTML = html;
+}
+
+function goAccountPage(page) {
+  _accountPage = page;
+  filterAccounts();
+}
+
+// ── Account Select All / Delete Selected ─────
+function updateAccountSelectLabel() {
+  const items = document.querySelectorAll('#account-list > div');
+  const visibleItems = [...items].filter(i => i.style.display !== 'none');
+  const total = visibleItems.length;
+  const checked = visibleItems.filter(i => i.querySelector('input[type="checkbox"]')?.checked).length;
+  const label = document.getElementById('account-select-all-label');
+  const selectAll = document.getElementById('account-select-all');
+  if (label) label.textContent = `전체 선택 (${total}개)`;
+  if (selectAll) selectAll.checked = total > 0 && checked === total;
+}
+
+function toggleSelectAllAccounts() {
+  const selectAll = document.getElementById('account-select-all');
+  const items = document.querySelectorAll('#account-list > div');
+  items.forEach(item => {
+    if (item.style.display === 'none') return;
+    const cb = item.querySelector('input[type="checkbox"]');
+    if (cb) cb.checked = selectAll.checked;
+  });
+}
+
+function deleteSelectedAccounts() {
+  const items = document.querySelectorAll('#account-list > div');
+  const selected = [...items].filter(i => i.querySelector('input[type="checkbox"]')?.checked);
+  if (selected.length === 0) return;
+  if (!confirm(`선택한 ${selected.length}개 계정을 삭제하시겠습니까?`)) return;
+  selected.forEach(item => item.remove());
+  updateAccountSelectLabel();
+}
+
+// 각 행 체크박스 변경 시 전체 선택 상태 동기화
+document.addEventListener('change', function(e) {
+  if (e.target.type === 'checkbox' && e.target.closest('#account-list')) {
+    updateAccountSelectLabel();
+  }
+});
 
 // ── Add Account Drawer ───────────────────────
 let accountDrawerMode  = 'add';
@@ -2740,6 +3172,7 @@ function openAddAccountDrawer() {
   document.getElementById('new-account-site').value = '';
   document.getElementById('new-account-category').value = '쇼핑몰';
   document.getElementById('new-account-id').value = '';
+  document.getElementById('new-account-url').value = '';
   document.getElementById('new-account-pw').value = '';
   document.getElementById('new-account-pw').type = 'password';
   document.getElementById('new-account-memo').value = '';
@@ -2765,8 +3198,9 @@ function openEditAccountDrawer(btn) {
   const site = nameEl  ? nameEl.textContent.trim() : '';
   const cat  = badgeEl ? badgeEl.textContent.trim() : '쇼핑몰';
   const id   = idEl    ? idEl.textContent.replace('ID:', '').trim() : '';
+  const url  = nameEl?.dataset?.accountUrl || (nameEl?.tagName === 'A' ? nameEl.href : '') || '';
   const pw   = dotsEl  ? (dotsEl.dataset.pw || '') : '';
-  const memo = memoEls.length > 1 ? memoEls[1].textContent.trim() : '';
+  const memo = memoEls.length > 1 ? memoEls[memoEls.length - 1].textContent.trim() : '';
 
   document.getElementById('account-drawer-title').textContent  = '계정 수정 ✏️';
   document.getElementById('account-drawer-desc').textContent   = '계정 정보를 수정해주세요.';
@@ -2774,6 +3208,7 @@ function openEditAccountDrawer(btn) {
   document.getElementById('new-account-site').value     = site;
   document.getElementById('new-account-category').value = cat;
   document.getElementById('new-account-id').value       = id;
+  document.getElementById('new-account-url').value      = url;
   document.getElementById('new-account-pw').value       = pw;
   document.getElementById('new-account-pw').type        = 'password';
   document.getElementById('new-account-memo').value     = memo;
@@ -2799,6 +3234,7 @@ function submitAccountDrawer() {
   const site  = document.getElementById('new-account-site').value.trim();
   const cat   = document.getElementById('new-account-category').value;
   const id    = document.getElementById('new-account-id').value.trim();
+  const url   = document.getElementById('new-account-url').value.trim();
   const pw    = document.getElementById('new-account-pw').value;
   const memo  = document.getElementById('new-account-memo').value.trim();
   const errEl = document.getElementById('account-drawer-error');
@@ -2833,6 +3269,9 @@ function submitAccountDrawer() {
   ];
   const p = palettes[Math.floor(Math.random() * palettes.length)];
 
+  const siteNameHtml = url
+    ? `<a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer" class="font-bold text-[0.95rem] md:text-[1rem] hover:underline" data-account-url="${escHtml(url)}">${escHtml(site)}</a>`
+    : `<span class="font-bold text-[0.95rem] md:text-[1rem]">${escHtml(site)}</span>`;
   const memoHtml = memo
     ? `<div class="text-brand-gray text-xs mt-0.5">${escHtml(memo)}</div>` : '';
 
@@ -2845,7 +3284,7 @@ function submitAccountDrawer() {
     </div>
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2 mb-0.5 flex-wrap">
-        <span class="font-bold text-[0.95rem] md:text-[1rem]">${escHtml(site)}</span>
+        ${siteNameHtml}
         <span class="text-[11px] px-1.5 py-0.5 rounded-md bg-brand-border text-brand-gray font-bold">${escHtml(cat)}</span>
       </div>
       <div class="text-brand-gray text-sm">ID: ${escHtml(id)}</div>
@@ -2862,6 +3301,8 @@ function submitAccountDrawer() {
       <button onclick="openEditAccountDrawer(this)" class="px-3 py-2 text-xs font-bold text-brand-gray hover:text-brand-black hover:bg-white rounded-lg transition-all border border-transparent hover:border-brand-border hidden md:block">수정</button>
     </div>`;
 
+  item.querySelector('input[type="checkbox"]')?.addEventListener('change', updateAccountSelectLabel);
+
   if (accountDrawerMode === 'edit' && editingAccountItem) {
     // 기존 항목 업데이트
     const nameEl  = editingAccountItem.querySelector('.font-bold');
@@ -2870,21 +3311,52 @@ function submitAccountDrawer() {
     const dotsEl  = editingAccountItem.querySelector('.font-mono');
     const memoEls = editingAccountItem.querySelectorAll('.flex-1 .text-brand-gray');
 
-    if (nameEl)  nameEl.textContent  = site;
     if (badgeEl) badgeEl.textContent = cat;
     if (idEl)    idEl.textContent    = 'ID: ' + id;
+
+    // 사이트명 + URL 처리
+    if (nameEl) {
+      if (url) {
+        // span을 a로 교체하거나 기존 a를 업데이트
+        if (nameEl.tagName === 'A') {
+          nameEl.href = url;
+          nameEl.dataset.accountUrl = url;
+          nameEl.textContent = site;
+        } else {
+          const a = document.createElement('a');
+          a.href = url;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          a.className = 'font-bold text-[0.95rem] md:text-[1rem] hover:underline';
+          a.dataset.accountUrl = url;
+          a.textContent = site;
+          nameEl.replaceWith(a);
+        }
+      } else {
+        // a를 span으로 교체하거나 기존 span 업데이트
+        if (nameEl.tagName === 'A') {
+          const span = document.createElement('span');
+          span.className = 'font-bold text-[0.95rem] md:text-[1rem]';
+          span.textContent = site;
+          nameEl.replaceWith(span);
+        } else {
+          nameEl.textContent = site;
+        }
+      }
+    }
+
     if (dotsEl) {
       dotsEl.dataset.pw    = pw;
       dotsEl.textContent   = '••••••••';
       dotsEl.dataset.showing = '0';
     }
-    // 아이콘 색상 업데이트
     const copyBtn = editingAccountItem.querySelector('button[onclick*="copyAccountId"]');
     if (copyBtn) copyBtn.setAttribute('onclick', `copyAccountId(this, '${escHtml(id).replace(/'/g,"&#39;")}')`);
     const eyeBtn = editingAccountItem.querySelector('button[onclick*="toggleAccountRowPw"]');
     // 메모 처리
-    if (memoEls.length > 1) {
-      memoEls[1].textContent = memo;
+    const editMemoEls = editingAccountItem.querySelectorAll('.flex-1 .text-brand-gray:not(.account-url-link)');
+    if (editMemoEls.length > 1) {
+      editMemoEls[editMemoEls.length - 1].textContent = memo;
     } else if (memo) {
       const memoDiv = document.createElement('div');
       memoDiv.className = 'text-brand-gray text-xs mt-0.5';
@@ -2898,6 +3370,230 @@ function submitAccountDrawer() {
   }
   closeAddAccountDrawer();
 }
+
+// ── Account Excel Import / Export ────────────
+let accountImportedRows = [];
+
+function openAccountImportModal() {
+  resetAccountImport();
+  document.getElementById('account-import-modal-backdrop').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeAccountImportModal() {
+  document.getElementById('account-import-modal-backdrop').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function handleAccountImportBackdropClick(e) {
+  if (e.target === e.currentTarget) closeAccountImportModal();
+}
+
+function resetAccountImport() {
+  accountImportedRows = [];
+  document.getElementById('account-import-step-upload').classList.remove('hidden');
+  document.getElementById('account-import-step-preview').classList.add('hidden');
+  document.getElementById('account-import-confirm-btn').classList.add('hidden');
+  document.getElementById('account-import-upload-error').classList.add('hidden');
+  document.getElementById('account-excel-file-input').value = '';
+}
+
+function downloadAccountImportTemplate() {
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['사이트명', '아이디', '사이트 URL', '비밀번호', '카테고리', '메모'],
+    ['예시) 스마트스토어', 'shop_admin', 'https://sell.smartstore.naver.com', 'password123', '쇼핑몰', '관리자 계정'],
+  ]);
+  ws['!cols'] = [{wch:30},{wch:25},{wch:40},{wch:25},{wch:15},{wch:30}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '계정 목록');
+  XLSX.writeFile(wb, 'GPLAN_계정등록_서식.xlsx');
+}
+
+function processAccountExcelFile(file) {
+  const errEl  = document.getElementById('account-import-upload-error');
+  const errMsg = document.getElementById('account-import-upload-error-msg');
+  errEl.classList.add('hidden');
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb   = XLSX.read(e.target.result, { type: 'array' });
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+      if (data.length < 2) {
+        errMsg.textContent = '데이터가 없습니다. 헤더 행 외에 최소 1개 이상의 계정 데이터가 필요합니다.';
+        errEl.classList.remove('hidden'); return;
+      }
+
+      const header = data[0].map(h => String(h).trim());
+      const idx = {
+        site: findColIdx(header, ['사이트명', '사이트']),
+        id:   findColIdx(header, ['아이디', 'ID', 'id']),
+        url:  findColIdx(header, ['사이트 URL', 'URL', 'url', '주소']),
+        pw:   findColIdx(header, ['비밀번호', '패스워드', 'PW', 'pw']),
+        cat:  findColIdx(header, ['카테고리', '분류']),
+        memo: findColIdx(header, ['메모', '비고']),
+      };
+
+      if (idx.site === -1 || idx.id === -1 || idx.pw === -1) {
+        errMsg.textContent = '사이트명, 아이디 또는 비밀번호 열을 찾을 수 없습니다. 서식 파일을 다운로드하여 사용해주세요.';
+        errEl.classList.remove('hidden'); return;
+      }
+
+      accountImportedRows = data.slice(1)
+        .filter(row => String(row[idx.site] || '').trim() && String(row[idx.id] || '').trim())
+        .map(row => ({
+          site: String(row[idx.site] || '').trim(),
+          id:   String(row[idx.id]   || '').trim(),
+          url:  idx.url  !== -1 ? String(row[idx.url]  || '').trim() : '',
+          pw:   String(row[idx.pw]   || '').trim(),
+          cat:  idx.cat  !== -1 ? String(row[idx.cat]  || '').trim() : '기타',
+          memo: idx.memo !== -1 ? String(row[idx.memo] || '').trim() : '',
+        }));
+
+      if (!accountImportedRows.length) {
+        errMsg.textContent = '유효한 계정 데이터가 없습니다. 사이트명과 아이디가 입력된 행을 확인해주세요.';
+        errEl.classList.remove('hidden'); return;
+      }
+
+      showAccountImportPreview(file.name, accountImportedRows);
+    } catch(err) {
+      errMsg.textContent = '파일을 읽는 중 오류가 발생했습니다. 올바른 엑셀 파일인지 확인해주세요.';
+      errEl.classList.remove('hidden');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function showAccountImportPreview(filename, rows) {
+  document.getElementById('account-import-step-upload').classList.add('hidden');
+  document.getElementById('account-import-step-preview').classList.remove('hidden');
+  document.getElementById('account-import-confirm-btn').classList.remove('hidden');
+  document.getElementById('account-import-filename').textContent = filename;
+  document.getElementById('account-import-rowcount').textContent = rows.length + '개 계정';
+
+  const tbody = document.getElementById('account-import-preview-tbody');
+  tbody.innerHTML = '';
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.className = 'border-t border-brand-border hover:bg-brand-bg transition-colors';
+    tr.innerHTML = `
+      <td class="px-4 py-3 font-semibold text-sm max-w-[180px] truncate">${escHtml(r.site)}</td>
+      <td class="px-4 py-3 text-sm text-brand-gray">${escHtml(r.id)}</td>
+      <td class="px-4 py-3 text-sm text-brand-blue truncate max-w-[200px]">${escHtml(r.url || '-')}</td>
+      <td class="px-4 py-3 text-sm">${escHtml(r.cat || '-')}</td>
+      <td class="px-4 py-3 text-sm text-brand-gray">${escHtml(r.memo || '-')}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function confirmAccountImport() {
+  if (!accountImportedRows.length) return;
+
+  const palettes = [
+    { bg: 'bg-brand-blue-light',   stroke: '#2196F3' },
+    { bg: 'bg-brand-pink-light',   stroke: '#E91E63' },
+    { bg: 'bg-brand-orange-light', stroke: '#FF9800' },
+    { bg: 'bg-brand-green-light',  stroke: '#00C853' },
+    { bg: 'bg-brand-border',       stroke: '#8E8E93' },
+  ];
+
+  const list = document.getElementById('account-list');
+  accountImportedRows.forEach(r => {
+    const p = palettes[Math.floor(Math.random() * palettes.length)];
+    const importSiteHtml = r.url
+      ? `<a href="${escHtml(r.url)}" target="_blank" rel="noopener noreferrer" class="font-bold text-[0.95rem] md:text-[1rem] hover:underline" data-account-url="${escHtml(r.url)}">${escHtml(r.site)}</a>`
+      : `<span class="font-bold text-[0.95rem] md:text-[1rem]">${escHtml(r.site)}</span>`;
+    const memoHtml = r.memo ? `<div class="text-brand-gray text-xs mt-0.5">${escHtml(r.memo)}</div>` : '';
+    const item = document.createElement('div');
+    item.className = 'flex items-center gap-3 md:gap-4 py-5 md:py-6 border-b border-brand-border hover:bg-brand-bg px-1 md:px-2 transition-colors fade-in';
+    item.innerHTML = `
+      <input type="checkbox" class="w-4 h-4 rounded border-brand-border shrink-0">
+      <div class="w-10 md:w-12 h-10 md:h-12 rounded-xl ${p.bg} flex items-center justify-center shrink-0">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${p.stroke}" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 mb-0.5 flex-wrap">
+          ${importSiteHtml}
+          <span class="text-[11px] px-1.5 py-0.5 rounded-md bg-brand-border text-brand-gray font-bold">${escHtml(r.cat)}</span>
+        </div>
+        <div class="text-brand-gray text-sm">ID: ${escHtml(r.id)}</div>
+        ${memoHtml}
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <div class="bg-brand-bg px-3 md:px-4 py-2 rounded-xl text-sm font-mono tracking-widest text-brand-gray hidden sm:block" data-pw="${escHtml(r.pw)}">••••••••</div>
+        <button class="p-2 hover:bg-white rounded-lg transition-colors" title="비밀번호 보기" onclick="toggleAccountRowPw(this, '${escHtml(r.pw).replace(/'/g,'&#39;')}')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+        <button class="p-2 hover:bg-white rounded-lg transition-colors" title="복사" onclick="copyAccountId(this, '${escHtml(r.id).replace(/'/g,'&#39;')}')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+        </button>
+        <button onclick="openEditAccountDrawer(this)" class="px-3 py-2 text-xs font-bold text-brand-gray hover:text-brand-black hover:bg-white rounded-lg transition-all border border-transparent hover:border-brand-border hidden md:block">수정</button>
+      </div>`;
+    list.appendChild(item);
+  });
+
+  closeAccountImportModal();
+  updateAccountSelectLabel();
+}
+
+function exportAccountsExcel() {
+  const items = document.querySelectorAll('#account-list > div');
+  if (!items.length) { alert('내보낼 계정이 없습니다.'); return; }
+
+  const headers = ['사이트명', '아이디', '사이트 URL', '비밀번호', '카테고리', '메모'];
+  const data = [headers];
+
+  items.forEach(item => {
+    if (item.style.display === 'none') return;
+    const nameEl  = item.querySelector('.font-bold');
+    const badgeEl = item.querySelector('.rounded-md.bg-brand-border');
+    const idEl    = item.querySelector('.text-brand-gray.text-sm');
+    const pwEl    = item.querySelector('.font-mono');
+    const memoEls = item.querySelectorAll('.flex-1 .text-brand-gray');
+
+    const site = nameEl  ? nameEl.textContent.trim()  : '';
+    const cat  = badgeEl ? badgeEl.textContent.trim() : '';
+    const id   = idEl    ? idEl.textContent.replace('ID:', '').trim() : '';
+    const url  = nameEl?.dataset?.accountUrl || (nameEl?.tagName === 'A' ? nameEl.href : '') || '';
+    const pw   = pwEl    ? (pwEl.dataset.pw || '') : '';
+    const memo = memoEls.length > 1 ? memoEls[memoEls.length - 1].textContent.trim() : '';
+
+    data.push([site, id, url, pw, cat, memo]);
+  });
+
+  if (data.length < 2) { alert('내보낼 계정이 없습니다.'); return; }
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{wch:30},{wch:25},{wch:40},{wch:25},{wch:15},{wch:30}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '계정 목록');
+
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+  XLSX.writeFile(wb, `GPLAN_계정목록_${dateStr}.xlsx`);
+}
+
+// 계정 드롭존 이벤트 등록
+document.addEventListener('DOMContentLoaded', function() {
+  const adz  = document.getElementById('account-drop-zone');
+  const afin = document.getElementById('account-excel-file-input');
+  if (adz && afin) {
+    adz.addEventListener('click', () => afin.click());
+    adz.addEventListener('dragover',  e => { e.preventDefault(); adz.classList.add('dragover'); });
+    adz.addEventListener('dragleave', () => adz.classList.remove('dragover'));
+    adz.addEventListener('drop', e => {
+      e.preventDefault(); adz.classList.remove('dragover');
+      const f = e.dataTransfer.files[0];
+      if (f) processAccountExcelFile(f);
+    });
+    afin.addEventListener('change', e => {
+      const f = e.target.files[0];
+      if (f) processAccountExcelFile(f);
+    });
+  }
+});
 
 function toggleAccountRowPw(btn, pw) {
   const wrap = btn.closest('.flex.items-center.gap-2');
@@ -3172,7 +3868,7 @@ function _todoToDbRow(t) {
 async function loadTodosFromDB() {
   const { data: { user } } = await _supabase.auth.getUser();
   if (!user) return;
-  const { data, error } = await _supabase.from('todos').select('*').eq('user_id', user.id).order('created_at', { ascending: true });
+  const { data, error } = await _supabase.from('todos').select('*').order('created_at', { ascending: true });
   if (error) { console.error('todos load error:', error); return; }
   todos.length = 0;
   (data || []).forEach(r => todos.push(_dbRowToTodo(r)));
@@ -3373,6 +4069,317 @@ async function clearAllCompleted() {
 }
 
 // ── Ledger Tabs ──────────────────────────────
+// ── Ledger Entry Import ──────────────────────
+let _ledgerEntries = [];
+
+const LEDGER_COLS = [
+  '거래처명','사이트','날짜','사이트코드','거래처코드','택배코드','품목코드','품목명',
+  '수량','단가(vat포함)','택배비','택배비용','원가','수령자명','이익'
+];
+const LEDGER_HIDDEN_COLS = ['사이트코드','거래처코드','택배코드'];
+
+function downloadLedgerEntryTemplate() {
+  const ws = XLSX.utils.aoa_to_sheet([
+    LEDGER_COLS,
+    ['(주)지플랜','스마트스토어','2026-04-13','SS001','GC001','CJ01','P001','프리미엄 코튼 티셔츠',2,25000,3000,2500,12000,'홍길동',15500],
+  ]);
+  ws['!cols'] = LEDGER_COLS.map(c => ({ wch: Math.max(c.length * 2, 14) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '장부');
+  XLSX.writeFile(wb, 'GPLAN_장부입력_서식.xlsx');
+}
+
+function openLedgerImportModal() {
+  document.getElementById('ledger-import-step-upload').classList.remove('hidden');
+  document.getElementById('ledger-import-step-preview').classList.add('hidden');
+  document.getElementById('ledger-import-confirm-btn').classList.add('hidden');
+  document.getElementById('ledger-import-upload-error').classList.add('hidden');
+  document.getElementById('ledger-excel-file-input').value = '';
+  document.getElementById('ledger-import-modal-backdrop').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLedgerImportModal() {
+  document.getElementById('ledger-import-modal-backdrop').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function processLedgerExcelFile(file) {
+  const errEl  = document.getElementById('ledger-import-upload-error');
+  const errMsg = document.getElementById('ledger-import-upload-error-msg');
+  errEl.classList.add('hidden');
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb   = XLSX.read(e.target.result, { type: 'array' });
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+      if (data.length < 2) {
+        errMsg.textContent = '데이터가 없습니다. 헤더 행 외에 최소 1행의 데이터가 필요합니다.';
+        errEl.classList.remove('hidden'); return;
+      }
+
+      const header = data[0].map(h => String(h).trim());
+
+      // 거래처명 컬럼 필수 확인
+      const chIdx = findColIdx(header, ['거래처명','거래처']);
+      if (chIdx === -1) {
+        errMsg.textContent = '거래처명 열을 찾을 수 없습니다. 서식 파일을 다운로드하여 사용해주세요.';
+        errEl.classList.remove('hidden'); return;
+      }
+
+      // 컬럼 인덱스 매핑
+      const colMap = {};
+      LEDGER_COLS.forEach(col => {
+        const candidates = [col];
+        if (col === '단가(vat포함)') candidates.push('단가','단가(VAT포함)','단가(vat 포함)');
+        colMap[col] = findColIdx(header, candidates);
+      });
+
+      const getVal = (row, col) => colMap[col] !== -1 && colMap[col] !== undefined ? row[colMap[col]] : '';
+      const getNum = (row, col) => { const v = getVal(row, col); return typeof v === 'number' ? v : (parseInt(String(v).replace(/[,\s]/g,'')) || 0); };
+      const getDate = (row, col) => {
+        const v = getVal(row, col);
+        if (!v) return '';
+        // 엑셀 시리얼 넘버 → 날짜 변환
+        if (typeof v === 'number') {
+          const d = XLSX.SSF.parse_date_code(v);
+          if (d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+        }
+        // 이미 문자열인 경우 그대로 반환
+        return String(v).trim();
+      };
+
+      const numCols = ['수량','단가(vat포함)','택배비','택배비용','원가','이익'];
+      const dateCols = ['날짜'];
+
+      const parsed = data.slice(1).filter(row => String(row[chIdx] || '').trim()).map(row => {
+        const obj = {};
+        LEDGER_COLS.forEach(col => {
+          if (numCols.includes(col)) obj[col] = getNum(row, col);
+          else if (dateCols.includes(col)) obj[col] = getDate(row, col);
+          else obj[col] = String(getVal(row, col) || '').trim();
+        });
+        return obj;
+      });
+
+      if (!parsed.length) {
+        errMsg.textContent = '유효한 데이터가 없습니다.';
+        errEl.classList.remove('hidden'); return;
+      }
+
+      // 행별 유효성 검사
+      const errors = [];
+      parsed.forEach((row, i) => {
+        const rowNum = i + 2; // 엑셀 기준 행번호 (헤더=1행)
+        if (!row['거래처명']) errors.push(rowNum + '행: 거래처명이 비어있습니다.');
+        if (!row['사이트']) errors.push(rowNum + '행: 사이트가 비어있습니다.');
+        if (!row['날짜']) errors.push(rowNum + '행: 날짜가 비어있습니다.');
+        if (!row['품목명']) errors.push(rowNum + '행: 품목명이 비어있습니다.');
+        if (!row['수량'] || row['수량'] <= 0) errors.push(rowNum + '행: 수량이 올바르지 않습니다.');
+        if (!row['단가(vat포함)'] || row['단가(vat포함)'] <= 0) errors.push(rowNum + '행: 단가가 올바르지 않습니다.');
+        if (row['원가'] < 0) errors.push(rowNum + '행: 원가가 음수입니다.');
+        if (row['택배비'] < 0) errors.push(rowNum + '행: 택배비가 음수입니다.');
+        if (row['택배비용'] < 0) errors.push(rowNum + '행: 택배비용이 음수입니다.');
+      });
+
+      if (errors.length > 0) {
+        const maxShow = 5;
+        let msg = errors.slice(0, maxShow).join('\n');
+        if (errors.length > maxShow) msg += '\n외 ' + (errors.length - maxShow) + '건의 오류가 있습니다.';
+        errMsg.textContent = msg;
+        errMsg.style.whiteSpace = 'pre-line';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      _ledgerEntries = parsed;
+
+      // 미리보기 표시
+      document.getElementById('ledger-import-step-upload').classList.add('hidden');
+      document.getElementById('ledger-import-step-preview').classList.remove('hidden');
+      document.getElementById('ledger-import-confirm-btn').classList.remove('hidden');
+      document.getElementById('ledger-import-filename').textContent = file.name;
+      document.getElementById('ledger-import-rowcount').textContent = parsed.length + '건';
+
+    } catch(err) {
+      errMsg.textContent = '파일을 읽는 중 오류가 발생했습니다: ' + err.message;
+      errEl.classList.remove('hidden');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function confirmLedgerImport() {
+  if (!_ledgerEntries.length) return;
+  closeLedgerImportModal();
+  renderLedgerEntries();
+}
+
+function renderLedgerEntries() {
+  const tbody = document.getElementById('ledger-entry-tbody');
+  const fmt = n => typeof n === 'number' ? n.toLocaleString('ko-KR') : n;
+
+  const numCols = ['수량','단가(vat포함)','택배비','택배비용','원가','이익'];
+
+  tbody.innerHTML = _ledgerEntries.map(r => {
+    return '<tr class="border-t border-brand-border hover:bg-brand-bg transition-colors">' +
+      LEDGER_COLS.map(col => {
+        const val = r[col];
+        const hide = LEDGER_HIDDEN_COLS.includes(col) ? ' hidden' : '';
+        if (numCols.includes(col)) {
+          const cls = col === '이익' && val > 0 ? ' text-brand-green font-bold' : (col === '이익' && val < 0 ? ' text-brand-pink font-bold' : '');
+          return `<td class="px-4 py-3 text-right${cls}${hide}">${fmt(val)}</td>`;
+        }
+        return `<td class="px-4 py-3 text-left${hide}">${escHtml(String(val))}</td>`;
+      }).join('') + '</tr>';
+  }).join('');
+
+  // 요약
+  let totalQty = 0, totalSales = 0, totalCost = 0, totalProfit = 0;
+  _ledgerEntries.forEach(r => {
+    totalQty    += r['수량'] || 0;
+    totalSales  += (r['수량'] || 0) * (r['단가(vat포함)'] || 0);
+    totalCost   += r['원가'] || 0;
+    totalProfit += r['이익'] || 0;
+  });
+
+  const fmtW = n => n.toLocaleString('ko-KR');
+  document.getElementById('entry-sum-count').textContent    = totalQty.toLocaleString() + '개';
+  document.getElementById('entry-sum-sales').textContent    = fmtW(totalSales);
+  document.getElementById('entry-sum-purchase').textContent = fmtW(totalCost);
+  document.getElementById('entry-sum-profit').textContent   = fmtW(totalProfit);
+  document.getElementById('entry-row-count').textContent    = _ledgerEntries.length + '행';
+
+  document.getElementById('ledger-entry-summary').classList.remove('hidden');
+  document.getElementById('ledger-entry-table-wrap').classList.remove('hidden');
+  document.getElementById('ledger-entry-empty').classList.add('hidden');
+}
+
+function clearLedgerEntries() {
+  if (!_ledgerEntries.length) return;
+  if (!confirm('업로드된 장부 데이터를 모두 삭제하시겠습니까?')) return;
+  _ledgerEntries = [];
+  document.getElementById('ledger-entry-tbody').innerHTML = '';
+  document.getElementById('ledger-entry-summary').classList.add('hidden');
+  document.getElementById('ledger-entry-table-wrap').classList.add('hidden');
+  document.getElementById('ledger-entry-empty').classList.remove('hidden');
+}
+
+// 장부 드롭존 이벤트
+document.addEventListener('DOMContentLoaded', function() {
+  const ldz  = document.getElementById('ledger-drop-zone');
+  const lfin = document.getElementById('ledger-excel-file-input');
+  if (ldz && lfin) {
+    ldz.addEventListener('click', () => lfin.click());
+    ldz.addEventListener('dragover',  e => { e.preventDefault(); ldz.classList.add('dragover'); });
+    ldz.addEventListener('dragleave', () => ldz.classList.remove('dragover'));
+    ldz.addEventListener('drop', e => {
+      e.preventDefault(); ldz.classList.remove('dragover');
+      const f = e.dataTransfer.files[0];
+      if (f) processLedgerExcelFile(f);
+    });
+    lfin.addEventListener('change', e => {
+      const f = e.target.files[0];
+      if (f) processLedgerExcelFile(f);
+    });
+  }
+});
+
+// ── Ledger Table Sort ────────────────────────
+const _ledgerSortState = {};
+
+function sortLedgerTable(tableId, colIdx, type) {
+  const tbodyId = tableId + '-tbody';
+  if (tableId === 'entry') {
+    // 장부 입력은 _ledgerEntries 배열을 정렬 후 다시 렌더
+    sortLedgerEntryByCol(colIdx, type);
+    return;
+  }
+
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+
+  const key = tableId + '-' + colIdx;
+  const prev = _ledgerSortState[tableId];
+  let dir = 'asc';
+  if (prev && prev.col === colIdx) dir = prev.dir === 'asc' ? 'desc' : 'asc';
+  _ledgerSortState[tableId] = { col: colIdx, dir };
+
+  // 헤더 아이콘 업데이트
+  const headRow = document.getElementById(tableId + '-thead-row');
+  if (headRow) {
+    headRow.querySelectorAll('th.sortable').forEach(th => {
+      th.classList.remove('sort-asc', 'sort-desc');
+      const icon = th.querySelector('.sort-icon');
+      if (icon) icon.textContent = '⇅';
+    });
+    const activeTh = headRow.querySelectorAll('th')[colIdx];
+    if (activeTh) {
+      activeTh.classList.add(dir === 'asc' ? 'sort-asc' : 'sort-desc');
+      const icon = activeTh.querySelector('.sort-icon');
+      if (icon) icon.textContent = dir === 'asc' ? '▲' : '▼';
+    }
+  }
+
+  const rows = [...tbody.querySelectorAll('tr')];
+  rows.sort((a, b) => {
+    const cellA = a.querySelectorAll('td')[colIdx];
+    const cellB = b.querySelectorAll('td')[colIdx];
+    if (!cellA || !cellB) return 0;
+    let va = cellA.textContent.trim();
+    let vb = cellB.textContent.trim();
+    if (type === 'num') {
+      va = parseFloat(va.replace(/[,%\s]/g, '').replace(/,/g, '')) || 0;
+      vb = parseFloat(vb.replace(/[,%\s]/g, '').replace(/,/g, '')) || 0;
+      return dir === 'asc' ? va - vb : vb - va;
+    }
+    return dir === 'asc' ? va.localeCompare(vb, 'ko') : vb.localeCompare(va, 'ko');
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+function sortLedgerEntryByCol(colIdx, type) {
+  if (!_ledgerEntries || !_ledgerEntries.length) return;
+
+  const key = 'entry';
+  const prev = _ledgerSortState[key];
+  let dir = 'asc';
+  if (prev && prev.col === colIdx) dir = prev.dir === 'asc' ? 'desc' : 'asc';
+  _ledgerSortState[key] = { col: colIdx, dir };
+
+  // 헤더 아이콘
+  const headRow = document.getElementById('entry-thead-row');
+  if (headRow) {
+    headRow.querySelectorAll('th.sortable').forEach(th => {
+      th.classList.remove('sort-asc', 'sort-desc');
+      const icon = th.querySelector('.sort-icon');
+      if (icon) icon.textContent = '⇅';
+    });
+    const allTh = headRow.querySelectorAll('th');
+    const activeTh = allTh[colIdx];
+    if (activeTh) {
+      activeTh.classList.add(dir === 'asc' ? 'sort-asc' : 'sort-desc');
+      const icon = activeTh.querySelector('.sort-icon');
+      if (icon) icon.textContent = dir === 'asc' ? '▲' : '▼';
+    }
+  }
+
+  const colName = LEDGER_COLS[colIdx];
+  if (!colName) return;
+  const numCols = ['수량','단가(vat포함)','택배비','택배비용','원가','이익'];
+  const isNum = numCols.includes(colName);
+
+  _ledgerEntries.sort((a, b) => {
+    const va = a[colName], vb = b[colName];
+    if (isNum || type === 'num') return dir === 'asc' ? (va||0) - (vb||0) : (vb||0) - (va||0);
+    return dir === 'asc' ? String(va||'').localeCompare(String(vb||''), 'ko') : String(vb||'').localeCompare(String(va||''), 'ko');
+  });
+  renderLedgerEntries();
+}
+
 function switchLedgerTab(tab) {
   ['monthly','period','product','supplier','channel','entry','analysis'].forEach(p => {
     const el = document.getElementById('ledger-panel-' + p);
@@ -3421,12 +4428,53 @@ function setPeriodType(type) {
   renderPeriodChart();
 }
 
+function _buildMonthlyDataFromEntries() {
+  if (!_ledgerEntries || !_ledgerEntries.length) return null;
+  const monthMap = {};
+  _ledgerEntries.forEach(r => {
+    const d = r['날짜'] || '';
+    const m = parseInt(d.split('-')[1]) || 0;
+    if (m < 1 || m > 12) return;
+    if (!monthMap[m]) monthMap[m] = { label: m + '월', sales: 0, purchase: 0, fee: 0, delivery: 0 };
+    const qty = r['수량'] || 0;
+    const price = r['단가(vat포함)'] || 0;
+    const sales = qty * price;
+    monthMap[m].sales    += sales;
+    monthMap[m].purchase += (r['원가'] || 0) * qty;
+    monthMap[m].delivery += (r['택배비'] || 0) + (r['택배비용'] || 0);
+    monthMap[m].fee      += Math.round(sales * 0.08);
+  });
+  const result = Object.keys(monthMap).sort((a,b) => a - b).map(k => monthMap[k]);
+  return result.length > 0 ? result : null;
+}
+
+function _buildQuarterlyDataFromEntries() {
+  const monthly = _buildMonthlyDataFromEntries();
+  if (!monthly) return null;
+  const qMap = {};
+  monthly.forEach(m => {
+    const mNum = parseInt(m.label);
+    const q = Math.ceil(mNum / 3);
+    const label = q + '분기';
+    if (!qMap[q]) qMap[q] = { label, sales: 0, purchase: 0, fee: 0, delivery: 0 };
+    qMap[q].sales    += m.sales;
+    qMap[q].purchase += m.purchase;
+    qMap[q].fee      += m.fee;
+    qMap[q].delivery += m.delivery;
+  });
+  return Object.values(qMap);
+}
+
 function renderPeriodChart() {
-  const data = _periodType === 'quarterly' ? PERIOD_QUARTERLY_DATA : PERIOD_MONTHLY_DATA;
-  const prefix = _periodType === 'quarterly' ? '2024년 ' : '2024년 ';
+  const entryMonthly   = _buildMonthlyDataFromEntries();
+  const entryQuarterly = _buildQuarterlyDataFromEntries();
+  const data = _periodType === 'quarterly'
+    ? (entryQuarterly || PERIOD_QUARTERLY_DATA)
+    : (entryMonthly   || PERIOD_MONTHLY_DATA);
+  const prefix = _periodType === 'quarterly' ? '2026년 ' : '2026년 ';
   const maxSales = Math.max(...data.map(d => d.sales));
-  const fmt = n => '₩' + n.toLocaleString('ko-KR');
-  const fmtM = n => '₩' + (n / 1e6).toFixed(1) + 'M';
+  const fmt = n => n.toLocaleString('ko-KR');
+  const fmtM = n => Math.round(n / 1000).toLocaleString('ko-KR');
 
   const totalSales    = data.reduce((s, d) => s + d.sales, 0);
   const totalPurchase = data.reduce((s, d) => s + d.purchase, 0);
@@ -3438,7 +4486,7 @@ function renderPeriodChart() {
 
   // 범위 라벨
   const rangeEl = document.getElementById('period-range-label');
-  if (rangeEl) rangeEl.textContent = `2024년 ${data[0].label} ~ ${data[data.length-1].label} 누적`;
+  if (rangeEl) rangeEl.textContent = `2026년 ${data[0].label} ~ ${data[data.length-1].label} 누적`;
 
   // KPI 카드
   document.getElementById('period-kpi').innerHTML = [
@@ -3515,7 +4563,7 @@ function renderPeriodChart() {
 
 // ── Detail Tab 기간 데이터 ────────────────────
 
-const DETAIL_PERIOD_LABEL = ['2025년 1~5월 누적','2025년 1월','2025년 2월','2025년 3월','2025년 4월','2025년 5월'];
+const DETAIL_PERIOD_LABEL = ['2026년 1~5월 누적','2026년 1월','2026년 2월','2026년 3월','2026년 4월','2026년 5월'];
 
 // Product defs: name, purchaseRatio (fee 10% + delivery 4% of sales)
 const PRODUCT_DEFS = [
@@ -3650,13 +4698,13 @@ function applyDetailRange(tab) {
     return;
   }
 
-  // 보유 데이터: 2025년 1~5월 (index 0~4)
+  // 보유 데이터: 2026년 1~5월 (index 0~4)
   const MONTH_RANGES = [
-    { idx:0, s:new Date('2025-01-01'), e:new Date('2025-01-31T23:59:59') },
-    { idx:1, s:new Date('2025-02-01'), e:new Date('2025-02-28T23:59:59') },
-    { idx:2, s:new Date('2025-03-01'), e:new Date('2025-03-31T23:59:59') },
-    { idx:3, s:new Date('2025-04-01'), e:new Date('2025-04-30T23:59:59') },
-    { idx:4, s:new Date('2025-05-01'), e:new Date('2025-05-31T23:59:59') },
+    { idx:0, s:new Date('2026-01-01'), e:new Date('2026-01-31T23:59:59') },
+    { idx:1, s:new Date('2026-02-01'), e:new Date('2026-02-28T23:59:59') },
+    { idx:2, s:new Date('2026-03-01'), e:new Date('2026-03-31T23:59:59') },
+    { idx:3, s:new Date('2026-04-01'), e:new Date('2026-04-30T23:59:59') },
+    { idx:4, s:new Date('2026-05-01'), e:new Date('2026-05-31T23:59:59') },
   ];
 
   const idxs = MONTH_RANGES
@@ -3694,17 +4742,83 @@ function applyDetailRange(tab) {
   else if (tab === 'analysis') renderAnalysisTab(0, idxs);
 }
 
+// 장부 입력 데이터를 월(m)로 필터 (0=전체, 1=1월, ...)
+function _filterEntriesByMonth(m) {
+  if (!_ledgerEntries || !_ledgerEntries.length) return null;
+  if (m === 0) return _ledgerEntries;
+  return _ledgerEntries.filter(r => {
+    const d = r['날짜'] || '';
+    const month = parseInt(d.split('-')[1]) || 0;
+    return month === m;
+  });
+}
+
+function _getProductRowsFromEntries(m) {
+  const entries = _filterEntriesByMonth(m);
+  if (!entries || !entries.length) return null;
+  const map = {};
+  entries.forEach(r => {
+    const name = r['품목명'] || '미분류';
+    if (!map[name]) map[name] = { name, qty: 0, sales: 0, purchase: 0, profit: 0 };
+    const qty = r['수량'] || 0;
+    const price = r['단가(vat포함)'] || 0;
+    map[name].qty      += qty;
+    map[name].sales    += qty * price;
+    map[name].purchase += (r['원가'] || 0) * qty;
+    map[name].profit   += r['이익'] || 0;
+  });
+  return Object.values(map).map(r => ({
+    ...r,
+    margin: r.sales > 0 ? +(r.profit / r.sales * 100).toFixed(1) : 0
+  })).sort((a, b) => b.sales - a.sales);
+}
+
+function _getSupplierRowsFromEntries(m) {
+  const entries = _filterEntriesByMonth(m);
+  if (!entries || !entries.length) return null;
+  const map = {};
+  entries.forEach(r => {
+    const name = r['거래처명'] || '미분류';
+    if (!map[name]) map[name] = { name, item: r['품목명'] || '', orders: 0, qty: 0, amount: 0 };
+    map[name].orders += 1;
+    map[name].qty    += r['수량'] || 0;
+    map[name].amount += (r['원가'] || 0) * (r['수량'] || 0);
+  });
+  return Object.values(map).sort((a, b) => b.amount - a.amount);
+}
+
+function _getChannelRowsFromEntries(m) {
+  const entries = _filterEntriesByMonth(m);
+  if (!entries || !entries.length) return null;
+  const map = {};
+  entries.forEach(r => {
+    const name = r['사이트'] || '미분류';
+    if (!map[name]) map[name] = { name, color: '#8E8E93', fr: 0, orders: 0, sales: 0, fee: 0, profit: 0 };
+    const qty = r['수량'] || 0;
+    const price = r['단가(vat포함)'] || 0;
+    map[name].orders += 1;
+    map[name].sales  += qty * price;
+    map[name].profit += r['이익'] || 0;
+  });
+  return Object.values(map).map(r => ({
+    ...r,
+    fee: Math.round(r.sales * 0.08),
+    profit: r.profit,
+  })).sort((a, b) => b.sales - a.sales);
+}
+
 function renderProductTab(m, idxs) {
-  const rows = idxs ? _productData(idxs) : _getProductRows(m);
+  const entryRows = _getProductRowsFromEntries(m);
+  const rows = entryRows || [];
   const totalSales = rows.reduce((s,r) => s + r.sales, 0);
   const totalProfit = rows.reduce((s,r) => s + r.profit, 0);
   const avgMargin = totalSales > 0 ? +(totalProfit / totalSales * 100).toFixed(1) : 0;
   const best = rows[0];
 
   document.getElementById('product-kpi').innerHTML = [
-    { label:'취급 상품 수',  value: PRODUCT_DEFS.length + '개' },
+    { label:'취급 상품 수',  value: rows.length + '개' },
     { label:'베스트셀러',    value: best ? best.name : '-', small:true },
-    { label:'1위 상품 매출', value: best ? Math.round(best.sales/1e4).toLocaleString() + '만원' : '-' },
+    { label:'1위 상품 매출', value: best ? best.sales.toLocaleString('ko-KR') : '-' },
     { label:'평균 수익률',   value: avgMargin + '%', color:'text-brand-green' },
   ].map(k => `<div class="bg-white rounded-3xl panel px-5 py-4 flex flex-col gap-1">
     <div class="text-xs font-bold text-brand-gray tracking-wide">${k.label}</div>
@@ -3724,15 +4838,16 @@ function renderProductTab(m, idxs) {
 }
 
 function renderSupplierTab(m, idxs) {
-  const rows = idxs ? _supplierData(idxs) : _getSupplierRows(m);
+  const entryRows = _getSupplierRowsFromEntries(m);
+  const rows = entryRows || (idxs ? _supplierData(idxs) : _getSupplierRows(m));
   const totalAmount = rows.reduce((s,r) => s + r.amount, 0);
   const top = rows[0];
 
   document.getElementById('supplier-kpi').innerHTML = [
-    { label:'거래 매입처 수', value: SUPPLIER_DEFS.length + '곳' },
+    { label:'거래 매입처 수', value: rows.length + '곳' },
     { label:'주요 매입처',    value: top ? top.name : '-', small:true },
-    { label:'총 매입 원가',   value: (totalAmount/1e8).toFixed(2) + '억' },
-    { label:'매입처 다변화',  value: SUPPLIER_DEFS.length + '개사', color:'text-brand-blue' },
+    { label:'총 매입 원가',   value: totalAmount.toLocaleString('ko-KR') },
+    { label:'매입처 다변화',  value: rows.length + '개사', color:'text-brand-blue' },
   ].map(k => `<div class="bg-white rounded-3xl panel px-5 py-4 flex flex-col gap-1">
     <div class="text-xs font-bold text-brand-gray tracking-wide">${k.label}</div>
     <div class="font-black mt-1 ${k.color||''} ${k.small ? 'text-xl truncate' : 'text-2xl'}">${k.value}</div>
@@ -3753,7 +4868,8 @@ function renderSupplierTab(m, idxs) {
 }
 
 function renderChannelTab(m, idxs) {
-  const rows = idxs ? _channelData(idxs) : _getChannelRows(m);
+  const entryRows = _getChannelRowsFromEntries(m);
+  const rows = entryRows || (idxs ? _channelData(idxs) : _getChannelRows(m));
   const totalSales = rows.reduce((s,r) => s + r.sales, 0);
   const totalFee = rows.reduce((s,r) => s + r.fee, 0);
   const avgFeeRate = totalSales > 0 ? (totalFee / totalSales * 100).toFixed(1) : '0.0';
@@ -3761,7 +4877,7 @@ function renderChannelTab(m, idxs) {
   const topPct = totalSales > 0 ? (top.sales / totalSales * 100).toFixed(1) : '0.0';
 
   document.getElementById('channel-kpi').innerHTML = [
-    { label:'운영 채널 수',    value: CHANNEL_DEFS.length + '개' },
+    { label:'운영 채널 수',    value: rows.length + '개' },
     { label:'주력 채널',       value: top ? top.name : '-', small:true },
     { label:'주력 채널 비중',  value: topPct + '%', color:'text-brand-orange' },
     { label:'평균 수수료율',   value: avgFeeRate + '%' },
@@ -3802,7 +4918,7 @@ function renderAnalysisTab(m, idxs) {
   const topCh = cRows[0];
 
   document.getElementById('analysis-kpi').innerHTML = [
-    { label:'총 매출',    value: (totalSales/1e8).toFixed(2) + '억' },
+    { label:'총 매출',    value: totalSales.toLocaleString('ko-KR') },
     { label:'총 순이익',  value: (totalProfit/1e6).toFixed(1) + 'M', color:'text-brand-green' },
     { label:'평균 수익률', value: avgMargin + '%', color:'text-brand-blue' },
     { label:'최고 채널',  value: topCh ? topCh.name : '-', small:true },
@@ -3816,7 +4932,7 @@ function renderAnalysisTab(m, idxs) {
       <span class="w-6 h-6 rounded-full ${i===0?'bg-brand-black text-white':'bg-brand-gray/20 text-brand-gray'} text-xs font-bold inline-flex items-center justify-center shrink-0">${i+1}</span>
       <div class="flex-1 min-w-0">
         <div class="font-semibold text-sm truncate">${escHtml(r.name)}</div>
-        <div class="text-xs text-brand-gray mt-0.5">${_fmtW(r.sales)}원</div>
+        <div class="text-xs text-brand-gray mt-0.5">${_fmtW(r.sales)}</div>
       </div>
       <span class="text-brand-green font-bold text-sm shrink-0">${r.margin}%</span>
     </div>`).join('');
@@ -3829,7 +4945,7 @@ function renderAnalysisTab(m, idxs) {
         <span class="text-sm font-bold">${pct}%</span>
       </div>
       <div class="bg-brand-bg rounded-full h-2.5 overflow-hidden"><div class="h-2.5 rounded-full transition-all" style="width:${pct}%;background:${r.color}"></div></div>
-      <div class="text-xs text-brand-gray mt-1">${_fmtW(r.sales)}원</div>
+      <div class="text-xs text-brand-gray mt-1">${_fmtW(r.sales)}</div>
     </div>`;
   }).join('');
 }

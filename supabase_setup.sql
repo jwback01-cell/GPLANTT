@@ -37,11 +37,11 @@ CREATE TABLE IF NOT EXISTS products (
 ALTER TABLE todos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 
--- 4. RLS 정책: 로그인한 사용자만 자기 데이터 접근
-CREATE POLICY "users_manage_own_todos" ON todos
-  FOR ALL USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+-- 4. RLS 정책: 로그인한 모든 사용자가 전체 데이터 공유
+CREATE POLICY "authenticated_users_manage_all_todos" ON todos
+  FOR ALL USING (auth.uid() IS NOT NULL)
+  WITH CHECK (auth.uid() IS NOT NULL);
 
-CREATE POLICY "users_manage_own_products" ON products
-  FOR ALL USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "authenticated_users_manage_all_products" ON products
+  FOR ALL USING (auth.uid() IS NOT NULL)
+  WITH CHECK (auth.uid() IS NOT NULL);
