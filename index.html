@@ -2180,6 +2180,10 @@ tailwind.config = {
               <span class="text-xs font-bold text-brand-gray">서버 존</span>
               <input id="ecount-zone" type="text" placeholder="예: 1" class="bg-brand-bg rounded-xl px-4 py-2.5 text-sm font-medium border border-brand-border outline-none focus:border-brand-black">
             </label>
+            <label class="flex flex-col gap-1.5">
+              <span class="text-xs font-bold text-brand-gray">기본 택배발송비 (구매입력 택배비용 단가, VAT 포함)</span>
+              <input id="ecount-ship-cost" type="number" placeholder="예: 3500" class="bg-brand-bg rounded-xl px-4 py-2.5 text-sm font-medium border border-brand-border outline-none focus:border-brand-black">
+            </label>
             <div class="flex items-end">
               <a href="#" onclick="event.preventDefault();alert('이카운트 API 키 발급 방법 안내 페이지로 이동합니다.')" class="text-sm font-bold text-brand-blue hover:underline">API 키 발급 방법 안내</a>
             </div>
@@ -2284,6 +2288,65 @@ tailwind.config = {
             <button onclick="saveVendorMap()" class="px-5 py-2.5 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333]">매핑 저장</button>
           </div>
         </div>
+
+        <!-- 배송처 ↔ 이카운트 거래처 매핑 (구매입력용) -->
+        <div class="bg-white rounded-3xl panel overflow-hidden">
+          <div class="px-6 py-4 border-b border-brand-border flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div class="font-bold text-[15px]">배송처 ↔ 이카운트 거래처 매핑 (구매입력용)</div>
+              <div class="text-xs text-brand-gray mt-1">플레이오토 배송처(depot)를 이카운트 거래처코드에 연결합니다. 구매입력 시 거래처 자리에 들어갑니다.</div>
+            </div>
+            <button onclick="addDepotMapRow()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+              매핑 추가
+            </button>
+          </div>
+          <div id="depot-map-body" class="p-6 flex flex-col gap-2"></div>
+          <div class="px-6 py-4 border-t border-brand-border flex justify-between items-center flex-wrap gap-3">
+            <div class="text-xs text-brand-gray leading-relaxed">
+              💡 키는 배송처명(예: <b>지플랜</b>) 또는 PA depot_no(예: <b>179937</b>) 어느 쪽이든 사용 가능합니다.<br>
+              매칭 순서: 정확일치 → 공백제거 → 부분포함.
+            </div>
+            <button onclick="saveDepotMap()" class="px-5 py-2.5 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333]">매핑 저장</button>
+          </div>
+        </div>
+
+        <!-- SKU별 택배발송비 매핑 (구매입력 택배비용 라인 단가) -->
+        <div class="bg-white rounded-3xl panel overflow-hidden">
+          <div class="px-6 py-4 border-b border-brand-border flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div class="font-bold text-[15px]">SKU별 택배발송비 매핑 (구매입력 택배비용 단가)</div>
+              <div class="text-xs text-brand-gray mt-1">품목(SKU)마다 택배발송비가 다르면 여기서 SKU 코드별 단가를 지정하세요. 매칭된 값이 있으면 설정의 '기본 택배발송비'보다 우선합니다.</div>
+            </div>
+            <div class="flex gap-2">
+              <input type="file" id="pa-ship-cost-excel" accept=".xlsx,.xls,.csv" class="hidden" onchange="importShipCostFromExcel(event)">
+              <button onclick="document.getElementById('pa-ship-cost-excel').click()" id="pa-ship-cost-sync-btn" class="px-4 py-2 rounded-full bg-brand-blue text-white text-sm font-bold hover:opacity-90 flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                PA 엑셀 업로드
+              </button>
+              <button onclick="addShipCostMapRow()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                매핑 추가
+              </button>
+            </div>
+          </div>
+          <div class="px-6 pt-4 pb-2 flex items-center justify-between flex-wrap gap-3">
+            <div class="flex items-center gap-2">
+              <input id="ship-cost-map-search" type="text" oninput="renderShipCostMap()" placeholder="SKU 검색" class="bg-brand-bg border border-brand-border rounded-xl px-3 py-2 text-sm outline-none focus:border-brand-black w-56">
+              <span id="ship-cost-map-count" class="text-xs text-brand-gray font-semibold"></span>
+            </div>
+            <div id="ship-cost-map-pager" class="flex items-center gap-1 flex-wrap text-sm"></div>
+          </div>
+          <div id="ship-cost-map-body" class="px-6 pb-4 flex flex-col gap-2 max-h-[640px] overflow-y-auto"></div>
+          <div class="px-6 py-4 border-t border-brand-border flex justify-between items-center flex-wrap gap-3">
+            <div class="text-xs text-brand-gray leading-relaxed">
+              💡 우선순위: <b>SKU별 매핑</b> → 설정의 '기본 택배발송비' → PA 주문 `ship_cost`.<br>
+              SKU 코드는 이카운트 전송 시 사용되는 품목코드(예: K10030, C0001)와 동일해야 합니다.<br>
+              📥 <b>PA 엑셀 업로드</b>: PA 관리자 → SKU상품관리 → <b>엑셀</b> 메뉴에서 내려받은 파일을 선택하면 'SKU코드' + '택배발송비' 컬럼을 자동 매핑합니다.
+            </div>
+            <button onclick="saveShipCostMap()" class="px-5 py-2.5 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333]">매핑 저장</button>
+          </div>
+        </div>
       </div>
 
       <!-- ── Tab: 플레이오토 연동 ── -->
@@ -2372,6 +2435,23 @@ tailwind.config = {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
                 매출 장부에 저장
               </button>
+            </div>
+            <!-- 원클릭 전송 기간 설정 -->
+            <div class="flex flex-col gap-2 bg-brand-bg rounded-2xl p-3 border border-brand-border">
+              <div class="flex items-center justify-between flex-wrap gap-2">
+                <span class="text-xs font-bold text-brand-gray">원클릭 전송 기간</span>
+                <div class="flex gap-1">
+                  <button type="button" onclick="setPaOneClickDate('today')" class="px-3 py-1 rounded-full text-xs font-bold bg-white border border-brand-border hover:bg-brand-bg">오늘</button>
+                  <button type="button" onclick="setPaOneClickDate('yesterday')" class="px-3 py-1 rounded-full text-xs font-bold bg-white border border-brand-border hover:bg-brand-bg">어제</button>
+                  <button type="button" onclick="setPaOneClickDate('7days')" class="px-3 py-1 rounded-full text-xs font-bold bg-white border border-brand-border hover:bg-brand-bg">최근 7일</button>
+                  <button type="button" onclick="setPaOneClickDate('month')" class="px-3 py-1 rounded-full text-xs font-bold bg-white border border-brand-border hover:bg-brand-bg">이번 달</button>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <input id="pa-one-click-start" type="date" class="flex-1 min-w-[140px] bg-white border border-brand-border rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:border-brand-black">
+                <span class="text-brand-gray font-bold">~</span>
+                <input id="pa-one-click-end" type="date" class="flex-1 min-w-[140px] bg-white border border-brand-border rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:border-brand-black">
+              </div>
             </div>
             <button onclick="fetchSaveAndSendToEcount()" id="pa-one-click-btn" class="w-full bg-gradient-to-r from-brand-orange to-brand-pink text-white py-3 rounded-full font-bold text-sm hover:opacity-90 flex items-center justify-center gap-2">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
@@ -2774,6 +2854,7 @@ tailwind.config = {
               <button data-days="14" class="kw-trend-pbtn px-3 py-1.5 text-sm font-medium text-brand-gray hover:text-brand-black transition-colors">14일</button>
               <button data-days="30" class="kw-trend-pbtn px-3 py-1.5 text-sm font-medium text-brand-gray hover:text-brand-black transition-colors">30일</button>
               <button data-days="90" class="kw-trend-pbtn px-3 py-1.5 text-sm font-medium text-brand-gray hover:text-brand-black transition-colors">90일</button>
+              <button data-days="all" class="kw-trend-pbtn px-3 py-1.5 text-sm font-medium text-brand-gray hover:text-brand-black transition-colors">전체</button>
             </div>
           </div>
 
@@ -3335,6 +3416,25 @@ tailwind.config = {
 </div>
 
 <!-- 이카운트 전송 오류 상세 모달 -->
+<!-- 공용 알림 모달 (native alert 대체) -->
+<div id="app-alert-modal" class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-black/40" onclick="if(event.target===this)closeAppAlert()">
+  <div class="bg-white rounded-3xl panel w-[90%] max-w-md overflow-hidden flex flex-col">
+    <div class="px-6 py-5 flex items-start gap-4">
+      <div id="app-alert-icon" class="w-12 h-12 rounded-2xl bg-brand-bg flex items-center justify-center shrink-0">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div id="app-alert-title" class="font-bold text-base">알림</div>
+        <div id="app-alert-msg" class="text-sm text-brand-gray mt-1 leading-relaxed whitespace-pre-line"></div>
+        <div id="app-alert-extra" class="text-xs text-brand-gray mt-3 bg-brand-bg rounded-xl px-3 py-2 leading-relaxed hidden"></div>
+      </div>
+    </div>
+    <div class="px-6 py-4 border-t border-brand-border flex justify-end">
+      <button onclick="closeAppAlert()" class="px-5 py-2.5 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333]">확인</button>
+    </div>
+  </div>
+</div>
+
 <div id="ecount-error-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onclick="if(event.target===this)closeEcountErrorModal()">
   <div class="bg-white rounded-3xl panel w-[90%] max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
     <div class="px-6 py-4 border-b border-brand-border flex items-center justify-between">
@@ -4324,7 +4424,8 @@ function _cleanupOrphanKwSeries() {
 function _bindKwTrendPeriodButtons() {
   document.querySelectorAll('.kw-trend-pbtn').forEach(btn => {
     btn.onclick = () => {
-      _kwTrendDays = parseInt(btn.dataset.days, 10);
+      const v = btn.dataset.days;
+      _kwTrendDays = (v === 'all') ? 'all' : parseInt(v, 10);
       document.querySelectorAll('.kw-trend-pbtn').forEach(b => {
         b.className = 'kw-trend-pbtn px-3 py-1.5 text-sm font-medium text-brand-gray hover:text-brand-black transition-colors';
       });
@@ -4382,8 +4483,23 @@ function renderKwTrend() {
   if (!rowMap.size) { empty('표시할 키워드가 없습니다', '키워드를 등록하거나 순위 조회를 실행하세요.'); return; }
 
   // 날짜 컬럼 만들기 (오늘부터 N일)
-  const days = _kwTrendDays || 7;
   const today = new Date(); today.setHours(0,0,0,0);
+  let days;
+  if (_kwTrendDays === 'all') {
+    // rowMap 내 모든 키(legacy 포함)의 시리즈에서 가장 오래된 타임스탬프 찾기
+    let oldest = today.getTime();
+    for (const [histKey, info] of rowMap) {
+      const arr = (series[histKey] || []).concat(info.legacyKey ? (series[info.legacyKey] || []) : []);
+      for (const e of arr) {
+        const t = new Date(e.t).getTime();
+        if (t < oldest) oldest = t;
+      }
+    }
+    const diffDays = Math.ceil((today.getTime() - oldest) / 86400000) + 1;
+    days = Math.max(1, Math.min(365, diffDays)); // 최대 365일로 제한
+  } else {
+    days = _kwTrendDays || 7;
+  }
   const dateCols = []; // 최신 -> 과거
   for (let i = 0; i < days; i++) {
     const d = new Date(today.getTime() - i * 86400000);
@@ -9033,7 +9149,7 @@ function switchUploadTab(tab) {
   const title = document.getElementById('upload-page-title');
   const desc  = document.getElementById('upload-page-desc');
   if (tab === 'file')      { title.textContent = '장부 업로드 📤'; desc.textContent = '엑셀 파일을 업로드하여 매출 데이터를 한 번에 저장하세요.'; }
-  if (tab === 'ecount')    { title.textContent = '이카운트 연동 🔗'; desc.textContent = '저장된 장부 데이터를 이카운트 ERP로 전송하세요.'; _fillEcountSettingsForm(); _renderEcountHistory(); renderVendorMap(); }
+  if (tab === 'ecount')    { title.textContent = '이카운트 연동 🔗'; desc.textContent = '저장된 장부 데이터를 이카운트 ERP로 전송하세요.'; _fillEcountSettingsForm(); _renderEcountHistory(); renderVendorMap(); renderDepotMap(); renderShipCostMap(); }
   if (tab === 'playauto')  { title.textContent = '플레이오토 연동 🔗'; desc.textContent = '플레이오토에서 주문/상품/재고 데이터를 자동으로 수집합니다.'; _initPlayauto(); }
   if (tab === 'data')      { title.textContent = '업로드 데이터 📚'; desc.textContent = '엑셀 업로드로 저장된 매출 데이터를 확인하세요.'; renderUploadData(); }
 }
@@ -9065,11 +9181,18 @@ function _initPlayauto() {
   const e = document.getElementById('pa-order-end');
   if (s) s.value = fmt(today);
   if (e && !e.value) e.value = fmt(today);
+  // 원클릭 전용 기간도 오늘로 초기화 (비어있을 때만)
+  const oc1 = document.getElementById('pa-one-click-start');
+  const oc2 = document.getElementById('pa-one-click-end');
+  if (oc1 && !oc1.value) oc1.value = fmt(today);
+  if (oc2 && !oc2.value) oc2.value = fmt(today);
   // 쇼핑몰 목록(별칭 포함) 자동 캐시 — 거래처코드 매핑에 사용
   if (k && a) {
     const c = _paLoadShopsCache();
     const expired = !c || (Date.now() - (c.at || 0) > 24 * 60 * 60 * 1000); // 24시간
-    if (expired) _paRefreshShops(true);
+    // 캐시가 빈약(필드 2개 이하 = /shops 폴백 결과)하면 강제 재조회 → 상세 엔드포인트 재시도
+    const lean = c && Array.isArray(c.shops) && c.shops.length && Object.keys(c.shops[0]).length <= 2;
+    if (expired || lean) _paRefreshShops(true);
     else if (Array.isArray(c.shops)) _paShops = c.shops;
   }
 }
@@ -9098,24 +9221,18 @@ async function _paFetch(path, opts = {}) {
   if (!key) throw new Error('API Key가 등록되지 않았습니다.');
   if (!auth) throw new Error('솔루션 인증키가 등록되지 않았습니다.');
 
-  // 로컬 프록시 서버가 있으면 CORS 우회 (/api/playauto/*)
-  const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-  if (isLocal) {
-    try {
-      const r = await fetch('/api/playauto' + path, {
-        ...opts,
-        headers: { 'x-pa-key': key, 'x-pa-auth': auth, 'Content-Type': 'application/json', 'Accept': 'application/json', ...(opts.headers || {}) },
-      });
-      if (r.ok) return r.json();
-      const err = await r.json().catch(() => ({}));
-      throw new Error(err.error || `HTTP ${r.status}`);
-    } catch (e) {
-      if (e.message.includes('Failed to fetch')) {
-        // 프록시 서버가 없으면 직접 호출 시도
-      } else {
-        throw e;
-      }
-    }
+  // 프록시 서버를 통해 CORS 우회 (localhost는 server.py, Netlify는 netlify/functions/playauto.js)
+  try {
+    const r = await fetch('/api/playauto' + path, {
+      ...opts,
+      headers: { 'x-pa-key': key, 'x-pa-auth': auth, 'Content-Type': 'application/json', 'Accept': 'application/json', ...(opts.headers || {}) },
+    });
+    if (r.ok) return r.json();
+    const err = await r.json().catch(() => ({}));
+    throw new Error(err.error || `HTTP ${r.status}`);
+  } catch (e) {
+    if (!e.message.includes('Failed to fetch')) throw e;
+    // 프록시 서버가 없으면 아래의 직접 호출로 fallback
   }
 
   // 직접 호출 (CORS 허용 시에만 동작)
@@ -9153,7 +9270,9 @@ function _paUnwrap(data) {
 }
 
 // 쇼핑몰 목록 캐시 (별칭 기반 거래처코드 매핑용)
-const PA_SHOPS_CACHE_KEY = 'gplan_playauto_shops_v1';
+// v2: shopManage/getShopList 응답으로 변경 (별칭 등 상세 필드 포함)
+const PA_SHOPS_CACHE_KEY = 'gplan_playauto_shops_v2';
+try { localStorage.removeItem('gplan_playauto_shops_v1'); } catch(_) {}
 let _paShops = [];
 function _paLoadShopsCache() {
   try { const j = JSON.parse(localStorage.getItem(PA_SHOPS_CACHE_KEY) || 'null'); return j || null; } catch(_) { return null; }
@@ -9168,28 +9287,105 @@ function _paGetShops() {
   return [];
 }
 // 주문 → 해당 쇼핑몰의 별칭(=이카운트 거래처코드 용도) 찾기
+// 반환값은 별칭에서 추출한 "숫자만"(예: 524-86-01528 → 5248601528)
+let _paAliasDebugLogged = false;
 function _paShopAliasOf(order) {
   const shops = _paGetShops();
   if (!shops.length) return '';
+  // 캐시 진단 1회: 첫 호출 시 shops[0] 키와 샘플을 출력 (캐시 hit 시에도 키 확인 가능)
+  if (!_paAliasDebugLogged) {
+    _paAliasDebugLogged = true;
+    try {
+      console.log('[PA] (캐시) shops[0] 전체 키:', Object.keys(shops[0]));
+      console.log('[PA] (캐시) shops[0] 샘플:', shops[0]);
+    } catch(_) {}
+  }
   const oCd = String(order.shop_cd || order.pa_shop_cd || '').trim();
   const oId = String(order.shop_id || order.seller_id || '').trim();
   // 1) shop_cd + shop_id 동시 매칭 (여러 계정 구분)
   let hit = shops.find(s => String(s.shop_cd || '') === oCd && String(s.shop_id || s.seller_id || '') === oId);
   if (!hit) hit = shops.find(s => String(s.shop_cd || '') === oCd);
   if (!hit) return '';
-  // 별칭 후보 — 실제 PA 응답 필드에 따라 맞는 키가 발견되면 맨 앞으로 옮기면 됨
-  return hit.alias || hit.shop_alias || hit.nick_name || hit.shop_nick || hit.memo || hit.comment || '';
+  // 별칭 후보 — PA 실제 응답에서 별칭/메모/사업자번호 등이 들어갈 가능성 있는 모든 키
+  const aliasKeys = [
+    'alias', 'shop_alias', 'shop_nick', 'shop_nickname', 'nick_name', 'nickname',
+    'memo', 'comment', 'shop_memo', 'shop_comment', 'remark', 'remarks',
+    'biz_no', 'business_no', 'business_number', 'company_no', 'comp_no',
+    'sub_id', 'cust_cd', 'cust_code', 'vendor_code', 'partner_code'
+  ];
+  let raw = '';
+  let hitKey = '';
+  for (const k of aliasKeys) {
+    if (hit[k]) { raw = hit[k]; hitKey = k; break; }
+  }
+  if (!raw) {
+    // 진단: 매칭된 shop이지만 별칭 후보 키 모두 비어있음 — 첫 누락 1회만 전체 dump
+    if (!_paShopAliasOf._missDumped) {
+      _paShopAliasOf._missDumped = true;
+      console.warn('[PA] 별칭 후보 키 모두 비어있음. 매칭된 shop 전체:', hit);
+    }
+    return '';
+  }
+  if (!_paShopAliasOf._hitKeyLogged) {
+    _paShopAliasOf._hitKeyLogged = true;
+    console.log('[PA] 별칭 추출 성공 — 사용된 키:', hitKey, '값:', raw);
+  }
+  // 숫자만 추출 (사업자번호의 대시/공백 제거) — 숫자가 하나도 없으면 원본 반환
+  const digits = String(raw).replace(/\D/g, '');
+  return digits || String(raw);
 }
 
 async function _paRefreshShops(silent) {
+  // 1순위: shopManage/getShopList — 별칭 등 상세 필드 포함 (POST + 페이지네이션)
+  try {
+    const all = [];
+    let start = 0;
+    const length = 500;
+    let firstResp = null;
+    for (let page = 0; page < 20; page++) {  // 안전 상한 10,000개
+      const data = await _paFetch('/shopManage/getShopList', {
+        method: 'POST',
+        body: JSON.stringify({ start, length })
+      });
+      if (page === 0) firstResp = data;
+      const arr = _paUnwrap(data);
+      if (!Array.isArray(arr) || !arr.length) break;
+      all.push(...arr);
+      if (arr.length < length) break;
+      start += length;
+    }
+    if (!all.length && firstResp) {
+      console.warn('[PA] shopManage/getShopList 응답이 빈 배열. raw:', firstResp);
+    }
+    if (all.length) {
+      _paShops = all;
+      _paSaveShopsCache(all);
+      console.log('[PA] shopManage/getShopList 로드 완료:', all.length, '개');
+      console.log('[PA] shops[0] 전체 키:', Object.keys(all[0]));
+      console.log('[PA] shops[0] 샘플:', all[0]);
+      // 별칭 후보 키 가진 첫 shop을 따로 출력 (디버깅 가속)
+      const aliasKeys = ['alias','shop_alias','shop_nick','shop_nickname','nick_name','nickname','memo','comment','shop_memo','shop_comment','remark','remarks','biz_no','business_no','business_number','company_no','comp_no','sub_id','cust_cd','cust_code','vendor_code','partner_code','etc_input','shop_name_kr'];
+      const sample = all.find(s => aliasKeys.some(k => s[k]));
+      if (sample) {
+        const found = aliasKeys.filter(k => sample[k]);
+        console.log('[PA] 별칭 후보 키 보유 샘플:', { shop_name: sample.shop_name, shop_cd: sample.shop_cd, found_keys: found, values: Object.fromEntries(found.map(k=>[k, sample[k]])) });
+      } else {
+        console.warn('[PA] shopManage/getShopList 응답에도 별칭 후보 키가 없음. 첫 shop 전체:', all[0]);
+      }
+      if (!silent) _renderPaShops(all);
+      return all;
+    }
+  } catch (e) {
+    console.warn('[PA] shopManage/getShopList 실패 → /shops 폴백:', e.message);
+  }
+  // 폴백: 기본 /shops (shop_name + shop_cd 만)
   try {
     const data = await _paFetch('/shops');
     const shops = _paUnwrap(data);
     _paShops = shops;
     _paSaveShopsCache(shops);
     if (shops.length) {
-      console.log('[PA] shops[0] 전체 키:', Object.keys(shops[0]));
-      console.log('[PA] shops[0] 샘플:', shops[0]);
+      console.log('[PA] (폴백) /shops 로드:', shops.length, '개. 첫 키:', Object.keys(shops[0]));
     }
     if (!silent) _renderPaShops(shops);
     return shops;
@@ -9291,6 +9487,17 @@ async function dashboardOneClickEcount(mode) {
   }
 }
 
+// 원클릭 실행 시 PA 쇼핑몰 목록(별칭 포함)을 확실히 로드
+async function _paEnsureShopsLoaded() {
+  const cur = _paGetShops();
+  // 캐시가 빈약(필드 2개 이하)하면 강제 재조회
+  const lean = cur.length && Object.keys(cur[0]).length <= 2;
+  if (cur.length && !lean) return;
+  const k = _loadPaKey(), a = _loadPaAuth();
+  if (!k || !a) return; // API 설정 없으면 스킵
+  await _paRefreshShops(true);
+}
+
 // 원클릭: 주문 수집 → 매출 장부 저장 → 이카운트 전송
 async function fetchSaveAndSendToEcount() {
   const btn = document.getElementById('pa-one-click-btn');
@@ -9304,16 +9511,28 @@ async function fetchSaveAndSendToEcount() {
       }
       return;
     }
+
+    // 원클릭 전용 기간 입력을 주문 수집 기간에 반영 (비어있으면 유지)
+    const oc1 = document.getElementById('pa-one-click-start');
+    const oc2 = document.getElementById('pa-one-click-end');
+    const pa1 = document.getElementById('pa-order-start');
+    const pa2 = document.getElementById('pa-order-end');
+    if (oc1 && oc1.value && pa1) pa1.value = oc1.value;
+    if (oc2 && oc2.value && pa2) pa2.value = oc2.value;
+
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="animate-pulse">1/3 주문 수집 중...</span>'; }
 
-    // 2. 주문 수집
+    // 2. PA 쇼핑몰 별칭 캐시 확보 (거래처코드 매핑용)
+    await _paEnsureShopsLoaded();
+
+    // 3. 주문 수집
     await fetchPlayautoOrders();
     if (!_paOrders.length) { alert('수집된 주문이 없어 전송을 중단합니다.'); return; }
 
-    // 3. 매출 장부 저장 (silent)
+    // 4. 매출 장부 저장 (silent)
     if (btn) btn.innerHTML = '<span class="animate-pulse">2/3 장부 저장 중...</span>';
-    const paStart = document.getElementById('pa-order-start').value || '';
-    const paEnd = document.getElementById('pa-order-end').value || '';
+    const paStart = pa1 ? pa1.value || '' : '';
+    const paEnd = pa2 ? pa2.value || '' : '';
     const savedCnt = savePlayautoOrdersToLedger(true);
     if (!savedCnt) { alert('장부 저장에 실패했습니다.'); return; }
 
@@ -9333,14 +9552,31 @@ async function fetchSaveAndSendToEcount() {
   }
 }
 
+function _fmtYmd(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
 function setPaOrderQuickDate(mode) {
   const today = new Date();
   const target = mode === 'yesterday' ? new Date(today.getTime() - 86400000) : today;
-  const ymd = target.getFullYear() + '-' + String(target.getMonth()+1).padStart(2,'0') + '-' + String(target.getDate()).padStart(2,'0');
+  const ymd = _fmtYmd(target);
   const s = document.getElementById('pa-order-start');
   const e = document.getElementById('pa-order-end');
   if (s) s.value = ymd;
   if (e) e.value = ymd;
+}
+
+// 원클릭 버튼용 날짜 프리셋 (오늘/어제/최근7일/이번달)
+function setPaOneClickDate(mode) {
+  const today = new Date();
+  let start = today, end = today;
+  if (mode === 'yesterday') { start = end = new Date(today.getTime() - 86400000); }
+  else if (mode === '7days') { start = new Date(today.getTime() - 6 * 86400000); end = today; }
+  else if (mode === 'month')  { start = new Date(today.getFullYear(), today.getMonth(), 1); end = today; }
+  const s = document.getElementById('pa-one-click-start');
+  const e = document.getElementById('pa-one-click-end');
+  if (s) s.value = _fmtYmd(start);
+  if (e) e.value = _fmtYmd(end);
 }
 
 function _paPickDate(obj, fields) {
@@ -9511,15 +9747,37 @@ function _renderPaOrders(orders) {
   }).join('');
 }
 
+// PA SKU(results_prod) 한 건에서 '택배발송비' 추정값을 꺼낸다.
+// PA 원가 세부 설정의 "택배발송비" 필드 후보명을 폭넓게 시도.
+function _paExtractShipCost(p) {
+  if (!p || typeof p !== 'object') return 0;
+  const keys = [
+    'fb_out_cost', 'fb_delivery_cost', 'fb_ship_cost',
+    'out_ship_cost', 'out_cost', 'delivery_cost', 'dlv_cost',
+    'ship_cost', 'ship_price', 'shipping_cost', 'shipping_price',
+    'basic_ship_cost', 'pkg_price'
+  ];
+  for (const k of keys) {
+    const v = Number(p[k]);
+    if (!isNaN(v) && v > 0) return v;
+  }
+  return 0;
+}
+
 // results_prod 배열을 주문→세트코드 매칭 맵으로 변환
 function _paBuildSkuMap() {
-  const map = new Map(); // linkKey → [{ sku, name, qty }...]
+  const map = new Map(); // linkKey → [{ sku, name, qty, shipCost }...]
   const _link = o => String(o.bundle_no || o.pa_bundle_no || o.uniq || o.shop_ord_no || o.ori_uniq || '');
   const _sku = p => p.set_cd || p.sku_cd || p.prod_no || p.pa_prod_no || p.set_no || p.stock_cd || p.model_no || '';
   (_paOrdersProd || []).forEach(p => {
     const k = _link(p);
     if (!k) return;
-    const entry = { sku: _sku(p), name: p.set_name || p.prod_name || p.sku_name || '', qty: Number(p.pack_unit || p.qty || 1) };
+    const entry = {
+      sku: _sku(p),
+      name: p.set_name || p.prod_name || p.sku_name || '',
+      qty: Number(p.pack_unit || p.qty || 1),
+      shipCost: _paExtractShipCost(p),
+    };
     if (!map.has(k)) map.set(k, []);
     map.get(k).push(entry);
   });
@@ -9535,6 +9793,9 @@ function savePlayautoOrdersToLedger(silent) {
   const dateFields = (_PA_DATE_FIELDS[dateType] || [dateType]).concat(['ord_time', 'order_date', 'wdate']);
   // 세트코드 매핑 (results_prod 기반)
   const { map: skuMap, _link } = _paBuildSkuMap();
+  // 묶음주문(bundle) 첫 라인 추적 — 같은 bundle_no 에 SKU가 여러 개면 택배비는 첫 라인에만 부과
+  const _bundleKey = o => String(o.bundle_no || o.pa_bundle_no || o.uniq || o.shop_ord_no || o.ori_uniq || o.order_no || o.ord_no || '');
+  const _seenBundles = new Set();
   const existing = _loadUploadData();
   const rows = _paOrders.map(o => {
     const matched = skuMap.get(_link(o)) || [];
@@ -9543,14 +9804,21 @@ function savePlayautoOrdersToLedger(silent) {
     const shopName = o.shop_name || o.shopName || o.site || '플레이오토';
     // 1순위: PA 쇼핑몰 별칭 → 2순위: 사용자 수동 매핑
     const custCd = _paShopAliasOf(o) || _resolveVendorCode(shopName);
+    // 배송처(PA depot) — 구매입력 거래처용. depot_no=코드, depot_name=거래처명
+    const depotCode = String(o.depot_no || o.depot_cd || '').trim();
+    const depotName = String(o.depot_name || '').trim();
     return {
       vendor: shopName,
       site: shopName,
       date: (_paPickDate(o, dateFields) || '').slice(0, 10),
-      // 거래처코드를 siteCode/vendorCode 양쪽에 동일하게 채움
+      // 거래처코드를 siteCode/vendorCode 양쪽에 동일하게 채움 (판매입력용)
       siteCode: custCd,
       vendorCode: custCd,
-      shipCode: '',
+      // 구매입력은 배송처 기준 — depot_no 우선, 없으면 depot_name
+      depotCode,
+      depotName,
+      // 택배비용 품목코드 기본값 — 이카운트 기초등록에서 등록된 '택배비용' 품목
+      shipCode: 'SK0001',
       itemCode: setCd || o.sku_cd || o.item_code || '',
       itemName: (prod && prod.name) || o.shop_sale_name || o.item_name || o.goods_name || '',
       qty: Number(o.sale_cnt || o.qty || 1),
@@ -9562,19 +9830,78 @@ function savePlayautoOrdersToLedger(silent) {
         const unit = Number(o.sales_unit || 0);
         return total ? Math.round(total / qty) : unit;
       })(),
-      ship: 0,
-      shipCost: Number(o.ship_cost || 0),
+      // 택배비(고객 부담) — PA 주문의 배송비 필드 후보를 폭넓게 시도
+      // 같은 묶음주문(bundle)에 SKU가 여러 개면 '첫 유효값' 라인에만 택배비 부과 → 중복 방지
+      ship: (() => {
+        const bk = _bundleKey(o);
+        if (bk && _seenBundles.has(bk)) return 0;
+        const candidates = [o.ship_cost, o.shop_ship_cost, o.delivery_cost, o.delivery_fee, o.ship_fee, o.invoice_ship_cost, o.basic_ship_cost];
+        let amt = 0;
+        for (const c of candidates) {
+          const v = Number(c);
+          if (!isNaN(v) && v > 0) { amt = v; break; }
+        }
+        if (bk && amt > 0) _seenBundles.add(bk); // 유효값(>0) 발견 시에만 마킹 → 누락 방지
+        return amt;
+      })(),
+      // 택배비용: PA SKU의 '택배발송비'(원가 세부설정) 우선 → SKU별 매핑 폴백 → 0
+      shipCost: (prod && Number(prod.shipCost)) || _resolveShipCostBySku(setCd || o.sku_cd || o.item_code || '') || 0,
       cost: Number(o.shop_cost_price || o.shop_supply_price || o.supply_price || o.cost || 0),
       receiver: o.to_name || o.receiver_name || '',
+      // 배송 주소 — 제주도 추가배송비 판별용 (to_state/to_city/to_addr1/to_addr2 합침)
+      address: [o.to_state, o.to_city, o.to_addr1, o.to_addr2, o.addr1, o.addr2].filter(Boolean).join(' '),
       profit: 0,
       template: 'playauto',
       savedAt: stamp,
     };
   });
   rows.forEach(r => { r.profit = (r.price * r.qty) - r.cost - r.shipCost; });
+  // 거래처코드(별칭) 매핑 결과 진단 로그
+  const missingVendor = rows.filter(r => !r.vendorCode);
+  console.log(`[PA→장부] 거래처코드 매핑: ${rows.length - missingVendor.length}/${rows.length}건 성공 (쇼핑몰 ${_paGetShops().length}개 캐시됨)`);
+  if (missingVendor.length) {
+    const byShop = {};
+    missingVendor.forEach((r, i) => {
+      const o = _paOrders[rows.indexOf(r)] || {};
+      const key = `${r.vendor} (shop_cd=${o.shop_cd || '?'}, shop_id=${o.shop_id || '?'})`;
+      byShop[key] = (byShop[key] || 0) + 1;
+    });
+    console.warn('[PA→장부] 거래처코드 누락 상세:', byShop);
+    console.warn('→ 해당 쇼핑몰의 PA 별칭이 비어있거나, /shops 응답에 해당 shop_cd가 없을 수 있습니다. "이카운트 연동" 탭의 수동 매핑으로 보완 가능합니다.');
+  }
   // 품목코드 누락 건수 로그 (이카운트 전송 필수 필드)
   const missingCode = rows.filter(r => !r.itemCode).length;
   console.log(`[PA→장부] 세트코드 매칭: ${rows.length - missingCode}/${rows.length}건 성공`);
+  // 택배비용 소스 로그 (PA SKU 택배발송비 vs SKU매핑 폴백)
+  const shipFromPA = rows.filter((r,i) => {
+    const prod = (skuMap.get(_link(_paOrders[i])) || [])[0];
+    return prod && Number(prod.shipCost) > 0;
+  }).length;
+  const shipFromMap = rows.filter((r,i) => {
+    const prod = (skuMap.get(_link(_paOrders[i])) || [])[0];
+    return (!prod || !Number(prod.shipCost)) && Number(r.shipCost) > 0;
+  }).length;
+  console.log(`[PA→장부] 택배비용 채움: PA SKU '택배발송비' ${shipFromPA}건 / SKU매핑 폴백 ${shipFromMap}건 / 미채움 ${rows.length - shipFromPA - shipFromMap}건`);
+  // 택배비(고객부담) 상세 로그 — 어떤 PA 필드에서 왔는지 / 묶음 중복으로 0이 된 건 추적
+  const SHIP_FIELDS = ['ship_cost','shop_ship_cost','delivery_cost','delivery_fee','ship_fee','invoice_ship_cost','basic_ship_cost'];
+  const shipDetail = _paOrders.map((o, i) => {
+    const present = {};
+    SHIP_FIELDS.forEach(f => { if (o[f] != null && o[f] !== '') present[f] = o[f]; });
+    return {
+      idx: i, receiver: o.to_name || o.receiver_name || '',
+      bundle: String(o.bundle_no || o.pa_bundle_no || o.uniq || ''),
+      rawShipFields: present,
+      saved_ship: rows[i] ? Number(rows[i].ship || 0) : 0,
+    };
+  });
+  console.log('[PA→장부] 택배비(ship) 채움 상세:', shipDetail);
+  const shipCount = rows.filter(r => Number(r.ship || 0) > 0).length;
+  console.log(`[PA→장부] 택배비 부과: ${shipCount}/${rows.length}건 (묶음 중복 제외)`);
+  // PA 주문에 택배비 필드가 있는데도 저장값이 0인 경우 경고
+  const fieldPresentRows = shipDetail.filter(d => Object.keys(d.rawShipFields).length && d.saved_ship === 0);
+  if (fieldPresentRows.length) {
+    console.warn(`[PA→장부] ⚠ PA에 배송비 필드가 있지만 장부 ship=0인 행 ${fieldPresentRows.length}건 (묶음 중복으로 제외됐거나 값이 0):`, fieldPresentRows);
+  }
   if (missingCode) {
     console.warn(`[PA→장부] 품목코드 누락: ${missingCode}/${rows.length}건. 첫 주문 샘플 키:`, _paOrders[0] ? {
       shop_sku_cd: _paOrders[0].shop_sku_cd, c_sale_cd: _paOrders[0].c_sale_cd,
@@ -10197,8 +10524,444 @@ function downloadUploadTemplate() {
 
 const ECOUNT_SETTINGS_KEY = 'gplan_ecount_settings_v1';
 const ECOUNT_VENDOR_MAP_KEY = 'gplan_ecount_vendor_map_v1';
+const ECOUNT_DEPOT_MAP_KEY = 'gplan_ecount_depot_map_v1';
+// 배송처 (PA depot_no/depot_name) → 이카운트 거래처코드 매핑
+function _loadDepotMap() {
+  try { return JSON.parse(localStorage.getItem(ECOUNT_DEPOT_MAP_KEY) || '{}'); } catch(_) { return {}; }
+}
+function _saveDepotMapStore(m) {
+  try { localStorage.setItem(ECOUNT_DEPOT_MAP_KEY, JSON.stringify(m)); } catch(_) {}
+}
+// depot_no(코드) 또는 depot_name(이름) 어느 쪽이든 키로 매칭 — 정확 → 공백제거 → 부분포함
+function _resolveDepotCode(depotCode, depotName) {
+  const map = _loadDepotMap();
+  const tries = [String(depotCode || '').trim(), String(depotName || '').trim()].filter(Boolean);
+  for (const t of tries) {
+    if (map[t]) return map[t];
+  }
+  for (const t of tries) {
+    const norm = t.replace(/\s+/g,'').toLowerCase();
+    for (const k of Object.keys(map)) {
+      if (String(k).replace(/\s+/g,'').toLowerCase() === norm) return map[k];
+    }
+  }
+  for (const t of tries) {
+    const norm = t.replace(/\s+/g,'').toLowerCase();
+    for (const k of Object.keys(map)) {
+      const kn = String(k).replace(/\s+/g,'').toLowerCase();
+      if (kn && (norm.includes(kn) || kn.includes(norm))) return map[k];
+    }
+  }
+  return '';
+}
+function renderDepotMap() {
+  const body = document.getElementById('depot-map-body');
+  if (!body) return;
+  const map = _loadDepotMap();
+  const entries = Object.entries(map);
+  if (!entries.length) entries.push(['', '']);
+  body.innerHTML = entries.map(([name, code], i) => `
+    <div class="flex items-center gap-2" data-idx="${i}">
+      <input type="text" placeholder="배송처명 또는 depot_no (예: 지플랜 / 179937)" value="${_escapeHtml(name)}" class="dm-name flex-1 bg-brand-bg rounded-xl px-3 py-2 text-sm border border-brand-border outline-none focus:border-brand-black">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-brand-gray shrink-0"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      <input type="text" placeholder="이카운트 거래처코드 (예: 4476400180)" value="${_escapeHtml(code)}" class="dm-code flex-1 bg-brand-bg rounded-xl px-3 py-2 text-sm border border-brand-border outline-none focus:border-brand-black">
+      <button type="button" onclick="removeDepotMapRow(this)" class="text-brand-gray hover:text-brand-pink p-2" title="삭제">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  `).join('');
+}
+function addDepotMapRow() {
+  const body = document.getElementById('depot-map-body');
+  if (!body) return;
+  const div = document.createElement('div');
+  div.className = 'flex items-center gap-2';
+  div.innerHTML = `
+    <input type="text" placeholder="배송처명 또는 depot_no (예: 지플랜 / 179937)" class="dm-name flex-1 bg-brand-bg rounded-xl px-3 py-2 text-sm border border-brand-border outline-none focus:border-brand-black">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-brand-gray shrink-0"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    <input type="text" placeholder="이카운트 거래처코드 (예: 4476400180)" class="dm-code flex-1 bg-brand-bg rounded-xl px-3 py-2 text-sm border border-brand-border outline-none focus:border-brand-black">
+    <button type="button" onclick="removeDepotMapRow(this)" class="text-brand-gray hover:text-brand-pink p-2" title="삭제">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>`;
+  body.appendChild(div);
+}
+function removeDepotMapRow(btn) {
+  const row = btn.closest('[class*="flex"]');
+  if (row && row.parentElement) row.parentElement.removeChild(row);
+}
+function saveDepotMap() {
+  const body = document.getElementById('depot-map-body');
+  if (!body) return;
+  const map = {};
+  body.querySelectorAll('.dm-name').forEach((nEl, i) => {
+    const cEl = body.querySelectorAll('.dm-code')[i];
+    const name = (nEl.value || '').trim();
+    const code = (cEl ? cEl.value || '' : '').trim();
+    if (name) map[name] = code;
+  });
+  _saveDepotMapStore(map);
+  alert(`배송처 매핑 ${Object.keys(map).length}건이 저장되었습니다.`);
+  renderDepotMap();
+}
+// 사용자가 알려준 초기 매핑 (지플랜 → 4476400180) — 비어있을 때 1회만 자동 시드
+(function _seedDepotMap() {
+  try {
+    const cur = JSON.parse(localStorage.getItem(ECOUNT_DEPOT_MAP_KEY) || '{}');
+    if (Object.keys(cur).length) return;
+    const seed = { '지플랜': '4476400180', '179937': '4476400180' };
+    localStorage.setItem(ECOUNT_DEPOT_MAP_KEY, JSON.stringify(seed));
+  } catch(_) {}
+})();
 function _loadEcountSettings() {
   try { return JSON.parse(localStorage.getItem(ECOUNT_SETTINGS_KEY) || '{}'); } catch (_) { return {}; }
+}
+
+// SKU별 택배발송비 매핑 (이카운트 구매입력 택배비용 라인 단가용)
+const ECOUNT_SHIP_COST_MAP_KEY = 'gplan_ecount_ship_cost_map_v1';
+function _loadShipCostMap() {
+  try { return JSON.parse(localStorage.getItem(ECOUNT_SHIP_COST_MAP_KEY) || '{}'); } catch(_) { return {}; }
+}
+function _saveShipCostMapStore(m) {
+  try { localStorage.setItem(ECOUNT_SHIP_COST_MAP_KEY, JSON.stringify(m)); } catch(_) {}
+}
+// SKU 코드로 매핑된 택배발송비 조회 (정확일치 → 공백제거+대소문자무시)
+function _resolveShipCostBySku(sku) {
+  const map = _loadShipCostMap();
+  const s = String(sku || '').trim();
+  if (!s) return 0;
+  if (map[s] != null) return Number(map[s]) || 0;
+  const norm = s.replace(/\s+/g,'').toLowerCase();
+  for (const k of Object.keys(map)) {
+    if (String(k).replace(/\s+/g,'').toLowerCase() === norm) return Number(map[k]) || 0;
+  }
+  return 0;
+}
+const SHIP_COST_MAP_PAGE_SIZE = 100;
+let _shipCostMapPage = 1;
+function renderShipCostMap() {
+  const body = document.getElementById('ship-cost-map-body');
+  if (!body) return;
+  const map = _loadShipCostMap();
+  const q = (document.getElementById('ship-cost-map-search')?.value || '').trim().toLowerCase();
+  let entries = Object.entries(map);
+  if (q) entries = entries.filter(([sku]) => String(sku).toLowerCase().includes(q));
+
+  const total = entries.length;
+  const totalPages = Math.max(1, Math.ceil(total / SHIP_COST_MAP_PAGE_SIZE));
+  if (_shipCostMapPage > totalPages) _shipCostMapPage = totalPages;
+  if (_shipCostMapPage < 1) _shipCostMapPage = 1;
+
+  const startIdx = (_shipCostMapPage - 1) * SHIP_COST_MAP_PAGE_SIZE;
+  const pageEntries = entries.slice(startIdx, startIdx + SHIP_COST_MAP_PAGE_SIZE);
+  const display = pageEntries.length ? pageEntries : [['', '']];
+
+  body.innerHTML = display.map(([sku, cost], i) => `
+    <div class="flex items-center gap-2" data-idx="${startIdx + i}">
+      <input type="text" placeholder="SKU 코드 (예: K10030)" value="${_escapeHtml(sku)}" class="sc-sku flex-1 bg-brand-bg rounded-xl px-3 py-2 text-sm border border-brand-border outline-none focus:border-brand-black">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-brand-gray shrink-0"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      <input type="number" placeholder="택배발송비 (예: 3500)" value="${_escapeHtml(String(cost))}" class="sc-cost flex-1 bg-brand-bg rounded-xl px-3 py-2 text-sm border border-brand-border outline-none focus:border-brand-black">
+      <button type="button" onclick="removeShipCostMapRow(this)" class="text-brand-gray hover:text-brand-pink p-2" title="삭제">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  `).join('');
+
+  // 카운트 표시
+  const countEl = document.getElementById('ship-cost-map-count');
+  if (countEl) {
+    const shown = pageEntries.length;
+    const rangeStart = total ? startIdx + 1 : 0;
+    const rangeEnd = startIdx + shown;
+    countEl.textContent = total
+      ? `${rangeStart}-${rangeEnd} / 총 ${total}건` + (q ? ' (검색)' : '')
+      : (q ? '검색 결과 없음' : '매핑 없음');
+  }
+
+  // 페이지네이션 렌더
+  const pager = document.getElementById('ship-cost-map-pager');
+  if (pager) {
+    if (totalPages <= 1) { pager.innerHTML = ''; }
+    else {
+      const btnCls = 'px-2.5 py-1 rounded-full border border-brand-border text-xs font-bold hover:bg-brand-bg disabled:opacity-40 disabled:cursor-not-allowed';
+      const activeCls = 'px-2.5 py-1 rounded-full bg-brand-black text-white text-xs font-bold';
+      const parts = [];
+      parts.push(`<button class="${btnCls}" ${_shipCostMapPage <= 1 ? 'disabled' : ''} onclick="gotoShipCostMapPage(${_shipCostMapPage - 1})">이전</button>`);
+      const maxBtns = 7;
+      let from = Math.max(1, _shipCostMapPage - Math.floor(maxBtns / 2));
+      let to = Math.min(totalPages, from + maxBtns - 1);
+      from = Math.max(1, to - maxBtns + 1);
+      if (from > 1) parts.push(`<button class="${btnCls}" onclick="gotoShipCostMapPage(1)">1</button>`, '<span class="text-brand-gray px-1">…</span>');
+      for (let p = from; p <= to; p++) {
+        parts.push(`<button class="${p === _shipCostMapPage ? activeCls : btnCls}" onclick="gotoShipCostMapPage(${p})">${p}</button>`);
+      }
+      if (to < totalPages) parts.push('<span class="text-brand-gray px-1">…</span>', `<button class="${btnCls}" onclick="gotoShipCostMapPage(${totalPages})">${totalPages}</button>`);
+      parts.push(`<button class="${btnCls}" ${_shipCostMapPage >= totalPages ? 'disabled' : ''} onclick="gotoShipCostMapPage(${_shipCostMapPage + 1})">다음</button>`);
+      pager.innerHTML = parts.join('');
+    }
+  }
+}
+function gotoShipCostMapPage(p) { _shipCostMapPage = p; renderShipCostMap(); }
+function addShipCostMapRow() {
+  const body = document.getElementById('ship-cost-map-body');
+  if (!body) return;
+  const div = document.createElement('div');
+  div.className = 'flex items-center gap-2';
+  div.innerHTML = `
+    <input type="text" placeholder="SKU 코드 (예: K10030)" class="sc-sku flex-1 bg-brand-bg rounded-xl px-3 py-2 text-sm border border-brand-border outline-none focus:border-brand-black">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-brand-gray shrink-0"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    <input type="number" placeholder="택배발송비 (예: 3500)" class="sc-cost flex-1 bg-brand-bg rounded-xl px-3 py-2 text-sm border border-brand-border outline-none focus:border-brand-black">
+    <button type="button" onclick="removeShipCostMapRow(this)" class="text-brand-gray hover:text-brand-pink p-2" title="삭제">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>`;
+  body.appendChild(div);
+}
+function removeShipCostMapRow(btn) {
+  const row = btn.closest('[class*="flex"]');
+  if (row && row.parentElement) row.parentElement.removeChild(row);
+}
+function saveShipCostMap() {
+  const body = document.getElementById('ship-cost-map-body');
+  if (!body) return;
+  // 현재 페이지에 렌더링된 항목들
+  const pageMap = {};
+  const skuInputs  = body.querySelectorAll('.sc-sku');
+  const costInputs = body.querySelectorAll('.sc-cost');
+  skuInputs.forEach((nEl, i) => {
+    const sku = (nEl.value || '').trim();
+    const cost = Number((costInputs[i] ? costInputs[i].value || '' : '').trim() || 0);
+    if (sku) pageMap[sku] = cost;
+  });
+  // 현재 페이지에 "원래 있던" SKU 목록 — 사용자가 삭제(또는 SKU코드 변경)한 항목 식별용
+  const existing = _loadShipCostMap();
+  const pageSize = SHIP_COST_MAP_PAGE_SIZE;
+  const q = (document.getElementById('ship-cost-map-search')?.value || '').trim().toLowerCase();
+  let allEntries = Object.entries(existing);
+  if (q) allEntries = allEntries.filter(([sku]) => String(sku).toLowerCase().includes(q));
+  const startIdx = (_shipCostMapPage - 1) * pageSize;
+  const originalPageSkus = allEntries.slice(startIdx, startIdx + pageSize).map(([sku]) => sku);
+
+  // 병합: 전체 기존 맵에서 현재 페이지의 "원래 SKU"만 제거 후, 편집된 pageMap 덧붙임
+  const merged = { ...existing };
+  originalPageSkus.forEach(k => { delete merged[k]; });
+  Object.assign(merged, pageMap);
+
+  _saveShipCostMapStore(merged);
+  alert(`SKU별 택배발송비 ${Object.keys(merged).length}건이 저장되었습니다.`);
+  renderShipCostMap();
+}
+
+// PA 관리자에서 내려받은 SKU 엑셀을 업로드 → SKU코드/택배발송비 컬럼 자동 매핑
+// PA 내부 API 'ship_cost' 필드가 "택배발송비"이므로, 엑셀 컬럼은 "택배발송비" 또는 "ship_cost"로 인식
+function importShipCostFromExcel(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  ev.target.value = ''; // 같은 파일 재선택 허용
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      if (!rows.length) { alert('엑셀에 데이터가 없습니다.'); return; }
+
+      // 헤더 행 탐지 — PA는 간혹 상단에 요약 행을 두므로 'SKU'가 들어간 첫 행을 헤더로 간주
+      let headerIdx = -1;
+      for (let i = 0; i < Math.min(rows.length, 10); i++) {
+        const cells = rows[i].map(c => String(c || '').trim());
+        if (cells.some(c => /SKU.*코드|sku[_ ]?code|SKU코드/i.test(c))) { headerIdx = i; break; }
+      }
+      if (headerIdx === -1) { alert('SKU코드 열을 찾을 수 없습니다. PA 관리자 → SKU상품관리에서 엑셀 다운로드한 파일인지 확인해 주세요.'); return; }
+
+      const header = rows[headerIdx].map(c => String(c || '').trim());
+      const _findCol = (patterns) => {
+        for (let i = 0; i < header.length; i++) {
+          const h = header[i];
+          if (patterns.some(p => (p instanceof RegExp ? p.test(h) : h === p))) return i;
+        }
+        return -1;
+      };
+      const skuIdx  = _findCol([/SKU.*코드/i, /sku[_ ]?code/i, 'SKU코드']);
+      const shipIdx = _findCol([/택배발송비/, /ship[_ ]?cost/i, /배송비/]);
+
+      if (skuIdx === -1) { alert('SKU코드 컬럼을 찾을 수 없습니다.'); return; }
+      if (shipIdx === -1) {
+        alert('택배발송비 컬럼을 찾을 수 없습니다.\n헤더 목록: ' + header.filter(Boolean).join(', '));
+        return;
+      }
+
+      const map = {};
+      let matched = 0, skipped = 0, zero = 0;
+      for (let i = headerIdx + 1; i < rows.length; i++) {
+        const r = rows[i];
+        if (!r || !r.length) continue;
+        const sku = String(r[skuIdx] || '').trim();
+        if (!sku) { skipped++; continue; }
+        const cost = Number(String(r[shipIdx] || '').replace(/[,\s]/g, '')) || 0;
+        if (cost > 0) { map[sku] = cost; matched++; }
+        else { zero++; }
+      }
+
+      if (!matched) {
+        alert(`SKU ${skipped + zero}건을 읽었으나 택배발송비가 0보다 큰 행이 없습니다.\n(0원: ${zero}건, SKU 누락: ${skipped}건)`);
+        return;
+      }
+
+      const existing = _loadShipCostMap();
+      const merged = { ...existing, ...map };
+      _saveShipCostMapStore(merged);
+      renderShipCostMap();
+      alert(
+        `PA 엑셀 업로드 완료.\n` +
+        `• 매핑 ${matched}건 저장 (택배발송비 > 0)\n` +
+        `• 0원 ${zero}건 / SKU 누락 ${skipped}건\n` +
+        `• 전체 매핑 ${Object.keys(merged).length}건`
+      );
+    } catch (err) {
+      alert('엑셀 파싱 실패: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// (구) PA OpenAPI 기반 SKU 마스터 자동 동기화 — PA OpenAPI가 SKU 마스터를 노출하지 않아 엑셀 업로드로 대체됨.
+// 필요 시 재사용 가능하도록 남겨둠.
+async function syncShipCostFromPA() {
+  const btn = document.getElementById('pa-ship-cost-sync-btn');
+  if (!_loadPaKey() || !_loadPaAuth()) { alert('플레이오토 API 설정이 필요합니다. "플레이오토 연동" 탭에서 먼저 등록하세요.'); return; }
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="animate-pulse">동기화 중...</span>'; }
+
+  // SKU 코드 후보 (results_prod 키와 동일 우선순위)
+  const SKU_KEYS = ['set_cd', 'sku_cd', 'stock_cd', 'prod_no', 'set_no', 'pa_prod_no', 'model_no'];
+  // 택배발송비 후보 — PA 원가 세부설정 필드명 변종을 최대한 포괄
+  const SHIP_KEYS = [
+    'fb_out_cost', 'fb_delivery_cost', 'fb_ship_cost', 'fb_dlv_cost',
+    'out_ship_cost', 'out_cost', 'delivery_cost', 'dlv_cost',
+    'ship_cost', 'ship_price', 'shipping_cost', 'shipping_price',
+    'basic_ship_cost', 'pkg_price'
+  ];
+  const endpoints = [
+    // 세트상품
+    '/set/getSetList', '/set/list', '/set/getList', '/set/getSetProdList',
+    // 재고
+    '/stock/getStockList', '/stock/list', '/stock/getList', '/stock/getStockInfo',
+    // 단일상품
+    '/prod/getProdList', '/prod/list', '/prod/getList',
+    '/prod/getMasterProdList', '/prod/getProdMasterList',
+    '/prod/getSetList', '/prod/getProdSetList', '/prod/getSetProdList',
+    // shopManage 등
+    '/shopManage/getProdList', '/shopManage/getSetList',
+    // scm / master
+    '/scm/getProdList', '/masterProd/list', '/masterProd/getList',
+    // 기타 변종
+    '/goods/list', '/goods/getList', '/goods/getGoodsList',
+  ];
+
+  const shipMap = {}; // sku → shipCost
+  let usedEndpoint = '';
+  let totalRows = 0;
+  let sampleKeys = [];
+  const tryLog = []; // 각 엔드포인트 시도 요약 (사용자에게 노출)
+
+  try {
+    outer: for (const ep of endpoints) {
+      try {
+        // 1차: 기본 파라미터
+        let data = await _paFetch(ep, { method: 'POST', body: JSON.stringify({ start: 0, length: 500 }) });
+        console.log(`[PA SKU 동기화] ${ep} raw:`, data);
+        let arr = _paUnwrap(data);
+        // 2차 폴백: 파라미터 없이
+        if (!arr.length) {
+          try {
+            const data2 = await _paFetch(ep, { method: 'POST', body: JSON.stringify({}) });
+            console.log(`[PA SKU 동기화] ${ep} raw (no params):`, data2);
+            arr = _paUnwrap(data2);
+            if (arr.length) data = data2;
+          } catch (_) {}
+        }
+        // 3차 폴백: GET
+        if (!arr.length) {
+          try {
+            const data3 = await _paFetch(ep, { method: 'GET' });
+            console.log(`[PA SKU 동기화] ${ep} raw (GET):`, data3);
+            arr = _paUnwrap(data3);
+            if (arr.length) data = data3;
+          } catch (_) {}
+        }
+        if (!arr.length) {
+          const topKeys = (data && typeof data === 'object') ? Object.keys(data).join(',') : String(typeof data);
+          tryLog.push(`${ep} → 빈 배열 (응답 키: ${topKeys || 'none'})`);
+          continue;
+        }
+        // 응답 전체 페이지 수집 (1페이지 이미 있음)
+        const all = [...arr];
+        let start = arr.length;
+        const length = 500;
+        for (let page = 1; page < 40 && arr.length >= length; page++) {
+          const next = await _paFetch(ep, { method: 'POST', body: JSON.stringify({ start, length }) });
+          arr = _paUnwrap(next);
+          if (!Array.isArray(arr) || !arr.length) break;
+          all.push(...arr);
+          if (arr.length < length) break;
+          start += length;
+        }
+        sampleKeys = Object.keys(all[0]);
+        console.log('[PA SKU 동기화] 엔드포인트 성공:', ep, '총', all.length, '행. 첫 행 키:', sampleKeys);
+        console.log('[PA SKU 동기화] 첫 행 샘플:', all[0]);
+
+        all.forEach(r => {
+          let sku = '';
+          for (const k of SKU_KEYS) { if (r[k]) { sku = String(r[k]).trim(); break; } }
+          if (!sku) return;
+          let cost = 0;
+          for (const k of SHIP_KEYS) {
+            const v = Number(r[k]);
+            if (!isNaN(v) && v > 0) { cost = v; break; }
+          }
+          if (cost > 0) shipMap[sku] = cost;
+        });
+        totalRows = all.length;
+        usedEndpoint = ep;
+        break outer;
+      } catch (e) {
+        tryLog.push(`${ep} → 에러: ${e.message}`);
+        console.log('[PA SKU 동기화] 엔드포인트 실패:', ep, e.message);
+      }
+    }
+
+    if (!usedEndpoint) {
+      console.warn('[PA SKU 동기화] 시도한 엔드포인트 전체:\n' + tryLog.join('\n'));
+      alert(
+        'PA SKU 마스터 조회 가능한 엔드포인트를 찾지 못했습니다.\n' +
+        'F12 콘솔 "[PA SKU 동기화]" 로그에서 각 엔드포인트의 원본 응답을 확인하세요.\n\n' +
+        '가능한 원인:\n' +
+        '1) PA 오픈API가 SKU 마스터를 제공하지 않음\n' +
+        '2) 엔드포인트 이름이 다름 (PA 개발자센터 문서 확인 필요)\n' +
+        '3) 응답 구조가 예상과 다름\n\n' +
+        '대안: "매핑 추가"로 수동 입력하거나, PA 개발자센터에서 정확한 SKU 조회 엔드포인트를 확인해주세요.'
+      );
+      return;
+    }
+    const matched = Object.keys(shipMap).length;
+    if (!matched) {
+      alert(
+        `엔드포인트 "${usedEndpoint}"에서 ${totalRows}건 조회 완료, 하지만 '택배발송비' 필드가 없어 매핑되지 않았습니다.\n` +
+        `F12 콘솔에서 첫 행 키를 확인해 주세요:\n${sampleKeys.slice(0, 20).join(', ')}\n...\n` +
+        `실제 택배발송비 필드명을 알려주시면 후보에 추가하겠습니다.`
+      );
+      return;
+    }
+    // 기존 수동 매핑과 병합 (PA 자동값 덮어쓰기)
+    const existing = _loadShipCostMap();
+    const merged = { ...existing, ...shipMap };
+    _saveShipCostMapStore(merged);
+    renderShipCostMap();
+    alert(`PA SKU ${totalRows}건 중 택배발송비 ${matched}건을 동기화했습니다.\n(엔드포인트: ${usedEndpoint})`);
+  } catch (e) {
+    alert('동기화 실패: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+  }
 }
 // 쇼핑몰명 → 이카운트 거래처코드 매핑 (PA 주문을 이카운트 거래처에 연결)
 function _loadVendorMap() {
@@ -10281,6 +11044,7 @@ function _fillEcountSettingsForm() {
   const user    = document.getElementById('ecount-user');    if (user)    user.value    = s.user    || '';
   const apikey  = document.getElementById('ecount-apikey');  if (apikey)  apikey.value  = s.apikey  || '';
   const zone    = document.getElementById('ecount-zone');    if (zone)    zone.value    = s.zone    || '';
+  const shipC   = document.getElementById('ecount-ship-cost'); if (shipC) shipC.value   = s.shipCost || '';
   const d = new Date();
   const today = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   const rs = document.getElementById('ecount-range-start'); if (rs) rs.value = today;
@@ -10296,10 +11060,11 @@ function _readEcountForm() {
   const ls = _loadEcountSettings();
   const _get = (id, fb) => ((document.getElementById(id)?.value || '').trim() || (fb || ''));
   return {
-    company: _get('ecount-company', ls.company),
-    user:    _get('ecount-user',    ls.user),
-    apikey:  _get('ecount-apikey',  ls.apikey),
-    zone:    _get('ecount-zone',    ls.zone).toUpperCase()
+    company:  _get('ecount-company', ls.company),
+    user:     _get('ecount-user',    ls.user),
+    apikey:   _get('ecount-apikey',  ls.apikey),
+    zone:     _get('ecount-zone',    ls.zone).toUpperCase(),
+    shipCost: _get('ecount-ship-cost', ls.shipCost)
   };
 }
 function _setEcountStatusBar(msg, show) {
@@ -10510,7 +11275,7 @@ function previewEcountTransfer() {
   const countEl = document.getElementById('ecount-preview-count');
   const body = document.getElementById('ecount-preview-body');
   const saleCount     = items.indexOf('sale')     !== -1 ? rows.length : 0;
-  const purchaseRows  = rows.filter(r => !_isGplanVendor(r.vendor));
+  const purchaseRows  = rows.filter(r => !_isGplanPurchaseRow(r));
   const purchaseCount = items.indexOf('purchase') !== -1 ? purchaseRows.length : 0;
   const total = saleCount + purchaseCount;
   const dupMsg = dup.length > 0 ? ' · 중복 ' + dup.length + '건 제외' : '';
@@ -10565,11 +11330,25 @@ function _toEcountDate(d) { return (d || '').replace(/-/g,''); }
 function _cleanVendorName(v) {
   return String(v || '').replace(/\s*그\s*외\s*$/,'').trim();
 }
+// 거래처 표시명 정규화: 같은 사업자번호로 묶이는 변형(-A/-B/-C 등)을 표준명으로 통일
+//   예: "스마트스토어-B", "스마트스토어-C" → "스마트스토어"
+function _normalizeSiteName(name) {
+  const s = String(name || '').trim();
+  if (!s) return s;
+  // "스마트스토어-X" / "스마트스토어 B" 등 → "스마트스토어"
+  if (/^스마트스토어[\s\-_]/.test(s)) return '스마트스토어';
+  return s;
+}
 function _groupKeyOf(r) {
   return _toEcountDate(r.date) + '|' + (r.vendorCode || _cleanVendorName(r.vendor) || '');
 }
+// 판매입력 묶음 키: 같은 날짜 + 같은 거래처(코드 또는 정규화된 이름)
+// — 코드가 있으면 코드로, 없으면 이름(스마트스토어-X 등 정규화 후)으로 묶어 일관성 보장
 function _groupKeyOfSale(r) {
-  return _toEcountDate(r.date) + '|' + (r.siteCode || r.site || '');
+  const code = String(r.siteCode || '').trim();
+  const name = _normalizeSiteName(_cleanVendorName(r.site || r.vendor || '')).replace(/\s+/g,'').toLowerCase();
+  const cust = code || name;
+  return _toEcountDate(r.date) + '|' + cust;
 }
 function _assignSerialsByGroup(rows, keyFn) {
   keyFn = keyFn || _groupKeyOf;
@@ -10586,14 +11365,78 @@ function _isGplanVendor(v) {
   const s = String(v || '').replace(/[\s\(\)㈜주식회사]/g, '').toUpperCase();
   return /지플랜/.test(s) || /GPLAN/.test(s) || /G[-]?PLAN/.test(s);
 }
+// 구매입력 제외 대상 — 쇼핑몰(vendor) 또는 배송처(depotName)가 지플랜인 행
+function _isGplanPurchaseRow(r) {
+  return _isGplanVendor(r.vendor) || _isGplanVendor(r.depotName);
+}
+// 제주도 추가 배송비 — 주소에 "제주"가 포함되면 구매입력에 추가 라인으로 넣음
+const JEJU_EXTRA_SHIP_CODE = 'SK0003';
+const JEJU_EXTRA_SHIP_AMOUNT = 3000;
+function _isJejuAddress(addr) {
+  const s = String(addr || '').replace(/\s+/g, '');
+  return /제주/.test(s);
+}
+// 배송처명 정규화 — 같은 거래처의 분점/카테고리 변형을 한 이름으로 통일
+// 예) "서울리빙", "서울리빙 그외", "서울리빙 의류" → "서울리빙"
+const DEPOT_NORMALIZE_PREFIXES = ['서울리빙'];
+function _normalizeDepotName(name) {
+  const s = String(name || '').trim();
+  if (!s) return s;
+  for (const p of DEPOT_NORMALIZE_PREFIXES) {
+    // 정확히 prefix 로 시작하고, 그 뒤가 없거나 공백/구분자일 때만 매칭 (부분 단어 오매칭 방지)
+    const re = new RegExp('^' + p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\s|[\\-_/,·]|$)');
+    if (re.test(s)) return p;
+  }
+  return s;
+}
+// 구매입력 묶음 키: 같은 날짜 + 같은 배송처
+// 우선순위: 사용자 매핑코드 → 정규화된 배송처명 → depotCode → vendorCode → vendor명
+//   (PA에서 "서울리빙/서울리빙 의류/서울리빙 그외"가 각기 다른 depot_no를 가져도
+//    정규화된 이름이 우선하므로 1전표로 합쳐진다)
+function _groupKeyOfPurchase(r) {
+  const mapped  = _resolveDepotCode(r.depotCode, r.depotName);
+  const nameKey = _normalizeDepotName(r.depotName || '').replace(/\s+/g, '').toLowerCase();
+  const cust = mapped
+    || nameKey
+    || String(r.depotCode || '').trim()
+    || String(r.vendorCode || '').trim()
+    || _cleanVendorName(r.vendor || '').replace(/\s+/g, '').toLowerCase();
+  return _toEcountDate(r.date) + '|' + cust;
+}
 
 function _buildSalePayload(rows) {
   const serOf = _assignSerialsByGroup(rows, _groupKeyOfSale);
+  // 진단: 묶음(전표) 개수 vs 행 수
+  const groupCount = new Set(rows.map(r => _groupKeyOfSale(r))).size;
+  console.log(`[이카운트→판매] 묶음 ${groupCount}개 / 행 ${rows.length}개 — 같은 날짜+같은 거래처는 1전표로 합쳐 전송됩니다.`);
+  // 진단: 모든 행의 키와 거래처 정보 (왜 같은 거래처가 분할되는지 추적)
+  console.log('[이카운트→판매] 행별 키 dump:', rows.map(r => ({
+    site: r.site, vendor: r.vendor, siteCode: r.siteCode, date: r.date,
+    item: (r.itemName || '').slice(0, 20),
+    ship: Number(r.ship || 0), shipCode: r.shipCode || '',
+    key: _groupKeyOfSale(r)
+  })));
+  const shipRows = rows.filter(r => Number(r.ship || 0) > 0 && r.shipCode);
+  if (shipRows.length) console.log(`[이카운트→판매] 택배비 추가 라인: ${shipRows.length}건 (합계 ${shipRows.reduce((s,r)=>s+Number(r.ship||0),0).toLocaleString()}원)`);
+  // 같은 묶음은 SaleList 내 연속 위치에 와야 이카운트가 1전표로 인식 → 그룹키로 정렬
+  rows = rows.slice().sort((a, b) => {
+    const ka = _groupKeyOfSale(a), kb = _groupKeyOfSale(b);
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+  });
+  // 같은 그룹 내에서 CUST_DES(거래처명)가 다르면 이카운트가 전표를 분리 → 표준명으로 통일
+  // 변형 이름(스마트스토어-B, 스마트스토어-C)은 _normalizeSiteName으로 표준명("스마트스토어")으로 변환
+  const groupCustDes = {};
+  rows.forEach(r => {
+    const k = _groupKeyOfSale(r);
+    if (!(k in groupCustDes)) groupCustDes[k] = _normalizeSiteName(r.site);
+  });
+  // UPLOAD_SER_NO는 1~N 작은 정수만 허용 (이카운트 자릿수 제한)
   const emp = 'API';
   const list = [];
   let lineNo = 0;
   rows.forEach(r => {
     const serNo = serOf(r);
+    const custDes = groupCustDes[_groupKeyOfSale(r)] || r.site || '';
     lineNo++;
     list.push({
       Line: String(lineNo),
@@ -10601,7 +11444,7 @@ function _buildSalePayload(rows) {
         IO_DATE:    _toEcountDate(r.date),
         UPLOAD_SER_NO: String(serNo),
         CUST:       r.siteCode || '',
-        CUST_DES:   r.site || '',
+        CUST_DES:   custDes,
         EMP_CD:     emp,
         WH_CD:      '',
         IO_TYPE:    '',
@@ -10617,9 +11460,10 @@ function _buildSalePayload(rows) {
         REMARKS:    (r.receiver || '')
       }
     });
-    // 택배비: 동일 전표에 추가 라인으로 전송
+    // 택배비: 동일 전표에 추가 라인으로 전송 (같은 UPLOAD_SER_NO + 같은 CUST_DES)
+    // shipCode 없으면 PROD_CD 비어 이카운트가 거부 → 라인 자체 스킵
     const ship = Number(r.ship || 0);
-    if (ship > 0) {
+    if (ship > 0 && r.shipCode) {
       lineNo++;
       list.push({
         Line: String(lineNo),
@@ -10627,7 +11471,7 @@ function _buildSalePayload(rows) {
           IO_DATE:    _toEcountDate(r.date),
           UPLOAD_SER_NO: String(serNo),
           CUST:       r.siteCode || '',
-          CUST_DES:   r.site || '',
+          CUST_DES:   custDes,
           EMP_CD:     emp,
           WH_CD:      '',
           IO_TYPE:    '',
@@ -10644,23 +11488,63 @@ function _buildSalePayload(rows) {
       });
     }
   });
+  // 진단: UPLOAD_SER_NO별 라인 수 집계 (이카운트가 실제로 묶어주는지 확인용)
+  const bySer = {};
+  list.forEach(item => {
+    const k = item.BulkDatas.UPLOAD_SER_NO;
+    bySer[k] = (bySer[k] || 0) + 1;
+  });
+  console.log('[이카운트→판매] UPLOAD_SER_NO별 라인 수:', bySer, '— 같은 번호의 라인은 이카운트에서 1전표로 합쳐져야 함');
+  console.log('[이카운트→판매] 전송 payload 첫 3라인:', list.slice(0, 3));
   return { SaleList: list };
 }
 function _buildPurchasePayload(rows) {
   const list = [];
   let lineNo = 0;
-  const serOf = _assignSerialsByGroup(rows);
+  const serOf = _assignSerialsByGroup(rows, _groupKeyOfPurchase);
+  // 진단: 각 행의 묶음 키(어떻게 그룹핑되는지 눈으로 확인 가능)
+  try {
+    const keyBreakdown = rows.map(r => ({
+      date: r.date, vendor: r.vendor, depotCode: r.depotCode,
+      depotName: r.depotName, normDepot: _normalizeDepotName(r.depotName || ''),
+      mappedDepot: _resolveDepotCode(r.depotCode, r.depotName) || '(none)',
+      groupKey: _groupKeyOfPurchase(r),
+      itemCode: r.itemCode,
+      address: r.address || '', isJeju: _isJejuAddress(r.address),
+    }));
+    console.log('[이카운트→구매] 행별 묶음 키:', keyBreakdown);
+    const jejuCount = keyBreakdown.filter(x => x.isJeju).length;
+    if (jejuCount) console.log(`[이카운트→구매] 제주도 추가배송비 대상: ${jejuCount}건 (각 ${JEJU_EXTRA_SHIP_AMOUNT}원, 코드 ${JEJU_EXTRA_SHIP_CODE})`);
+  } catch (_) {}
+  // 같은 묶음 행을 연속 위치로 정렬 (이카운트가 1전표로 인식하도록)
+  rows = rows.slice().sort((a, b) => {
+    const ka = _groupKeyOfPurchase(a), kb = _groupKeyOfPurchase(b);
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+  });
+  // 같은 그룹 내 CUST_DES 통일 (이카운트 전표 분리 방지) — 배송처명 정규화 적용
+  const groupPurCustDes = {};
+  rows.forEach(r => {
+    const k = _groupKeyOfPurchase(r);
+    if (!(k in groupPurCustDes)) {
+      groupPurCustDes[k] = _normalizeDepotName(r.depotName) || _cleanVendorName(r.vendor);
+    }
+  });
   const emp = 'API';
   rows.forEach(r => {
     const serNo = serOf(r);
+    // 구매입력 거래처는 배송처(depot) 기준 — 사용자 지정 배송처→이카운트 매핑이 있으면 우선 적용
+    const mappedDepot = _resolveDepotCode(r.depotCode, r.depotName);
+    const normDepot   = _normalizeDepotName(r.depotName);
+    const purCust    = mappedDepot || r.depotCode || normDepot || r.vendorCode || '';
+    const purCustDes = groupPurCustDes[_groupKeyOfPurchase(r)] || normDepot || _cleanVendorName(r.vendor);
     lineNo++;
     list.push({
       Line: String(lineNo),
       BulkDatas: {
         IO_DATE:    _toEcountDate(r.date),
         UPLOAD_SER_NO: String(serNo),
-        CUST:       r.vendorCode || '',
-        CUST_DES:   _cleanVendorName(r.vendor),
+        CUST:       purCust,
+        CUST_DES:   purCustDes,
         EMP_CD:     emp,
         WH_CD:      '',
         IO_TYPE:    '',
@@ -10675,17 +11559,18 @@ function _buildPurchasePayload(rows) {
         REMARKS:    r.receiver || ''
       }
     });
-    // 택배비용: 동일 전표에 추가 라인으로 전송 (수량 1, 단가 = 택배비용)
-    const ship = Number(r.shipCost || 0);
-    if (ship > 0) {
+    // 택배비용: 동일 전표에 추가 라인으로 전송 (수량 1, 단가 = SKU별 매핑)
+    // 전송 시점에 SKU 매핑 조회 — 장부 저장값(r.shipCost) 무시
+    const ship = _resolveShipCostBySku(r.itemCode);
+    if (ship > 0 && r.shipCode) {
       lineNo++;
       list.push({
         Line: String(lineNo),
         BulkDatas: {
           IO_DATE:    _toEcountDate(r.date),
           UPLOAD_SER_NO: String(serNo),
-          CUST:       r.vendorCode || '',
-          CUST_DES:   _cleanVendorName(r.vendor),
+          CUST:       purCust,
+          CUST_DES:   purCustDes,
           EMP_CD:     emp,
           WH_CD:      '',
           IO_TYPE:    '',
@@ -10701,7 +11586,40 @@ function _buildPurchasePayload(rows) {
         }
       });
     }
+    // 제주도 추가배송비: 주소에 "제주" 포함 시 동일 전표에 추가 라인 (수량 1, 고정 3000원)
+    if (_isJejuAddress(r.address) && JEJU_EXTRA_SHIP_AMOUNT > 0) {
+      lineNo++;
+      const jp = JEJU_EXTRA_SHIP_AMOUNT;
+      list.push({
+        Line: String(lineNo),
+        BulkDatas: {
+          IO_DATE:    _toEcountDate(r.date),
+          UPLOAD_SER_NO: String(serNo),
+          CUST:       purCust,
+          CUST_DES:   purCustDes,
+          EMP_CD:     emp,
+          WH_CD:      '',
+          IO_TYPE:    '',
+          EXCHANGE_TYPE: '',
+          EXCHANGE_RATE: '',
+          PROD_CD:    JEJU_EXTRA_SHIP_CODE,
+          PROD_DES:   '제주도 추가배송비',
+          QTY:        '1',
+          PRICE:      String(jp),
+          SUPPLY_AMT: String(Math.round(jp / 1.1)),
+          VAT_AMT:    String(jp - Math.round(jp / 1.1)),
+          REMARKS:    '제주도 추가배송비' + (r.receiver ? ' - ' + r.receiver : '')
+        }
+      });
+    }
   });
+  // 진단: UPLOAD_SER_NO별 라인 수 (구매)
+  const bySer = {};
+  list.forEach(item => {
+    const k = item.BulkDatas.UPLOAD_SER_NO;
+    bySer[k] = (bySer[k] || 0) + 1;
+  });
+  console.log('[이카운트→구매] UPLOAD_SER_NO별 라인 수:', bySer);
   return { PurchasesList: list };
 }
 async function _ecountPost(zone, path, sessionId, body) {
@@ -10784,6 +11702,38 @@ function closeEcountErrorModal() {
   const modal = document.getElementById('ecount-error-modal');
   if (modal) modal.classList.add('hidden');
 }
+// 공용 알림 모달 — type: 'success' | 'warn' | 'error' | 'info'
+function showAppAlert(title, msg, type, extra) {
+  const modal = document.getElementById('app-alert-modal');
+  if (!modal) { alert((title ? title + '\n' : '') + msg); return; }
+  const t = document.getElementById('app-alert-title');
+  const m = document.getElementById('app-alert-msg');
+  const e = document.getElementById('app-alert-extra');
+  const ic = document.getElementById('app-alert-icon');
+  if (t) t.textContent = title || '알림';
+  if (m) m.textContent = msg || '';
+  if (e) {
+    if (extra) { e.innerHTML = extra; e.classList.remove('hidden'); }
+    else e.classList.add('hidden');
+  }
+  // 아이콘 + 색상 테마
+  const themes = {
+    success: { bg: 'bg-brand-green-light', stroke: '#00C853', icon: '<circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/>' },
+    warn:    { bg: 'bg-brand-orange-light/50', stroke: '#FF9800', icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' },
+    error:   { bg: 'bg-brand-pink-light',    stroke: '#E91E63', icon: '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>' },
+    info:    { bg: 'bg-brand-bg',            stroke: '#333',    icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>' },
+  };
+  const th = themes[type] || themes.info;
+  if (ic) {
+    ic.className = 'w-12 h-12 rounded-2xl ' + th.bg + ' flex items-center justify-center shrink-0';
+    ic.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${th.stroke}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">${th.icon}</svg>`;
+  }
+  modal.classList.remove('hidden');
+}
+function closeAppAlert() {
+  const modal = document.getElementById('app-alert-modal');
+  if (modal) modal.classList.add('hidden');
+}
 async function sendToEcount() {
   const items = Array.from(document.querySelectorAll('.ecount-item:checked')).map(c => c.value);
   if (items.length === 0) { alert('전송할 데이터가 없습니다. 기간을 다시 선택해 주세요.'); return; }
@@ -10822,9 +11772,24 @@ async function sendToEcount() {
       saleFail = (typeof r.fail === 'number' && r.fail > 0) ? r.fail : Math.max(0, lineCount - r.ok);
     }
     if (items.indexOf('purchase') !== -1) {
-      const purchaseRows = rows.filter(r => !_isGplanVendor(r.vendor));
+      let purchaseRows = rows.filter(r => !_isGplanPurchaseRow(r));
+      const purchaseCandidateCount = purchaseRows.length;
+      // SKU별 택배발송비 매핑 검증 — 미매핑 SKU는 구매입력에서 제외 (완료 모달에 통합 표시)
+      const missingShipCostRows = purchaseRows.filter(r => !(_resolveShipCostBySku(r.itemCode) > 0));
+      if (missingShipCostRows.length) {
+        sendToEcount._missingSkus = [...new Set(missingShipCostRows.map(r => r.itemCode || '(빈 품목코드)'))];
+        sendToEcount._missingRowCount = missingShipCostRows.length;
+        console.warn('[이카운트→구매] SKU 택배발송비 미매핑으로 제외된 행:', sendToEcount._missingRowCount, '건 / SKU:', sendToEcount._missingSkus);
+        purchaseRows = purchaseRows.filter(r => _resolveShipCostBySku(r.itemCode) > 0);
+      } else {
+        sendToEcount._missingSkus = [];
+        sendToEcount._missingRowCount = 0;
+      }
       if (purchaseRows.length === 0) {
-        logs.push({ type:'구매입력', resp:null, errors:[{ line:'-', msg:'전송 대상(지플랜 제외) 행이 없습니다.' }] });
+        const msg = purchaseCandidateCount === 0
+          ? '전송 대상(지플랜 제외) 행이 없습니다.'
+          : `전송 대상 ${purchaseCandidateCount}건이 모두 SKU 택배발송비 미매핑으로 제외되었습니다.`;
+        logs.push({ type:'구매입력', resp:null, errors:[{ line:'-', msg }] });
       } else {
         const payload = _buildPurchasePayload(purchaseRows);
         const lineCount = (payload.PurchasesList || []).length;
@@ -10864,15 +11829,32 @@ async function sendToEcount() {
   try {
     const saleSuccess     = saleOk > 0;
     const purchaseSuccess = purOk  > 0;
-    const purchaseRows    = rows.filter(r => !_isGplanVendor(r.vendor));
+    const purchaseRows    = rows.filter(r => !_isGplanPurchaseRow(r));
     if (saleSuccess) rows.forEach(r => sent.add(_rowSignature(r)));
     if (purchaseSuccess) purchaseRows.forEach(r => sent.add(_rowSignature(r)));
     _saveSentSignatures(sent);
   } catch (_) {}
 
   const dupNote = dup.length > 0 ? '\n(중복 ' + dup.length + '건은 전송에서 제외되었습니다.)' : '';
-  if (failTotal === 0) alert(total + '건의 데이터가 이카운트로 전송되었습니다.' + dupNote);
-  else {
+  const missingSkus = sendToEcount._missingSkus || [];
+  const missingRowCount = sendToEcount._missingRowCount || 0;
+  // 다음 호출을 위해 초기화
+  sendToEcount._missingSkus = [];
+  sendToEcount._missingRowCount = 0;
+  if (failTotal === 0) {
+    let title = '전송 완료';
+    let msg = `판매입력 ${saleOk}건 · 구매입력 ${purOk}건이 이카운트로 전송되었습니다.` + dupNote;
+    let type = 'success';
+    let extra = '';
+    if (missingRowCount > 0) {
+      title = '전송 완료 (일부 제외)';
+      type = 'warn';
+      msg += `\n(SKU 택배발송비 미매핑으로 구매입력 ${missingRowCount}건 제외)`;
+      extra = '미매핑 SKU: <b class="text-brand-black">' + missingSkus.map(s => _escapeHtml(s)).join(', ') + '</b>' +
+              '<br>이카운트 연동 탭 ▶ "SKU별 택배발송비 매핑"에서 등록 후 다시 전송하세요.';
+    }
+    showAppAlert(title, msg, type, extra);
+  } else {
     showEcountErrors(logs);
   }
 }
@@ -10933,11 +11915,10 @@ function disconnectEcount() {
   try { localStorage.removeItem(ECOUNT_SETTINGS_KEY); } catch(_) {}
   try { localStorage.removeItem(ECOUNT_SENT_KEY); } catch(_) {}
   _clearEcountSession();
-  ['ecount-company','ecount-user','ecount-apikey','ecount-zone'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['ecount-company','ecount-user','ecount-apikey','ecount-zone','ecount-ship-cost'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   _setEcountConnected(false);
   alert('이카운트 연동이 해제되었습니다.');
 }
 </script>
 </body>
 </html>
-
