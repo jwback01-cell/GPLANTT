@@ -1,0 +1,12 @@
+{
+  "name": "gplan",
+  "version": "1.0.0",
+  "description": "GPLAN — 내부 운영 관리 도구",
+  "private": true,
+  "engines": {
+    "node": "20.x"
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.16"
+  }
+}

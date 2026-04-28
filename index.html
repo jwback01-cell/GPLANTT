@@ -4402,20 +4402,16 @@ const SUPABASE_URL = 'https://gdsutxmceghvkemcfyuw.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdkc3V0eG1jZWdodmtlbWNmeXV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODc0MDEsImV4cCI6MjA5MTU2MzQwMX0.yO_UwxtQVtVBLC2dVsmJQ4_qgOuWl5LBVAbsnmlwq1U';
 const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// ── FormSubmit.co (서울리빙 발주서 메일 발송용) ────────
-// 받는사람: jwback01@nate.com
-// 무료 양식 → 메일 전달 서비스. 가입·API 키 불필요. 첨부파일 최대 10MB.
+// ── 서울리빙 발주서 메일 발송 (Vercel 서버리스 함수 + Naver SMTP) ──
+// 받는사람: jwback01@nate.com  /  보낸사람: gplan23@naver.com (실제 Naver 메일에서 발송)
+// 발송 흐름: 사이트 → POST /api/send-mail → Vercel 함수 → Naver SMTP → 받는사람
 //
-// 🔧 첫 사용 시 1회 활성화 필요:
-//  1) 처음 "메일 발송" 버튼을 누르면 FormSubmit이 jwback01@nate.com 으로
-//     "Activate Form" 안내 메일을 보냄 (받은편지함 또는 스팸함 확인)
-//  2) 그 메일의 [Activate / Confirm] 링크 한 번 클릭 → 활성화 완료
-//  3) 이후 클릭하는 메일 발송은 모두 정상으로 전달됨
-//
-// 메일 from: noreply@formsubmit.co (FormSubmit 서버에서 발송)
-// 메일 reply-to: gplan23@naver.com 으로 설정되어 받은 사람이 답장 시 자동으로 지플랜 메일로 감.
+// 🔧 Vercel 환경변수 설정 (한 번만):
+//  vercel.com → 프로젝트 → Settings → Environment Variables 에서 추가:
+//   • NAVER_SMTP_USER = gplan23@naver.com
+//   • NAVER_SMTP_PASS = 네이버 환경설정 → POP3/SMTP → 발급된 비밀번호
+//  저장 후 자동 재배포되어야 적용됨.
 const SEOULLIVING_TO_EMAIL = 'jwback01@nate.com';
-const SEOULLIVING_REPLY_TO = 'gplan23@naver.com';
 
 // ── Navigation ──────────────────────────────
 const PAGES = ['login','dashboard','todo','ledger','products','accounts','upload','keywords','sourcing','design'];
@@ -13556,83 +13552,46 @@ async function downloadSeoulLiving(mode, actionType) {
 
   const expandMsg = expandedSets ? ` (세트 ${expandedSets}건을 구성품 ${expandedRows}행으로 분해)` : '';
 
-  // ── 메일 발송 모드 (FormSubmit.co 경유) ──
+  // ── 메일 발송 모드 (Vercel 서버리스 함수 + Naver SMTP) ──
   if (actionType === 'email') {
-    // 워크북 → Blob (xlsx)
-    let wbArr;
-    try { wbArr = XLSXS.write(wb, { bookType: 'xlsx', type: 'array' }); }
+    // 워크북 → base64 (서버에 JSON으로 전송)
+    let base64;
+    try { base64 = XLSXS.write(wb, { bookType: 'xlsx', type: 'base64' }); }
     catch (e) { _msg('파일 변환 실패: ' + (e.message || e), 'text-brand-pink'); return; }
-    const wbBlob = new Blob([wbArr], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 
-    // FormSubmit 은 multipart/form-data 만 첨부 지원이라 fetch 대신 hidden form + iframe 트릭 사용
-    // (브라우저가 응답을 못 보지만 메일은 정상 발송됨)
-    let iframe = document.getElementById('seoulliving-mail-iframe');
-    if (!iframe) {
-      iframe = document.createElement('iframe');
-      iframe.id   = 'seoulliving-mail-iframe';
-      iframe.name = 'seoulliving-mail-iframe';
-      iframe.style.display = 'none';
-      document.body.appendChild(iframe);
-    }
-
-    const form = document.createElement('form');
-    form.action  = `https://formsubmit.co/${SEOULLIVING_TO_EMAIL}`;
-    form.method  = 'POST';
-    form.enctype = 'multipart/form-data';
-    form.target  = 'seoulliving-mail-iframe';
-    form.style.display = 'none';
-
-    const _addInput = (name, value) => {
-      const inp = document.createElement('input');
-      inp.type = 'hidden';
-      inp.name = name;
-      inp.value = value;
-      form.appendChild(inp);
-    };
-    // FormSubmit 메타 필드 (언더스코어 prefix는 설정용)
-    _addInput('_subject',  fileName);          // 제목 = 파일명
-    _addInput('_replyto',  SEOULLIVING_REPLY_TO); // 답장 받을 주소 → 지플랜
-    _addInput('_template', 'box');             // 메일 형식 (깔끔한 박스 템플릿)
-    _addInput('_captcha',  'false');           // 캡차 비활성 (자동 발송)
-    // 본문에 표시될 필드들 (FormSubmit 은 모든 필드를 본문에 나열함)
-    _addInput('보낸곳', '지플랜 (gplan23@naver.com)');
-    _addInput('내용',
-      `안녕하세요. 첨부 발주서 확인 부탁드립니다.\n\n` +
-      `• 주문 ${sortedOrders.length}건\n` +
-      `• 행 ${rows.length}건` +
-      (expandMsg ? `\n• ${expandMsg.trim()}` : '') +
-      `\n\n— 지플랜`
-    );
-
-    // 첨부파일 — DataTransfer 트릭으로 file input 의 files 에 Blob 주입
+    _msg(`📧 ${SEOULLIVING_TO_EMAIL} 로 메일 발송 중... (Naver SMTP)`, 'text-brand-gray');
     try {
-      const fileInput = document.createElement('input');
-      fileInput.type = 'file';
-      fileInput.name = 'attachment';
-      const dt = new DataTransfer();
-      dt.items.add(new File([wbBlob], fileName, { type: wbBlob.type }));
-      fileInput.files = dt.files;
-      form.appendChild(fileInput);
-    } catch (e) {
-      _msg('브라우저가 첨부파일 자동 입력을 지원하지 않습니다 (DataTransfer 미지원). 다른 브라우저 사용 권장.', 'text-brand-pink');
-      return;
+      const response = await fetch('/api/send-mail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to:       SEOULLIVING_TO_EMAIL,
+          subject:  fileName,                                  // 제목 = 파일명
+          fromName: '지플랜',                                   // 발송자 표시명
+          message:
+            `안녕하세요. 첨부 발주서 확인 부탁드립니다.\n\n` +
+            `• 주문 ${sortedOrders.length}건\n` +
+            `• 행 ${rows.length}건` +
+            (expandMsg ? `\n• ${expandMsg.trim()}` : '') +
+            `\n\n— 지플랜`,
+          fileName,
+          fileBase64: base64,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) {
+        const errMsg = data.error || `HTTP ${response.status}`;
+        const hint = data.hint ? `\n${data.hint}` : '';
+        gplanAlert('메일 발송 실패\n\n' + errMsg + hint, { type: 'error', title: '메일 발송 실패' });
+        _msg('📧 메일 발송 실패: ' + errMsg, 'text-brand-pink');
+        return;
+      }
+      _msg(`📧 메일 발송 완료 — ${SEOULLIVING_TO_EMAIL} 로 ${fileName} 전송 (${rows.length}행, gplan23@naver.com 발신)`, 'text-brand-green');
+    } catch (err) {
+      console.error('[메일발송] 실패:', err);
+      gplanAlert('메일 발송 중 네트워크 오류\n\n' + (err.message || err) + '\n\nVercel 환경변수(NAVER_SMTP_USER/PASS)가 설정되었는지 확인해주세요.', { type: 'error', title: '메일 발송 실패' });
+      _msg('📧 메일 발송 실패: ' + (err.message || err), 'text-brand-pink');
     }
-
-    document.body.appendChild(form);
-    _msg(`📧 ${SEOULLIVING_TO_EMAIL} 로 메일 발송 중... (FormSubmit 경유)`, 'text-brand-gray');
-    try {
-      form.submit();
-    } catch (e) {
-      _msg('메일 발송 실패: ' + (e.message || e), 'text-brand-pink');
-      return;
-    }
-    setTimeout(() => { try { form.remove(); } catch(_) {} }, 1500);
-
-    _msg(
-      `📧 메일 발송 요청 완료 — ${SEOULLIVING_TO_EMAIL} 로 ${fileName} (${rows.length}행) ` +
-      `※ 첫 사용 시 받은편지함의 [FormSubmit Activate] 메일 링크를 한 번 눌러주세요.`,
-      'text-brand-green'
-    );
     return;
   }
 
