@@ -13569,11 +13569,11 @@ async function downloadSeoulLiving(mode, actionType) {
           subject:  fileName,                                  // 제목 = 파일명
           fromName: '지플랜',                                   // 발송자 표시명
           message:
-            `안녕하세요. 첨부 발주서 확인 부탁드립니다.\n\n` +
-            `• 주문 ${sortedOrders.length}건\n` +
-            `• 행 ${rows.length}건` +
-            (expandMsg ? `\n• ${expandMsg.trim()}` : '') +
-            `\n\n— 지플랜`,
+            `지플랜\n` +
+            `인천 미추홀구 토금남로4번길 12, 더젠시티 504호\n\n` +
+            `O. 070-4509-1408\n` +
+            `M. 010-9925-4445\n` +
+            `E-mail : gplan23@naver.com`,
           fileName,
           fileBase64: base64,
         }),
