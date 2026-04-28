@@ -1825,6 +1825,11 @@ tailwind.config = {
           <span class="text-brand-gray font-bold shrink-0">~</span>
           <input id="todo-due-end" type="date" class="drawer-input flex-1" placeholder="종료일 (선택)">
         </div>
+        <div class="flex items-center gap-2 flex-wrap mt-1">
+          <button type="button" onclick="setTodoDueQuick('today')"    class="px-3 py-1.5 rounded-full bg-brand-bg border border-brand-border text-xs font-bold hover:bg-white transition-colors">오늘</button>
+          <button type="button" onclick="setTodoDueQuick('tomorrow')" class="px-3 py-1.5 rounded-full bg-brand-bg border border-brand-border text-xs font-bold hover:bg-white transition-colors">내일</button>
+          <button type="button" onclick="setTodoDueQuick('clear')"    class="px-3 py-1.5 rounded-full bg-white border border-brand-border text-xs font-bold text-brand-gray hover:text-brand-black hover:bg-brand-bg transition-colors" title="시작일/종료일 모두 비우기">초기화</button>
+        </div>
         <div id="todo-due-end-note" class="text-xs text-brand-gray font-medium px-1">종료일을 선택하면 기간 업무로 등록됩니다.</div>
       </div>
       <!-- 반복 설정 -->
@@ -8593,6 +8598,26 @@ function onDueDateChange() {
   const endInput = document.getElementById('todo-due-end');
   if (start && endInput.value && endInput.value < start) endInput.value = start;
   if (start) endInput.min = start;
+}
+
+// 할 일 추가 폼: 기간 빠른 선택 — 오늘/내일/초기화
+function setTodoDueQuick(mode) {
+  const startInput = document.getElementById('todo-due');
+  const endInput   = document.getElementById('todo-due-end');
+  if (!startInput) return;
+  if (mode === 'clear') {
+    startInput.value = '';
+    if (endInput) endInput.value = '';
+    onDueDateChange();
+    return;
+  }
+  const d = new Date();
+  if (mode === 'tomorrow') d.setDate(d.getDate() + 1);
+  const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  startInput.value = key;
+  // 종료일이 선택되어있는데 새 시작일보다 빠르면 보정
+  if (endInput && endInput.value && endInput.value < key) endInput.value = key;
+  onDueDateChange();
 }
 
 function toggleRepeatDow(dow) {
