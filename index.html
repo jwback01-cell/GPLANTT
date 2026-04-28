@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -1916,6 +1915,7 @@ tailwind.config = {
         <div class="bg-brand-bg rounded-2xl p-4 mb-5">
           <p class="font-bold text-sm mb-2.5">열 형식 <span class="text-brand-gray font-medium">(* 필수)</span></p>
           <div class="flex flex-wrap gap-2 text-xs">
+            <span class="px-2.5 py-1.5 bg-white rounded-lg border border-brand-border font-mono text-brand-gray">ID</span>
             <span class="px-2.5 py-1.5 bg-white rounded-lg border border-brand-border font-mono font-bold">상품명 *</span>
             <span class="px-2.5 py-1.5 bg-white rounded-lg border border-brand-border font-mono font-bold">SKU *</span>
             <span class="px-2.5 py-1.5 bg-white rounded-lg border border-brand-border font-mono text-brand-gray">카테고리</span>
@@ -10416,6 +10416,7 @@ function exportProductsExcel() {
     if (cell) cell.s = { font: { bold: true }, fill: { fgColor: { rgb: 'F2F2F7' } } };
   }
   ws['!cols'] = [
+    { wch: 8 },  // ID
     { wch: 40 }, // 상품명
     { wch: 20 }, // SKU
     { wch: 14 }, // 카테고리
