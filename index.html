@@ -3621,60 +3621,6 @@ tailwind.config = {
         </section>
       </div>
 
-      <!-- Row 2: 키워드 관리 -->
-      <div class="flex flex-col gap-6">
-        <!-- 키워드 관리 -->
-        <section class="bg-white p-6 md:p-8 rounded-4xl panel flex flex-col h-[640px]">
-          <div class="flex justify-between items-start mb-4 shrink-0 gap-3">
-            <div class="min-w-0">
-              <div class="flex items-center gap-3 mb-1">
-                <div class="w-2 h-6 bg-brand-black rounded-full"></div>
-                <h2 class="text-[1.35rem] font-bold">키워드 관리</h2>
-              </div>
-              <p class="text-brand-gray text-sm ml-5">자동으로 순위를 추적할 키워드를 등록하고 관리하세요.</p>
-            </div>
-            <button onclick="openKwManageModal()" class="bg-brand-black text-white px-5 py-2.5 rounded-full text-sm font-semibold hover:-translate-y-0.5 transition-transform shadow-btn flex items-center gap-2 whitespace-nowrap">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              키워드 등록
-            </button>
-          </div>
-
-          <!-- 필터 + 보기 모드 -->
-          <div class="flex items-center justify-between gap-2 mb-3 shrink-0 flex-wrap">
-            <div class="relative flex-1 min-w-[180px]">
-              <select id="kw-manage-filter" onchange="(function(){ _kwManagePage=1; renderKwManageList(); })()" class="w-full bg-brand-bg border border-brand-border rounded-xl pl-4 pr-9 py-2 text-sm focus:outline-none focus:border-brand-black transition-colors appearance-none cursor-pointer">
-                <option value="__all__">전체 상품</option>
-              </select>
-              <svg class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-brand-gray" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-            </div>
-            <div class="flex gap-1 bg-brand-bg p-1 rounded-xl">
-              <button id="kw-manage-view-list" onclick="setKwManageView('list')" class="px-3 py-1.5 text-xs font-bold bg-white shadow-sm rounded-lg text-brand-black">목록</button>
-              <button id="kw-manage-view-group" onclick="setKwManageView('group')" class="px-3 py-1.5 text-xs font-medium text-brand-gray hover:text-brand-black transition-colors">상품별 그룹</button>
-            </div>
-          </div>
-
-          <div class="overflow-y-auto flex-1 border border-brand-border rounded-2xl">
-            <table class="w-full text-left border-collapse">
-              <thead class="sticky top-0 bg-brand-bg z-10 shadow-sm">
-                <tr class="text-brand-gray text-[0.85rem]">
-                  <th class="font-semibold p-4 pl-5 whitespace-nowrap">키워드</th>
-                  <th class="font-semibold p-4 whitespace-nowrap">연결 상품</th>
-                  <th class="font-semibold p-4 whitespace-nowrap text-center">현재 순위</th>
-                  <th class="font-semibold p-4 whitespace-nowrap text-center">자동 추적</th>
-                  <th class="font-semibold p-4 pr-5 whitespace-nowrap text-right">관리</th>
-                </tr>
-              </thead>
-              <tbody id="kw-manage-body" class="text-[0.95rem]"></tbody>
-            </table>
-          </div>
-          <div class="flex justify-between items-center mt-3 shrink-0 flex-wrap gap-2">
-            <span id="kw-manage-range" class="text-xs text-brand-gray"></span>
-            <div id="kw-manage-pages" class="flex items-center gap-1 flex-wrap"></div>
-          </div>
-        </section>
-
-      </div>
-
       </div><!-- /kw-tab-track -->
 
       <!-- 탭: 순위 변동 추이 -->
@@ -3700,54 +3646,8 @@ tailwind.config = {
       <!-- 탭: 설정 -->
       <div id="kw-tab-settings" class="hidden space-y-6">
 
-      <!-- Row 3: 3개 카드 -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <!-- 자동 추적 설정 -->
-        <section class="bg-white p-7 rounded-3xl panel flex flex-col hover:-translate-y-1 transition-transform duration-300">
-          <div class="flex justify-between items-start mb-4">
-            <div>
-              <div class="font-bold text-[1.15rem] mb-1 flex items-center gap-2">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                자동 추적 설정
-              </div>
-              <p class="text-brand-gray text-sm leading-snug">매일 오전 7시에 <span id="kw-auto-target-count" class="font-bold text-brand-black">0</span>개 키워드를 자동 추적합니다.</p>
-            </div>
-          </div>
-
-          <div class="bg-brand-bg rounded-xl p-4 mb-3 flex items-center justify-between">
-            <div class="flex flex-col">
-              <span class="text-xs font-bold text-brand-gray mb-1">현재 상태</span>
-              <div class="flex items-center gap-1.5 font-bold text-brand-black">
-                <span id="kw-auto-status-dot" class="w-2 h-2 rounded-full bg-brand-green"></span>
-                <span id="kw-auto-status-text">자동 추적 활성</span>
-              </div>
-            </div>
-            <label class="kw-toggle">
-              <input id="kw-auto-enabled" type="checkbox" checked onchange="setKwAutoEnabled(this.checked)">
-              <span class="slider"></span>
-            </label>
-          </div>
-
-          <div class="text-xs text-brand-gray mb-3 px-1">
-            <div class="flex justify-between py-0.5"><span>마지막 실행</span><span id="kw-auto-last" class="font-semibold text-brand-black">-</span></div>
-            <div class="flex justify-between py-0.5"><span>다음 예정</span><span id="kw-auto-next" class="font-semibold text-brand-black">-</span></div>
-          </div>
-
-          <button id="kw-auto-run-btn" onclick="runKwAutoTrackNow()" class="w-full bg-brand-black text-white py-2.5 rounded-full text-sm font-bold hover:bg-[#333] transition-colors flex items-center justify-center gap-2 mb-3">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            지금 바로 실행
-          </button>
-
-          <div class="mt-auto">
-            <label class="block text-sm font-bold mb-2">수집 시각</label>
-            <div class="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-sm font-semibold text-brand-black flex items-center justify-between">
-              <span>매일 오전 7시</span>
-              <span class="text-xs font-bold text-brand-gray bg-white border border-brand-border px-2 py-0.5 rounded-full">고정</span>
-            </div>
-            <p class="text-[11px] text-brand-gray mt-2 leading-relaxed">💡 브라우저가 켜져 있을 때만 자동으로 실행됩니다. 꺼져 있다가 다시 열면 당일 아직 실행 안 됐을 때 즉시 실행합니다.</p>
-          </div>
-        </section>
-
+      <!-- Row 3: 카드 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- 순위 알림 -->
         <section class="bg-white p-7 rounded-3xl panel flex flex-col hover:-translate-y-1 transition-transform duration-300">
           <div class="flex justify-between items-start mb-4">
@@ -5514,9 +5414,10 @@ function renderKwAutoStatus() {
 }
 
 async function runKwAutoTrack(isAuto) {
-  const list = _loadKwManage().filter(x => x.auto);
+  // 자동 추적은 등록된 모든 키워드를 대상으로 실행 (auto 플래그 무시)
+  const list = _loadKwManage();
   if (!list.length) {
-    if (!isAuto) alert('자동 추적이 활성화된 키워드가 없습니다. 키워드 관리에서 토글을 켜주세요.');
+    if (!isAuto) alert('등록된 키워드가 없습니다. 순위 조회 결과에서 "선택한 키워드 등록" 버튼으로 추가하세요.');
     return { ok: 0, skipped: 0 };
   }
   const api = _loadNaverApi();
@@ -5579,12 +5480,10 @@ async function runKwAutoTrack(isAuto) {
 
 async function runKwAutoTrackNow() {
   const btn = document.getElementById('kw-auto-run-btn');
-  const orig = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<span class="animate-pulse">실행 중...</span>';
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="animate-pulse">실행 중...</span>'; }
   const res = await runKwAutoTrack(false);
-  btn.disabled = false;
-  btn.innerHTML = orig;
+  if (btn) { btn.disabled = false; btn.innerHTML = orig; }
   if (res.ok || res.skipped) {
     alert(`자동 추적 완료: 성공 ${res.ok}건 / 건너뜀 ${res.skipped}건`);
   }
@@ -5598,19 +5497,17 @@ function _scheduleKwAutoTick() {
 }
 
 async function _kwAutoTick() {
+  // 자동 추적은 항상 활성. 등록된 모든 키워드를 매일 오전 7시 이후 한 번 실행.
   const s = _loadKwAuto();
-  if (s.enabled === false) return;
   const now = new Date();
   const today = _ymdStr(now);
   if (s.lastRunDay === today) return; // 오늘 이미 실행됨
-  // 오전 7시 이후에만 실행
-  if (now.getHours() < KW_AUTO_HOUR) return;
-  // 키워드 없으면 스킵 (하지만 lastRunDay는 기록해서 중복 체크 안 하도록)
-  const list = _loadKwManage().filter(x => x.auto);
+  if (now.getHours() < KW_AUTO_HOUR) return; // 오전 7시 이후에만
+  const list = _loadKwManage();
   if (!list.length) return;
   const api = _loadNaverApi();
   if (!api.clientId || !api.clientSecret) return; // API 없으면 조용히 스킵
-  console.log('[KW Auto] 자동 추적 실행:', today);
+  console.log('[KW Auto] 자동 추적 실행:', today, list.length, '개 키워드');
   await runKwAutoTrack(true);
 }
 
@@ -5695,7 +5592,7 @@ function renderKwTrend() {
   }
 
   // 키워드를 productKey 단위로 묶음
-  const byProduct = new Map(); // productKey → { product, items: [{keyword, rankType, histKey, legacyKey}] }
+  const byProduct = new Map(); // productKey → { product, items: [{id, keyword, rankType, histKey, legacyKey}] }
   manage.forEach(it => {
     const product = _kwResolveProduct(it.productKey);
     if (!product) return; // 끊긴 상품은 표시 안 함
@@ -5704,6 +5601,7 @@ function renderKwTrend() {
     if (!byProduct.has(it.productKey)) byProduct.set(it.productKey, { product, items: [] });
     types.forEach(t => {
       byProduct.get(it.productKey).items.push({
+        id: it.id,
         keyword: it.keyword,
         rankType: t,
         histKey: realKey + '||' + it.keyword + '||' + t,
@@ -5762,9 +5660,10 @@ function renderKwTrend() {
     const typeIcon = item.rankType === 'plus'
       ? '<span class="inline-block bg-brand-green-light text-[#00C853] text-[9px] font-bold px-1 py-0 rounded ml-1 align-middle">+</span>'
       : '';
-    return `<span class="inline-flex items-center gap-1 bg-brand-bg border border-brand-border rounded-full px-2.5 py-1 text-[12px] font-semibold whitespace-nowrap" title="${_escapeHtml(item.keyword)}${item.rankType === 'plus' ? ' (플러스스토어)' : ''}">
+    return `<span class="group inline-flex items-center gap-1 bg-brand-bg border border-brand-border rounded-full pl-2.5 pr-1.5 py-1 text-[12px] font-semibold whitespace-nowrap" title="${_escapeHtml(item.keyword)}${item.rankType === 'plus' ? ' (플러스스토어)' : ''}">
       <span class="text-brand-black">${_escapeHtml(item.keyword)}${typeIcon}</span>
       ${body}
+      <button type="button" onclick="deleteKwTrendItem('${item.id}', this)" title="키워드 삭제" class="ml-1 w-4 h-4 rounded-full text-brand-gray hover:text-white hover:bg-brand-pink flex items-center justify-center text-[12px] leading-none transition-colors" aria-label="삭제">×</button>
     </span>`;
   }
 
@@ -5821,6 +5720,48 @@ function renderKwTrend() {
   canvas.innerHTML = cardsHtml + plusCard;
 
   // 키워드 검색량 표시는 카드뷰에선 생략 (디자인 단순화) — 필요 시 칩에 추가 가능
+}
+
+// 추이 카드 칩에서 X 버튼 → 키워드 즉시 삭제
+function deleteKwTrendItem(id, btn) {
+  if (!id) return;
+  const all = _loadKwManage();
+  const target = all.find(x => x.id === id);
+  if (!target) { renderKwTrend(); return; }
+  const ok = window.showAppConfirm
+    ? null  // showAppConfirm은 비동기 콜백 패턴이므로 별도 처리
+    : confirm(`"${target.keyword}" 키워드를 삭제할까요?\n해당 키워드의 추이 데이터도 함께 삭제됩니다.`);
+  if (window.showAppConfirm) {
+    showAppConfirm(
+      '키워드 삭제',
+      `"${target.keyword}" 키워드를 삭제할까요?\n해당 키워드의 추이 데이터도 함께 삭제됩니다.`,
+      () => _doDeleteKwTrendItem(id),
+      { type: 'danger', confirmText: '삭제', confirmStyle: 'danger' }
+    );
+    return;
+  }
+  if (ok) _doDeleteKwTrendItem(id);
+}
+function _doDeleteKwTrendItem(id) {
+  const all = _loadKwManage();
+  const target = all.find(x => x.id === id);
+  if (!target) return;
+  const list = all.filter(x => x.id !== id);
+  _saveKwManage(list);
+  // 추이 시리즈 정리
+  const product = _kwResolveProduct(target.productKey);
+  const realKey = product ? (product.url || product.name) : target.productKey;
+  const series = _loadKwSeries();
+  const types = Array.isArray(target.rankTypes) && target.rankTypes.length ? target.rankTypes : ['price'];
+  // 다른 동일 키워드 등록이 있는지 확인
+  const stillUsed = list.some(x => x.keyword === target.keyword && _realKeyOf(x.productKey) === realKey);
+  if (!stillUsed) {
+    delete series[realKey + '||' + target.keyword];
+    types.forEach(t => delete series[realKey + '||' + target.keyword + '||' + t]);
+    _saveKwSeries(series);
+  }
+  renderKwTrend();
+  function _realKeyOf(pk) { const p = _kwResolveProduct(pk); return p ? (p.url || p.name) : pk; }
 }
 
 // ── 키워드 월 검색량 (네이버 검색광고 API) ─────────────────────────
