@@ -4757,63 +4757,47 @@ async function _probeBackendProxy() {
 }
 
 // 네이버 쇼핑 검색
-// 우선순위: 백엔드 프록시(실제 웹 순위) → 공식 API(CORS 프록시 경유, 관련도 순위)
+// 모든 호출은 자체 백엔드 함수 /api/naver-shop 만 사용 (외부 CORS 프록시 미사용).
+// /api/naver-shop 내부에서 1차 웹 스크래핑 → 실패 시 공식 Open API로 자동 폴백.
+// 클라이언트 키를 헤더로 함께 보내 폴백 경로에서 사용할 수 있게 함.
 async function _naverShopSearch(query, start, display, clientId, clientSecret) {
-  // 백엔드 프록시 우선 시도 (실제 웹 순위 일치)
-  if (await _probeBackendProxy()) {
-    try {
-      const r = await fetch(`/api/naver-shop?query=${encodeURIComponent(query)}&start=${start}&display=${display}`);
-      if (r.ok) {
-        const data = await r.json();
-        // 공식 API 포맷으로 변환 (기존 코드 호환)
-        return {
-          total: data.total || 0,
-          start,
-          display,
-          manuTags: data.manuTags || [],
-          items: (data.items || []).map(it => ({
-            title: it.title || '',
-            link: it.link || '',
-            productId: it.productId || '',
-            productUrl: it.link || '',
-            lprice: it.price || 0,
-            category1: it.category1 || '',
-            category2: it.category2 || '',
-            category3: it.category3 || '',
-            category4: it.category4 || '',
-            mallName: it.mallName || '',
-            brand: it.brand || '',
-            manuTag: it.manuTag || '',
-            attributeValue: it.attributeValue || '',
-            reviewCount: it.reviewCount || 0,
-            _rank: it.rank,
-          })),
-        };
-      }
-    } catch (e) { console.warn('backend proxy failed, falling back:', e); }
+  const headers = {};
+  if (clientId)     headers['X-Naver-Client-Id']     = clientId;
+  if (clientSecret) headers['X-Naver-Client-Secret'] = clientSecret;
+  const r = await fetch(
+    `/api/naver-shop?query=${encodeURIComponent(query)}&start=${start}&display=${display}`,
+    { headers }
+  );
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(err.error || ('HTTP ' + r.status));
   }
-
-  // 공식 API fallback (CORS 프록시 경유)
-  const target = `https://openapi.naver.com/v1/search/shop.json?query=${encodeURIComponent(query)}&display=${display}&start=${start}&sort=sim`;
-  const proxies = [
-    u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  ];
-  let lastErr;
-  for (const wrap of proxies) {
-    try {
-      const r = await fetch(wrap(target), {
-        headers: {
-          'X-Naver-Client-Id': clientId,
-          'X-Naver-Client-Secret': clientSecret,
-        }
-      });
-      if (!r.ok) { lastErr = new Error('HTTP ' + r.status); continue; }
-      const txt = await r.text();
-      try { return JSON.parse(txt); } catch (_) { lastErr = new Error('응답 파싱 실패'); continue; }
-    } catch (e) { lastErr = e; }
-  }
-  throw lastErr || new Error('요청 실패');
+  const data = await r.json();
+  // 프론트가 기대하는 포맷(공식 API 비슷)으로 변환
+  return {
+    total: data.total || 0,
+    start,
+    display,
+    manuTags: data.manuTags || [],
+    source: data.source || '',
+    items: (data.items || []).map(it => ({
+      title: it.title || '',
+      link: it.link || '',
+      productId: it.productId || '',
+      productUrl: it.link || '',
+      lprice: it.price || 0,
+      category1: it.category1 || '',
+      category2: it.category2 || '',
+      category3: it.category3 || '',
+      category4: it.category4 || '',
+      mallName: it.mallName || '',
+      brand: it.brand || '',
+      manuTag: it.manuTag || '',
+      attributeValue: it.attributeValue || '',
+      reviewCount: it.reviewCount || 0,
+      _rank: it.rank,
+    })),
+  };
 }
 
 // 상품 매칭: URL의 productId(우선) 또는 상품명 정확 매칭
