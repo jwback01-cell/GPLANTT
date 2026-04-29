@@ -3487,6 +3487,7 @@ tailwind.config = {
       <div class="flex">
         <div class="bg-white p-1.5 rounded-full panel inline-flex gap-1">
           <button id="kw-tab-btn-track" type="button" onclick="setKwTab('track')" class="px-6 py-2.5 rounded-full text-sm font-bold bg-brand-black text-white transition-all">순위 추적</button>
+          <button id="kw-tab-btn-trend" type="button" onclick="setKwTab('trend')" class="px-6 py-2.5 rounded-full text-sm font-medium text-brand-gray hover:text-brand-black transition-all">순위 변동 추이</button>
           <button id="kw-tab-btn-settings" type="button" onclick="setKwTab('settings')" class="px-6 py-2.5 rounded-full text-sm font-medium text-brand-gray hover:text-brand-black transition-all">설정</button>
         </div>
       </div>
@@ -3620,7 +3621,7 @@ tailwind.config = {
         </section>
       </div>
 
-      <!-- Row 2: 추이 + 키워드 관리 -->
+      <!-- Row 2: 키워드 관리 -->
       <div class="flex flex-col gap-6">
         <!-- 키워드 관리 -->
         <section class="bg-white p-6 md:p-8 rounded-4xl panel flex flex-col h-[640px]">
@@ -3641,7 +3642,7 @@ tailwind.config = {
           <!-- 필터 + 보기 모드 -->
           <div class="flex items-center justify-between gap-2 mb-3 shrink-0 flex-wrap">
             <div class="relative flex-1 min-w-[180px]">
-              <select id="kw-manage-filter" onchange="renderKwManageList()" class="w-full bg-brand-bg border border-brand-border rounded-xl pl-4 pr-9 py-2 text-sm focus:outline-none focus:border-brand-black transition-colors appearance-none cursor-pointer">
+              <select id="kw-manage-filter" onchange="(function(){ _kwManagePage=1; renderKwManageList(); })()" class="w-full bg-brand-bg border border-brand-border rounded-xl pl-4 pr-9 py-2 text-sm focus:outline-none focus:border-brand-black transition-colors appearance-none cursor-pointer">
                 <option value="__all__">전체 상품</option>
               </select>
               <svg class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-brand-gray" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
@@ -3666,10 +3667,19 @@ tailwind.config = {
               <tbody id="kw-manage-body" class="text-[0.95rem]"></tbody>
             </table>
           </div>
+          <div class="flex justify-between items-center mt-3 shrink-0 flex-wrap gap-2">
+            <span id="kw-manage-range" class="text-xs text-brand-gray"></span>
+            <div id="kw-manage-pages" class="flex items-center gap-1 flex-wrap"></div>
+          </div>
         </section>
 
-        <!-- 순위 변동 추이 -->
-        <section class="bg-white p-6 md:p-8 rounded-4xl panel flex flex-col h-[520px]">
+      </div>
+
+      </div><!-- /kw-tab-track -->
+
+      <!-- 탭: 순위 변동 추이 -->
+      <div id="kw-tab-trend" class="hidden space-y-6">
+        <section class="bg-white p-6 md:p-8 rounded-4xl panel flex flex-col h-[640px]">
           <div class="flex justify-between items-center mb-4 shrink-0 flex-wrap gap-3">
             <div class="flex items-center gap-3">
               <div class="w-2 h-6 bg-brand-orange-light rounded-full"></div>
@@ -3699,9 +3709,7 @@ tailwind.config = {
 
           <div id="kw-trend-canvas" class="flex-1 border border-brand-border rounded-2xl overflow-auto"></div>
         </section>
-      </div>
-
-      </div><!-- /kw-tab-track -->
+      </div><!-- /kw-tab-trend -->
 
       <!-- 탭: 설정 -->
       <div id="kw-tab-settings" class="hidden space-y-6">
@@ -5138,9 +5146,12 @@ function refreshKwVolumes() {
 }
 
 let _kwManageView = 'list'; // 'list' | 'group'
+let _kwManagePage = 1;
+const KW_MANAGE_PAGE_SIZE = 20;
 
 function setKwManageView(mode) {
   _kwManageView = mode;
+  _kwManagePage = 1;
   const lb = document.getElementById('kw-manage-view-list');
   const gb = document.getElementById('kw-manage-view-group');
   if (lb && gb) {
@@ -5150,6 +5161,15 @@ function setKwManageView(mode) {
     gb.className = 'px-3 py-1.5 text-xs font-bold ' + (mode === 'group' ? on : off) + ' rounded-lg';
   }
   renderKwManageList();
+}
+function setKwManagePage(p) {
+  _kwManagePage = Math.max(1, p|0);
+  renderKwManageList();
+  // 표 상단으로 스크롤
+  const body = document.getElementById('kw-manage-body');
+  if (body && body.parentElement && body.parentElement.parentElement) {
+    body.parentElement.parentElement.scrollTop = 0;
+  }
 }
 
 function _populateKwManageFilter() {
@@ -5224,20 +5244,33 @@ function renderKwManageList() {
   const all = _loadKwManage();
   const list = filter === '__all__' ? all : all.filter(it => it.productKey === filter);
   const history = _loadKwHistory();
+  const pagesEl = document.getElementById('kw-manage-pages');
+  const rangeEl = document.getElementById('kw-manage-range');
 
   if (!all.length) {
     tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-brand-gray text-sm">등록된 키워드가 없습니다. <button onclick="openKwManageModal()" class="text-brand-blue font-bold hover:underline ml-1">키워드 등록</button></td></tr>`;
+    if (pagesEl) pagesEl.innerHTML = '';
+    if (rangeEl) rangeEl.textContent = '';
     return;
   }
   if (!list.length) {
     tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-brand-gray text-sm">선택한 상품에 등록된 키워드가 없습니다.</td></tr>`;
+    if (pagesEl) pagesEl.innerHTML = '';
+    if (rangeEl) rangeEl.textContent = '';
     return;
   }
 
+  // 페이지네이션 — 한 페이지 20개
+  const totalPages = Math.max(1, Math.ceil(list.length / KW_MANAGE_PAGE_SIZE));
+  if (_kwManagePage > totalPages) _kwManagePage = totalPages;
+  if (_kwManagePage < 1) _kwManagePage = 1;
+  const startIdx = (_kwManagePage - 1) * KW_MANAGE_PAGE_SIZE;
+  const pageItems = list.slice(startIdx, startIdx + KW_MANAGE_PAGE_SIZE);
+
   if (_kwManageView === 'group') {
-    // 상품별 그룹화 — 필터된 결과 안에서 productKey로 묶기
+    // 페이지로 잘라낸 결과를 productKey로 다시 묶기
     const groups = new Map();
-    list.forEach(it => {
+    pageItems.forEach(it => {
       if (!groups.has(it.productKey)) groups.set(it.productKey, []);
       groups.get(it.productKey).push(it);
     });
@@ -5250,7 +5283,39 @@ function renderKwManageList() {
     });
     tbody.innerHTML = html.join('');
   } else {
-    tbody.innerHTML = list.map((it, i) => _renderKwRow(it, i === list.length - 1, history)).join('');
+    tbody.innerHTML = pageItems.map((it, i) => _renderKwRow(it, i === pageItems.length - 1, history)).join('');
+  }
+
+  // 페이지 버튼 렌더
+  if (rangeEl) {
+    const from = startIdx + 1;
+    const to = Math.min(list.length, startIdx + pageItems.length);
+    rangeEl.textContent = `${from}–${to} / 총 ${list.length}건`;
+  }
+  if (pagesEl) {
+    if (totalPages <= 1) {
+      pagesEl.innerHTML = '';
+    } else {
+      const showRange = 5;
+      let pStart = Math.max(1, _kwManagePage - Math.floor(showRange / 2));
+      let pEnd   = Math.min(totalPages, pStart + showRange - 1);
+      pStart = Math.max(1, pEnd - showRange + 1);
+      const btn = (p, label, disabled, active) =>
+        `<button ${disabled?'disabled':''} onclick="setKwManagePage(${p})" class="px-3 py-1 rounded-full text-xs font-bold border ${active ? 'bg-brand-black text-white border-brand-black' : 'border-brand-border bg-white ' + (disabled ? 'text-brand-gray/40 cursor-not-allowed' : 'hover:bg-brand-bg')}">${label}</button>`;
+      let html = '';
+      html += btn(Math.max(1, _kwManagePage - 1), '‹', _kwManagePage === 1, false);
+      if (pStart > 1) {
+        html += btn(1, '1', false, false);
+        if (pStart > 2) html += '<span class="text-brand-gray px-1">…</span>';
+      }
+      for (let p = pStart; p <= pEnd; p++) html += btn(p, String(p), false, p === _kwManagePage);
+      if (pEnd < totalPages) {
+        if (pEnd < totalPages - 1) html += '<span class="text-brand-gray px-1">…</span>';
+        html += btn(totalPages, String(totalPages), false, false);
+      }
+      html += btn(Math.min(totalPages, _kwManagePage + 1), '›', _kwManagePage === totalPages, false);
+      pagesEl.innerHTML = html;
+    }
   }
 }
 
@@ -5386,18 +5451,20 @@ function toggleKwManageAuto(id, checked) {
 
 // ── 키워드 페이지 탭 전환 ─────────────────────────
 function setKwTab(tab) {
-  const isSettings = tab === 'settings';
-  const trackEl = document.getElementById('kw-tab-track');
-  const settingsEl = document.getElementById('kw-tab-settings');
-  const trackBtn = document.getElementById('kw-tab-btn-track');
-  const settingsBtn = document.getElementById('kw-tab-btn-settings');
-  if (!trackEl || !settingsEl || !trackBtn || !settingsBtn) return;
-  trackEl.classList.toggle('hidden', isSettings);
-  settingsEl.classList.toggle('hidden', !isSettings);
+  const tabs = ['track', 'trend', 'settings'];
+  if (!tabs.includes(tab)) tab = 'track';
   const activeCls = 'px-6 py-2.5 rounded-full text-sm font-bold bg-brand-black text-white transition-all';
   const idleCls = 'px-6 py-2.5 rounded-full text-sm font-medium text-brand-gray hover:text-brand-black transition-all';
-  trackBtn.className = isSettings ? idleCls : activeCls;
-  settingsBtn.className = isSettings ? activeCls : idleCls;
+  for (const t of tabs) {
+    const el  = document.getElementById('kw-tab-' + t);
+    const btn = document.getElementById('kw-tab-btn-' + t);
+    if (el)  el.classList.toggle('hidden', t !== tab);
+    if (btn) btn.className = (t === tab) ? activeCls : idleCls;
+  }
+  // 추이 탭으로 전환 시 차트가 늦게 그려진 경우 다시 렌더
+  if (tab === 'trend' && typeof renderKwTrend === 'function') {
+    try { renderKwTrend(); } catch (_) {}
+  }
 }
 
 // ── 자동 추적 설정 ─────────────────────────
