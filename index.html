@@ -3679,35 +3679,21 @@ tailwind.config = {
 
       <!-- 탭: 순위 변동 추이 -->
       <div id="kw-tab-trend" class="hidden space-y-6">
-        <section class="bg-white p-6 md:p-8 rounded-4xl panel flex flex-col h-[640px]">
-          <div class="flex justify-between items-center mb-4 shrink-0 flex-wrap gap-3">
+        <section class="bg-white p-6 md:p-8 rounded-4xl panel flex flex-col">
+          <div class="flex justify-between items-center mb-5 shrink-0 flex-wrap gap-3">
             <div class="flex items-center gap-3">
               <div class="w-2 h-6 bg-brand-orange-light rounded-full"></div>
               <h2 class="text-[1.35rem] font-bold">순위 변동 추이</h2>
-              <button type="button" onclick="refreshKwVolumes()" title="모든 키워드의 월 검색량을 다시 조회합니다" class="text-xs font-bold text-brand-blue hover:underline flex items-center gap-1">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                검색량 새로고침
-              </button>
+              <p class="text-brand-gray text-sm hidden md:block">상품별로 등록된 키워드들의 현재 순위와 등락을 한눈에 확인하세요.</p>
             </div>
-            <div id="kw-trend-period" class="flex gap-1 bg-brand-bg p-1 rounded-xl">
-              <button data-days="7" class="kw-trend-pbtn px-3 py-1.5 text-sm font-bold bg-white shadow-sm rounded-lg text-brand-black">7일</button>
-              <button data-days="14" class="kw-trend-pbtn px-3 py-1.5 text-sm font-medium text-brand-gray hover:text-brand-black transition-colors">14일</button>
-              <button data-days="30" class="kw-trend-pbtn px-3 py-1.5 text-sm font-medium text-brand-gray hover:text-brand-black transition-colors">30일</button>
-              <button data-days="90" class="kw-trend-pbtn px-3 py-1.5 text-sm font-medium text-brand-gray hover:text-brand-black transition-colors">90일</button>
-              <button data-days="all" class="kw-trend-pbtn px-3 py-1.5 text-sm font-medium text-brand-gray hover:text-brand-black transition-colors">전체</button>
-            </div>
+            <button type="button" onclick="refreshKwVolumes()" title="모든 키워드의 월 검색량을 다시 조회합니다" class="text-xs font-bold text-brand-blue hover:underline flex items-center gap-1">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              검색량 새로고침
+            </button>
           </div>
 
-          <div class="flex items-center gap-2 mb-3 shrink-0 flex-wrap">
-            <div class="relative flex-1 min-w-[200px] max-w-[320px]">
-              <select id="kw-trend-product" onchange="renderKwTrend()" class="w-full bg-brand-bg border border-brand-border rounded-xl pl-4 pr-9 py-2 text-sm font-semibold focus:outline-none focus:border-brand-black transition-colors appearance-none cursor-pointer">
-                <option value="__all__">전체 상품</option>
-              </select>
-              <svg class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-brand-gray" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-            </div>
-          </div>
-
-          <div id="kw-trend-canvas" class="flex-1 border border-brand-border rounded-2xl overflow-auto"></div>
+          <!-- 카드 그리드 — 1/2/3열 반응형 -->
+          <div id="kw-trend-canvas" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
         </section>
       </div><!-- /kw-tab-trend -->
 
@@ -5698,152 +5684,143 @@ function _ymdLabel(d) { return String(d.getMonth()+1).padStart(2,'0') + '.' + St
 function renderKwTrend() {
   const canvas = document.getElementById('kw-trend-canvas');
   if (!canvas) return;
-  _kwTrendPopulateProducts();
 
-  const productKey = document.getElementById('kw-trend-product').value || '__all__';
   const series = _loadKwSeries();
   const manage = _loadKwManage();
+  const allProducts = _kwAllProductOptions(); // 등록된 모든 "조회할 상품"
 
   function _realKeyOf(pk) {
     const p = _kwResolveProduct(pk);
     return p ? (p.url || p.name) : pk;
   }
 
-  // 키워드 관리에 등록된 키워드만 표시 (트렌드 = 관리와 연동)
-  // 키워드당 유형별 하나의 행 생성
-  const rowMap = new Map(); // histKey(with type) → { keyword, realKey, productName, rankType }
+  // 키워드를 productKey 단위로 묶음
+  const byProduct = new Map(); // productKey → { product, items: [{keyword, rankType, histKey, legacyKey}] }
   manage.forEach(it => {
-    if (productKey !== '__all__' && it.productKey !== productKey) return;
-    const realKey = _realKeyOf(it.productKey);
     const product = _kwResolveProduct(it.productKey);
+    if (!product) return; // 끊긴 상품은 표시 안 함
+    const realKey = _realKeyOf(it.productKey);
     const types = Array.isArray(it.rankTypes) && it.rankTypes.length ? it.rankTypes : ['price'];
+    if (!byProduct.has(it.productKey)) byProduct.set(it.productKey, { product, items: [] });
     types.forEach(t => {
-      const histKey = realKey + '||' + it.keyword + '||' + t;
-      const legacyKey = realKey + '||' + it.keyword;
-      // 시리즈 조회 시 신키 우선, 없으면 legacy(가격비교만)
-      rowMap.set(histKey, { keyword: it.keyword, realKey, productName: product ? product.name : '<연결 끊김>', rankType: t, legacyKey });
+      byProduct.get(it.productKey).items.push({
+        keyword: it.keyword,
+        rankType: t,
+        histKey: realKey + '||' + it.keyword + '||' + t,
+        legacyKey: realKey + '||' + it.keyword,
+      });
     });
   });
 
-  const empty = (msg, sub) => {
-    canvas.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-center p-6">
-      <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#D1D1D6" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+  // "+" 카드: 새 상품 추가
+  const plusCard = `
+    <button type="button" onclick="openKwAddProductModal()" class="border-2 border-dashed border-brand-border rounded-3xl p-6 flex flex-col items-center justify-center gap-3 hover:border-brand-black hover:bg-brand-bg/40 transition-colors min-h-[180px] text-center">
+      <div class="w-14 h-14 rounded-full bg-brand-orange-light/60 flex items-center justify-center">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF9500" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       </div>
-      <h3 class="font-bold text-[1.05rem] mb-1">${_escapeHtml(msg)}</h3>
-      <p class="text-brand-gray text-sm">${_escapeHtml(sub)}</p>
-    </div>`;
-  };
+      <div>
+        <div class="text-sm font-bold text-brand-black">모니터링할 상품 추가</div>
+        <div class="text-[11px] text-brand-gray mt-1">상품을 등록하면 키워드 순위를 카드로 묶어 보여줍니다.</div>
+      </div>
+    </button>`;
 
-  if (!rowMap.size) { empty('표시할 키워드가 없습니다', '키워드를 등록하거나 순위 조회를 실행하세요.'); return; }
-
-  // 날짜 컬럼 만들기 (오늘부터 N일)
-  const today = new Date(); today.setHours(0,0,0,0);
-  let days;
-  if (_kwTrendDays === 'all') {
-    // rowMap 내 모든 키(legacy 포함)의 시리즈에서 가장 오래된 타임스탬프 찾기
-    let oldest = today.getTime();
-    for (const [histKey, info] of rowMap) {
-      const arr = (series[histKey] || []).concat(info.legacyKey ? (series[info.legacyKey] || []) : []);
-      for (const e of arr) {
-        const t = new Date(e.t).getTime();
-        if (t < oldest) oldest = t;
-      }
-    }
-    const diffDays = Math.ceil((today.getTime() - oldest) / 86400000) + 1;
-    days = Math.max(1, Math.min(365, diffDays)); // 최대 365일로 제한
-  } else {
-    days = _kwTrendDays || 7;
-  }
-  const dateCols = []; // 최신 -> 과거
-  for (let i = 0; i < days; i++) {
-    const d = new Date(today.getTime() - i * 86400000);
-    dateCols.push({ key: _ymd(d), label: _ymdLabel(d), date: d });
-  }
-
-  // 각 행의 day별 마지막 조회 순위 추출
-  function _dayRank(histKey, dayKey, legacyKey) {
+  // 가장 최근 시리즈 항목의 (rank, prevRank) 추출
+  // - prevRank는 같은 histKey의 그 직전 항목
+  function _latest(histKey, legacyKey) {
     const arr = (series[histKey] || []).concat(legacyKey ? (series[legacyKey] || []) : []);
-    let v = undefined, latestT = '';
-    for (const e of arr) {
-      if (_ymd(new Date(e.t)) === dayKey && e.t > latestT) { v = e.r; latestT = e.t; }
-    }
-    return v;
+    if (!arr.length) return { rank: undefined, prev: undefined, t: '' };
+    arr.sort((a, b) => String(a.t).localeCompare(String(b.t)));
+    const last = arr[arr.length - 1];
+    const prev = arr.length >= 2 ? arr[arr.length - 2].r : undefined;
+    return { rank: last.r, prev, t: last.t };
   }
 
-  // 데이터가 한 행이라도 있는지 체크
-  let anyData = false;
-  for (const [histKey, info] of rowMap) {
-    if ((series[histKey] || []).length || (info.legacyKey && (series[info.legacyKey] || []).length)) { anyData = true; break; }
-  }
-  if (!anyData) { empty('데이터가 없습니다', '순위 조회를 실행하면 날짜별로 추이가 쌓입니다.'); return; }
-
-  const headerCells = dateCols.map(c => `<th class="font-semibold p-3 text-left whitespace-nowrap min-w-[140px]">${c.label}</th>`).join('');
-  const rowsHtml = [...rowMap.entries()].map(([histKey, info]) => {
-    const lk = info.legacyKey && info.rankType === 'price' ? info.legacyKey : null;
-    const cells = dateCols.map((c, idx) => {
-      const cur = _dayRank(histKey, c.key, lk);
-      // 비교 대상: 그 다음 컬럼(=하루 더 과거). 없으면 -
-      let prev = undefined;
-      for (let j = idx + 1; j < dateCols.length; j++) {
-        const v = _dayRank(histKey, dateCols[j].key, lk);
-        if (v !== undefined) { prev = v; break; }
-      }
-      if (cur === undefined) {
-        return `<td class="p-3 text-brand-gray text-sm">-</td>`;
-      }
-      if (cur === null) {
-        return `<td class="p-3"><span class="text-brand-gray font-semibold text-sm">순위권 밖</span></td>`;
-      }
-      const page = _kwPageOf(cur);
+  // 키워드 칩 1개 렌더
+  function _renderChip(item) {
+    const { rank, prev } = _latest(item.histKey, item.rankType === 'price' ? item.legacyKey : null);
+    let body = '';
+    if (rank === undefined) {
+      body = `<span class="text-brand-gray text-[11px]">미조회</span>`;
+    } else if (rank === null) {
+      body = `<span class="text-brand-gray text-[11px] font-bold">순위권 밖</span>`;
+    } else {
       let delta = '';
       if (typeof prev === 'number') {
-        const diff = prev - cur; // +면 상승(좋아짐)
+        const diff = prev - rank; // +면 상승
         if (diff > 0) {
-          delta = `<span class="ml-1.5 text-green-600 font-bold text-xs inline-flex items-center gap-0.5"><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,4 22,20 2,20"/></svg>${diff}</span>`;
+          delta = `<span class="text-brand-pink font-bold text-[11px] inline-flex items-center gap-0.5"><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,4 22,20 2,20"/></svg>${diff}</span>`;
         } else if (diff < 0) {
-          delta = `<span class="ml-1.5 text-red-500 font-bold text-xs inline-flex items-center gap-0.5"><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,20 22,4 2,4"/></svg>${-diff}</span>`;
+          delta = `<span class="text-brand-blue font-bold text-[11px] inline-flex items-center gap-0.5"><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,20 22,4 2,4"/></svg>${rank - prev}</span>`;
         } else {
-          delta = `<span class="ml-1.5 text-brand-gray font-bold text-xs">-</span>`;
+          delta = `<span class="text-brand-gray font-bold text-[11px]">-</span>`;
         }
       } else if (prev === null) {
-        delta = `<span class="ml-1.5 text-brand-orange font-bold text-xs">신규</span>`;
+        delta = `<span class="text-brand-orange font-bold text-[11px]">신규</span>`;
       }
-      return `<td class="p-3 whitespace-nowrap"><span class="font-bold text-brand-black">${cur}위</span> <span class="text-brand-gray text-xs">- ${page}페이지 ${cur}위</span>${delta}</td>`;
-    }).join('');
-    const typeBadge = info.rankType === 'plus'
-      ? '<span class="inline-block bg-brand-green-light text-[#00C853] text-[10px] font-bold px-1.5 py-0.5 rounded">플러스</span>'
-      : '<span class="inline-block bg-brand-blue-light text-brand-blue text-[10px] font-bold px-1.5 py-0.5 rounded">가격비교</span>';
-    return `<tr class="border-b border-brand-border last:border-b-0 hover:bg-gray-50/50">
-      <td class="p-3 pl-4 sticky left-0 bg-white z-10 border-r border-brand-border">
-        <div class="flex items-center gap-2">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-          <span class="font-semibold text-sm text-brand-black whitespace-nowrap">${_escapeHtml(info.keyword)}</span>
-          ${typeBadge}
-        </div>
-        ${productKey === '__all__' ? `<div class="text-[11px] text-brand-gray mt-0.5 ml-6 truncate max-w-[200px]" title="${_escapeHtml(info.productName)}">${_escapeHtml(info.productName)}</div>` : ''}
-        <div class="text-[11px] text-brand-gray mt-1 ml-6 flex items-center gap-1">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <span>월 검색량</span>
-          <span data-vol-kw="${_escapeHtml(info.keyword)}" class="font-bold text-brand-black ml-0.5">—</span>
-        </div>
-      </td>
-      ${cells}
-    </tr>`;
-  }).join('');
+      body = `<span class="font-bold text-brand-black text-[12px]">${rank}위</span>${delta ? ' ' + delta : ''}`;
+    }
+    const typeIcon = item.rankType === 'plus'
+      ? '<span class="inline-block bg-brand-green-light text-[#00C853] text-[9px] font-bold px-1 py-0 rounded ml-1 align-middle">+</span>'
+      : '';
+    return `<span class="inline-flex items-center gap-1 bg-brand-bg border border-brand-border rounded-full px-2.5 py-1 text-[12px] font-semibold whitespace-nowrap" title="${_escapeHtml(item.keyword)}${item.rankType === 'plus' ? ' (플러스스토어)' : ''}">
+      <span class="text-brand-black">${_escapeHtml(item.keyword)}${typeIcon}</span>
+      ${body}
+    </span>`;
+  }
 
-  canvas.innerHTML = `<table class="w-full text-left border-collapse text-[0.95rem]">
-    <thead class="sticky top-0 bg-brand-bg z-20 shadow-sm">
-      <tr class="text-brand-gray text-[0.8rem]">
-        <th class="font-semibold p-3 pl-4 whitespace-nowrap sticky left-0 bg-brand-bg z-20 border-r border-brand-border min-w-[200px]">키워드</th>
-        ${headerCells}
-      </tr>
-    </thead>
-    <tbody>${rowsHtml}</tbody>
-  </table>`;
+  // 카드 1개 렌더 — 등록 상품(byProduct에 있든 없든)별로
+  function _renderCard(productKey, product) {
+    const data = byProduct.get(productKey);
+    const items = data ? data.items : [];
+    // 키워드 정렬: 순위 있는 것부터 (오름차순), 그 다음 미조회 / 순위권 밖
+    items.sort((a, b) => {
+      const ra = _latest(a.histKey, a.rankType === 'price' ? a.legacyKey : null).rank;
+      const rb = _latest(b.histKey, b.rankType === 'price' ? b.legacyKey : null).rank;
+      const aOK = (typeof ra === 'number');
+      const bOK = (typeof rb === 'number');
+      if (aOK && bOK) return ra - rb;
+      if (aOK) return -1;
+      if (bOK) return 1;
+      return 0;
+    });
 
-  // 검색량 비동기 갱신 (캐시 즉시 표시 → 만료된 키워드만 백그라운드 fetch)
-  _refreshKwVolumesForRendered();
+    const SHOWN = 6;
+    const visible = items.slice(0, SHOWN);
+    const hidden = items.slice(SHOWN);
+    const chipsHtml = visible.map(_renderChip).join(' ');
+    const hiddenHtml = hidden.length
+      ? `<details class="inline"><summary class="text-[11px] font-bold text-brand-blue cursor-pointer hover:underline list-none ml-1 inline">+${hidden.length}개 더보기</summary><div class="mt-2 flex flex-wrap gap-1.5">${hidden.map(_renderChip).join(' ')}</div></details>`
+      : '';
+    const productName = product.name || '<이름 없음>';
+    const urlLink = product.url
+      ? `<a href="${_escapeHtml(product.url)}" target="_blank" rel="noopener" class="text-[11px] text-brand-blue hover:underline truncate max-w-full block">${_escapeHtml(product.url.replace(/^https?:\/\//, ''))}</a>`
+      : `<span class="text-[11px] text-brand-gray">URL 없음</span>`;
+
+    return `<div class="bg-white border border-brand-border rounded-3xl p-5 flex flex-col gap-3 hover:shadow-md transition-shadow">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0 flex-1">
+          <h3 class="font-bold text-[15px] text-brand-black leading-tight truncate" title="${_escapeHtml(productName)}">${_escapeHtml(productName)}</h3>
+          <div class="mt-1">${urlLink}</div>
+        </div>
+        <span class="shrink-0 text-[10px] font-bold text-brand-gray bg-brand-bg border border-brand-border px-2 py-0.5 rounded-full whitespace-nowrap">${items.length}개 키워드</span>
+      </div>
+      <div class="border-t border-brand-border pt-3 flex flex-wrap gap-1.5 min-h-[40px]">
+        ${items.length === 0
+          ? '<span class="text-brand-gray text-xs">등록된 키워드 없음 — "키워드 관리"에서 추가하세요</span>'
+          : chipsHtml + hiddenHtml}
+      </div>
+    </div>`;
+  }
+
+  if (!allProducts.length) {
+    canvas.innerHTML = plusCard;
+    return;
+  }
+
+  const cardsHtml = allProducts.map(p => _renderCard(p.id, p)).join('');
+  canvas.innerHTML = cardsHtml + plusCard;
+
+  // 키워드 검색량 표시는 카드뷰에선 생략 (디자인 단순화) — 필요 시 칩에 추가 가능
 }
 
 // ── 키워드 월 검색량 (네이버 검색광고 API) ─────────────────────────
