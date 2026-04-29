@@ -1,0 +1,9 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/playauto/*"
+  to = "/.netlify/functions/playauto/:splat"
+  status = 200
+  force = true

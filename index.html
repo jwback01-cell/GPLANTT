@@ -3065,7 +3065,7 @@ tailwind.config = {
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     서울리빙 엑셀 다운로드
                   </button>
-                  <button onclick="sendSeoulLivingEmail('all')" class="bg-brand-blue text-white px-5 py-2.5 rounded-full font-bold text-xs hover:opacity-90 flex items-center gap-1.5" title="jwback01@nate.com 으로 발주서 메일 전송">
+                  <button onclick="sendSeoulLivingEmail('all')" class="bg-brand-blue text-white px-5 py-2.5 rounded-full font-bold text-xs hover:opacity-90 flex items-center gap-1.5" title="seoulbjs@naver.com 으로 발주서 메일 전송">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                     📧 메일 발송
                   </button>
@@ -3083,7 +3083,7 @@ tailwind.config = {
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     서울리빙 그외 엑셀 다운로드
                   </button>
-                  <button onclick="sendSeoulLivingEmail('etc')" class="bg-brand-blue text-white px-5 py-2.5 rounded-full font-bold text-xs hover:opacity-90 flex items-center gap-1.5" title="jwback01@nate.com 으로 발주서 메일 전송">
+                  <button onclick="sendSeoulLivingEmail('etc')" class="bg-brand-blue text-white px-5 py-2.5 rounded-full font-bold text-xs hover:opacity-90 flex items-center gap-1.5" title="seoulbjs@naver.com 으로 발주서 메일 전송">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                     📧 메일 발송
                   </button>
@@ -3101,7 +3101,7 @@ tailwind.config = {
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     서울리빙 의류 엑셀 다운로드
                   </button>
-                  <button onclick="sendSeoulLivingEmail('cloth')" class="bg-brand-blue text-white px-5 py-2.5 rounded-full font-bold text-xs hover:opacity-90 flex items-center gap-1.5" title="jwback01@nate.com 으로 발주서 메일 전송">
+                  <button onclick="sendSeoulLivingEmail('cloth')" class="bg-brand-blue text-white px-5 py-2.5 rounded-full font-bold text-xs hover:opacity-90 flex items-center gap-1.5" title="seoulbjs@naver.com 으로 발주서 메일 전송">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                     📧 메일 발송
                   </button>
@@ -3482,6 +3482,17 @@ tailwind.config = {
         <p class="text-brand-gray text-base md:text-[1.1rem]">검색 키워드로 내 상품의 네이버 쇼핑 순위를 실시간으로 확인하세요.</p>
       </section>
 
+      <!-- 탭 네비게이션 -->
+      <div class="flex">
+        <div class="bg-white p-1.5 rounded-full panel inline-flex gap-1">
+          <button id="kw-tab-btn-track" type="button" onclick="setKwTab('track')" class="px-6 py-2.5 rounded-full text-sm font-bold bg-brand-black text-white transition-all">순위 추적</button>
+          <button id="kw-tab-btn-settings" type="button" onclick="setKwTab('settings')" class="px-6 py-2.5 rounded-full text-sm font-medium text-brand-gray hover:text-brand-black transition-all">설정</button>
+        </div>
+      </div>
+
+      <!-- 탭: 순위 추적 -->
+      <div id="kw-tab-track" class="space-y-6">
+
       <!-- Row 1: 조회 폼 + 결과 -->
       <div class="flex flex-col gap-6 xl:flex-row">
         <!-- 키워드 순위 조회 -->
@@ -3718,6 +3729,10 @@ tailwind.config = {
             <div class="flex items-center gap-3">
               <div class="w-2 h-6 bg-brand-orange-light rounded-full"></div>
               <h2 class="text-[1.35rem] font-bold">순위 변동 추이</h2>
+              <button type="button" onclick="refreshKwVolumes()" title="모든 키워드의 월 검색량을 다시 조회합니다" class="text-xs font-bold text-brand-blue hover:underline flex items-center gap-1">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                검색량 새로고침
+              </button>
             </div>
             <div id="kw-trend-period" class="flex gap-1 bg-brand-bg p-1 rounded-xl">
               <button data-days="7" class="kw-trend-pbtn px-3 py-1.5 text-sm font-bold bg-white shadow-sm rounded-lg text-brand-black">7일</button>
@@ -3740,6 +3755,11 @@ tailwind.config = {
           <div id="kw-trend-canvas" class="flex-1 border border-brand-border rounded-2xl overflow-auto"></div>
         </section>
       </div>
+
+      </div><!-- /kw-tab-track -->
+
+      <!-- 탭: 설정 -->
+      <div id="kw-tab-settings" class="hidden space-y-6">
 
       <!-- Row 3: 3개 카드 -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -3877,6 +3897,44 @@ tailwind.config = {
           </div>
         </section>
       </div>
+
+      <!-- 네이버 검색광고 API (월 검색량 조회용) -->
+      <section class="bg-white p-7 rounded-3xl panel">
+        <div class="flex justify-between items-start mb-4 flex-wrap gap-3">
+          <div class="min-w-0">
+            <div class="font-bold text-[1.15rem] mb-1 flex items-center gap-2 flex-wrap">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              네이버 검색광고 API
+              <span id="sa-key-badge" class="text-[10px] font-bold px-2 py-0.5 rounded-full text-brand-gray bg-brand-bg">미등록</span>
+            </div>
+            <p class="text-brand-gray text-sm leading-snug">키워드별 <b>월 검색량</b>(추이 표 옆 표시)을 조회하려면 검색광고 API 키가 필요합니다. 위쪽 "네이버 API 설정"(쇼핑 Open API)과는 별도입니다.</p>
+            <p class="text-brand-gray text-xs mt-1.5">발급: <a href="https://manage.searchad.naver.com" target="_blank" class="text-brand-blue hover:underline font-semibold">searchad.naver.com</a> → 도구 → API 사용 관리</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+          <div>
+            <label class="block text-xs font-bold text-brand-gray mb-1.5">CUSTOMER_ID</label>
+            <input id="sa-customer-id" type="text" class="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-black transition-colors font-mono" placeholder="예: 1234567">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-brand-gray mb-1.5">ACCESS_LICENSE</label>
+            <input id="sa-license" type="text" class="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-black transition-colors font-mono" placeholder="01000000...">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-brand-gray mb-1.5">SECRET_KEY</label>
+            <input id="sa-secret" type="password" class="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-black transition-colors font-mono" placeholder="시크릿 키">
+          </div>
+        </div>
+
+        <div class="mt-5 flex gap-2 justify-end flex-wrap">
+          <button type="button" onclick="clearSaKeys()" class="px-5 py-2.5 bg-white border border-[#E5E5EA] text-brand-gray rounded-full text-sm font-bold hover:bg-brand-bg transition-colors">키 삭제</button>
+          <button type="button" onclick="testSaApi()" class="px-5 py-2.5 bg-white border border-[#E5E5EA] text-brand-black rounded-full text-sm font-bold hover:bg-brand-bg transition-colors">연결 테스트</button>
+          <button type="button" onclick="saveSaKeys()" class="px-5 py-2.5 bg-brand-black text-white rounded-full text-sm font-bold hover:bg-[#333] transition-colors">검색광고 API 키 저장</button>
+        </div>
+      </section>
+
+      </div><!-- /kw-tab-settings -->
     </main>
   </div>
 </div>
@@ -4407,8 +4465,159 @@ const SUPABASE_URL = 'https://gdsutxmceghvkemcfyuw.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdkc3V0eG1jZWdodmtlbWNmeXV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODc0MDEsImV4cCI6MjA5MTU2MzQwMX0.yO_UwxtQVtVBLC2dVsmJQ4_qgOuWl5LBVAbsnmlwq1U';
 const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// ── Cloud Sync (gplan_kv) ───────────────────
+// localStorage 항목들을 Supabase의 gplan_kv 테이블로 자동 동기화.
+// 규칙: 로그인 시 PULL → 로컬 변경 시 자동 PUSH(디바운스 1.5초). PULL 완료 전에는 PUSH 차단.
+const GPLAN_SYNC_KEYS = [
+  'gplan_upload_data_v1',           // 업로드 데이터(가장 중요)
+  'gplan_set_products_v2',          // 세트 상품
+  'gplan_ext_order_upload_v1',      // 외부 주문 업로드
+  'gplan_pa_product_map_v1',        // 플레이오토 상품 매핑
+  'pa_invoice_records_v1',          // 송장 기록
+  'gplan_ecount_settings_v1',       // 이카운트 설정
+  'gplan_ecount_vendor_map_v1',     // 이카운트 거래처 매핑
+  'gplan_ecount_depot_map_v1',      // 이카운트 창고 매핑
+  'gplan_ecount_ship_cost_map_v1',  // 이카운트 배송비 매핑
+  'kw_extra_products',              // 키워드 추가 상품
+  'kw_naver_api',                   // 네이버 API 키
+  'kw_rank_history',                // 키워드 순위 이력
+  'kw_manage_list',                 // 관리 키워드 목록
+  'kw_auto_tracking',               // 자동 추적 설정
+  'kw_rank_series',                 // 순위 시계열
+  'src_favorites',                  // 소싱 즐겨찾기
+  'gplan_naver_searchad_keys',      // 네이버 검색광고 API 키
+  'gplan_playauto_key',             // 플레이오토 키
+  'gplan_pa_auth',                  // 플레이오토 인증
+];
+let _gplanCloudReady = false;     // PULL 완료 전에는 PUSH 금지(다른 PC 데이터 덮어쓰기 방지)
+const _gplanPushTimers = {};
+async function gplanCloudPullAll() {
+  try {
+    const { data: { session } } = await _supabase.auth.getSession();
+    if (!session) return 0;
+    const { data, error } = await _supabase.from('gplan_kv').select('key, data');
+    if (error) {
+      // 테이블이 아직 없으면 PULL은 건너뛰고 PUSH도 비활성 유지
+      if (String(error.message||'').toLowerCase().includes('does not exist') || error.code === '42P01') {
+        console.warn('[cloud-sync] gplan_kv 테이블이 없습니다. SQL을 먼저 실행하세요.');
+        return -1;
+      }
+      console.warn('[cloud-pull] error', error); return 0;
+    }
+    let pulled = 0;
+    for (const row of (data || [])) {
+      if (!GPLAN_SYNC_KEYS.includes(row.key)) continue;
+      if (row.data == null) continue;
+      try {
+        const s = (typeof row.data === 'string') ? row.data : JSON.stringify(row.data);
+        // 원본 setItem 사용 (PUSH 트리거 방지)
+        Storage.prototype._origSetItem.call(localStorage, row.key, s);
+        pulled++;
+      } catch (_) {}
+    }
+    _gplanCloudReady = true;
+    console.log('[cloud-sync] pulled', pulled, 'keys');
+    return pulled;
+  } catch (e) { console.warn('[cloud-pull] failed', e); return 0; }
+}
+function _gplanCloudPushKey(key) {
+  if (!_gplanCloudReady) return;                          // PULL 끝나기 전엔 무시
+  if (!GPLAN_SYNC_KEYS.includes(key)) return;
+  clearTimeout(_gplanPushTimers[key]);
+  _gplanPushTimers[key] = setTimeout(async () => {
+    try {
+      const { data: { session } } = await _supabase.auth.getSession();
+      if (!session) return;
+      const raw = localStorage.getItem(key);
+      let parsed = null;
+      if (raw != null) { try { parsed = JSON.parse(raw); } catch (_) { parsed = raw; } }
+      const { error } = await _supabase.from('gplan_kv').upsert(
+        { key, data: parsed, updated_by: session.user.id },
+        { onConflict: 'key' }
+      );
+      if (error) console.warn('[cloud-push] error', key, error);
+    } catch (e) { console.warn('[cloud-push] failed', key, e); }
+  }, 1500);
+}
+// localStorage.setItem 후킹 — 동기화 키만 자동 PUSH
+(function hookGplanSync() {
+  if (Storage.prototype._origSetItem) return;
+  Storage.prototype._origSetItem = Storage.prototype.setItem;
+  Storage.prototype.setItem = function (k, v) {
+    Storage.prototype._origSetItem.apply(this, arguments);
+    if (this === localStorage) _gplanCloudPushKey(k);
+  };
+  Storage.prototype._origRemoveItem = Storage.prototype.removeItem;
+  Storage.prototype.removeItem = function (k) {
+    Storage.prototype._origRemoveItem.apply(this, arguments);
+    if (this === localStorage) _gplanCloudPushKey(k);
+  };
+})();
+// 명시적 전체 PUSH (PC1 → 클라우드 최초 업로드용)
+async function gplanCloudPushAll() {
+  const { data: { session } } = await _supabase.auth.getSession();
+  if (!session) { window.showAppAlert ? showAppAlert('알림','로그인이 필요합니다.') : alert('로그인이 필요합니다.'); return 0; }
+  const rows = [];
+  for (const key of GPLAN_SYNC_KEYS) {
+    const raw = localStorage.getItem(key);
+    if (raw == null) continue;
+    let parsed = null;
+    try { parsed = JSON.parse(raw); } catch (_) { parsed = raw; }
+    rows.push({ key, data: parsed, updated_by: session.user.id });
+  }
+  if (!rows.length) return 0;
+  const { error } = await _supabase.from('gplan_kv').upsert(rows, { onConflict: 'key' });
+  if (error) {
+    window.showAppAlert ? showAppAlert('업로드 실패', error.message) : alert('업로드 실패: ' + error.message);
+    return 0;
+  }
+  return rows.length;
+}
+// 로컬 백업 파일(JSON) 다운로드
+function gplanLocalBackupDownload() {
+  const dump = {};
+  for (const key of GPLAN_SYNC_KEYS) {
+    const v = localStorage.getItem(key);
+    if (v != null) dump[key] = v;
+  }
+  const payload = { _format: 'gplan-backup-v1', _at: new Date().toISOString(), data: dump };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+  a.href = url; a.download = 'gplan-backup-' + ts + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+// 백업 파일 복원
+async function gplanLocalBackupRestore(file) {
+  try {
+    const text = await file.text();
+    const json = JSON.parse(text);
+    if (!json || json._format !== 'gplan-backup-v1' || !json.data) {
+      window.showAppAlert ? showAppAlert('복원 실패','지플랜 백업 파일 형식이 아닙니다.') : alert('지플랜 백업 파일 형식이 아닙니다.');
+      return 0;
+    }
+    let n = 0;
+    for (const [k, v] of Object.entries(json.data)) {
+      if (!GPLAN_SYNC_KEYS.includes(k)) continue;
+      if (typeof v !== 'string') continue;
+      // 후킹 우회 (디바운스 PUSH 대신 아래에서 일괄 PUSH)
+      Storage.prototype._origSetItem.call(localStorage, k, v);
+      n++;
+    }
+    // 복원된 로컬을 즉시 클라우드에도 반영 (location.reload 전에 완료 보장)
+    await gplanCloudPushAll();
+    window.showAppAlert ? showAppAlert('복원 완료', n + '개 항목을 복원했습니다. 새로고침합니다.', { onConfirm: () => location.reload() }) : (alert(n+'개 복원. 새로고침'), location.reload());
+    return n;
+  } catch (e) {
+    window.showAppAlert ? showAppAlert('복원 실패', String(e.message||e)) : alert('복원 실패: ' + e.message);
+    return 0;
+  }
+}
+
 // ── 서울리빙 발주서 메일 발송 (Vercel 서버리스 함수 + Naver SMTP) ──
-// 받는사람: jwback01@nate.com  /  보낸사람: gplan23@naver.com (실제 Naver 메일에서 발송)
+// 받는사람: seoulbjs@naver.com  /  보낸사람: gplan23@naver.com (실제 Naver 메일에서 발송)
 // 발송 흐름: 사이트 → POST /api/send-mail → Vercel 함수 → Naver SMTP → 받는사람
 //
 // 🔧 Vercel 환경변수 설정 (한 번만):
@@ -4416,7 +4625,7 @@ const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //   • NAVER_SMTP_USER = gplan23@naver.com
 //   • NAVER_SMTP_PASS = 네이버 환경설정 → POP3/SMTP → 발급된 비밀번호
 //  저장 후 자동 재배포되어야 적용됨.
-const SEOULLIVING_TO_EMAIL = 'jwback01@nate.com';
+const SEOULLIVING_TO_EMAIL = 'seoulbjs@naver.com';
 
 // ── Navigation ──────────────────────────────
 const PAGES = ['login','dashboard','todo','ledger','products','accounts','upload','keywords','sourcing','design'];
@@ -4439,7 +4648,7 @@ function navigate(page) {
   if (page === 'upload') { try { _fillEcountSettingsForm(); _renderEcountHistory && _renderEcountHistory(); } catch(_) {} }
   if (page === 'products') loadProductsFromDB();
   if (page === 'accounts') filterAccounts();
-  if (page === 'keywords') { _loadKwExtras(); _migrateKwManageProductKeys(); _cleanupOrphanKwSeries(); renderKwProductSelect(); _fillNaverApiInputs(); renderKwManageList(); _bindKwTrendPeriodButtons(); renderKwTrend(); renderKwAutoStatus(); _scheduleKwAutoTick(); }
+  if (page === 'keywords') { _loadKwExtras(); _migrateKwManageProductKeys(); _cleanupOrphanKwSeries(); renderKwProductSelect(); _fillNaverApiInputs(); renderKwManageList(); _bindKwTrendPeriodButtons(); renderKwTrend(); renderKwAutoStatus(); _scheduleKwAutoTick(); if (typeof _populateSaInputs === 'function') _populateSaInputs(); if (typeof _updateSaBadge === 'function') _updateSaBadge(); }
   if (page === 'sourcing') initSourcingPage();
 }
 
@@ -4848,6 +5057,28 @@ async function runKwRankSearch() {
     }
 
     _saveKwHistory(history);
+
+    // 자동 등록: 조회한 키워드를 키워드 관리에 자동 추가 (이미 있으면 유형만 합침, auto는 false)
+    // 키워드 관리는 'ex:<id>' 형식의 productKey를 기대하므로 select의 원래 값을 사용
+    const manageProductKey = (document.getElementById('kw-product-select')?.value) || product.id || productKey;
+    const manage = _loadKwManage();
+    let autoAdded = 0, autoMerged = 0;
+    keywords.forEach(keyword => {
+      const existing = manage.find(x => x.keyword === keyword && x.productKey === manageProductKey);
+      if (existing) {
+        const curTypes = Array.isArray(existing.rankTypes) && existing.rankTypes.length ? existing.rankTypes : ['price'];
+        const newTypes = rankTypes.filter(t => !curTypes.includes(t));
+        if (newTypes.length) {
+          existing.rankTypes = [...curTypes, ...newTypes];
+          autoMerged++;
+        }
+      } else {
+        manage.push({ id: _kwUid(), keyword, productKey: manageProductKey, auto: false, rankTypes: [...rankTypes], createdAt: Date.now() });
+        autoAdded++;
+      }
+    });
+    if (autoAdded || autoMerged) _saveKwManage(manage);
+
     _renderKwResults(rows);
     renderKwManageList();
     renderKwTrend();
@@ -4899,9 +5130,23 @@ function _migrateKwManageProductKeys() {
         it.productKey = 'ex:' + extras[0].id;
         changed = true;
       }
+    } else if (!/^ex:/.test(it.productKey)) {
+      // 자동 등록 버그로 url 또는 name이 통째로 productKey에 들어간 경우
+      // 현재 등록된 상품 중 url 또는 name이 일치하는 것을 찾아 정상 형식으로 교체
+      const matched = extras.find(p => (p.url && p.url === it.productKey) || p.name === it.productKey);
+      if (matched) {
+        it.productKey = 'ex:' + matched.id;
+        changed = true;
+      }
     }
   });
   if (changed) _saveKwManage(list);
+}
+
+// 검색량 캐시 비우고 다시 조회
+function refreshKwVolumes() {
+  if (typeof _saveKwVolume === 'function') _saveKwVolume({});
+  if (typeof _refreshKwVolumesForRendered === 'function') _refreshKwVolumesForRendered();
 }
 
 let _kwManageView = 'list'; // 'list' | 'group'
@@ -5149,6 +5394,22 @@ function toggleKwManageAuto(id, checked) {
   const it = list.find(x => x.id === id);
   if (it) { it.auto = !!checked; _saveKwManage(list); }
   renderKwAutoStatus();
+}
+
+// ── 키워드 페이지 탭 전환 ─────────────────────────
+function setKwTab(tab) {
+  const isSettings = tab === 'settings';
+  const trackEl = document.getElementById('kw-tab-track');
+  const settingsEl = document.getElementById('kw-tab-settings');
+  const trackBtn = document.getElementById('kw-tab-btn-track');
+  const settingsBtn = document.getElementById('kw-tab-btn-settings');
+  if (!trackEl || !settingsEl || !trackBtn || !settingsBtn) return;
+  trackEl.classList.toggle('hidden', isSettings);
+  settingsEl.classList.toggle('hidden', !isSettings);
+  const activeCls = 'px-6 py-2.5 rounded-full text-sm font-bold bg-brand-black text-white transition-all';
+  const idleCls = 'px-6 py-2.5 rounded-full text-sm font-medium text-brand-gray hover:text-brand-black transition-all';
+  trackBtn.className = isSettings ? idleCls : activeCls;
+  settingsBtn.className = isSettings ? activeCls : idleCls;
 }
 
 // ── 자동 추적 설정 ─────────────────────────
@@ -5506,6 +5767,11 @@ function renderKwTrend() {
           ${typeBadge}
         </div>
         ${productKey === '__all__' ? `<div class="text-[11px] text-brand-gray mt-0.5 ml-6 truncate max-w-[200px]" title="${_escapeHtml(info.productName)}">${_escapeHtml(info.productName)}</div>` : ''}
+        <div class="text-[11px] text-brand-gray mt-1 ml-6 flex items-center gap-1">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span>월 검색량</span>
+          <span data-vol-kw="${_escapeHtml(info.keyword)}" class="font-bold text-brand-black ml-0.5">—</span>
+        </div>
       </td>
       ${cells}
     </tr>`;
@@ -5520,6 +5786,142 @@ function renderKwTrend() {
     </thead>
     <tbody>${rowsHtml}</tbody>
   </table>`;
+
+  // 검색량 비동기 갱신 (캐시 즉시 표시 → 만료된 키워드만 백그라운드 fetch)
+  _refreshKwVolumesForRendered();
+}
+
+// ── 키워드 월 검색량 (네이버 검색광고 API) ─────────────────────────
+const KW_VOL_KEY = 'kw_search_volume';
+const KW_VOL_TTL = 24 * 60 * 60 * 1000; // 24시간
+function _loadKwVolume() { try { return JSON.parse(localStorage.getItem(KW_VOL_KEY) || '{}'); } catch(_) { return {}; } }
+function _saveKwVolume(o) { localStorage.setItem(KW_VOL_KEY, JSON.stringify(o)); }
+function _kwHasSaKey() {
+  const k = _loadSaKeys();
+  return !!(k.customerId && k.accessLicense && k.secretKey);
+}
+function _normalizeQc(qc) {
+  if (qc == null) return { n: 0, low: false };
+  if (typeof qc === 'number') return { n: qc, low: false };
+  const s = String(qc).trim();
+  if (s.startsWith('<')) return { n: 0, low: true };
+  const n = parseInt(s.replace(/[^0-9]/g, ''), 10);
+  return { n: isNaN(n) ? 0 : n, low: false };
+}
+const KW_VOL_ERR_TTL = 5 * 60 * 1000; // 에러 캐시 5분 (rate-limit 회피)
+function _kwVolumeText(v) {
+  if (v && v.error === 'no_key') return '<button type="button" onclick="setKwTab(\'settings\'); document.getElementById(\'sa-customer-id\') && document.getElementById(\'sa-customer-id\').focus()" class="text-brand-blue hover:underline font-medium">설정 → 검색광고 API 등록</button>';
+  if (v && v.error) {
+    const detail = String(v.error).slice(0, 80);
+    return `<span class="text-brand-pink font-medium" title="${detail.replace(/"/g,'&quot;')}">조회 실패 (콘솔 확인)</span>`;
+  }
+  if (v && v.loading) return '<span class="text-brand-gray">조회 중…</span>';
+  if (!v || v.total == null) return '—';
+  if (typeof v.total === 'string') return v.total + '회';
+  return v.total.toLocaleString() + '회';
+}
+async function _fetchAndCacheKwVolume(keyword) {
+  if (!_kwHasSaKey()) {
+    return { error: 'no_key' };
+  }
+  const cache = _loadKwVolume();
+  // 네이버 검색광고 API는 hintKeywords에 공백 포함 키워드를 거부 (BAD_REQUEST 11001)
+  // 공백을 제거해서 호출 — 네이버는 띄어쓰기 변형을 통합 집계하므로 검색량은 동일
+  const hintForSa = keyword.replace(/\s+/g, '');
+  const data = await _saFetchKeywords(hintForSa);
+  if (!data || data.error) {
+    const errMsg = (data && (data.error || data.detail)) || 'fetch_failed';
+    console.warn('[KW Volume] fetch 실패:', keyword, '→', errMsg, data);
+    cache[keyword] = { error: errMsg, ts: Date.now() };
+    _saveKwVolume(cache);
+    return cache[keyword];
+  }
+  if (!Array.isArray(data.keywordList)) {
+    console.warn('[KW Volume] keywordList 없음:', keyword, data);
+    cache[keyword] = { error: 'no_list', ts: Date.now() };
+    _saveKwVolume(cache);
+    return cache[keyword];
+  }
+  const norm = s => String(s || '').replace(/\s+/g, '').toLowerCase();
+  const target = norm(keyword);
+  const found = data.keywordList.find(k => norm(k.relKeyword) === target) || data.keywordList[0];
+  if (!found) {
+    cache[keyword] = { error: 'no_match', ts: Date.now() };
+    _saveKwVolume(cache);
+    return cache[keyword];
+  }
+  const pc = _normalizeQc(found.monthlyPcQcCnt);
+  const mb = _normalizeQc(found.monthlyMobileQcCnt);
+  const allLow = pc.low && mb.low;
+  const result = {
+    pc: pc.n, mobile: mb.n,
+    total: allLow ? '< 20' : (pc.n + mb.n),
+    ts: Date.now(),
+  };
+  cache[keyword] = result;
+  _saveKwVolume(cache);
+  return result;
+}
+function _applyKwVolumesToCells() {
+  const cache = _loadKwVolume();
+  document.querySelectorAll('[data-vol-kw]').forEach(el => {
+    const kw = el.getAttribute('data-vol-kw');
+    el.innerHTML = _kwVolumeText(cache[kw]);
+  });
+}
+let _kwVolumeFetchInFlight = false;
+let _kwVolumePendingRefresh = false;
+async function _refreshKwVolumesForRendered() {
+  _applyKwVolumesToCells();
+  if (_kwVolumeFetchInFlight) {
+    // 진행 중이면 끝난 후 다시 시도하도록 플래그만 세팅 (새로 추가된 키워드 잡기)
+    _kwVolumePendingRefresh = true;
+    return;
+  }
+  if (!_kwHasSaKey()) {
+    document.querySelectorAll('[data-vol-kw]').forEach(el => {
+      el.innerHTML = _kwVolumeText({ error: 'no_key' });
+    });
+    return;
+  }
+  const cache = _loadKwVolume();
+  const now = Date.now();
+  const needFetch = [];
+  const seen = new Set();
+  document.querySelectorAll('[data-vol-kw]').forEach(el => {
+    const kw = el.getAttribute('data-vol-kw');
+    if (!kw || seen.has(kw)) return;
+    seen.add(kw);
+    const c = cache[kw];
+    if (!c || !c.ts) { needFetch.push(kw); return; }
+    if (c.error) {
+      // 에러는 5분 TTL로 재시도
+      if ((now - c.ts) > KW_VOL_ERR_TTL) needFetch.push(kw);
+    } else {
+      if ((now - c.ts) > KW_VOL_TTL) needFetch.push(kw);
+    }
+  });
+  if (!needFetch.length) return;
+  _kwVolumeFetchInFlight = true;
+  // 진행 중 표시
+  needFetch.forEach(kw => {
+    document.querySelectorAll(`[data-vol-kw="${kw.replace(/"/g, '\\"')}"]`).forEach(el => {
+      el.innerHTML = _kwVolumeText({ loading: true });
+    });
+  });
+  try {
+    for (const kw of needFetch) {
+      try { await _fetchAndCacheKwVolume(kw); } catch(e) { console.warn('[KW Volume] 예외:', kw, e); }
+      _applyKwVolumesToCells();
+      await new Promise(r => setTimeout(r, 250)); // rate-limit 회피
+    }
+  } finally {
+    _kwVolumeFetchInFlight = false;
+    if (_kwVolumePendingRefresh) {
+      _kwVolumePendingRefresh = false;
+      setTimeout(() => _refreshKwVolumesForRendered(), 0);
+    }
+  }
 }
 
 // ── 상품 소싱 — 키워드 발굴 ──────────────────
@@ -5552,6 +5954,25 @@ function _populateSaInputs() {
   if (lc) lc.value = keys.accessLicense || '';
   if (sc) sc.value = keys.secretKey || '';
 }
+function _saValidateKeyFormat(customerId, accessLicense, secretKey) {
+  const warnings = [];
+  if (!/^\d+$/.test(customerId)) {
+    warnings.push(`• CUSTOMER_ID가 숫자만이 아닙니다 (현재 ${customerId.length}자, "${customerId.slice(0,8)}...")`);
+  }
+  // ACCESS_LICENSE는 hex 64자 정도, 보통 "0100"으로 시작
+  if (!/^[0-9a-f]+$/i.test(accessLicense)) {
+    warnings.push(`• ACCESS_LICENSE에 영문/숫자 외 문자가 있습니다 (예: 콜론, 공백, ==)`);
+  }
+  // SECRET_KEY는 base64이며 보통 "=="로 끝
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(secretKey)) {
+    warnings.push(`• SECRET_KEY가 base64 형식이 아닙니다 (영숫자+/=만 허용)`);
+  }
+  // 헷갈려서 라이선스/시크릿 자리 바꿔 입력했는지 체크
+  if (accessLicense.endsWith('==') && !secretKey.endsWith('==')) {
+    warnings.push(`⚠️ ACCESS_LICENSE와 SECRET_KEY가 서로 바뀌어 입력된 것 같습니다 (라이선스에 "==" 포함)`);
+  }
+  return warnings;
+}
 function saveSaKeys() {
   const customerId = (document.getElementById('sa-customer-id').value || '').trim();
   const accessLicense = (document.getElementById('sa-license').value || '').trim();
@@ -5560,15 +5981,87 @@ function saveSaKeys() {
     alert('CUSTOMER_ID / ACCESS_LICENSE / SECRET_KEY 3개 모두 입력해 주세요.');
     return;
   }
+  const warns = _saValidateKeyFormat(customerId, accessLicense, secretKey);
+  if (warns.length) {
+    if (!confirm('입력된 키에 의심스러운 부분이 있습니다:\n\n' + warns.join('\n') + '\n\n그래도 저장할까요?')) return;
+  }
   _saveSaKeysRaw({ customerId, accessLicense, secretKey });
   _updateSaBadge();
+  // 에러 캐시 정리 → 새 키로 즉시 재시도
+  if (typeof _loadKwVolume === 'function') {
+    const cache = _loadKwVolume();
+    let cleared = 0;
+    for (const k in cache) {
+      if (cache[k] && cache[k].error) { delete cache[k]; cleared++; }
+    }
+    if (cleared) _saveKwVolume(cache);
+  }
   alert('네이버 검색광고 API 키가 저장되었습니다.');
+  if (typeof _refreshKwVolumesForRendered === 'function' && document.querySelector('[data-vol-kw]')) {
+    _refreshKwVolumesForRendered();
+  }
 }
 function clearSaKeys() {
   if (!confirm('저장된 API 키를 삭제할까요?')) return;
   localStorage.removeItem(SA_KEYS_LS);
   _populateSaInputs();
   _updateSaBadge();
+  if (typeof _loadKwVolume === 'function') {
+    const cache = _loadKwVolume();
+    let cleared = 0;
+    for (const k in cache) {
+      if (cache[k] && cache[k].error) { delete cache[k]; cleared++; }
+    }
+    if (cleared) _saveKwVolume(cache);
+  }
+  if (typeof _refreshKwVolumesForRendered === 'function' && document.querySelector('[data-vol-kw]')) {
+    _refreshKwVolumesForRendered();
+  }
+}
+async function testSaApi() {
+  const customerId = (document.getElementById('sa-customer-id').value || '').trim();
+  const accessLicense = (document.getElementById('sa-license').value || '').trim();
+  const secretKey = (document.getElementById('sa-secret').value || '').trim();
+  if (!customerId || !accessLicense || !secretKey) {
+    alert('3개 키를 모두 입력한 후 테스트하세요.');
+    return;
+  }
+  // 형식 검사부터
+  const warns = _saValidateKeyFormat(customerId, accessLicense, secretKey);
+  if (warns.length) {
+    alert('⚠️ 키 형식 의심:\n\n' + warns.join('\n') + '\n\n광고주센터에서 각 값을 다시 확인해 주세요.');
+    return;
+  }
+  // 임시로 입력값으로 호출 (저장 안 된 상태에서도 테스트 가능)
+  try {
+    const r = await fetch(`/api/naver-searchad?hint=${encodeURIComponent('티셔츠')}`, {
+      headers: {
+        'x-naver-sa-customer': customerId,
+        'x-naver-sa-license': accessLicense,
+        'x-naver-sa-secret': secretKey,
+      },
+    });
+    if (r.ok) {
+      const data = await r.json();
+      const cnt = (data.keywordList || []).length;
+      alert(`✅ 연결 성공! "티셔츠" 검색에서 ${cnt}개 연관 키워드를 가져왔습니다.\n\n저장 버튼을 눌러 적용하세요.`);
+      return;
+    }
+    const errBody = await r.json().catch(() => ({}));
+    let hint = '';
+    if (r.status === 403) {
+      hint = '\n\n원인 가능성:\n1. CUSTOMER_ID(숫자) ↔ 다른 키와 자리 바뀜\n2. ACCESS_LICENSE ↔ SECRET_KEY 자리 바뀜\n3. 광고주센터에서 비밀키 재발급 후 옛날 키 입력\n4. 광고주센터에서 SA API 사용 신청이 안 된 상태\n\n광고주센터 → 도구 → SA API 사용 관리 에서 재확인 필요';
+    } else if (r.status === 401) {
+      hint = '\n\n인증 오류 — 키 값을 다시 확인해 주세요.';
+    } else if (r.status === 429) {
+      hint = '\n\n호출 제한 — 1분 후 다시 시도하세요.';
+    } else if (r.status >= 500) {
+      hint = '\n\n네이버 서버 오류 또는 server.py 미실행 가능성.';
+    }
+    alert(`❌ 연결 실패 (HTTP ${r.status})\n\n${errBody.error || ''}\n${(errBody.detail || '').slice(0, 200)}${hint}`);
+  } catch (e) {
+    alert(`❌ 통신 오류: ${e.message}\n\nserver.py가 실행 중인지 확인하세요. (cmd 창에서 python server.py)`);
+  }
 }
 async function _saFetchKeywords(hint) {
   const keys = _loadSaKeys();
@@ -8201,7 +8694,13 @@ function hideLoginMessages() {
 async function handleLoginAfterAuth() {
   await loadTodosFromDB();
   await loadProductsFromDB();
+  // 클라우드 데이터를 로컬에 PULL (다른 PC에서 입력한 업로드/송장/이카운트/키워드 데이터 가져오기)
+  await gplanCloudPullAll();
   navigate('dashboard');
+  // PULL 후에 화면 다시 그리기 (업로드 데이터 등)
+  try { if (typeof renderUploadData === 'function') renderUploadData(); } catch(_) {}
+  try { if (typeof syncLedgerFromUploadData === 'function') syncLedgerFromUploadData(); } catch(_) {}
+  try { if (typeof syncDashboardRevenue === 'function') syncDashboardRevenue(); } catch(_) {}
 }
 
 document.getElementById('login-btn').addEventListener('click', async () => {
@@ -15331,8 +15830,8 @@ async function uploadInvoiceFile() {
       }
 
       const map = _loadInvoiceRecords();
-      let matched = 0, unmatched = 0, noInvoice = 0, carrierMissingInPa = 0;
-      const matchedRows = [], unmatchedRows = [];
+      let matched = 0, unmatched = 0, noInvoice = 0, invalidInvoice = 0, carrierMissingInPa = 0;
+      const matchedRows = [], unmatchedRows = [], invalidRows = [];
       const carrierSeen = {};
       body.forEach(r => {
         const name = String(r[0] || '').trim();
@@ -15342,6 +15841,14 @@ async function uploadInvoiceFile() {
         const carrierName = rawCarrier || INVOICE_DEFAULT_CARRIER;
         const invoiceNo = String(r[10] || '').trim();
         if (!invoiceNo) { noInvoice++; return; }
+        // 송장번호가 숫자가 아닌 텍스트(예: "준비중", "미발송")면 실행 제외
+        // 하이픈/공백은 허용하고 그 외 문자가 섞이면 무효 처리
+        const digitsOnly = invoiceNo.replace(/[\s-]/g, '');
+        if (!/^\d+$/.test(digitsOnly)) {
+          invalidInvoice++;
+          invalidRows.push({ name, phone, product, invoiceNo, carrierName, carrNo: '' });
+          return;
+        }
         // 택배사 코드 조회
         const carrObj = _findCarrierByName(carrierName);
         const carrNo = _carrierNoOf(carrObj);
@@ -15406,8 +15913,9 @@ async function uploadInvoiceFile() {
       parts.push('✅ 매칭 ' + matched + '건');
       if (unmatched > 0) parts.push('⚠️ 미매칭 ' + unmatched + '건');
       if (noInvoice > 0) parts.push('송장번호 없음 ' + noInvoice + '건');
+      if (invalidInvoice > 0) parts.push('🚫 송장번호 텍스트(제외) ' + invalidInvoice + '건');
       _invoiceStatus(parts.join(' · ') + ' · 저장 완료 (메모리 + 로컬저장소)', matched > 0 ? 'ok' : 'warn');
-      _renderInvoiceResult(matchedRows, unmatchedRows, noInvoice);
+      _renderInvoiceResult(matchedRows, unmatchedRows, noInvoice, invalidRows);
     } catch (err) {
       _invoiceStatus('파일을 읽을 수 없습니다: ' + (err && err.message || err), 'error');
     }
@@ -15416,10 +15924,11 @@ async function uploadInvoiceFile() {
   reader.readAsArrayBuffer(file);
 }
 
-function _renderInvoiceResult(matchedRows, unmatchedRows, noInvoice) {
+function _renderInvoiceResult(matchedRows, unmatchedRows, noInvoice, invalidRows) {
+  invalidRows = invalidRows || [];
   const box = document.getElementById('invoice-result-box'); if (!box) return;
   const tbl = document.getElementById('invoice-result-body'); if (!tbl) return;
-  if (!matchedRows.length && !unmatchedRows.length) { box.classList.add('hidden'); return; }
+  if (!matchedRows.length && !unmatchedRows.length && !invalidRows.length) { box.classList.add('hidden'); return; }
   box.classList.remove('hidden');
   const _carrierCell = r => {
     const name = _escapeHtml(r.carrierName || '');
@@ -15436,9 +15945,17 @@ function _renderInvoiceResult(matchedRows, unmatchedRows, noInvoice) {
   unmatchedRows.forEach(r => {
     rowsHtml.push('<tr class="bg-brand-pink-light/20"><td class="px-3 py-2 border-b border-brand-border"><span class="text-xs font-bold text-brand-pink bg-brand-pink-light px-2 py-0.5 rounded-full">미매칭</span></td><td class="px-3 py-2 border-b border-brand-border whitespace-nowrap">' + _escapeHtml(r.name) + '</td><td class="px-3 py-2 border-b border-brand-border whitespace-nowrap">' + _escapeHtml(r.phone) + '</td><td class="px-3 py-2 border-b border-brand-border">' + _escapeHtml(r.product) + '</td>' + _carrierCell(r) + '<td class="px-3 py-2 border-b border-brand-border whitespace-nowrap font-bold">' + _escapeHtml(r.invoiceNo) + '</td></tr>');
   });
+  invalidRows.forEach(r => {
+    rowsHtml.push('<tr class="bg-brand-orange-light/30"><td class="px-3 py-2 border-b border-brand-border"><span class="text-xs font-bold text-brand-orange bg-brand-orange-light px-2 py-0.5 rounded-full" title="송장번호가 숫자가 아닙니다 — PA 전송 제외됨">형식오류</span></td><td class="px-3 py-2 border-b border-brand-border whitespace-nowrap">' + _escapeHtml(r.name) + '</td><td class="px-3 py-2 border-b border-brand-border whitespace-nowrap">' + _escapeHtml(r.phone) + '</td><td class="px-3 py-2 border-b border-brand-border">' + _escapeHtml(r.product) + '</td>' + _carrierCell(r) + '<td class="px-3 py-2 border-b border-brand-border whitespace-nowrap text-brand-orange font-bold">' + _escapeHtml(r.invoiceNo) + '</td></tr>');
+  });
   tbl.innerHTML = rowsHtml.join('');
   const summary = document.getElementById('invoice-result-summary');
-  if (summary) summary.textContent = '매칭 ' + matchedRows.length + '건 / 미매칭 ' + unmatchedRows.length + '건' + (noInvoice ? ' / 송장번호 없음 ' + noInvoice + '건' : '');
+  if (summary) {
+    let txt = '매칭 ' + matchedRows.length + '건 / 미매칭 ' + unmatchedRows.length + '건';
+    if (noInvoice) txt += ' / 송장번호 없음 ' + noInvoice + '건';
+    if (invalidRows.length) txt += ' / 형식오류(제외) ' + invalidRows.length + '건';
+    summary.textContent = txt;
+  }
   try { refreshInvoiceSendCount(); } catch(_) {}
   try { renderInvoiceCollectedOrders(); } catch(_) {}
 }
@@ -20767,6 +21284,89 @@ async function confirmPaImport() {
 
   window.showAppAlert = (title, message, opts) => _open({ title, message, showCancel: false, ...(opts||{}) });
   window.showAppConfirm = (title, message, onConfirm, opts) => _open({ title, message, showCancel: true, onConfirm, ...(opts||{}) });
+})();
+
+// ── 데이터 백업/동기화 플로팅 패널 ────────────────────────
+(function setupGplanBackupPanel() {
+  if (document.getElementById('gplan-backup-fab')) return;
+
+  const fab = document.createElement('button');
+  fab.id = 'gplan-backup-fab';
+  fab.title = '데이터 백업 / 동기화';
+  fab.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:9998;width:48px;height:48px;border-radius:9999px;background:#1A1A1A;color:#fff;border:none;box-shadow:0 6px 20px rgba(0,0,0,.18);cursor:pointer;display:none;align-items:center;justify-content:center;';
+  fab.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v8m0 0l-3-3m3 3l3-3"/><path d="M3 15v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4"/></svg>';
+
+  const panel = document.createElement('div');
+  panel.id = 'gplan-backup-panel';
+  panel.style.cssText = 'position:fixed;right:18px;bottom:78px;z-index:9999;width:300px;background:#fff;border:1px solid #E5E5E5;border-radius:18px;box-shadow:0 10px 40px rgba(0,0,0,.15);padding:16px;display:none;font-family:inherit;';
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div style="font-weight:800;font-size:14px;color:#1A1A1A;">데이터 백업/동기화</div>
+      <button id="gplan-backup-close" style="border:none;background:transparent;cursor:pointer;color:#777;font-size:18px;line-height:1;">×</button>
+    </div>
+    <div style="font-size:11px;color:#777;margin-bottom:10px;line-height:1.5;">
+      로그인 시 자동 PULL, 수정 시 자동 PUSH 됩니다.<br>
+      PC1의 기존 데이터를 클라우드에 처음 올릴 때만 "지금 클라우드에 백업"을 누르세요.
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button id="gplan-btn-cloud-push" style="padding:9px 12px;border-radius:9999px;background:#1A1A1A;color:#fff;border:none;font-weight:700;font-size:12px;cursor:pointer;">☁️ 지금 클라우드에 백업</button>
+      <button id="gplan-btn-cloud-pull" style="padding:9px 12px;border-radius:9999px;background:#fff;color:#1A1A1A;border:1px solid #E5E5E5;font-weight:700;font-size:12px;cursor:pointer;">⬇️ 클라우드에서 다시 가져오기</button>
+      <div style="height:1px;background:#EEE;margin:4px 0;"></div>
+      <button id="gplan-btn-file-export" style="padding:9px 12px;border-radius:9999px;background:#fff;color:#1A1A1A;border:1px solid #E5E5E5;font-weight:700;font-size:12px;cursor:pointer;">💾 파일로 저장 (JSON)</button>
+      <label for="gplan-file-import" style="padding:9px 12px;border-radius:9999px;background:#fff;color:#1A1A1A;border:1px solid #E5E5E5;font-weight:700;font-size:12px;cursor:pointer;text-align:center;">📂 백업 파일에서 복원</label>
+      <input id="gplan-file-import" type="file" accept=".json,application/json" style="display:none;">
+    </div>
+    <div id="gplan-backup-status" style="margin-top:10px;font-size:11px;color:#1976D2;min-height:14px;"></div>
+  `;
+
+  document.body.appendChild(fab);
+  document.body.appendChild(panel);
+
+  const setStatus = (msg, color) => {
+    const el = document.getElementById('gplan-backup-status');
+    if (el) { el.textContent = msg || ''; el.style.color = color || '#1976D2'; }
+  };
+
+  fab.addEventListener('click', () => {
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    setStatus('');
+  });
+  document.getElementById('gplan-backup-close').addEventListener('click', () => { panel.style.display = 'none'; });
+
+  document.getElementById('gplan-btn-cloud-push').addEventListener('click', async () => {
+    setStatus('업로드 중...', '#777');
+    const n = await gplanCloudPushAll();
+    setStatus(n > 0 ? `✅ ${n}개 항목을 클라우드에 백업했습니다.` : 'ℹ️ 업로드할 데이터가 없습니다.', n > 0 ? '#1976D2' : '#777');
+  });
+  document.getElementById('gplan-btn-cloud-pull').addEventListener('click', async () => {
+    setStatus('가져오는 중...', '#777');
+    const n = await gplanCloudPullAll();
+    if (n === -1) { setStatus('⚠️ gplan_kv 테이블이 없습니다. SQL을 먼저 실행하세요.', '#D32F2F'); return; }
+    setStatus(`✅ ${n}개 항목을 클라우드에서 가져왔습니다. 새로고침합니다...`, '#1976D2');
+    setTimeout(() => location.reload(), 1200);
+  });
+  document.getElementById('gplan-btn-file-export').addEventListener('click', () => {
+    gplanLocalBackupDownload();
+    setStatus('✅ 백업 파일이 다운로드되었습니다.', '#1976D2');
+  });
+  document.getElementById('gplan-file-import').addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    setStatus('복원 중...', '#777');
+    await gplanLocalBackupRestore(f);
+    e.target.value = '';
+  });
+
+  // 로그인된 페이지에서만 표시
+  function _toggleFab() {
+    const onLogin = document.getElementById('page-login') && document.getElementById('page-login').classList.contains('active');
+    fab.style.display = onLogin ? 'none' : 'flex';
+    if (onLogin) panel.style.display = 'none';
+  }
+  _toggleFab();
+  // 페이지 전환 감지
+  const observer = new MutationObserver(_toggleFab);
+  document.querySelectorAll('.page').forEach(p => observer.observe(p, { attributes: true, attributeFilter: ['class'] }));
 })();
 </script>
 </body>

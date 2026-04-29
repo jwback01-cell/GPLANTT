@@ -1,0 +1,29 @@
+# 로컬 개발 도구
+cloudflared.exe
+config.yml
+server.py
+*.bat
+__pycache__/
+node_modules/
+
+# 백업/보관 폴더
+백업/
+clicknara-site/
+
+# 백업 파일
+*.bak
+*.bak_*
+index.html.bak_*
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.claude/
+.netlify/
+.vercel/
+
+# 환경변수 (절대 커밋 금지)
+.env
+.env.*
