@@ -78,9 +78,9 @@ export default async function handler(req, res) {
     ? undefined
     : (typeof req.body === 'string' ? req.body : JSON.stringify(req.body));
 
-  // 두 가지 인증 방식 — AWS API Gateway가 어느 쪽을 받는지 단계적으로 시도
-  // 1) x-api-key 만 (AWS API Key 인증) — Authorization 없으면 Sigv4 검증 안 함
-  // 2) x-api-key + Authorization: Token <token> — server.py 로컬 동작 방식
+  // 진단 정보 — 응답 헤더로 노출 (브라우저 Network 탭에서 확인 가능)
+  const diag = { traceId, version: 'v3-no-auth-first', attempts: [] };
+
   const doRequest = async (token, includeAuth) => {
     const headers = {
       'x-api-key': apiKey,
@@ -88,6 +88,7 @@ export default async function handler(req, res) {
       'Accept': 'application/json',
     };
     if (includeAuth && token) headers['Authorization'] = `Token ${token}`;
+    const sentHeaderNames = Object.keys(headers).join(',');
     const r = await fetch(upstreamUrl, {
       method: req.method,
       headers,
@@ -96,11 +97,17 @@ export default async function handler(req, res) {
     const text = await r.text();
     let data;
     try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+    diag.attempts.push({
+      mode: includeAuth ? 'with-token' : 'x-api-key-only',
+      sentHeaders: sentHeaderNames,
+      status: r.status,
+      bodyPreview: text.slice(0, 200),
+    });
     return { status: r.status, data };
   };
 
   try {
-    // 1차: Authorization 빼고 x-api-key 만 (AWS Sigv4 파싱 회피)
+    // 1차: Authorization 헤더 없이 x-api-key 만 (AWS Sigv4 파싱 회피 시도)
     let { status, data } = await doRequest(null, false);
     console.log(`[playauto ${traceId}] no-auth attempt ${upstreamUrl} → ${status}`);
 
@@ -108,22 +115,29 @@ export default async function handler(req, res) {
     const needAuth = status === 401 || status === 403
       || (data && typeof data === 'object' && (data.error_code === 401 || data.error_code === 403));
     if (needAuth) {
-      let token = await getToken(apiKey, authKey);
-      console.log(`[playauto ${traceId}] retry with token len=${token.length} preview=${token.slice(0,8)}...`);
-      ({ status, data } = await doRequest(token, true));
-      console.log(`[playauto ${traceId}] auth attempt → ${status}`);
-
-      // 토큰 만료 → 강제 재발급 후 1회 더
-      if (status === 401 || (data && typeof data === 'object' && data.error_code === 401)) {
-        token = await getToken(apiKey, authKey, true);
+      try {
+        let token = await getToken(apiKey, authKey);
+        console.log(`[playauto ${traceId}] retry with token len=${token.length} preview=${token.slice(0,8)}...`);
+        diag.tokenLen = token.length;
         ({ status, data } = await doRequest(token, true));
-        console.log(`[playauto ${traceId}] refresh+retry → ${status}`);
+
+        // 토큰 만료 → 강제 재발급 후 1회 더
+        if (status === 401 || (data && typeof data === 'object' && data.error_code === 401)) {
+          token = await getToken(apiKey, authKey, true);
+          ({ status, data } = await doRequest(token, true));
+        }
+      } catch (tokenErr) {
+        diag.tokenError = String(tokenErr.message || tokenErr).slice(0, 300);
       }
     }
 
+    // 진단 정보를 응답 헤더로 노출
+    res.setHeader('x-pa-trace', traceId);
+    res.setHeader('x-pa-diag', JSON.stringify(diag).slice(0, 1900));
     res.status(status).json(data);
   } catch (e) {
     console.error(`[playauto ${traceId}] error:`, e);
-    res.status(500).json({ error: e.message || String(e), traceId });
+    res.setHeader('x-pa-trace', traceId);
+    res.status(500).json({ error: e.message || String(e), traceId, diag });
   }
 }
