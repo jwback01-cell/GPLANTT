@@ -4183,6 +4183,34 @@ PBT키캡	1180
   </div>
 </div>
 
+<!-- 순위 변동 추이 상세(상품별) 모달 -->
+<div id="kw-trend-detail-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onclick="if(event.target===this)closeKwTrendDetail()">
+  <div class="bg-white rounded-3xl panel w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+    <!-- 헤더 -->
+    <div class="px-6 py-4 border-b border-brand-border flex items-center justify-between gap-3">
+      <div class="min-w-0">
+        <div id="kw-detail-title" class="font-bold text-base truncate">상품 추이</div>
+        <div class="text-xs text-brand-gray mt-0.5">매일 오전 7시 자동 추적 결과 + 수동 조회 누적</div>
+      </div>
+      <button onclick="closeKwTrendDetail()" class="text-brand-gray hover:text-brand-black p-1 rounded-full hover:bg-brand-bg shrink-0" aria-label="닫기">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <!-- 기간 필터 -->
+    <div class="px-6 py-3 border-b border-brand-border flex items-center gap-3 flex-wrap">
+      <div id="kw-detail-period" class="flex gap-1 bg-brand-bg p-1 rounded-xl">
+        <button data-days="7" class="kw-detail-pbtn px-3 py-1.5 text-sm font-bold bg-white shadow-sm rounded-lg text-brand-black">7일</button>
+        <button data-days="14" class="kw-detail-pbtn px-3 py-1.5 text-sm font-medium text-brand-gray hover:text-brand-black transition-colors">14일</button>
+        <button data-days="30" class="kw-detail-pbtn px-3 py-1.5 text-sm font-medium text-brand-gray hover:text-brand-black transition-colors">30일</button>
+        <button data-days="all" class="kw-detail-pbtn px-3 py-1.5 text-sm font-medium text-brand-gray hover:text-brand-black transition-colors">전체</button>
+      </div>
+      <span class="text-xs text-brand-gray">최신 → 과거 순으로 정렬됨</span>
+    </div>
+    <!-- 표 -->
+    <div id="kw-detail-canvas" class="overflow-auto flex-1"></div>
+  </div>
+</div>
+
 <!-- 이카운트 전송 오류 상세 모달 -->
 <!-- 공용 알림 모달 (native alert 대체) -->
 <div id="app-alert-modal" class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-black/40" onclick="if(event.target===this)closeAppAlert()">
@@ -5663,7 +5691,7 @@ function renderKwTrend() {
     return `<span class="group inline-flex items-center gap-1 bg-brand-bg border border-brand-border rounded-full pl-2.5 pr-1.5 py-1 text-[12px] font-semibold whitespace-nowrap" title="${_escapeHtml(item.keyword)}${item.rankType === 'plus' ? ' (플러스스토어)' : ''}">
       <span class="text-brand-black">${_escapeHtml(item.keyword)}${typeIcon}</span>
       ${body}
-      <button type="button" onclick="deleteKwTrendItem('${item.id}', this)" title="키워드 삭제" class="ml-1 w-4 h-4 rounded-full text-brand-gray hover:text-white hover:bg-brand-pink flex items-center justify-center text-[12px] leading-none transition-colors" aria-label="삭제">×</button>
+      <button type="button" onclick="event.stopPropagation(); deleteKwTrendItem('${item.id}', this)" title="키워드 삭제" class="ml-1 w-4 h-4 rounded-full text-brand-gray hover:text-white hover:bg-brand-pink flex items-center justify-center text-[12px] leading-none transition-colors" aria-label="삭제">×</button>
     </span>`;
   }
 
@@ -5692,10 +5720,10 @@ function renderKwTrend() {
       : '';
     const productName = product.name || '<이름 없음>';
     const urlLink = product.url
-      ? `<a href="${_escapeHtml(product.url)}" target="_blank" rel="noopener" class="text-[11px] text-brand-blue hover:underline truncate max-w-full block">${_escapeHtml(product.url.replace(/^https?:\/\//, ''))}</a>`
+      ? `<a href="${_escapeHtml(product.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="text-[11px] text-brand-blue hover:underline truncate max-w-full block">${_escapeHtml(product.url.replace(/^https?:\/\//, ''))}</a>`
       : `<span class="text-[11px] text-brand-gray">URL 없음</span>`;
 
-    return `<div class="bg-white border border-brand-border rounded-3xl p-5 flex flex-col gap-3 hover:shadow-md transition-shadow">
+    return `<div onclick="openKwTrendDetail('${_escapeHtml(productKey)}')" class="bg-white border border-brand-border rounded-3xl p-5 flex flex-col gap-3 hover:shadow-md hover:border-brand-black/30 transition-all cursor-pointer">
       <div class="flex items-start justify-between gap-2">
         <div class="min-w-0 flex-1">
           <h3 class="font-bold text-[15px] text-brand-black leading-tight truncate" title="${_escapeHtml(productName)}">${_escapeHtml(productName)}</h3>
@@ -5705,8 +5733,12 @@ function renderKwTrend() {
       </div>
       <div class="border-t border-brand-border pt-3 flex flex-wrap gap-1.5 min-h-[40px]">
         ${items.length === 0
-          ? '<span class="text-brand-gray text-xs">등록된 키워드 없음 — "키워드 관리"에서 추가하세요</span>'
+          ? '<span class="text-brand-gray text-xs">등록된 키워드 없음 — 순위 조회 후 "선택한 키워드 등록"으로 추가하세요</span>'
           : chipsHtml + hiddenHtml}
+      </div>
+      <div class="text-[11px] text-brand-gray text-right -mt-1 flex items-center justify-end gap-1">
+        <span>날짜별 추이 보기</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
     </div>`;
   }
@@ -5761,7 +5793,178 @@ function _doDeleteKwTrendItem(id) {
     _saveKwSeries(series);
   }
   renderKwTrend();
+  // 상세 모달이 열려 있으면 같이 갱신
+  if (_kwDetailProductKey) _renderKwDetailTable();
   function _realKeyOf(pk) { const p = _kwResolveProduct(pk); return p ? (p.url || p.name) : pk; }
+}
+
+// ── 상품별 추이 상세 모달 ─────────────────────
+let _kwDetailDays = 7;            // 7 | 14 | 30 | 'all'
+let _kwDetailProductKey = null;
+
+function openKwTrendDetail(productKey) {
+  if (!productKey) return;
+  _kwDetailProductKey = productKey;
+  const product = _kwResolveProduct(productKey);
+  const titleEl = document.getElementById('kw-detail-title');
+  if (titleEl) titleEl.textContent = product ? product.name : '<연결 끊김>';
+  // 기간 버튼 바인딩 (한 번만 부착)
+  const periodEl = document.getElementById('kw-detail-period');
+  if (periodEl && !periodEl.dataset.bound) {
+    periodEl.querySelectorAll('.kw-detail-pbtn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const v = btn.dataset.days;
+        setKwDetailPeriod(v === 'all' ? 'all' : parseInt(v, 10));
+      });
+    });
+    periodEl.dataset.bound = '1';
+  }
+  // ESC 키로 닫기
+  document.addEventListener('keydown', _kwDetailEscHandler);
+  document.getElementById('kw-trend-detail-modal').classList.remove('hidden');
+  _renderKwDetailTable();
+}
+
+function _kwDetailEscHandler(e) {
+  if (e.key === 'Escape') closeKwTrendDetail();
+}
+
+function closeKwTrendDetail() {
+  document.getElementById('kw-trend-detail-modal').classList.add('hidden');
+  _kwDetailProductKey = null;
+  document.removeEventListener('keydown', _kwDetailEscHandler);
+}
+
+function setKwDetailPeriod(days) {
+  _kwDetailDays = days;
+  const idle = 'kw-detail-pbtn px-3 py-1.5 text-sm font-medium text-brand-gray hover:text-brand-black transition-colors';
+  const active = 'kw-detail-pbtn px-3 py-1.5 text-sm font-bold bg-white shadow-sm rounded-lg text-brand-black';
+  document.querySelectorAll('.kw-detail-pbtn').forEach(b => {
+    b.className = (String(b.dataset.days) === String(days)) ? active : idle;
+  });
+  _renderKwDetailTable();
+}
+
+function _renderKwDetailTable() {
+  const canvas = document.getElementById('kw-detail-canvas');
+  if (!canvas || !_kwDetailProductKey) return;
+  const series = _loadKwSeries();
+  const manage = _loadKwManage();
+
+  function _realKeyOf(pk) { const p = _kwResolveProduct(pk); return p ? (p.url || p.name) : pk; }
+
+  // 이 상품의 키워드만
+  const items = [];
+  manage.forEach(it => {
+    if (it.productKey !== _kwDetailProductKey) return;
+    const realKey = _realKeyOf(it.productKey);
+    const types = Array.isArray(it.rankTypes) && it.rankTypes.length ? it.rankTypes : ['price'];
+    types.forEach(t => {
+      items.push({
+        id: it.id,
+        keyword: it.keyword,
+        rankType: t,
+        histKey: realKey + '||' + it.keyword + '||' + t,
+        legacyKey: realKey + '||' + it.keyword,
+      });
+    });
+  });
+
+  if (!items.length) {
+    canvas.innerHTML = '<div class="p-10 text-center text-brand-gray text-sm">이 상품에 등록된 키워드가 없습니다. 순위 조회 후 "선택한 키워드 등록"으로 추가하세요.</div>';
+    return;
+  }
+
+  // 날짜 컬럼 (오늘부터 N일, 최신 → 과거)
+  const today = new Date(); today.setHours(0,0,0,0);
+  let days;
+  if (_kwDetailDays === 'all') {
+    let oldest = today.getTime();
+    for (const it of items) {
+      const arr = (series[it.histKey] || []).concat(it.rankType === 'price' ? (series[it.legacyKey] || []) : []);
+      for (const e of arr) {
+        const t = new Date(e.t).getTime();
+        if (t < oldest) oldest = t;
+      }
+    }
+    const diffDays = Math.ceil((today.getTime() - oldest) / 86400000) + 1;
+    days = Math.max(1, Math.min(180, diffDays));
+  } else {
+    days = _kwDetailDays || 7;
+  }
+  const dateCols = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date(today.getTime() - i * 86400000);
+    dateCols.push({ key: _ymd(d), label: _ymdLabel(d) });
+  }
+
+  function _dayRank(histKey, dayKey, legacyKey) {
+    const arr = (series[histKey] || []).concat(legacyKey ? (series[legacyKey] || []) : []);
+    let v = undefined, latestT = '';
+    for (const e of arr) {
+      if (_ymd(new Date(e.t)) === dayKey && e.t > latestT) { v = e.r; latestT = e.t; }
+    }
+    return v;
+  }
+
+  const headerCells = dateCols.map(c => `<th class="font-semibold p-3 text-left whitespace-nowrap min-w-[130px]">${c.label}</th>`).join('');
+  const rowsHtml = items.map(item => {
+    const lk = item.rankType === 'price' ? item.legacyKey : null;
+    const cells = dateCols.map((c, idx) => {
+      const cur = _dayRank(item.histKey, c.key, lk);
+      let prev = undefined;
+      for (let j = idx + 1; j < dateCols.length; j++) {
+        const v = _dayRank(item.histKey, dateCols[j].key, lk);
+        if (v !== undefined) { prev = v; break; }
+      }
+      if (cur === undefined) return '<td class="p-3 text-brand-gray text-sm">-</td>';
+      if (cur === null) return '<td class="p-3"><span class="text-brand-gray font-semibold text-sm">순위권 밖</span></td>';
+      const page = _kwPageOf(cur);
+      let delta = '';
+      if (typeof prev === 'number') {
+        const diff = prev - cur;
+        if (diff > 0) {
+          delta = `<span class="ml-1.5 text-green-600 font-bold text-xs inline-flex items-center gap-0.5"><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,4 22,20 2,20"/></svg>${diff}</span>`;
+        } else if (diff < 0) {
+          delta = `<span class="ml-1.5 text-red-500 font-bold text-xs inline-flex items-center gap-0.5"><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,20 22,4 2,4"/></svg>${-diff}</span>`;
+        } else {
+          delta = `<span class="ml-1.5 text-brand-gray font-bold text-xs">-</span>`;
+        }
+      } else if (prev === null) {
+        delta = `<span class="ml-1.5 text-brand-orange font-bold text-xs">신규</span>`;
+      }
+      return `<td class="p-3 whitespace-nowrap"><span class="font-bold text-brand-black">${cur}위</span> <span class="text-brand-gray text-xs">- ${page}페이지 ${cur}위</span>${delta}</td>`;
+    }).join('');
+    const typeBadge = item.rankType === 'plus'
+      ? '<span class="inline-block bg-brand-green-light text-[#00C853] text-[10px] font-bold px-1.5 py-0.5 rounded">플러스</span>'
+      : '<span class="inline-block bg-brand-blue-light text-brand-blue text-[10px] font-bold px-1.5 py-0.5 rounded">가격비교</span>';
+    return `<tr class="border-b border-brand-border last:border-b-0 hover:bg-gray-50/50">
+      <td class="p-3 pl-4 sticky left-0 bg-white z-10 border-r border-brand-border">
+        <div class="flex items-center gap-2">
+          <span class="font-semibold text-sm text-brand-black whitespace-nowrap">${_escapeHtml(item.keyword)}</span>
+          ${typeBadge}
+        </div>
+      </td>
+      <td class="p-3 sticky left-[200px] bg-white z-10 border-r border-brand-border whitespace-nowrap">
+        <span data-vol-kw="${_escapeHtml(item.keyword)}" class="font-bold text-brand-black text-sm">—</span>
+      </td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  canvas.innerHTML = `<table class="w-full text-left border-collapse text-[0.95rem]">
+    <thead class="sticky top-0 bg-brand-bg z-20 shadow-sm">
+      <tr class="text-brand-gray text-[0.8rem]">
+        <th class="font-semibold p-3 pl-4 whitespace-nowrap sticky left-0 bg-brand-bg z-30 border-r border-brand-border min-w-[200px]">키워드</th>
+        <th class="font-semibold p-3 whitespace-nowrap sticky left-[200px] bg-brand-bg z-30 border-r border-brand-border min-w-[100px]">월 검색량</th>
+        ${headerCells}
+      </tr>
+    </thead>
+    <tbody>${rowsHtml}</tbody>
+  </table>`;
+
+  // 검색량 비동기 갱신 (캐시 즉시 표시 → 만료된 키워드만 백그라운드 fetch)
+  if (typeof _refreshKwVolumesForRendered === 'function') _refreshKwVolumesForRendered();
 }
 
 // ── 키워드 월 검색량 (네이버 검색광고 API) ─────────────────────────
