@@ -3582,14 +3582,20 @@ tailwind.config = {
 
         <!-- 순위 조회 결과 -->
         <section class="bg-white p-6 md:p-8 rounded-4xl panel flex-1 flex flex-col overflow-hidden">
-          <div class="flex justify-between items-end mb-6 shrink-0">
+          <div class="flex justify-between items-end mb-6 shrink-0 flex-wrap gap-3">
             <div class="flex items-center gap-3">
               <div class="w-2 h-6 bg-brand-blue-light rounded-full"></div>
               <h2 class="text-[1.35rem] font-bold">순위 조회 결과</h2>
             </div>
-            <div class="text-brand-gray text-sm font-medium flex items-center gap-1.5 bg-brand-bg px-3 py-1.5 rounded-full">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              <span id="kw-last-query">아직 조회 기록 없음</span>
+            <div class="flex items-center gap-2">
+              <button id="kw-register-selected-btn" type="button" onclick="registerSelectedKwResults()" class="hidden px-4 py-2 rounded-full bg-brand-black text-white text-xs font-bold hover:bg-[#333] transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                <span id="kw-register-selected-label">선택한 키워드 등록</span>
+              </button>
+              <div class="text-brand-gray text-sm font-medium flex items-center gap-1.5 bg-brand-bg px-3 py-1.5 rounded-full">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span id="kw-last-query">아직 조회 기록 없음</span>
+              </div>
             </div>
           </div>
 
@@ -3597,7 +3603,8 @@ tailwind.config = {
             <table class="w-full text-left border-collapse min-w-[700px]">
               <thead>
                 <tr class="bg-brand-bg border-b border-brand-border text-brand-gray text-[0.85rem]">
-                  <th class="font-semibold p-4 pl-5 whitespace-nowrap">키워드</th>
+                  <th class="font-semibold p-4 pl-5 whitespace-nowrap w-10"><input type="checkbox" id="kw-result-select-all" onclick="toggleAllKwResults(this)" class="w-4 h-4 rounded cursor-pointer"></th>
+                  <th class="font-semibold p-4 whitespace-nowrap">키워드</th>
                   <th class="font-semibold p-4 whitespace-nowrap text-center">현재 순위</th>
                   <th class="font-semibold p-4 whitespace-nowrap">전일 대비</th>
                   <th class="font-semibold p-4 whitespace-nowrap text-center">최고 순위</th>
@@ -3606,70 +3613,7 @@ tailwind.config = {
                 </tr>
               </thead>
               <tbody id="kw-result-body" class="text-[0.95rem]">
-                <tr class="border-b border-brand-border hover:bg-gray-50/50 transition-colors group">
-                  <td class="p-4 pl-5 font-bold">오버핏 티셔츠</td>
-                  <td class="p-4 text-center font-bold text-[1.1rem]">3<span class="text-sm font-medium text-brand-gray ml-0.5">위</span></td>
-                  <td class="p-4">
-                    <span class="text-brand-pink font-bold text-xs bg-brand-pink-light/60 px-2.5 py-1 rounded-lg flex items-center gap-1 w-max">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m18 15-6-6-6 6"/></svg>
-                      2계단 상승
-                    </span>
-                  </td>
-                  <td class="p-4 text-center text-brand-gray">1위</td>
-                  <td class="p-4 text-center text-brand-gray">15위</td>
-                  <td class="p-4 pr-5 text-right text-brand-gray text-sm">14:20</td>
-                </tr>
-                <tr class="border-b border-brand-border hover:bg-gray-50/50 transition-colors group">
-                  <td class="p-4 pl-5 font-bold">여름 무지티</td>
-                  <td class="p-4 text-center font-bold text-[1.1rem]">12<span class="text-sm font-medium text-brand-gray ml-0.5">위</span></td>
-                  <td class="p-4">
-                    <span class="text-brand-blue font-bold text-xs bg-brand-blue-light/60 px-2.5 py-1 rounded-lg flex items-center gap-1 w-max">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m6 9 6 6 6-6"/></svg>
-                      1계단 하락
-                    </span>
-                  </td>
-                  <td class="p-4 text-center text-brand-gray">5위</td>
-                  <td class="p-4 text-center text-brand-gray">22위</td>
-                  <td class="p-4 pr-5 text-right text-brand-gray text-sm">14:20</td>
-                </tr>
-                <tr class="border-b border-brand-border hover:bg-gray-50/50 transition-colors group">
-                  <td class="p-4 pl-5 font-bold">커플 반팔</td>
-                  <td class="p-4 text-center font-bold text-[1.1rem]">8<span class="text-sm font-medium text-brand-gray ml-0.5">위</span></td>
-                  <td class="p-4">
-                    <span class="text-brand-gray font-bold text-xs bg-brand-border px-2.5 py-1 rounded-lg flex items-center gap-1 w-max">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                      변동 없음
-                    </span>
-                  </td>
-                  <td class="p-4 text-center text-brand-gray">6위</td>
-                  <td class="p-4 text-center text-brand-gray">18위</td>
-                  <td class="p-4 pr-5 text-right text-brand-gray text-sm">14:20</td>
-                </tr>
-                <tr class="border-b border-brand-border hover:bg-gray-50/50 transition-colors group">
-                  <td class="p-4 pl-5 font-bold">박스 티셔츠</td>
-                  <td class="p-4 text-center font-bold text-[1.1rem]">45<span class="text-sm font-medium text-brand-gray ml-0.5">위</span></td>
-                  <td class="p-4">
-                    <span class="text-brand-orange font-bold text-xs bg-brand-orange-light/80 px-2.5 py-1 rounded-lg flex items-center gap-1 w-max">
-                      <span class="w-1.5 h-1.5 bg-brand-orange rounded-full animate-pulse"></span>
-                      신규 진입
-                    </span>
-                  </td>
-                  <td class="p-4 text-center text-brand-gray">-</td>
-                  <td class="p-4 text-center text-brand-gray">-</td>
-                  <td class="p-4 pr-5 text-right text-brand-gray text-sm">14:20</td>
-                </tr>
-                <tr class="hover:bg-gray-50/50 transition-colors group">
-                  <td class="p-4 pl-5 font-bold text-brand-gray">레이어드 티</td>
-                  <td class="p-4 text-center font-bold text-[1.1rem] text-brand-gray">-</td>
-                  <td class="p-4">
-                    <span class="text-brand-gray font-bold text-xs border border-[#E5E5EA] px-2.5 py-1 rounded-lg flex items-center gap-1 w-max bg-white">
-                      순위권 밖
-                    </span>
-                  </td>
-                  <td class="p-4 text-center text-brand-gray">82위</td>
-                  <td class="p-4 text-center text-brand-gray">100위 밖</td>
-                  <td class="p-4 pr-5 text-right text-brand-gray text-sm">14:20</td>
-                </tr>
+                <tr><td colspan="7" class="p-10 text-center text-brand-gray">왼쪽에서 키워드와 상품을 선택한 뒤 <b class="text-brand-black">순위 조회</b> 버튼을 누르면 결과가 여기에 표시됩니다.</td></tr>
               </tbody>
             </table>
           </div>
@@ -4924,12 +4868,19 @@ function _getSelectedKwProduct() {
 function _loadKwHistory() { try { return JSON.parse(localStorage.getItem(KW_HIST_KEY) || '{}'); } catch(_) { return {}; } }
 function _saveKwHistory(h) { localStorage.setItem(KW_HIST_KEY, JSON.stringify(h)); }
 
-function _renderKwResults(rows) {
+function _renderKwResults(rows, ctx) {
   const tbody = document.getElementById('kw-result-body');
   if (!tbody) return;
+  const regBtn = document.getElementById('kw-register-selected-btn');
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-brand-gray">조회 결과가 없습니다.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-brand-gray">조회 결과가 없습니다.</td></tr>';
+    if (regBtn) regBtn.classList.add('hidden');
     return;
+  }
+  // 등록 시 사용할 컨텍스트(상품키, 순위유형)를 tbody에 보관
+  if (ctx) {
+    if (ctx.manageProductKey) tbody.setAttribute('data-product-key', ctx.manageProductKey);
+    if (Array.isArray(ctx.rankTypes)) tbody.setAttribute('data-rank-types', ctx.rankTypes.join(','));
   }
   tbody.innerHTML = rows.map((r, i) => {
     const isLast = i === rows.length - 1;
@@ -4957,7 +4908,8 @@ function _renderKwResults(rows) {
       ? '<span class="inline-block bg-brand-green-light text-[#00C853] text-[10px] font-bold px-1.5 py-0.5 rounded ml-1 align-middle">플러스</span>'
       : (r.rankType === 'price' ? '<span class="inline-block bg-brand-blue-light text-brand-blue text-[10px] font-bold px-1.5 py-0.5 rounded ml-1 align-middle">가격비교</span>' : '');
     return `<tr class="${borderCls} hover:bg-gray-50/50 transition-colors group">
-      <td class="p-4 pl-5 font-bold ${r.rank==null?'text-brand-gray':''}">${_escapeHtml(r.keyword)}${typeBadge}${matchedHtml}</td>
+      <td class="p-4 pl-5"><input type="checkbox" class="kw-result-cb w-4 h-4 rounded cursor-pointer" data-keyword="${_escapeHtml(r.keyword)}" data-rank-type="${r.rankType}" onchange="_updateKwSelectedCount()"></td>
+      <td class="p-4 font-bold ${r.rank==null?'text-brand-gray':''}">${_escapeHtml(r.keyword)}${typeBadge}${matchedHtml}</td>
       ${rankCell}
       ${deltaCell}
       <td class="p-4 text-center text-brand-gray">${best}</td>
@@ -4965,6 +4917,75 @@ function _renderKwResults(rows) {
       <td class="p-4 pr-5 text-right text-brand-gray text-sm">${r.time}</td>
     </tr>`;
   }).join('');
+  if (regBtn) regBtn.classList.remove('hidden');
+  const sa = document.getElementById('kw-result-select-all'); if (sa) sa.checked = false;
+  _updateKwSelectedCount();
+}
+
+// 결과 행 전체 선택/해제
+function toggleAllKwResults(cb) {
+  document.querySelectorAll('.kw-result-cb').forEach(c => { c.checked = cb.checked; });
+  _updateKwSelectedCount();
+}
+
+// 등록 버튼의 라벨에 선택 개수 표시 + 활성화 토글
+function _updateKwSelectedCount() {
+  const cbs = document.querySelectorAll('.kw-result-cb');
+  const checked = Array.from(cbs).filter(c => c.checked);
+  const btn = document.getElementById('kw-register-selected-btn');
+  const lbl = document.getElementById('kw-register-selected-label');
+  if (lbl) lbl.textContent = checked.length ? `선택한 키워드 등록 (${checked.length})` : '선택한 키워드 등록';
+  if (btn) btn.disabled = checked.length === 0;
+}
+
+// 선택한 결과를 키워드 관리에 등록
+function registerSelectedKwResults() {
+  const tbody = document.getElementById('kw-result-body');
+  const productKey = tbody?.getAttribute('data-product-key') || '';
+  const rankTypes = (tbody?.getAttribute('data-rank-types') || '').split(',').filter(Boolean);
+  if (!productKey) { showAppAlert ? showAppAlert('등록 불가', '먼저 순위 조회를 실행하세요.') : alert('먼저 순위 조회를 실행하세요.'); return; }
+  if (!rankTypes.length) { showAppAlert ? showAppAlert('등록 불가', '순위 유형 정보가 없습니다.') : alert('순위 유형 정보가 없습니다.'); return; }
+  const checked = Array.from(document.querySelectorAll('.kw-result-cb:checked'));
+  if (!checked.length) { showAppAlert ? showAppAlert('선택 항목 없음', '등록할 키워드를 먼저 체크하세요.') : alert('등록할 키워드를 먼저 체크하세요.'); return; }
+  // 선택 행 → 키워드 단위로 합치기 (같은 키워드의 가격비교/플러스 결과를 한 번에 처리)
+  const byKeyword = new Map();
+  checked.forEach(cb => {
+    const kw = cb.getAttribute('data-keyword') || '';
+    const rt = cb.getAttribute('data-rank-type') || '';
+    if (!kw) return;
+    if (!byKeyword.has(kw)) byKeyword.set(kw, new Set());
+    if (rt) byKeyword.get(kw).add(rt);
+  });
+  const manage = _loadKwManage();
+  let added = 0, merged = 0, skipped = 0;
+  byKeyword.forEach((typeSet, keyword) => {
+    const types = Array.from(typeSet).length ? Array.from(typeSet) : rankTypes.slice();
+    const existing = manage.find(x => x.keyword === keyword && x.productKey === productKey);
+    if (existing) {
+      const curTypes = Array.isArray(existing.rankTypes) && existing.rankTypes.length ? existing.rankTypes : ['price'];
+      const newTypes = types.filter(t => !curTypes.includes(t));
+      if (newTypes.length) {
+        existing.rankTypes = [...curTypes, ...newTypes];
+        merged++;
+      } else {
+        skipped++;
+      }
+    } else {
+      manage.push({ id: _kwUid(), keyword, productKey, auto: false, rankTypes: types, createdAt: Date.now() });
+      added++;
+    }
+  });
+  if (added || merged) _saveKwManage(manage);
+  renderKwManageList();
+  // 등록 후 선택 해제
+  document.querySelectorAll('.kw-result-cb').forEach(c => { c.checked = false; });
+  const sa = document.getElementById('kw-result-select-all'); if (sa) sa.checked = false;
+  _updateKwSelectedCount();
+  const msg = [];
+  if (added) msg.push(`신규 등록 ${added}개`);
+  if (merged) msg.push(`기존 항목에 유형 추가 ${merged}개`);
+  if (skipped) msg.push(`이미 등록됨 ${skipped}개`);
+  showAppAlert ? showAppAlert('키워드 등록 완료', msg.join('\n') || '변경 없음') : alert(msg.join(' / ') || '변경 없음');
 }
 
 // 플러스스토어(스마트스토어) 여부 판단
@@ -5059,28 +5080,10 @@ async function runKwRankSearch() {
 
     _saveKwHistory(history);
 
-    // 자동 등록: 조회한 키워드를 키워드 관리에 자동 추가 (이미 있으면 유형만 합침, auto는 false)
-    // 키워드 관리는 'ex:<id>' 형식의 productKey를 기대하므로 select의 원래 값을 사용
+    // 키워드 관리 등록은 결과 화면에서 사용자가 직접 선택해서 처리 (자동 등록 제거)
+    // 등록 시 사용할 productKey와 rankTypes를 결과 테이블에 저장해 둠
     const manageProductKey = (document.getElementById('kw-product-select')?.value) || product.id || productKey;
-    const manage = _loadKwManage();
-    let autoAdded = 0, autoMerged = 0;
-    keywords.forEach(keyword => {
-      const existing = manage.find(x => x.keyword === keyword && x.productKey === manageProductKey);
-      if (existing) {
-        const curTypes = Array.isArray(existing.rankTypes) && existing.rankTypes.length ? existing.rankTypes : ['price'];
-        const newTypes = rankTypes.filter(t => !curTypes.includes(t));
-        if (newTypes.length) {
-          existing.rankTypes = [...curTypes, ...newTypes];
-          autoMerged++;
-        }
-      } else {
-        manage.push({ id: _kwUid(), keyword, productKey: manageProductKey, auto: false, rankTypes: [...rankTypes], createdAt: Date.now() });
-        autoAdded++;
-      }
-    });
-    if (autoAdded || autoMerged) _saveKwManage(manage);
-
-    _renderKwResults(rows);
+    _renderKwResults(rows, { manageProductKey, rankTypes });
     renderKwManageList();
     renderKwTrend();
     const lq = document.getElementById('kw-last-query');
