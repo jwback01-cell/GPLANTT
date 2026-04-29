@@ -78,15 +78,19 @@ export default async function handler(req, res) {
     ? undefined
     : (typeof req.body === 'string' ? req.body : JSON.stringify(req.body));
 
-  const doRequest = async (token) => {
+  // 두 가지 인증 방식 — AWS API Gateway가 어느 쪽을 받는지 단계적으로 시도
+  // 1) x-api-key 만 (AWS API Key 인증) — Authorization 없으면 Sigv4 검증 안 함
+  // 2) x-api-key + Authorization: Token <token> — server.py 로컬 동작 방식
+  const doRequest = async (token, includeAuth) => {
+    const headers = {
+      'x-api-key': apiKey,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    if (includeAuth && token) headers['Authorization'] = `Token ${token}`;
     const r = await fetch(upstreamUrl, {
       method: req.method,
-      headers: {
-        'x-api-key': apiKey,
-        'Authorization': `Token ${token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
+      headers,
       body: bodyJson,
     });
     const text = await r.text();
@@ -96,18 +100,25 @@ export default async function handler(req, res) {
   };
 
   try {
-    let token = await getToken(apiKey, authKey);
-    console.log(`[playauto ${traceId}] token issued len=${token.length} preview=${token.slice(0,8)}...`);
-    let { status, data } = await doRequest(token);
-    console.log(`[playauto ${traceId}] upstream ${upstreamUrl} → ${status}`);
+    // 1차: Authorization 빼고 x-api-key 만 (AWS Sigv4 파싱 회피)
+    let { status, data } = await doRequest(null, false);
+    console.log(`[playauto ${traceId}] no-auth attempt ${upstreamUrl} → ${status}`);
 
-    // 토큰 만료 → 강제 재발급 후 1회 재시도
-    const needsRefresh = status === 401 || (data && typeof data === 'object' && data.error_code === 401);
-    if (needsRefresh) {
-      console.log(`[playauto ${traceId}] 401 detected, refreshing token`);
-      token = await getToken(apiKey, authKey, true);
-      ({ status, data } = await doRequest(token));
-      console.log(`[playauto ${traceId}] retry status=${status}`);
+    // 401/403 → 토큰 발급 후 Authorization 동봉해서 재시도
+    const needAuth = status === 401 || status === 403
+      || (data && typeof data === 'object' && (data.error_code === 401 || data.error_code === 403));
+    if (needAuth) {
+      let token = await getToken(apiKey, authKey);
+      console.log(`[playauto ${traceId}] retry with token len=${token.length} preview=${token.slice(0,8)}...`);
+      ({ status, data } = await doRequest(token, true));
+      console.log(`[playauto ${traceId}] auth attempt → ${status}`);
+
+      // 토큰 만료 → 강제 재발급 후 1회 더
+      if (status === 401 || (data && typeof data === 'object' && data.error_code === 401)) {
+        token = await getToken(apiKey, authKey, true);
+        ({ status, data } = await doRequest(token, true));
+        console.log(`[playauto ${traceId}] refresh+retry → ${status}`);
+      }
     }
 
     res.status(status).json(data);
