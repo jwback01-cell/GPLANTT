@@ -24,13 +24,13 @@ async function issueToken(apiKey, authKey) {
     body: JSON.stringify({ authentication_key: authKey }),
   });
   const text = await r.text();
-  if (!r.ok) throw new Error(`/auth HTTP ${r.status}: ${text.slice(0, 200)}`);
+  if (!r.ok) throw new Error(`/auth HTTP ${r.status}: ${text.slice(0, 300)}`);
   let data;
-  try { data = JSON.parse(text); } catch { throw new Error('/auth 응답 파싱 실패'); }
+  try { data = JSON.parse(text); } catch { throw new Error('/auth 응답 파싱 실패: ' + text.slice(0, 200)); }
   const item = Array.isArray(data) ? data[0] : data;
-  const token = item && item.token;
-  if (!token) throw new Error('/auth 응답에 token 없음');
-  return token;
+  const token = item && (item.token || item.access_token || item.Authorization);
+  if (!token) throw new Error('/auth 응답에 token 필드 없음. 응답: ' + JSON.stringify(data).slice(0, 300));
+  return String(token).trim();
 }
 
 async function getToken(apiKey, authKey, force = false) {
@@ -55,6 +55,9 @@ export default async function handler(req, res) {
   const authKey = String(req.headers['x-pa-auth'] || '').trim();
   if (!apiKey)  { res.status(400).json({ error: 'x-pa-key header required' }); return; }
   if (!authKey) { res.status(400).json({ error: 'x-pa-auth header required (솔루션 인증키)' }); return; }
+  // 디버그용 추적 ID — Vercel 함수 로그에서 식별 가능
+  const traceId = Math.random().toString(36).slice(2, 8);
+  console.log(`[playauto ${traceId}] ${req.method} ${req.url} apiKey=${apiKey.slice(0,6)}... authKey=${authKey.slice(0,6)}...`);
 
   // [...path] 다이내믹 라우트가 segments 배열로 들어옴
   const segs = req.query.path;
@@ -94,17 +97,22 @@ export default async function handler(req, res) {
 
   try {
     let token = await getToken(apiKey, authKey);
+    console.log(`[playauto ${traceId}] token issued len=${token.length} preview=${token.slice(0,8)}...`);
     let { status, data } = await doRequest(token);
+    console.log(`[playauto ${traceId}] upstream ${upstreamUrl} → ${status}`);
 
     // 토큰 만료 → 강제 재발급 후 1회 재시도
     const needsRefresh = status === 401 || (data && typeof data === 'object' && data.error_code === 401);
     if (needsRefresh) {
+      console.log(`[playauto ${traceId}] 401 detected, refreshing token`);
       token = await getToken(apiKey, authKey, true);
       ({ status, data } = await doRequest(token));
+      console.log(`[playauto ${traceId}] retry status=${status}`);
     }
 
     res.status(status).json(data);
   } catch (e) {
-    res.status(500).json({ error: e.message || String(e) });
+    console.error(`[playauto ${traceId}] error:`, e);
+    res.status(500).json({ error: e.message || String(e), traceId });
   }
 }
