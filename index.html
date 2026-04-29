@@ -8621,6 +8621,7 @@ function renderSrcFavs() {
   const list = document.getElementById('src-fav-list');
   const empty = document.getElementById('src-fav-empty');
   if (cnt) cnt.textContent = favs.length;
+  if (!list) return; // 즐겨찾기 UI가 현재 페이지에 없으면 종료
   if (!favs.length) { if (empty) empty.classList.remove('hidden'); list.innerHTML = ''; list.appendChild(empty || document.createTextNode('')); return; }
   if (empty) empty.classList.add('hidden');
   list.innerHTML = favs.map(kw => `<span class="inline-flex items-center gap-1.5 bg-brand-bg border border-brand-border rounded-full px-3 py-1.5 text-xs font-semibold text-brand-black"><svg width="12" height="12" viewBox="0 0 24 24" fill="#FFB300" stroke="#FFB300" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>${_escapeHtml(kw)}<button onclick="toggleSrcFav('${_escapeHtml(kw)}')" class="text-brand-gray hover:text-brand-pink">&times;</button></span>`).join('');
