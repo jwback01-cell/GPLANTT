@@ -3509,7 +3509,7 @@ tailwind.config = {
               <textarea id="kw-keywords" class="w-full bg-brand-bg border border-brand-border rounded-2xl px-4 py-3 text-[0.95rem] focus:outline-none focus:border-brand-black transition-colors resize-none h-[100px]" placeholder="예: 오버핏 티셔츠, 캔버스 토트백"></textarea>
               <p class="text-brand-gray text-xs mt-2 flex items-center gap-1.5">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                쉼표로 구분하면 여러 키워드를 한 번에 조회할 수 있습니다.
+                쉼표(,) 또는 줄바꿈(엔터)으로 구분하면 여러 키워드를 한 번에 조회할 수 있습니다.
               </p>
             </div>
 
@@ -4999,7 +4999,7 @@ async function runKwRankSearch() {
     return;
   }
 
-  const keywords = kwRaw.split(',').map(s => s.trim()).filter(Boolean);
+  const keywords = kwRaw.split(/[,\r\n]+/).map(s => s.trim()).filter(Boolean);
   const productIds = _extractProductIds(product.url);
   if (product.url && productIds.length === 0) {
     if (!confirm('입력한 상품 URL에서 상품 ID를 추출하지 못했습니다.\n상품명만으로 매칭하면 잘못된 순위가 나올 수 있습니다.\n계속 진행할까요?')) return;
