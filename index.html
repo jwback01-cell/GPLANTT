@@ -13664,15 +13664,20 @@ function _paExtractOrderRow(o) {
   // SKU상품명: results_prod.prod_name → o.prod_list[].prod_name → o.prod_name → 쇼핑몰 상품명 폴백
   const skuItemName = _paGetSkuName(o, prod)
     || _paPickField(o, ['shop_sale_name', 'item_name', 'productName', 'goods_name']);
+  // 수량 (PA 응답 또는 폴백 1)
+  const qty = _paPickNumber(o, ['sale_cnt', 'qty', 'quantity', 'order_qty']) || 1;
+  // 원가는 PA가 단가(per-unit)로 주므로 수량 곱하여 라인 합계로 저장
+  // (공급가/판매가/택배비는 PA가 이미 라인 합계로 주는 것을 가정)
+  const costTotal = cost == null ? null : Number(cost) * qty;
   return {
     ordNo,
     shop: shopName,
     date: _paPickDate(o, dateFields),
     name: skuItemName,
-    qty: _paPickNumber(o, ['sale_cnt', 'qty', 'quantity', 'order_qty']) || 1,
+    qty,
     price,
     supply,
-    cost: cost == null ? null : cost,
+    cost: costTotal,
     shipFee,
     shipCost,
     skuCode,                    // 진단용 — 매칭된 SKU 코드
