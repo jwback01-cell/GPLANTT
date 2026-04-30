@@ -2506,6 +2506,7 @@ tailwind.config = {
         <button id="upload-tab-file" class="px-5 py-2 rounded-full text-sm font-bold bg-brand-black text-white shadow-sm" onclick="switchUploadTab('file')">엑셀 업로드</button>
         <button id="upload-tab-ecount" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black" onclick="switchUploadTab('ecount')">이카운트 연동</button>
         <button id="upload-tab-playauto" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black" onclick="switchUploadTab('playauto')">플레이오토 연동</button>
+        <button id="upload-tab-ad" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black" onclick="switchUploadTab('ad')">광고비 업로드</button>
         <button id="upload-tab-data" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black" onclick="switchUploadTab('data')">업로드 데이터</button>
       </div>
 
@@ -3361,6 +3362,70 @@ tailwind.config = {
         </div>
         <!-- /Sub-panel: 플레이오토연동 -->
       </div>
+
+      <!-- ── Tab: 광고비 업로드 ── -->
+      <div id="upload-panel-ad" class="flex flex-col gap-6 hidden">
+
+        <!-- 9개 사이트 카드 -->
+        <div class="bg-white rounded-3xl panel overflow-hidden">
+          <div class="px-6 py-4 border-b border-brand-border">
+            <div class="font-bold text-[15px]">사이트별 광고비 업로드</div>
+            <div class="text-xs text-brand-gray mt-1">각 사이트의 광고비 보고서 엑셀을 그대로 업로드하세요. 날짜·광고비 컬럼을 자동 인식합니다.</div>
+          </div>
+          <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="ad-site-grid"></div>
+        </div>
+
+        <!-- 기간별 사이트 광고비 vs 마진 비교 -->
+        <div class="bg-white rounded-3xl panel overflow-hidden">
+          <div class="px-6 py-4 border-b border-brand-border flex items-center gap-3 flex-wrap">
+            <div>
+              <div class="font-bold text-[15px]">기간별 사이트 광고비 vs 마진</div>
+              <div class="text-xs text-brand-gray mt-1">"마이너스 확인 실행" 후 비교됩니다. 마진은 동일 기간 사이트별 합계.</div>
+            </div>
+            <div class="ml-auto flex gap-2 items-center text-sm">
+              <input id="ad-period-from" type="date" class="bg-brand-bg border border-brand-border rounded-lg px-3 py-1.5 text-sm">
+              <span class="text-brand-gray">~</span>
+              <input id="ad-period-to" type="date" class="bg-brand-bg border border-brand-border rounded-lg px-3 py-1.5 text-sm">
+              <button onclick="renderAdSummary()" class="px-4 py-1.5 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333]">조회</button>
+            </div>
+          </div>
+          <div class="p-2 overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead id="ad-summary-thead"></thead>
+              <tbody id="ad-summary-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 업로드된 광고비 상세 -->
+        <div class="bg-white rounded-3xl panel overflow-hidden">
+          <div class="px-6 py-4 border-b border-brand-border flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div class="font-bold text-[15px]">업로드된 광고비 상세</div>
+              <div class="text-xs text-brand-gray mt-1">엑셀 / API로 업로드된 모든 광고비 항목 (날짜·캠페인 단위)</div>
+            </div>
+            <div class="flex gap-2 items-center">
+              <select id="ad-detail-site-filter" class="bg-brand-bg border border-brand-border rounded-lg px-3 py-1.5 text-sm" onchange="renderAdDetail()">
+                <option value="">전체 사이트</option>
+              </select>
+              <button onclick="exportAdCosts()" class="px-4 py-1.5 rounded-full bg-white border border-brand-border text-sm font-bold hover:bg-brand-bg">📥 백업 다운로드</button>
+              <button onclick="importAdCosts()" class="px-4 py-1.5 rounded-full bg-white border border-brand-border text-sm font-bold hover:bg-brand-bg">📤 백업 복원</button>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead id="ad-detail-thead"></thead>
+              <tbody id="ad-detail-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 숨겨진 file input — 엑셀 업로드용 -->
+        <input type="file" id="ad-upload-file-input" accept=".xlsx,.xls,.csv" class="hidden">
+        <!-- 숨겨진 file input — 백업 복원용 -->
+        <input type="file" id="ad-restore-file-input" accept=".json" class="hidden">
+      </div>
+      <!-- /Tab: 광고비 업로드 -->
 
       <!-- ── Tab: 업로드 데이터 ── -->
       <div id="upload-panel-data" class="flex flex-col gap-6 hidden">
@@ -13478,7 +13543,7 @@ function renderCalDetail(key) {
 
 // ── 장부 업로드 / 이카운트 연동 ─────────────────
 function switchUploadTab(tab) {
-  const tabs = ['file','ecount','playauto','data'];
+  const tabs = ['file','ecount','playauto','ad','data'];
   if (tabs.indexOf(tab) === -1) tab = 'file';
   tabs.forEach(t => {
     const btn = document.getElementById('upload-tab-' + t);
@@ -13491,6 +13556,7 @@ function switchUploadTab(tab) {
   if (tab === 'file')      { title.textContent = '장부 업로드 📤'; desc.textContent = '엑셀 파일을 업로드하여 매출 데이터를 한 번에 저장하세요.'; }
   if (tab === 'ecount')    { title.textContent = '이카운트 연동 🔗'; desc.textContent = '저장된 장부 데이터를 이카운트 ERP로 전송하세요.'; _fillEcountSettingsForm(); _renderEcountHistory(); renderVendorMap(); renderDepotMap(); renderShipCostMap(); switchEcountSubTab('transfer'); }
   if (tab === 'playauto')  { title.textContent = '플레이오토 연동 🔗'; desc.textContent = '플레이오토에서 주문/상품/재고 데이터를 자동으로 수집합니다.'; _initPlayauto(); }
+  if (tab === 'ad')        { title.textContent = '광고비 업로드 💸'; desc.textContent = '사이트별 광고비를 업로드하고 마진에서 차감해 실제 수익을 확인하세요.'; _initAdTab(); }
   if (tab === 'data')      { title.textContent = '업로드 데이터 📚'; desc.textContent = '엑셀 업로드로 저장된 매출 데이터를 확인하세요.'; renderUploadData(); }
 }
 
@@ -13521,6 +13587,555 @@ async function fetchPlayautoNewOrders() {
 
   // 기존 주문 수집 로직 그대로 호출
   await fetchPlayautoOrders();
+}
+
+// ── 광고비 업로드 ─────────────────────────
+// 9개 사이트 정의: shopAliases 는 PA shop_name 자동 매칭용 (대소문자 무시)
+// api.available=true 사이트는 카드에 "API 가능" 배지 표시 (실제 연동은 추후)
+const AD_SITES = [
+  { id: '스마트스토어', label: '스마트스토어',
+    shopAliases: ['스마트스토어','스토어팜','네이버페이','네이버스마트스토어','smartstore','SMART_STORE'],
+    api: { available: true,  label: '네이버 검색광고 API' } },
+  { id: '11번가',      label: '11번가',
+    shopAliases: ['11번가','일일번가','11ST','11st','11번 가'],
+    api: { available: false } },
+  { id: '지마켓',      label: '지마켓',
+    shopAliases: ['지마켓','G마켓','GMARKET','Gmarket','gmarket'],
+    api: { available: false } },
+  { id: '옥션',        label: '옥션',
+    shopAliases: ['옥션','AUCTION','Auction','auction'],
+    api: { available: false } },
+  { id: 'SSG',         label: 'SSG',
+    shopAliases: ['SSG','쓱','쓱닷컴','이마트몰','SSG.COM','ssg'],
+    api: { available: false } },
+  { id: '쿠팡',        label: '쿠팡',
+    shopAliases: ['쿠팡','COUPANG','Coupang','coupang'],
+    api: { available: true,  label: 'Coupang Wing Ads API' } },
+  { id: '올웨이즈',    label: '올웨이즈',
+    shopAliases: ['올웨이즈','올웨이스','ALWAYZ','alwayz'],
+    api: { available: false } },
+  { id: '에이블리',    label: '에이블리',
+    shopAliases: ['에이블리','ABLY','ably'],
+    api: { available: false } },
+  { id: '토스쇼핑',    label: '토스쇼핑',
+    shopAliases: ['토스쇼핑','토스','TOSS','toss'],
+    api: { available: false } },
+];
+
+const AD_COSTS_KEY = 'gplan_ad_costs_v1';
+
+function _loadAdCosts() {
+  try { return JSON.parse(localStorage.getItem(AD_COSTS_KEY) || '[]') || []; } catch (_) { return []; }
+}
+function _saveAdCosts(rows) {
+  localStorage.setItem(AD_COSTS_KEY, JSON.stringify(rows));
+}
+
+// PA 주문의 shop_name → 광고비 사이트 id 매핑 (마이너스 확인 통합용)
+function _adSiteFromShopName(shopName) {
+  if (!shopName) return null;
+  const s = String(shopName).toUpperCase();
+  for (const site of AD_SITES) {
+    if (site.shopAliases.some(a => s.includes(String(a).toUpperCase()))) return site.id;
+  }
+  return null;
+}
+
+function _ymdString(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+// 카드 9개 렌더링 — 이번 달 사이트별 합계 + 엑셀 업로드 / API 연동 버튼
+function renderAdSiteCards() {
+  const grid = document.getElementById('ad-site-grid');
+  if (!grid) return;
+  const rows = _loadAdCosts();
+  const ym = _ymdString(new Date()).slice(0, 7);
+  const totals = {};
+  rows.forEach(r => {
+    if (String(r.date).slice(0, 7) !== ym) return;
+    totals[r.site] = (totals[r.site] || 0) + (Number(r.amount) || 0);
+  });
+  grid.innerHTML = AD_SITES.map(site => {
+    const total = totals[site.id] || 0;
+    const apiBadge = site.api.available
+      ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-brand-blue-light text-brand-blue font-bold">API 가능</span>'
+      : '';
+    const apiBtn = site.api.available
+      ? `<button onclick="connectAdApi('${site.id}')" class="flex-1 px-3 py-1.5 rounded-full bg-white border border-brand-border text-xs font-bold hover:bg-brand-bg" title="${_escapeHtml(site.api.label)} (준비 중)">🔗 API</button>`
+      : '';
+    return `
+      <div class="border border-brand-border rounded-2xl p-4 flex flex-col gap-3 hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between">
+          <div class="font-bold text-sm">${_escapeHtml(site.label)}</div>
+          ${apiBadge}
+        </div>
+        <div class="text-xs text-brand-gray">이번 달: <span class="font-mono font-bold text-brand-black">${total.toLocaleString('ko-KR')}원</span></div>
+        <div class="flex gap-2">
+          <button onclick="openAdUpload('${site.id}')" class="flex-1 px-3 py-1.5 rounded-full bg-brand-black text-white text-xs font-bold hover:bg-[#333]">📊 엑셀 업로드</button>
+          ${apiBtn}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// 엑셀 업로드 시작 — file input 클릭 트리거
+let _adUploadCurrentSite = null;
+function openAdUpload(siteId) {
+  _adUploadCurrentSite = siteId;
+  const fileInput = document.getElementById('ad-upload-file-input');
+  if (!fileInput) return;
+  fileInput.value = '';
+  fileInput.click();
+}
+
+// 파일 선택 후 처리 — 모든 시트 순회하며 헤더 자동 인식
+function _adFileChosen(file) {
+  if (!file || !_adUploadCurrentSite) return;
+  const siteId = _adUploadCurrentSite;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      let allRows = [];
+      const sheetTried = [];
+      for (const sheetName of wb.SheetNames) {
+        const ws = wb.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+        const parsed = _adParseSheet(data, siteId, sheetName);
+        sheetTried.push({ name: sheetName, parsed: parsed.length });
+        if (parsed.length) allRows = allRows.concat(parsed);
+      }
+      if (!allRows.length) {
+        showAppAlert('파싱 실패',
+          `엑셀에서 날짜와 광고비를 인식하지 못했습니다.\n\n시트별 결과: ${sheetTried.map(s => s.name + '(' + s.parsed + '건)').join(', ')}\n\n인식 가능한 컬럼명:\n• 날짜: 일자, 날짜, 광고일자, 집행일자, date\n• 광고비: 광고비, 비용, 금액, 사용금액, 결제금액, 광고비용, spend, cost\n• 캠페인(선택): 캠페인, 광고그룹, 키워드, 상품명`,
+          'error');
+        return;
+      }
+      _adShowPreview(siteId, file.name, allRows);
+    } catch (err) {
+      showAppAlert('엑셀 읽기 실패', err.message || String(err), 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// 시트 파싱 — 헤더 행을 처음 8행 안에서 찾고 (키워드 부분 일치) 데이터 추출
+function _adParseSheet(data, siteId, sheetName) {
+  if (!Array.isArray(data) || data.length < 2) return [];
+  const DATE_KEYS = ['일자','날짜','광고일자','집행일자','date','광고일','노출일자','dt'];
+  const COST_KEYS = ['광고비','비용','금액','사용금액','결제금액','광고비용','광고지출','집행비용','지출','spend','cost','amount'];
+  const NAME_KEYS = ['캠페인','캠페인명','광고그룹','광고명','키워드','상품명','이름','name','campaign','광고제목','소재명'];
+
+  const matchHeader = (cell, keys) => {
+    const c = String(cell || '').toLowerCase().trim();
+    if (!c) return false;
+    return keys.some(k => c.includes(String(k).toLowerCase()));
+  };
+
+  let headerIdx = -1, header = null;
+  for (let i = 0; i < Math.min(data.length, 8); i++) {
+    const row = (data[i] || []).map(v => String(v || '').trim());
+    if (row.some(c => matchHeader(c, DATE_KEYS)) && row.some(c => matchHeader(c, COST_KEYS))) {
+      headerIdx = i;
+      header = row;
+      break;
+    }
+  }
+  if (headerIdx === -1) return [];
+
+  const findIdx = (keys) => {
+    for (let i = 0; i < header.length; i++) {
+      if (matchHeader(header[i], keys)) return i;
+    }
+    return -1;
+  };
+  const dateIdx = findIdx(DATE_KEYS);
+  const costIdx = findIdx(COST_KEYS);
+  const nameIdx = findIdx(NAME_KEYS);
+  if (dateIdx === -1 || costIdx === -1) return [];
+
+  const out = [];
+  for (let i = headerIdx + 1; i < data.length; i++) {
+    const row = data[i] || [];
+    const dateRaw = row[dateIdx];
+    const costRaw = row[costIdx];
+    if (dateRaw == null || dateRaw === '') continue;
+    if (costRaw == null || costRaw === '') continue;
+    // 합계 행 스킵 (캠페인 칼럼이 합계/총합/total 이거나 날짜 칼럼이 그렇거나)
+    const camp = nameIdx !== -1 ? String(row[nameIdx] || '').trim() : '';
+    if (/^(합계|총합|합 계|total|sum|소계|전체)$/i.test(camp)) continue;
+    if (/^(합계|총합|합 계|total|sum|소계|전체)$/i.test(String(dateRaw).trim())) continue;
+
+    const dateStr = _adNormalizeDate(dateRaw);
+    if (!dateStr) continue;
+    const amount = _adParseNumber(costRaw);
+    if (amount == null || amount === 0) continue;
+    out.push({ site: siteId, date: dateStr, amount, campaign: camp, sheet: sheetName });
+  }
+  return out;
+}
+
+// Excel serial / Date / 'YYYY-MM-DD'·'YYYY.MM.DD'·'YYYY/MM/DD' 모두 처리
+function _adNormalizeDate(v) {
+  if (v instanceof Date) return _ymdString(v);
+  if (typeof v === 'number') {
+    try {
+      const d = XLSX.SSF.parse_date_code(v);
+      if (d && d.y) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+    } catch (_) {}
+  }
+  const s = String(v).trim();
+  // YYYY-MM-DD / YYYY.MM.DD / YYYY/MM/DD / YYYYMMDD
+  let m = s.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+  if (m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+  m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  return null;
+}
+
+function _adParseNumber(v) {
+  if (typeof v === 'number') return v;
+  const s = String(v || '').replace(/[,\s원₩]/g, '');
+  if (!s) return null;
+  const n = Number(s);
+  return isNaN(n) ? null : n;
+}
+
+// 미리보기 모달 — 사용자가 확인 후 [저장] 누르면 localStorage 에 추가
+function _adShowPreview(siteId, fileName, rows) {
+  const total = rows.reduce((a, r) => a + (Number(r.amount) || 0), 0);
+  const dates = rows.map(r => r.date).sort();
+  const dateRange = dates.length ? `${dates[0]} ~ ${dates[dates.length-1]}` : '-';
+
+  const prev = document.getElementById('ad-preview-modal');
+  if (prev) prev.remove();
+  const m = document.createElement('div');
+  m.id = 'ad-preview-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  const previewRows = rows.slice(0, 100).map((r,i) => `<tr style="border-bottom:1px solid #eee;">
+    <td style="padding:6px 10px;font-size:12px;color:#888;">${i+1}</td>
+    <td style="padding:6px 10px;font-size:12px;">${_escapeHtml(r.date)}</td>
+    <td style="padding:6px 10px;font-size:12px;">${_escapeHtml(r.campaign || '-')}</td>
+    <td style="padding:6px 10px;font-size:12px;text-align:right;font-family:monospace;">${Number(r.amount).toLocaleString('ko-KR')}원</td>
+  </tr>`).join('');
+  m.innerHTML = `
+    <div style="background:white;border-radius:16px;max-width:900px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="padding:16px 22px;border-bottom:1px solid #eee;">
+        <div style="font-weight:bold;font-size:16px;">${_escapeHtml(siteId)} 광고비 업로드 미리보기</div>
+        <div style="color:#888;font-size:12px;margin-top:4px;">${_escapeHtml(fileName)}<br>총 <b>${rows.length}건</b> · 합계 <b>${total.toLocaleString('ko-KR')}원</b> · 기간 <b>${dateRange}</b></div>
+      </div>
+      <div style="padding:0 22px;overflow:auto;flex:1;">
+        <table style="width:100%;font-size:13px;border-collapse:collapse;">
+          <thead style="position:sticky;top:0;background:white;">
+            <tr style="text-align:left;color:#888;border-bottom:2px solid #eee;font-size:11px;">
+              <th style="padding:8px 10px;font-weight:bold;">#</th>
+              <th style="padding:8px 10px;font-weight:bold;">날짜</th>
+              <th style="padding:8px 10px;font-weight:bold;">캠페인/광고명</th>
+              <th style="padding:8px 10px;font-weight:bold;text-align:right;">광고비</th>
+            </tr>
+          </thead>
+          <tbody>${previewRows}</tbody>
+        </table>
+        ${rows.length > 100 ? `<div style="text-align:center;color:#888;font-size:12px;padding:8px;">... 외 ${rows.length-100}건 (저장 시 모두 포함)</div>` : ''}
+      </div>
+      <div style="padding:14px 22px;border-top:1px solid #eee;display:flex;gap:8px;justify-content:flex-end;align-items:center;">
+        <span style="color:#888;font-size:12px;margin-right:auto;">⚠ 같은 기간을 다시 업로드하면 중복 저장됩니다 (자동 중복 제거 X)</span>
+        <button id="ad-preview-cancel" style="padding:9px 22px;border-radius:20px;border:1px solid #ddd;background:white;cursor:pointer;font-size:13px;font-weight:bold;">취소</button>
+        <button id="ad-preview-confirm" style="padding:9px 26px;border-radius:20px;border:none;background:#000;color:white;cursor:pointer;font-size:13px;font-weight:bold;">저장</button>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+  document.getElementById('ad-preview-cancel').onclick = () => m.remove();
+  document.getElementById('ad-preview-confirm').onclick = () => {
+    const all = _loadAdCosts();
+    const stamp = new Date().toISOString();
+    rows.forEach((r, i) => {
+      all.push({
+        ...r,
+        source: 'excel',
+        fileName,
+        uploadedAt: stamp,
+        _key: `${stamp}_${i}_${Math.random().toString(36).slice(2,6)}`,
+      });
+    });
+    _saveAdCosts(all);
+    m.remove();
+    showAppAlert('저장 완료', `${rows.length}건의 광고비가 저장되었습니다.\n합계 ${total.toLocaleString('ko-KR')}원`, 'success');
+    renderAdSiteCards();
+    renderAdSummary();
+    renderAdDetail();
+  };
+}
+
+// API 연동 (스텁) — 실제 키 등록/조회는 추후
+function connectAdApi(siteId) {
+  const site = AD_SITES.find(s => s.id === siteId);
+  showAppAlert('API 연동 준비 중',
+    `${siteId} (${site?.api?.label || ''}) 자동 조회는 준비 중입니다.\n\n현재는 사이트에서 광고비 보고서 엑셀을 다운로드 받아\n"📊 엑셀 업로드"로 올려주세요.`,
+    'info');
+}
+
+// 기간별 사이트 광고비 vs 마진 요약 — _paMinusRows 사용 (마이너스 확인 실행 후에만 의미 있음)
+function renderAdSummary() {
+  const tbodyEl = document.getElementById('ad-summary-tbody');
+  const theadEl = document.getElementById('ad-summary-thead');
+  if (!tbodyEl || !theadEl) return;
+  const from = document.getElementById('ad-period-from')?.value || '';
+  const to   = document.getElementById('ad-period-to')?.value || '';
+  const ads = _loadAdCosts();
+  const filtered = ads.filter(r => (!from || r.date >= from) && (!to || r.date <= to));
+
+  const adBySite = {};
+  filtered.forEach(r => { adBySite[r.site] = (adBySite[r.site] || 0) + (Number(r.amount) || 0); });
+
+  // 마이너스 확인 행에서 같은 기간의 사이트별 마진 합계
+  const marginBySite = {};
+  const minusRows = (typeof _paMinusRows !== 'undefined' && Array.isArray(_paMinusRows)) ? _paMinusRows : [];
+  minusRows.forEach(r => {
+    if (r.margin == null) return;
+    const dateYMD = String(r.date || '').slice(0, 10);
+    if (!dateYMD) return;
+    if (from && dateYMD < from) return;
+    if (to && dateYMD > to) return;
+    const siteId = _adSiteFromShopName(r.shop);
+    if (!siteId) return;
+    marginBySite[siteId] = (marginBySite[siteId] || 0) + Number(r.margin);
+  });
+
+  theadEl.innerHTML = `<tr class="text-brand-gray text-xs border-b border-brand-border">
+    <th class="p-3 text-left font-semibold pl-5">사이트</th>
+    <th class="p-3 text-right font-semibold">광고비 합계</th>
+    <th class="p-3 text-right font-semibold">마진 합계</th>
+    <th class="p-3 text-right font-semibold">실마진 (마진−광고비)</th>
+    <th class="p-3 text-right font-semibold pr-5">ROAS (마진/광고비)</th>
+  </tr>`;
+
+  const allSites = new Set([...Object.keys(adBySite), ...Object.keys(marginBySite)]);
+  if (!allSites.size) {
+    tbodyEl.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-brand-gray text-sm">
+      광고비를 업로드하고 ${minusRows.length ? '' : '"마이너스 확인 실행" 후 '}조회해주세요.
+    </td></tr>`;
+    return;
+  }
+
+  let totalAd = 0, totalMargin = 0;
+  const rowsHtml = [...allSites].sort().map(siteId => {
+    const ad = adBySite[siteId] || 0;
+    const margin = marginBySite[siteId] || 0;
+    const real = margin - ad;
+    const realCls = real < 0 ? 'text-brand-pink font-bold' : (real > 0 ? 'text-brand-green font-bold' : 'text-brand-gray');
+    const roas = ad > 0 ? (margin / ad * 100).toFixed(1) + '%' : '<span class="text-brand-gray">-</span>';
+    totalAd += ad; totalMargin += margin;
+    return `<tr class="border-b border-brand-border hover:bg-brand-bg/40">
+      <td class="p-3 text-xs font-semibold pl-5">${_escapeHtml(siteId)}</td>
+      <td class="p-3 text-right text-xs font-mono">${ad.toLocaleString('ko-KR')}원</td>
+      <td class="p-3 text-right text-xs font-mono">${margin.toLocaleString('ko-KR')}원</td>
+      <td class="p-3 text-right text-xs font-mono ${realCls}">${real.toLocaleString('ko-KR')}원</td>
+      <td class="p-3 text-right text-xs pr-5">${roas}</td>
+    </tr>`;
+  }).join('');
+  const realTotal = totalMargin - totalAd;
+  const realCls = realTotal < 0 ? 'text-brand-pink font-bold' : (realTotal > 0 ? 'text-brand-green font-bold' : '');
+  const roasTotal = totalAd > 0 ? (totalMargin / totalAd * 100).toFixed(1) + '%' : '-';
+  const totalRow = `<tr class="border-t-2 border-brand-border font-bold bg-brand-bg/50">
+    <td class="p-3 text-xs pl-5">합계</td>
+    <td class="p-3 text-right text-xs font-mono">${totalAd.toLocaleString('ko-KR')}원</td>
+    <td class="p-3 text-right text-xs font-mono">${totalMargin.toLocaleString('ko-KR')}원</td>
+    <td class="p-3 text-right text-xs font-mono ${realCls}">${realTotal.toLocaleString('ko-KR')}원</td>
+    <td class="p-3 text-right text-xs pr-5">${roasTotal}</td>
+  </tr>`;
+  tbodyEl.innerHTML = rowsHtml + totalRow;
+}
+
+// 상세 테이블 — 사이트 필터 + 행별 삭제
+function renderAdDetail() {
+  const theadEl = document.getElementById('ad-detail-thead');
+  const tbodyEl = document.getElementById('ad-detail-tbody');
+  const filterEl = document.getElementById('ad-detail-site-filter');
+  if (!tbodyEl || !theadEl) return;
+
+  // 필터 옵션 — 9개 사이트 한 번만 채우기
+  if (filterEl && filterEl.options.length <= 1) {
+    AD_SITES.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.id; o.textContent = s.label;
+      filterEl.appendChild(o);
+    });
+  }
+  const filterSite = filterEl?.value || '';
+  let rows = _loadAdCosts();
+  if (filterSite) rows = rows.filter(r => r.site === filterSite);
+  rows.sort((a, b) => String(b.uploadedAt || '').localeCompare(String(a.uploadedAt || ''))
+    || String(b.date || '').localeCompare(String(a.date || '')));
+
+  theadEl.innerHTML = `<tr class="text-brand-gray text-xs border-b border-brand-border">
+    <th class="p-3 text-left font-semibold pl-5">사이트</th>
+    <th class="p-3 text-left font-semibold">날짜</th>
+    <th class="p-3 text-left font-semibold">캠페인/광고명</th>
+    <th class="p-3 text-right font-semibold">광고비</th>
+    <th class="p-3 text-left font-semibold">출처</th>
+    <th class="p-3 text-left font-semibold">업로드</th>
+    <th class="p-3 text-center font-semibold pr-5">삭제</th>
+  </tr>`;
+
+  if (!rows.length) {
+    tbodyEl.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-brand-gray text-sm">업로드된 광고비가 없습니다.</td></tr>';
+    return;
+  }
+  tbodyEl.innerHTML = rows.map(r => `<tr class="border-b border-brand-border hover:bg-brand-bg/40">
+    <td class="p-3 text-xs pl-5 font-semibold">${_escapeHtml(r.site)}</td>
+    <td class="p-3 text-xs">${_escapeHtml(r.date)}</td>
+    <td class="p-3 text-xs truncate max-w-[260px]" title="${_escapeHtml(r.campaign || '')}">${_escapeHtml(r.campaign || '-')}</td>
+    <td class="p-3 text-right text-xs font-mono">${Number(r.amount).toLocaleString('ko-KR')}원</td>
+    <td class="p-3 text-xs">${_escapeHtml(r.source || '-')}</td>
+    <td class="p-3 text-xs text-brand-gray" title="${_escapeHtml(r.fileName || '')}">${String(r.uploadedAt || '').slice(0, 16).replace('T',' ')}</td>
+    <td class="p-3 text-xs text-center pr-5"><button onclick="deleteAdCost('${r._key || ''}')" class="text-brand-pink hover:underline font-bold">삭제</button></td>
+  </tr>`).join('');
+}
+
+function deleteAdCost(key) {
+  if (!key) return;
+  if (!confirm('이 광고비 항목을 삭제하시겠습니까?')) return;
+  const ads = _loadAdCosts();
+  const remain = ads.filter(r => r._key !== key);
+  _saveAdCosts(remain);
+  renderAdSiteCards();
+  renderAdSummary();
+  renderAdDetail();
+}
+
+// 백업 다운로드 — JSON 한 파일로
+function exportAdCosts() {
+  const ads = _loadAdCosts();
+  if (!ads.length) { showAppAlert('백업할 데이터 없음', '저장된 광고비 항목이 없습니다.', 'warn'); return; }
+  const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), version: 1, rows: ads }, null, 2)],
+                       { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `GPLAN_광고비_백업_${_ymdString(new Date())}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// 백업 복원 — JSON 파일 선택 → 기존에 추가/병합
+function importAdCosts() {
+  const input = document.getElementById('ad-restore-file-input');
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+function _adRestoreChosen(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const j = JSON.parse(e.target.result);
+      const incoming = Array.isArray(j) ? j : (Array.isArray(j.rows) ? j.rows : null);
+      if (!incoming) throw new Error('백업 파일 형식이 올바르지 않습니다.');
+      if (!incoming.length) { showAppAlert('빈 백업', '복원할 항목이 없습니다.', 'warn'); return; }
+      const mode = confirm(
+        `백업 파일에 ${incoming.length}건의 광고비 항목이 있습니다.\n\n` +
+        `[확인] = 기존 데이터에 추가 (병합)\n` +
+        `[취소] = 복원 취소`
+      );
+      if (!mode) return;
+      const all = _loadAdCosts();
+      // _key 기준 중복 제거
+      const seen = new Set(all.map(r => r._key).filter(Boolean));
+      const added = [];
+      incoming.forEach(r => {
+        if (!r._key || !seen.has(r._key)) {
+          if (!r._key) r._key = new Date().toISOString() + '_' + Math.random().toString(36).slice(2,8);
+          all.push(r);
+          added.push(r);
+        }
+      });
+      _saveAdCosts(all);
+      showAppAlert('복원 완료', `${added.length}건이 추가되었습니다. (중복 제외)`, 'success');
+      renderAdSiteCards();
+      renderAdSummary();
+      renderAdDetail();
+    } catch (err) {
+      showAppAlert('복원 실패', err.message || String(err), 'error');
+    }
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+// 탭 진입 시 초기화 — 기본 기간 + file input 핸들러 연결 + 렌더
+function _initAdTab() {
+  const fromEl = document.getElementById('ad-period-from');
+  const toEl   = document.getElementById('ad-period-to');
+  if (fromEl && !fromEl.value) {
+    const now = new Date();
+    fromEl.value = _ymdString(new Date(now.getFullYear(), now.getMonth(), 1));
+  }
+  if (toEl && !toEl.value) toEl.value = _ymdString(new Date());
+
+  const upInput = document.getElementById('ad-upload-file-input');
+  if (upInput && !upInput._adWired) {
+    upInput._adWired = true;
+    upInput.addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (f) _adFileChosen(f);
+    });
+  }
+  const reInput = document.getElementById('ad-restore-file-input');
+  if (reInput && !reInput._adWired) {
+    reInput._adWired = true;
+    reInput.addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (f) _adRestoreChosen(f);
+    });
+  }
+
+  renderAdSiteCards();
+  renderAdSummary();
+  renderAdDetail();
+}
+
+// 마이너스 확인 통합 — 일별/사이트별 광고비를 그날 그 사이트의 주문에 균등 배분하여 마진 차감
+// rows 는 _paMinusRows (인플레이스 변경)
+function _adAllocateToMinusRows(rows) {
+  if (!Array.isArray(rows) || !rows.length) return;
+  const ads = _loadAdCosts();
+  if (!ads.length) {
+    rows.forEach(r => { r.adCost = 0; r.marginAfterAd = r.margin; });
+    return;
+  }
+  // (siteId, dateYMD) → 광고비 합계
+  const adByKey = {};
+  ads.forEach(a => {
+    const k = `${a.site}|${a.date}`;
+    adByKey[k] = (adByKey[k] || 0) + (Number(a.amount) || 0);
+  });
+  // (siteId, dateYMD) → 그날 그 사이트 주문 수
+  const cntByKey = {};
+  rows.forEach(r => {
+    const dateYMD = String(r.date || '').slice(0, 10);
+    const siteId = _adSiteFromShopName(r.shop);
+    if (!siteId || !dateYMD) return;
+    const k = `${siteId}|${dateYMD}`;
+    cntByKey[k] = (cntByKey[k] || 0) + 1;
+  });
+  // 주문별 균등 배분
+  rows.forEach(r => {
+    const dateYMD = String(r.date || '').slice(0, 10);
+    const siteId = _adSiteFromShopName(r.shop);
+    if (!siteId || !dateYMD) {
+      r.adCost = 0;
+      r.marginAfterAd = r.margin;
+      return;
+    }
+    const k = `${siteId}|${dateYMD}`;
+    const total = adByKey[k] || 0;
+    const cnt = cntByKey[k] || 1;
+    const perOrder = total > 0 ? Math.round(total / cnt) : 0;
+    r.adCost = perOrder;
+    r.marginAfterAd = r.margin == null ? null : r.margin - perOrder;
+  });
 }
 
 // ── 마이너스 확인 ─────────────────────────
@@ -13750,6 +14365,16 @@ async function runPaMinusCheck() {
     return { ...r, margin, isMinus: margin != null && margin < 0 };
   });
 
+  // 4단계: 광고비 차감 — 일별/사이트별 광고비를 같은 날·같은 사이트의 주문에 균등 배분
+  // (광고비 업로드 탭에서 등록한 데이터 기준. 데이터 없으면 adCost=0)
+  // 차감 후 마진(marginAfterAd)이 음수이면 isMinus 도 true 로 갱신
+  if (typeof _adAllocateToMinusRows === 'function') {
+    _adAllocateToMinusRows(_paMinusRows);
+    _paMinusRows.forEach(r => {
+      if (r.marginAfterAd != null && r.marginAfterAd < 0) r.isMinus = true;
+    });
+  }
+
   // 진단 로그: 택배비용 매칭 통계
   const shipMatched = _paMinusRows.filter(r => r.shipCostMatched).length;
   const shipMissingSku = _paMinusRows.filter(r => !r.skuCode).length;
@@ -13819,6 +14444,8 @@ function renderPaMinus() {
       { key: 'cost',     label: '원가',    align: 'text-right',  extra: '' },
       { key: 'shipCost', label: '택배비용', align: 'text-right',  extra: '' },
       { key: 'margin',   label: '마진(공급가+택배비−원가−택배비용)', align: 'text-right', extra: '' },
+      { key: 'adCost',        label: '광고비',  align: 'text-right',  extra: '' },
+      { key: 'marginAfterAd', label: '실마진(광고비차감)', align: 'text-right', extra: '' },
       { key: 'receiver', label: '수령자',  align: '',           extra: 'pr-5' },
     ];
     thead.innerHTML = '<tr class="text-brand-gray text-xs">' + cols.map(c => {
@@ -13850,6 +14477,9 @@ function renderPaMinus() {
   };
   tbody.innerHTML = rows.length ? rows.map(r => {
     const rowCls = r.isMinus ? 'bg-brand-pink-light/30 border-b border-brand-border' : 'border-b border-brand-border hover:bg-brand-bg/40';
+    const adCostHtml = r.adCost == null
+      ? '<span class="text-brand-gray">-</span>'
+      : (Number(r.adCost) > 0 ? `<span class="text-brand-orange font-semibold">${fmt(r.adCost)}원</span>` : `<span class="text-brand-gray">0원</span>`);
     return `<tr class="${rowCls}">
       <td class="p-3 pl-5 text-xs">${_escapeHtml(r.shop)}</td>
       <td class="p-3 text-xs">${_escapeHtml(String(r.date).slice(0, 10))}</td>
@@ -13861,9 +14491,11 @@ function renderPaMinus() {
       <td class="p-3 text-right text-xs">${money(r.cost)}</td>
       <td class="p-3 text-right text-xs">${shipCostCell(r)}</td>
       <td class="p-3 text-right text-xs">${marginCell(r.margin)}</td>
+      <td class="p-3 text-right text-xs">${adCostHtml}</td>
+      <td class="p-3 text-right text-xs">${marginCell(r.marginAfterAd != null ? r.marginAfterAd : r.margin)}</td>
       <td class="p-3 pr-5 text-xs">${_escapeHtml(r.receiver)}</td>
     </tr>`;
-  }).join('') : '<tr><td colspan="11" class="p-8 text-center text-brand-gray text-sm">주문이 없습니다</td></tr>';
+  }).join('') : '<tr><td colspan="13" class="p-8 text-center text-brand-gray text-sm">주문이 없습니다</td></tr>';
 
   // 합계 행
   const tfoot = document.getElementById('pa-minus-tfoot');
@@ -13879,9 +14511,13 @@ function renderPaMinus() {
         if (r.cost != null) { a.cost += Number(r.cost) || 0; a.costN++; }
         a.shipCost += Number(r.shipCost) || 0;
         if (r.margin != null) { a.margin += Number(r.margin) || 0; a.marginN++; }
+        a.adCost += Number(r.adCost) || 0;
+        const realM = (r.marginAfterAd != null ? r.marginAfterAd : r.margin);
+        if (realM != null) { a.realMargin += Number(realM) || 0; a.realMarginN++; }
         return a;
-      }, { qty: 0, price: 0, supply: 0, shipFee: 0, cost: 0, costN: 0, shipCost: 0, margin: 0, marginN: 0 });
+      }, { qty: 0, price: 0, supply: 0, shipFee: 0, cost: 0, costN: 0, shipCost: 0, margin: 0, marginN: 0, adCost: 0, realMargin: 0, realMarginN: 0 });
       const marginCls = sum.margin < 0 ? 'text-brand-pink font-bold' : (sum.margin > 0 ? 'text-brand-green font-bold' : '');
+      const realMarginCls = sum.realMargin < 0 ? 'text-brand-pink font-bold' : (sum.realMargin > 0 ? 'text-brand-green font-bold' : '');
       tfoot.innerHTML = `<tr class="border-t-2 border-brand-border font-bold">
         <td class="p-3 pl-5 text-xs" colspan="3">합계 (${rows.length}건)</td>
         <td class="p-3 text-right text-xs">${fmt(sum.qty)}</td>
@@ -13891,6 +14527,8 @@ function renderPaMinus() {
         <td class="p-3 text-right text-xs">${sum.costN ? fmt(sum.cost) + '원' : '<span class="text-brand-gray font-normal">-</span>'}</td>
         <td class="p-3 text-right text-xs">${fmt(sum.shipCost)}원</td>
         <td class="p-3 text-right text-xs ${marginCls}">${sum.marginN ? fmt(sum.margin) + '원' : '<span class="text-brand-gray font-normal">-</span>'}</td>
+        <td class="p-3 text-right text-xs">${sum.adCost > 0 ? `<span class="text-brand-orange">${fmt(sum.adCost)}원</span>` : '<span class="text-brand-gray font-normal">-</span>'}</td>
+        <td class="p-3 text-right text-xs ${realMarginCls}">${sum.realMarginN ? fmt(sum.realMargin) + '원' : '<span class="text-brand-gray font-normal">-</span>'}</td>
         <td class="p-3 pr-5"></td>
       </tr>`;
     }
@@ -13910,16 +14548,19 @@ function exportPaMinus() {
     if (r.cost != null) a.cost += Number(r.cost) || 0;
     a.shipCost += Number(r.shipCost) || 0;
     if (r.margin != null) a.margin += Number(r.margin) || 0;
+    a.adCost += Number(r.adCost) || 0;
+    const realM = (r.marginAfterAd != null ? r.marginAfterAd : r.margin);
+    if (realM != null) a.realMargin += Number(realM) || 0;
     return a;
-  }, { qty: 0, price: 0, supply: 0, shipFee: 0, cost: 0, shipCost: 0, margin: 0 });
+  }, { qty: 0, price: 0, supply: 0, shipFee: 0, cost: 0, shipCost: 0, margin: 0, adCost: 0, realMargin: 0 });
   const data = [
-    ['쇼핑몰', '주문일', 'SKU상품명', '수량', '판매가', '공급가', '택배비', '원가', '택배비용', '마진(공급가+택배비-원가-택배비용)', '수령자', '마이너스'],
-    ...rows.map(r => [r.shop, String(r.date).slice(0, 10), r.name, r.qty, r.price, r.supply, r.shipFee || 0, r.cost == null ? '' : r.cost, r.shipCost || 0, r.margin == null ? '' : r.margin, r.receiver, r.isMinus ? 'Y' : 'N']),
-    ['합계', '', `${rows.length}건`, sum.qty, sum.price, sum.supply, sum.shipFee, sum.cost, sum.shipCost, sum.margin, '', ''],
+    ['쇼핑몰', '주문일', 'SKU상품명', '수량', '판매가', '공급가', '택배비', '원가', '택배비용', '마진(공급가+택배비-원가-택배비용)', '광고비', '실마진(광고비차감)', '수령자', '마이너스'],
+    ...rows.map(r => [r.shop, String(r.date).slice(0, 10), r.name, r.qty, r.price, r.supply, r.shipFee || 0, r.cost == null ? '' : r.cost, r.shipCost || 0, r.margin == null ? '' : r.margin, r.adCost || 0, r.marginAfterAd != null ? r.marginAfterAd : (r.margin == null ? '' : r.margin), r.receiver, r.isMinus ? 'Y' : 'N']),
+    ['합계', '', `${rows.length}건`, sum.qty, sum.price, sum.supply, sum.shipFee, sum.cost, sum.shipCost, sum.margin, sum.adCost, sum.realMargin, '', ''],
   ];
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{wch:10},{wch:12},{wch:40},{wch:6},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:22},{wch:10},{wch:8}];
+  ws['!cols'] = [{wch:10},{wch:12},{wch:40},{wch:6},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:22},{wch:10},{wch:18},{wch:10},{wch:8}];
   XLSX.utils.book_append_sheet(wb, ws, '마이너스확인');
   XLSX.writeFile(wb, `GPLAN_마이너스확인_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
