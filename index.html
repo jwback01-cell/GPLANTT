@@ -3351,8 +3351,9 @@ tailwind.config = {
                 <label class="block text-sm font-bold mb-1.5">솔루션 인증키 <span class="text-xs text-brand-gray font-normal">(플레이오토 설정 - API 사용 설정)</span></label>
                 <input id="pa-auth-key" type="password" class="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-2.5 text-sm font-mono focus:outline-none focus:border-brand-black" placeholder="55d49883a1fd70...">
               </div>
-              <div class="flex gap-2">
+              <div class="flex gap-2 flex-wrap">
                 <button onclick="testPlayautoConn()" class="flex-1 px-5 py-2.5 rounded-full bg-white border border-brand-border text-sm font-bold hover:bg-brand-bg">연결 테스트</button>
+                <button onclick="capturePlayautoTranscript()" class="flex-1 px-5 py-2.5 rounded-full bg-white border border-brand-border text-sm font-bold hover:bg-brand-bg" title="플레이오토 1:1 문의에 보낼 request/response 전문(헤더포함)을 캡처합니다">📋 진단전문 캡처</button>
                 <button onclick="savePlayautoKey()" class="flex-1 px-5 py-2.5 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333]">설정 저장</button>
               </div>
             </div>
@@ -16807,7 +16808,6 @@ function _paUnwrap(data) {
 }
 
 // 쇼핑몰 목록 캐시 (별칭 기반 거래처코드 매핑용)
-// v2: shopManage/getShopList 응답으로 변경 (별칭 등 상세 필드 포함)
 const PA_SHOPS_CACHE_KEY = 'gplan_playauto_shops_v2';
 try { localStorage.removeItem('gplan_playauto_shops_v1'); } catch(_) {}
 let _paShops = [];
@@ -16873,56 +16873,14 @@ function _paShopAliasOf(order) {
 }
 
 async function _paRefreshShops(silent) {
-  // 1순위: shopManage/getShopList — 별칭 등 상세 필드 포함 (POST + 페이지네이션)
-  try {
-    const all = [];
-    let start = 0;
-    const length = 500;
-    let firstResp = null;
-    for (let page = 0; page < 20; page++) {  // 안전 상한 10,000개
-      const data = await _paFetch('/shopManage/getShopList', {
-        method: 'POST',
-        body: JSON.stringify({ start, length })
-      });
-      if (page === 0) firstResp = data;
-      const arr = _paUnwrap(data);
-      if (!Array.isArray(arr) || !arr.length) break;
-      all.push(...arr);
-      if (arr.length < length) break;
-      start += length;
-    }
-    if (!all.length && firstResp) {
-      console.warn('[PA] shopManage/getShopList 응답이 빈 배열. raw:', firstResp);
-    }
-    if (all.length) {
-      _paShops = all;
-      _paSaveShopsCache(all);
-      console.log('[PA] shopManage/getShopList 로드 완료:', all.length, '개');
-      console.log('[PA] shops[0] 전체 키:', Object.keys(all[0]));
-      console.log('[PA] shops[0] 샘플:', all[0]);
-      // 별칭 후보 키 가진 첫 shop을 따로 출력 (디버깅 가속)
-      const aliasKeys = ['alias','shop_alias','shop_nick','shop_nickname','nick_name','nickname','memo','comment','shop_memo','shop_comment','remark','remarks','biz_no','business_no','business_number','company_no','comp_no','sub_id','cust_cd','cust_code','vendor_code','partner_code','etc_input','shop_name_kr'];
-      const sample = all.find(s => aliasKeys.some(k => s[k]));
-      if (sample) {
-        const found = aliasKeys.filter(k => sample[k]);
-        console.log('[PA] 별칭 후보 키 보유 샘플:', { shop_name: sample.shop_name, shop_cd: sample.shop_cd, found_keys: found, values: Object.fromEntries(found.map(k=>[k, sample[k]])) });
-      } else {
-        console.warn('[PA] shopManage/getShopList 응답에도 별칭 후보 키가 없음. 첫 shop 전체:', all[0]);
-      }
-      if (!silent) _renderPaShops(all);
-      return all;
-    }
-  } catch (e) {
-    console.warn('[PA] shopManage/getShopList 실패 → /shops 폴백:', e.message);
-  }
-  // 폴백: 기본 /shops (shop_name + shop_cd 만)
+  // 플레이오토 안내(2026-04-30): /shopManage/getShopList 는 폐기됨 → GET /api/shops 사용
   try {
     const data = await _paFetch('/shops');
     const shops = _paUnwrap(data);
     _paShops = shops;
     _paSaveShopsCache(shops);
     if (shops.length) {
-      console.log('[PA] (폴백) /shops 로드:', shops.length, '개. 첫 키:', Object.keys(shops[0]));
+      console.log('[PA] /shops 로드:', shops.length, '개. 첫 키:', Object.keys(shops[0]));
     }
     if (!silent) _renderPaShops(shops);
     return shops;
@@ -16948,6 +16906,133 @@ async function testPlayautoConn() {
     _updatePaBadge(false);
     showAppAlert('연결 실패', e.message || String(e), 'error');
   }
+}
+
+// 플레이오토 1:1 문의용 request/response 전문(헤더포함) 캡처
+// 프록시 응답 본문에 들어있는 _paProxyDiag 필드를 읽어서 사람이 읽을 수 있는 형태로 정리합니다.
+async function capturePlayautoTranscript() {
+  const key = _loadPaKey();
+  const auth = _loadPaAuth();
+  if (!key || !auth) {
+    showAppAlert('등록 필요', 'API Key와 솔루션 인증키를 먼저 등록해주세요.', 'error');
+    return;
+  }
+
+  const targets = [
+    { method: 'GET', proxyPath: '/shops',    label: 'GET /api/shops' },
+    { method: 'GET', proxyPath: '/carriers', label: 'GET /api/carriers' },
+  ];
+
+  const lines = [];
+  lines.push('========================================');
+  lines.push('플레이오토 진단전문 (request / response, 헤더 포함)');
+  lines.push('========================================');
+  lines.push(`캡처 시각: ${new Date().toLocaleString('ko-KR')} (KST)`);
+  lines.push('※ API Key / 토큰 값은 보안상 앞 6자 + 뒤 4자만 표시 (length는 표시).');
+  lines.push('');
+
+  for (const t of targets) {
+    lines.push('────────────────────────────────────────');
+    lines.push(`■ ${t.label}`);
+    lines.push('────────────────────────────────────────');
+    let r, text, json, diag;
+    try {
+      r = await fetch('/api/playauto' + t.proxyPath, {
+        method: t.method,
+        headers: {
+          'x-pa-key': key,
+          'x-pa-auth': auth,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      });
+      text = await r.text();
+      try { json = JSON.parse(text); } catch (_) { json = null; }
+      diag = json && json._paProxyDiag;
+    } catch (e) {
+      lines.push(`[fetch error] ${e.message || e}`);
+      lines.push('');
+      continue;
+    }
+
+    if (diag && Array.isArray(diag.attempts) && diag.attempts.length) {
+      lines.push(`프록시 trace: ${diag.traceId}  /  버전: ${diag.version}`);
+      if (diag.tokenLen) lines.push(`발급 토큰: length=${diag.tokenLen}, prefix="${diag.tokenPrefix}", suffix="${diag.tokenSuffix}", hasSpace=${diag.tokenHasSpace}, hasDot=${diag.tokenHasDot}`);
+      if (diag.tokenError) lines.push(`발급 토큰 오류: ${diag.tokenError}`);
+      lines.push('');
+      diag.attempts.forEach((a, i) => {
+        lines.push(`── 시도 ${i + 1} : Authorization = ${a.name || a.authPrefix} ──`);
+        lines.push('');
+        lines.push('[Request]');
+        lines.push(`${a.outgoing.method} ${a.outgoing.url}`);
+        Object.entries(a.outgoing.headers || {}).forEach(([k, v]) => lines.push(`${k}: ${v}`));
+        if (a.outgoing.body) {
+          lines.push('');
+          lines.push('Body:');
+          lines.push(a.outgoing.body);
+        }
+        lines.push('');
+        lines.push('[Response]');
+        lines.push(`HTTP ${a.upstream.status}`);
+        Object.entries(a.upstream.headers || {}).forEach(([k, v]) => lines.push(`${k}: ${v}`));
+        lines.push('');
+        lines.push('Body:');
+        lines.push(a.upstream.body || '(empty)');
+        lines.push('');
+      });
+    } else {
+      // _paProxyDiag 가 없는 경우 (성공 또는 비정상 응답) — 프록시 왕복만 표시
+      lines.push('[프록시 왕복 응답]');
+      lines.push(`HTTP ${r.status}`);
+      try { r.headers.forEach((v, k) => lines.push(`${k}: ${v}`)); } catch (_) {}
+      lines.push('');
+      lines.push('Body:');
+      lines.push((text || '').slice(0, 3000));
+      lines.push('');
+    }
+  }
+
+  _showCaptureModal(lines.join('\n'));
+}
+
+function _showCaptureModal(text) {
+  const prev = document.getElementById('pa-capture-modal');
+  if (prev) prev.remove();
+  const m = document.createElement('div');
+  m.id = 'pa-capture-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  m.innerHTML = `
+    <div style="background:white;border-radius:16px;max-width:1000px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="padding:14px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;gap:12px;">
+        <div>
+          <div style="font-weight:bold;font-size:15px;">플레이오토 전송용 진단전문</div>
+          <div style="color:#888;font-size:12px;margin-top:2px;">아래 내용을 복사해서 1:1 문의 답변에 그대로 붙여넣으세요.</div>
+        </div>
+        <button id="pa-cap-close" style="background:#eee;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;">닫기 ✕</button>
+      </div>
+      <div style="padding:14px 20px;overflow:auto;flex:1;">
+        <textarea id="pa-cap-text" readonly style="width:100%;height:62vh;font-family:Consolas,monospace;font-size:12px;border:1px solid #ddd;border-radius:8px;padding:12px;resize:none;line-height:1.5;"></textarea>
+      </div>
+      <div style="padding:12px 20px;border-top:1px solid #eee;display:flex;justify-content:flex-end;gap:8px;">
+        <button id="pa-cap-copy" style="background:#000;color:white;border:none;border-radius:20px;padding:10px 22px;cursor:pointer;font-weight:bold;font-size:14px;">📋 클립보드에 복사</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(m);
+  document.getElementById('pa-cap-text').value = text;
+  document.getElementById('pa-cap-close').onclick = () => m.remove();
+  document.getElementById('pa-cap-copy').onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      showAppAlert('복사 완료', '클립보드에 복사되었습니다. 플레이오토 1:1 문의 답변에 붙여넣으세요.', 'success');
+    } catch (_) {
+      const ta = document.getElementById('pa-cap-text');
+      ta.select();
+      ta.setSelectionRange(0, text.length);
+      try { document.execCommand('copy'); showAppAlert('복사 완료', '클립보드에 복사되었습니다.', 'success'); }
+      catch (e) { showAppAlert('복사 실패', '텍스트박스를 직접 선택해서 복사해주세요.', 'error'); }
+    }
+  };
 }
 
 function _renderPaShops(shops) {

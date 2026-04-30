@@ -69,25 +69,62 @@ export default async function handler(req, res) {
     ? undefined
     : (typeof req.body === 'string' ? req.body : JSON.stringify(req.body));
 
-  const diag = { traceId, version: 'v4-bearer-test', attempts: [] };
+  const diag = { traceId, version: 'v5-fulltrace', attempts: [] };
 
-  const doRequest = async (authHeaderValue) => {
-    const headers = {
+  const _mask = (v) => {
+    if (!v) return '';
+    const s = String(v);
+    if (s.length <= 12) return s.slice(0, 2) + '***' + s.slice(-2) + ` (len=${s.length})`;
+    return s.slice(0, 6) + '...' + s.slice(-4) + ` (len=${s.length})`;
+  };
+  const _maskAuth = (v) => {
+    if (!v) return '';
+    const parts = String(v).split(' ');
+    if (parts.length === 2) return `${parts[0]} ${_mask(parts[1])}`;
+    return _mask(v);
+  };
+
+  const doRequest = async (authHeaderValue, attemptName) => {
+    const realHeaders = {
       'x-api-key': apiKey,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
-    if (authHeaderValue) headers['Authorization'] = authHeaderValue;
+    if (authHeaderValue) realHeaders['Authorization'] = authHeaderValue;
+
     const r = await fetch(upstreamUrl, {
       method: req.method,
-      headers,
+      headers: realHeaders,
       body: bodyJson,
     });
     const text = await r.text();
     let data;
     try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+
+    const maskedHeaders = {
+      'x-api-key': _mask(apiKey),
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    if (authHeaderValue) maskedHeaders['Authorization'] = _maskAuth(authHeaderValue);
+
+    const upstreamHeaders = {};
+    try { for (const [k, v] of r.headers.entries()) upstreamHeaders[k] = v; } catch (_) {}
+
     diag.attempts.push({
+      name: attemptName,
       authPrefix: authHeaderValue ? authHeaderValue.split(' ')[0] : 'none',
+      outgoing: {
+        method: req.method,
+        url: upstreamUrl,
+        headers: maskedHeaders,
+        body: bodyJson || null,
+      },
+      upstream: {
+        status: r.status,
+        headers: upstreamHeaders,
+        body: text.slice(0, 3000),
+      },
       status: r.status,
       bodyPreview: text.slice(0, 150),
     });
@@ -111,7 +148,7 @@ export default async function handler(req, res) {
 
     // 시도 1: Token <token>
     if (token) {
-      result = await doRequest(`Token ${token}`);
+      result = await doRequest(`Token ${token}`, 'Token');
       if (result.status >= 200 && result.status < 300) {
         res.setHeader('x-pa-trace', traceId);
         res.setHeader('x-pa-diag', JSON.stringify(diag).slice(0, 1900));
@@ -121,7 +158,7 @@ export default async function handler(req, res) {
 
     // 시도 2: Bearer <token>
     if (token) {
-      result = await doRequest(`Bearer ${token}`);
+      result = await doRequest(`Bearer ${token}`, 'Bearer');
       if (result.status >= 200 && result.status < 300) {
         res.setHeader('x-pa-trace', traceId);
         res.setHeader('x-pa-diag', JSON.stringify(diag).slice(0, 1900));
@@ -131,7 +168,7 @@ export default async function handler(req, res) {
 
     // 시도 3: 그냥 <token> (스키마 없음)
     if (token) {
-      result = await doRequest(token);
+      result = await doRequest(token, 'raw');
       if (result.status >= 200 && result.status < 300) {
         res.setHeader('x-pa-trace', traceId);
         res.setHeader('x-pa-diag', JSON.stringify(diag).slice(0, 1900));
@@ -140,11 +177,20 @@ export default async function handler(req, res) {
     }
 
     // 시도 4: Authorization 헤더 없음
-    result = await doRequest(null);
+    result = await doRequest(null, 'no-auth');
 
     res.setHeader('x-pa-trace', traceId);
-    res.setHeader('x-pa-diag', JSON.stringify(diag).slice(0, 1900));
-    res.status(result ? result.status : 500).json(result ? result.data : { error: 'no result' });
+    res.setHeader('x-pa-diag', JSON.stringify({ traceId, version: diag.version, tokenLen: diag.tokenLen, attemptStatuses: diag.attempts.map(a => ({ name: a.name, status: a.status })) }).slice(0, 1900));
+
+    // 실패(4xx/5xx) 응답에는 진단전문(_paProxyDiag) 포함 — 프런트엔드 캡처 버튼이 사용
+    const finalStatus = result ? result.status : 500;
+    let finalBody;
+    if (result && result.data && typeof result.data === 'object' && !Array.isArray(result.data)) {
+      finalBody = { ...result.data, _paProxyDiag: diag };
+    } else {
+      finalBody = { upstreamData: result ? result.data : null, _paProxyDiag: diag };
+    }
+    res.status(finalStatus).json(finalBody);
   } catch (e) {
     console.error(`[playauto ${traceId}] error:`, e);
     res.setHeader('x-pa-trace', traceId);
