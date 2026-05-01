@@ -18847,6 +18847,8 @@ async function savePlayautoOrdersToLedger(silent) {
       // 택배비 묶음 적용 흔적 (가장 큰 1건만 남기고 0 처리된 행)
       shipFeeBundleApplied:  !!core._shipFeeBundleApplied,
       shipFeeBeforeDedup:    core._shipFeeBeforeDedup,
+      // PA bundle_no — 이카운트 전송 시 묶음 단위로 택배비/택배비용 1건만 추가하기 위함
+      bundleKey:             core._bundleKey || '',
       receiver: core.receiver,
       address:  [o.to_state, o.to_city, o.to_addr1, o.to_addr2, o.addr1, o.addr2].filter(Boolean).join(' '),
       profit,                                // null 가능 — 마이너스의 margin과 동일
@@ -21013,10 +21015,14 @@ function _buildSalePayload(rows) {
   const emp = 'API';
   const list = [];
   let lineNo = 0;
-  // 그룹별 최대 택배비 미리 계산 (묶음당 1번만 SK0001 추가)
+  // 묶음(PA bundle_no) 단위로 택배비 1건만 추가
+  // bundleKey 가 있으면 그걸 사용, 없으면 receiver+address+date+vendor 휴리스틱
+  const _shipBundleKey = (r) => r.bundleKey
+    ? `bk:${r.bundleKey}`
+    : `h:${r.date || ''}|${r.vendor || ''}|${r.receiver || ''}|${r.address || ''}`;
   const shipByGroup = {};
   rows.forEach(r => {
-    const gk = _groupKeyOfSale(r);
+    const gk = _shipBundleKey(r);
     const ship = Number(r.ship || 0);
     if (ship > 0 && r.shipCode) {
       if (!shipByGroup[gk] || ship > shipByGroup[gk].ship) {
@@ -21027,8 +21033,9 @@ function _buildSalePayload(rows) {
   const shipAddedByGroup = new Set();
   rows.forEach(r => {
     const serNo = serOf(r);
-    const gk = _groupKeyOfSale(r);
-    const custDes = groupCustDes[gk] || r.site || '';
+    const ecountGk = _groupKeyOfSale(r);
+    const gk = _shipBundleKey(r);  // 택배비 dedup 용 (이카운트 전표 그룹과 별개)
+    const custDes = groupCustDes[ecountGk] || r.site || '';
     lineNo++;
     list.push({
       Line: String(lineNo),
@@ -21122,13 +21129,16 @@ function _buildPurchasePayload(rows) {
     }
   });
   const emp = 'API';
-  // 같은 묶음(UPLOAD_SER_NO)에 택배비용 SK0001 라인이 이미 추가되었는지 추적
-  // — 묶음에 행이 N개 있어도 SK0001 은 1번만 추가 (가장 큰 택배비용 1건)
+  // 묶음(PA bundle_no) 단위로 택배비용 1건만 추가
+  // bundleKey 가 있으면 그걸 사용, 없으면 receiver+address+date+vendor 휴리스틱
+  const _shipBundleKey = (r) => r.bundleKey
+    ? `bk:${r.bundleKey}`
+    : `h:${r.date || ''}|${r.vendor || ''}|${r.receiver || ''}|${r.address || ''}`;
   const shipAddedByGroup = new Set();
-  // 그룹별 최대 택배비용 + 그 행의 receiver/shipCode 미리 계산
+  // 묶음별 최대 택배비용 + 그 행의 receiver/shipCode 미리 계산
   const shipByGroup = {};
   rows.forEach(r => {
-    const gk = _groupKeyOfPurchase(r);
+    const gk = _shipBundleKey(r);
     const ship = _resolveShipCostBySku(r.itemCode);
     if (ship > 0 && r.shipCode) {
       if (!shipByGroup[gk] || ship > shipByGroup[gk].ship) {
@@ -21142,8 +21152,9 @@ function _buildPurchasePayload(rows) {
     const mappedDepot = _resolveDepotCode(r.depotCode, r.depotName);
     const normDepot   = _normalizeDepotName(r.depotName);
     const purCust    = mappedDepot || r.depotCode || normDepot || r.vendorCode || '';
-    const gk = _groupKeyOfPurchase(r);
-    const purCustDes = groupPurCustDes[gk] || normDepot || _cleanVendorName(r.vendor);
+    const ecountGk = _groupKeyOfPurchase(r);
+    const gk = _shipBundleKey(r);  // 택배비용 dedup 용 (이카운트 전표 그룹과 별개)
+    const purCustDes = groupPurCustDes[ecountGk] || normDepot || _cleanVendorName(r.vendor);
     lineNo++;
     list.push({
       Line: String(lineNo),
