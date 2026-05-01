@@ -21013,9 +21013,22 @@ function _buildSalePayload(rows) {
   const emp = 'API';
   const list = [];
   let lineNo = 0;
+  // 그룹별 최대 택배비 미리 계산 (묶음당 1번만 SK0001 추가)
+  const shipByGroup = {};
+  rows.forEach(r => {
+    const gk = _groupKeyOfSale(r);
+    const ship = Number(r.ship || 0);
+    if (ship > 0 && r.shipCode) {
+      if (!shipByGroup[gk] || ship > shipByGroup[gk].ship) {
+        shipByGroup[gk] = { ship, shipCode: r.shipCode, receiver: r.receiver, siteCode: r.siteCode };
+      }
+    }
+  });
+  const shipAddedByGroup = new Set();
   rows.forEach(r => {
     const serNo = serOf(r);
-    const custDes = groupCustDes[_groupKeyOfSale(r)] || r.site || '';
+    const gk = _groupKeyOfSale(r);
+    const custDes = groupCustDes[gk] || r.site || '';
     lineNo++;
     list.push({
       Line: String(lineNo),
@@ -21039,32 +21052,32 @@ function _buildSalePayload(rows) {
         REMARKS:    (r.receiver || '')
       }
     });
-    // 택배비: 동일 전표에 추가 라인으로 전송 (같은 UPLOAD_SER_NO + 같은 CUST_DES)
-    // shipCode 없으면 PROD_CD 비어 이카운트가 거부 → 라인 자체 스킵
-    const ship = Number(r.ship || 0);
-    if (ship > 0 && r.shipCode) {
+    // 택배비: 동일 묶음(전표)에 1건만 추가 — 가장 큰 택배비 사용
+    if (!shipAddedByGroup.has(gk) && shipByGroup[gk]) {
+      const sg = shipByGroup[gk];
       lineNo++;
       list.push({
         Line: String(lineNo),
         BulkDatas: {
           IO_DATE:    _toEcountDate(r.date),
           UPLOAD_SER_NO: String(serNo),
-          CUST:       r.siteCode || '',
+          CUST:       sg.siteCode || r.siteCode || '',
           CUST_DES:   custDes,
           EMP_CD:     emp,
           WH_CD:      '',
           IO_TYPE:    '',
           EXCHANGE_TYPE: '',
           EXCHANGE_RATE: '',
-          PROD_CD:    r.shipCode   || '',
+          PROD_CD:    sg.shipCode   || '',
           PROD_DES:   '택배비',
           QTY:        '1',
-          PRICE:      String(Math.round(ship / 1.1)),
-          SUPPLY_AMT: String(Math.round(ship / 1.1)),
-          VAT_AMT:    String(ship - Math.round(ship / 1.1)),
-          REMARKS:    '택배비' + (r.receiver ? ' - ' + r.receiver : '')
+          PRICE:      String(Math.round(sg.ship / 1.1)),
+          SUPPLY_AMT: String(Math.round(sg.ship / 1.1)),
+          VAT_AMT:    String(sg.ship - Math.round(sg.ship / 1.1)),
+          REMARKS:    '택배비' + (sg.receiver ? ' - ' + sg.receiver : '')
         }
       });
+      shipAddedByGroup.add(gk);
     }
   });
   // 진단: UPLOAD_SER_NO별 라인 수 집계 (이카운트가 실제로 묶어주는지 확인용)
@@ -21109,13 +21122,28 @@ function _buildPurchasePayload(rows) {
     }
   });
   const emp = 'API';
+  // 같은 묶음(UPLOAD_SER_NO)에 택배비용 SK0001 라인이 이미 추가되었는지 추적
+  // — 묶음에 행이 N개 있어도 SK0001 은 1번만 추가 (가장 큰 택배비용 1건)
+  const shipAddedByGroup = new Set();
+  // 그룹별 최대 택배비용 + 그 행의 receiver/shipCode 미리 계산
+  const shipByGroup = {};
+  rows.forEach(r => {
+    const gk = _groupKeyOfPurchase(r);
+    const ship = _resolveShipCostBySku(r.itemCode);
+    if (ship > 0 && r.shipCode) {
+      if (!shipByGroup[gk] || ship > shipByGroup[gk].ship) {
+        shipByGroup[gk] = { ship, shipCode: r.shipCode, receiver: r.receiver, date: r.date };
+      }
+    }
+  });
   rows.forEach(r => {
     const serNo = serOf(r);
     // 구매입력 거래처는 배송처(depot) 기준 — 사용자 지정 배송처→이카운트 매핑이 있으면 우선 적용
     const mappedDepot = _resolveDepotCode(r.depotCode, r.depotName);
     const normDepot   = _normalizeDepotName(r.depotName);
     const purCust    = mappedDepot || r.depotCode || normDepot || r.vendorCode || '';
-    const purCustDes = groupPurCustDes[_groupKeyOfPurchase(r)] || normDepot || _cleanVendorName(r.vendor);
+    const gk = _groupKeyOfPurchase(r);
+    const purCustDes = groupPurCustDes[gk] || normDepot || _cleanVendorName(r.vendor);
     lineNo++;
     list.push({
       Line: String(lineNo),
@@ -21138,10 +21166,10 @@ function _buildPurchasePayload(rows) {
         REMARKS:    r.receiver || ''
       }
     });
-    // 택배비용: 동일 전표에 추가 라인으로 전송 (수량 1, 단가 = SKU별 매핑)
-    // 전송 시점에 SKU 매핑 조회 — 장부 저장값(r.shipCost) 무시
-    const ship = _resolveShipCostBySku(r.itemCode);
-    if (ship > 0 && r.shipCode) {
+    // 택배비용: 동일 묶음에 1건만 추가 (가장 큰 택배비용 기준)
+    // 같은 그룹의 첫 행을 처리할 때 1번만 push, 이후 행은 건너뜀
+    if (!shipAddedByGroup.has(gk) && shipByGroup[gk]) {
+      const sg = shipByGroup[gk];
       lineNo++;
       list.push({
         Line: String(lineNo),
@@ -21155,15 +21183,16 @@ function _buildPurchasePayload(rows) {
           IO_TYPE:    '',
           EXCHANGE_TYPE: '',
           EXCHANGE_RATE: '',
-          PROD_CD:    r.shipCode   || '',
+          PROD_CD:    sg.shipCode   || '',
           PROD_DES:   '택배비용',
           QTY:        '1',
-          PRICE:      String(ship),
-          SUPPLY_AMT: String(Math.round(ship / 1.1)),
-          VAT_AMT:    String(ship - Math.round(ship / 1.1)),
-          REMARKS:    '택배비용' + (r.receiver ? ' - ' + r.receiver : '')
+          PRICE:      String(sg.ship),
+          SUPPLY_AMT: String(Math.round(sg.ship / 1.1)),
+          VAT_AMT:    String(sg.ship - Math.round(sg.ship / 1.1)),
+          REMARKS:    '택배비용' + (sg.receiver ? ' - ' + sg.receiver : '')
         }
       });
+      shipAddedByGroup.add(gk);
     }
     // 제주도 추가배송비: 주소에 "제주" 포함 시 동일 전표에 추가 라인 (수량 1, 고정 3000원)
     if (_isJejuAddress(r.address) && JEJU_EXTRA_SHIP_AMOUNT > 0) {
