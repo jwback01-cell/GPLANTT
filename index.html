@@ -20206,15 +20206,30 @@ function _loadShipCostMap() {
 function _saveShipCostMapStore(m) {
   try { localStorage.setItem(ECOUNT_SHIP_COST_MAP_KEY, JSON.stringify(m)); } catch(_) {}
 }
-// SKU 코드로 매핑된 택배발송비 조회 (정확일치 → 공백제거+대소문자무시)
+// SKU 코드로 매핑된 택배발송비 조회
+// 우선순위: 1) 이카운트 전용 매핑 (gplan_ecount_ship_cost_map_v1)
+//           2) 상품관리(_allProducts) / 세트상품(_loadSetProducts) 의 shipping_cost 폴백
 function _resolveShipCostBySku(sku) {
   const map = _loadShipCostMap();
   const s = String(sku || '').trim();
   if (!s) return 0;
-  if (map[s] != null) return Number(map[s]) || 0;
+  // 1) 이카운트 전용 매핑 직접 일치
+  if (map[s] != null) {
+    const v = Number(map[s]);
+    if (v > 0) return v;
+  }
+  // 2) 이카운트 전용 매핑 정규화 일치 (공백/대소문자 무시)
   const norm = s.replace(/\s+/g,'').toLowerCase();
   for (const k of Object.keys(map)) {
-    if (String(k).replace(/\s+/g,'').toLowerCase() === norm) return Number(map[k]) || 0;
+    if (String(k).replace(/\s+/g,'').toLowerCase() === norm) {
+      const v = Number(map[k]);
+      if (v > 0) return v;
+    }
+  }
+  // 3) 폴백 — 상품관리/세트상품 의 shipping_cost 사용 (기존에 _paShipCostFromProductMgmt 동일 로직)
+  if (typeof _paShipCostFromProductMgmt === 'function') {
+    const fallback = _paShipCostFromProductMgmt(s);
+    if (fallback != null && Number(fallback) > 0) return Number(fallback);
   }
   return 0;
 }
