@@ -21520,25 +21520,21 @@ async function sendToEcount() {
   sendToEcount._missingSkus = [];
   sendToEcount._missingRowCount = 0;
   if (failTotal === 0) {
-    let title = '전송 완료';
-    let msg = `판매입력 ${saleOk}건 · 구매입력 ${purOk}건이 이카운트로 전송되었습니다.` + dupNote;
-    let type = 'success';
-    let extra = '';
     if (missingRowCount > 0) {
-      title = '전송 완료 (일부 제외)';
-      type = 'warn';
-      msg += `\n(SKU 택배발송비 미매핑으로 구매입력 ${missingRowCount}건 제외)`;
-      extra = '미매핑 SKU: <b class="text-brand-black">' + missingSkus.map(s => _escapeHtml(s)).join(', ') + '</b>' +
-              '<br>이카운트 연동 탭 ▶ "SKU별 택배발송비 매핑"에서 등록 후 다시 전송하세요.' +
-              `<br><br><button onclick="showMissingShipCostRows()" style="padding:8px 16px;border-radius:18px;border:1px solid #ddd;background:white;cursor:pointer;font-size:13px;font-weight:bold;color:#000;">📋 제외된 ${missingRowCount}건 상세 보기</button>`;
+      // 제외된 행이 있으면 작은 알림 대신 표 모달 직접 표시 (요약 문구 상단 포함)
+      const summary = `전송 완료 (일부 제외)\n판매입력 ${saleOk}건 · 구매입력 ${purOk}건이 이카운트로 전송되었습니다.${dupNote}\n(SKU 택배발송비 미매핑으로 구매입력 ${missingRowCount}건 제외)`;
+      showMissingShipCostRows(summary);
+    } else {
+      const msg = `판매입력 ${saleOk}건 · 구매입력 ${purOk}건이 이카운트로 전송되었습니다.` + dupNote;
+      showAppAlert('전송 완료', msg, 'success');
     }
-    showAppAlert(title, msg, type, extra);
   } else {
     showEcountErrors(logs);
   }
 }
 // 마지막 이카운트 전송에서 SKU 택배발송비 미매핑으로 제외된 행을 표 형태로 표시
-function showMissingShipCostRows() {
+// summary: 상단에 표시할 요약 문구(전송 결과 등). 없으면 기본 안내 표시.
+function showMissingShipCostRows(summary) {
   const rows = (window._ecountLastMissingRows && window._ecountLastMissingRows.length)
     ? window._ecountLastMissingRows : [];
   if (!rows.length) {
@@ -21572,7 +21568,8 @@ function showMissingShipCostRows() {
   m.innerHTML = `
     <div style="background:white;border-radius:16px;max-width:1200px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
       <div style="padding:16px 22px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
-        <div>
+        <div style="flex:1;min-width:0;">
+          ${summary ? `<div style="background:#FFF3E0;border:1px solid #FFE0B2;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#000;line-height:1.5;">${_escapeHtml(summary).replace(/\n/g, '<br>')}</div>` : ''}
           <div style="font-weight:bold;font-size:16px;">SKU 택배발송비 미매핑으로 제외된 ${rows.length}건</div>
           <div style="color:#888;font-size:12px;margin-top:4px;">미매핑 SKU ${skuSet.size}개 — 이카운트 연동 ▶ "SKU별 택배발송비 매핑"에서 등록 후 다시 전송하세요.</div>
         </div>
