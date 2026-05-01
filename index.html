@@ -18816,11 +18816,17 @@ async function savePlayautoOrdersToLedger(silent) {
     const setCd = _prodSku(prod);
     const prodName = _prodName(prod);
     const shopName = core.shop || o.shop_name || o.shopName || o.site || '플레이오토';
-    const custCd = _paShopAliasOf(o) || _resolveVendorCode(shopName);
-    const depotCode = String(o.depot_no || o.depot_cd || '').trim();
-    const depotName = String(o.depot_name || '').trim();
+    let custCd = _paShopAliasOf(o) || _resolveVendorCode(shopName);
+    let depotCode = String(o.depot_no || o.depot_cd || '').trim();
+    let depotName = String(o.depot_name || '').trim();
     // 거래처(vendor)는 PA 의 배송처(depot) 기준 — 배송처 없으면 쇼핑몰명 폴백
-    const vendorName = depotName || shopName;
+    let vendorName = depotName || shopName;
+    // "올바른" 거래처/배송처 특별 처리: 거래처번호 = 154-81-01663
+    if (depotName.trim() === '올바른' || vendorName.trim() === '올바른' || shopName.trim() === '올바른') {
+      vendorName = '올바른';
+      depotName = '올바른';
+      custCd = '154-81-01663';
+    }
     const supply   = Number(core.supply) || 0;
     const shipFee  = Number(core.shipFee) || 0;
     const shipCost = Number(core.shipCost) || 0;
@@ -21271,15 +21277,26 @@ function _buildPurchasePayload(rows) {
       }
     }
   });
+  // "올바른" 거래처/배송처 → 거래처번호 154-81-01663 으로 구매입력
+  const _isOlbareun = (r) => {
+    const v = String(r.vendor || '').trim();
+    const d = String(r.depotName || '').trim();
+    return v === '올바른' || d === '올바른';
+  };
   rows.forEach(r => {
     const serNo = serOf(r);
     // 구매입력 거래처는 배송처(depot) 기준 — 사용자 지정 배송처→이카운트 매핑이 있으면 우선 적용
     const mappedDepot = _resolveDepotCode(r.depotCode, r.depotName);
     const normDepot   = _normalizeDepotName(r.depotName);
-    const purCust    = mappedDepot || r.depotCode || normDepot || r.vendorCode || '';
+    let purCust    = mappedDepot || r.depotCode || normDepot || r.vendorCode || '';
     const ecountGk = _groupKeyOfPurchase(r);
     const gk = _shipBundleKey(r);  // 택배비용 dedup 용 (이카운트 전표 그룹과 별개)
-    const purCustDes = groupPurCustDes[ecountGk] || normDepot || _cleanVendorName(r.vendor);
+    let purCustDes = groupPurCustDes[ecountGk] || normDepot || _cleanVendorName(r.vendor);
+    // "올바른" 특별 처리 — 위 매핑보다 우선
+    if (_isOlbareun(r)) {
+      purCust    = '154-81-01663';
+      purCustDes = '올바른';
+    }
     lineNo++;
     // r.cost 는 VAT 포함 라인 합계 (수량 곱해진 값, _paExtractOrderRow 에서 cost*qty 처리됨)
     const _q2 = Math.max(1, Number(r.qty) || 1);
