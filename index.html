@@ -5530,7 +5530,10 @@ async function runKwAutoTrack(isAuto) {
   const now = new Date();
 
   let ok = 0, skipped = 0;
-  for (const it of list) {
+  for (let listIdx = 0; listIdx < list.length; listIdx++) {
+    const it = list[listIdx];
+    // 봇 감지 회피: 첫 키워드를 제외한 나머지는 800ms 간격으로 호출
+    if (listIdx > 0) await new Promise(r => setTimeout(r, 800));
     const product = _kwResolveProduct(it.productKey);
     if (!product) { skipped++; continue; }
     const productIds = _extractProductIds(product.url);
