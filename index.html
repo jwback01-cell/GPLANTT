@@ -13803,7 +13803,9 @@ function _adParseNumber(v) {
 }
 
 // 미리보기 모달 — 사용자가 확인 후 [저장] 누르면 localStorage 에 추가
-function _adShowPreview(siteId, fileName, rows) {
+// source: 'excel' (기본) 또는 'api'
+function _adShowPreview(siteId, fileName, rows, source) {
+  const sourceLabel = source || 'excel';
   const total = rows.reduce((a, r) => a + (Number(r.amount) || 0), 0);
   const dates = rows.map(r => r.date).sort();
   const dateRange = dates.length ? `${dates[0]} ~ ${dates[dates.length-1]}` : '-';
@@ -13853,7 +13855,7 @@ function _adShowPreview(siteId, fileName, rows) {
     rows.forEach((r, i) => {
       all.push({
         ...r,
-        source: 'excel',
+        source: sourceLabel,
         fileName,
         uploadedAt: stamp,
         _key: `${stamp}_${i}_${Math.random().toString(36).slice(2,6)}`,
@@ -13868,12 +13870,112 @@ function _adShowPreview(siteId, fileName, rows) {
   };
 }
 
-// API 연동 (스텁) — 실제 키 등록/조회는 추후
+// API 연동 — 사이트별 분기
 function connectAdApi(siteId) {
+  if (siteId === '스마트스토어') {
+    return openSmartstoreSpendDialog();
+  }
   const site = AD_SITES.find(s => s.id === siteId);
   showAppAlert('API 연동 준비 중',
     `${siteId} (${site?.api?.label || ''}) 자동 조회는 준비 중입니다.\n\n현재는 사이트에서 광고비 보고서 엑셀을 다운로드 받아\n"📊 엑셀 업로드"로 올려주세요.`,
     'info');
+}
+
+// 스마트스토어(네이버 검색광고) 광고비 자동 조회 모달
+function openSmartstoreSpendDialog() {
+  const keys = (typeof _loadSaKeys === 'function') ? _loadSaKeys() : {};
+  const hasKeys = keys.customerId && keys.accessLicense && keys.secretKey;
+  if (!hasKeys) {
+    if (confirm('네이버 검색광고 API 키가 등록되어 있지 않습니다.\n\n[확인] 키워드 페이지로 이동해서 등록 (CUSTOMER_ID / ACCESS_LICENSE / SECRET_KEY)\n[취소] 닫기')) {
+      if (typeof navigate === 'function') navigate('keywords');
+    }
+    return;
+  }
+
+  const prev = document.getElementById('ad-ss-modal');
+  if (prev) prev.remove();
+  const m = document.createElement('div');
+  m.id = 'ad-ss-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  // 기본 기간: 이번 달 1일 ~ 어제 (오늘 데이터는 미정산)
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  const yest = new Date(now); yest.setDate(yest.getDate() - 1);
+  m.innerHTML = `
+    <div style="background:white;border-radius:16px;max-width:520px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="padding:18px 22px;border-bottom:1px solid #eee;">
+        <div style="font-weight:bold;font-size:16px;">스마트스토어 광고비 자동 조회</div>
+        <div style="color:#888;font-size:12px;margin-top:4px;">네이버 검색광고 API로 캠페인별 일자별 광고비(salesAmt)를 가져옵니다.</div>
+      </div>
+      <div style="padding:18px 22px;display:flex;flex-direction:column;gap:14px;">
+        <div>
+          <div style="font-size:13px;font-weight:bold;margin-bottom:6px;">조회 기간 (최대 92일)</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="date" id="ad-ss-from" value="${_ymdString(first)}" style="flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+            <span style="color:#888;">~</span>
+            <input type="date" id="ad-ss-to" value="${_ymdString(yest)}" style="flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+          </div>
+          <div style="color:#888;font-size:11px;margin-top:6px;">⚠ 오늘 날짜 데이터는 미정산이라 누락될 수 있어요. 어제까지 조회 권장.</div>
+        </div>
+        <div id="ad-ss-status" style="font-size:12px;color:#888;min-height:18px;"></div>
+      </div>
+      <div style="padding:14px 22px;border-top:1px solid #eee;display:flex;gap:8px;justify-content:flex-end;">
+        <button id="ad-ss-cancel" style="padding:9px 22px;border-radius:20px;border:1px solid #ddd;background:white;cursor:pointer;font-size:13px;font-weight:bold;">취소</button>
+        <button id="ad-ss-fetch" style="padding:9px 26px;border-radius:20px;border:none;background:#000;color:white;cursor:pointer;font-size:13px;font-weight:bold;">🔍 조회</button>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+  document.getElementById('ad-ss-cancel').onclick = () => m.remove();
+  document.getElementById('ad-ss-fetch').onclick = async () => {
+    const from = document.getElementById('ad-ss-from').value;
+    const to   = document.getElementById('ad-ss-to').value;
+    if (!from || !to) { showAppAlert('입력 필요', '조회 기간을 입력하세요.', 'warn'); return; }
+    if (from > to) { showAppAlert('기간 오류', '시작일이 종료일보다 늦습니다.', 'error'); return; }
+    const statusEl = document.getElementById('ad-ss-status');
+    const fetchBtn = document.getElementById('ad-ss-fetch');
+    fetchBtn.disabled = true;
+    fetchBtn.style.opacity = '0.5';
+    statusEl.textContent = '조회 중... (캠페인 + 일자별 광고비 가져오는 중)';
+    try {
+      const url = `/api/naver-searchad-spend?from=${from}&to=${to}`;
+      const r = await fetch(url, {
+        headers: {
+          'x-naver-sa-customer': keys.customerId,
+          'x-naver-sa-license': keys.accessLicense,
+          'x-naver-sa-secret': keys.secretKey,
+        },
+      });
+      const text = await r.text();
+      let data; try { data = JSON.parse(text); } catch (_) { data = { error: 'JSON 파싱 실패', detail: text.slice(0, 300) }; }
+      if (!r.ok) {
+        statusEl.style.color = '#E91E63';
+        statusEl.textContent = `❌ 실패 (HTTP ${r.status}): ${data.error || ''}`;
+        console.warn('[스마트스토어 광고비] 응답:', data);
+        return;
+      }
+      const rows = (data.rows || []).map(r => ({
+        site: '스마트스토어',
+        date: r.date,
+        amount: r.amount,
+        campaign: r.campaign + (r.clkCnt ? ` (클릭 ${r.clkCnt}, 노출 ${r.impCnt})` : ''),
+      }));
+      console.log('[스마트스토어 광고비] 조회 결과:', { total: data.total, rows: data.rows?.length, campaignCount: data.campaignCount, _diag: data._diag });
+      m.remove();
+      if (!rows.length) {
+        showAppAlert('조회 결과 없음',
+          `해당 기간에 광고비가 발생한 캠페인이 없습니다.\n캠페인 수: ${data.campaignCount || 0}개, 조회 일수: ${data.dateCount || 0}일`,
+          'warn');
+        return;
+      }
+      _adShowPreview('스마트스토어', `네이버검색광고 API (${from}~${to})`, rows, 'api');
+    } catch (e) {
+      statusEl.style.color = '#E91E63';
+      statusEl.textContent = `❌ 통신 오류: ${e.message}`;
+    } finally {
+      fetchBtn.disabled = false;
+      fetchBtn.style.opacity = '1';
+    }
+  };
 }
 
 // 기간별 사이트 광고비 vs 마진 요약 — _paMinusRows 사용 (마이너스 확인 실행 후에만 의미 있음)
