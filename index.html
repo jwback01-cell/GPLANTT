@@ -21426,11 +21426,18 @@ async function sendToEcount() {
       if (missingShipCostRows.length) {
         sendToEcount._missingSkus = [...new Set(missingShipCostRows.map(r => r.itemCode || '(빈 품목코드)'))];
         sendToEcount._missingRowCount = missingShipCostRows.length;
+        // 전체 행 정보 보존 (상세 보기용) — 페이지 리프레시 전까지 유지
+        window._ecountLastMissingRows = missingShipCostRows.slice();
         console.warn('[이카운트→구매] SKU 택배발송비 미매핑으로 제외된 행:', sendToEcount._missingRowCount, '건 / SKU:', sendToEcount._missingSkus);
+        console.table(missingShipCostRows.map(r => ({
+          date: r.date, vendor: r.vendor, itemCode: r.itemCode || '(빈 코드)',
+          itemName: (r.itemName || '').slice(0, 30), qty: r.qty, receiver: r.receiver,
+        })));
         purchaseRows = purchaseRows.filter(r => _resolveShipCostBySku(r.itemCode) > 0);
       } else {
         sendToEcount._missingSkus = [];
         sendToEcount._missingRowCount = 0;
+        window._ecountLastMissingRows = [];
       }
       if (purchaseRows.length === 0) {
         const msg = purchaseCandidateCount === 0
@@ -21498,13 +21505,81 @@ async function sendToEcount() {
       type = 'warn';
       msg += `\n(SKU 택배발송비 미매핑으로 구매입력 ${missingRowCount}건 제외)`;
       extra = '미매핑 SKU: <b class="text-brand-black">' + missingSkus.map(s => _escapeHtml(s)).join(', ') + '</b>' +
-              '<br>이카운트 연동 탭 ▶ "SKU별 택배발송비 매핑"에서 등록 후 다시 전송하세요.';
+              '<br>이카운트 연동 탭 ▶ "SKU별 택배발송비 매핑"에서 등록 후 다시 전송하세요.' +
+              `<br><br><button onclick="showMissingShipCostRows()" style="padding:8px 16px;border-radius:18px;border:1px solid #ddd;background:white;cursor:pointer;font-size:13px;font-weight:bold;color:#000;">📋 제외된 ${missingRowCount}건 상세 보기</button>`;
     }
     showAppAlert(title, msg, type, extra);
   } else {
     showEcountErrors(logs);
   }
 }
+// 마지막 이카운트 전송에서 SKU 택배발송비 미매핑으로 제외된 행을 표 형태로 표시
+function showMissingShipCostRows() {
+  const rows = (window._ecountLastMissingRows && window._ecountLastMissingRows.length)
+    ? window._ecountLastMissingRows : [];
+  if (!rows.length) {
+    showAppAlert('데이터 없음', '제외된 행 정보가 없습니다.\n(페이지 새로고침 후엔 사라져요. 다시 전송하면 확인 가능합니다.)', 'info');
+    return;
+  }
+  // SKU 별로 그룹화하여 같은 SKU 행이 모이도록 정렬
+  const sorted = rows.slice().sort((a, b) =>
+    String(a.itemCode || '').localeCompare(String(b.itemCode || ''))
+    || String(a.date || '').localeCompare(String(b.date || '')));
+
+  const prev = document.getElementById('ec-missing-rows-modal');
+  if (prev) prev.remove();
+
+  const skuSet = new Set(sorted.map(r => r.itemCode || '(빈 품목코드)'));
+  const tbodyHtml = sorted.map((r, i) => `<tr style="border-bottom:1px solid #eee;">
+    <td style="padding:8px 10px;font-size:11px;color:#888;">${i + 1}</td>
+    <td style="padding:8px 10px;font-size:12px;white-space:nowrap;">${_escapeHtml(String(r.date || '').slice(0, 10))}</td>
+    <td style="padding:8px 10px;font-size:12px;white-space:nowrap;">${_escapeHtml(r.vendor || '')}</td>
+    <td style="padding:8px 10px;font-size:12px;font-family:monospace;color:#E91E63;font-weight:bold;white-space:nowrap;">${_escapeHtml(r.itemCode || '(빈 코드)')}</td>
+    <td style="padding:8px 10px;font-size:12px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_escapeHtml(r.itemName || '')}">${_escapeHtml((r.itemName || '').slice(0, 50))}</td>
+    <td style="padding:8px 10px;font-size:12px;text-align:right;white-space:nowrap;">${Number(r.qty || 0)}</td>
+    <td style="padding:8px 10px;font-size:12px;text-align:right;white-space:nowrap;">${(Number(r.cost || 0) || 0).toLocaleString('ko-KR')}원</td>
+    <td style="padding:8px 10px;font-size:12px;white-space:nowrap;">${_escapeHtml(r.receiver || '')}</td>
+    <td style="padding:8px 10px;font-size:12px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_escapeHtml(r.address || '')}">${_escapeHtml((r.address || '').slice(0, 30))}</td>
+  </tr>`).join('');
+
+  const m = document.createElement('div');
+  m.id = 'ec-missing-rows-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  m.innerHTML = `
+    <div style="background:white;border-radius:16px;max-width:1200px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="padding:16px 22px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+        <div>
+          <div style="font-weight:bold;font-size:16px;">SKU 택배발송비 미매핑으로 제외된 ${rows.length}건</div>
+          <div style="color:#888;font-size:12px;margin-top:4px;">미매핑 SKU ${skuSet.size}개 — 이카운트 연동 ▶ "SKU별 택배발송비 매핑"에서 등록 후 다시 전송하세요.</div>
+        </div>
+        <button onclick="document.getElementById('ec-missing-rows-modal').remove()" style="background:#eee;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;flex-shrink:0;">닫기 ✕</button>
+      </div>
+      <div style="overflow:auto;flex:1;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead style="position:sticky;top:0;background:#f8f8f8;border-bottom:2px solid #ddd;">
+            <tr>
+              <th style="padding:10px;text-align:left;font-size:11px;font-weight:bold;color:#888;">#</th>
+              <th style="padding:10px;text-align:left;font-size:11px;font-weight:bold;color:#888;">날짜</th>
+              <th style="padding:10px;text-align:left;font-size:11px;font-weight:bold;color:#888;">거래처</th>
+              <th style="padding:10px;text-align:left;font-size:11px;font-weight:bold;color:#888;">SKU(미매핑)</th>
+              <th style="padding:10px;text-align:left;font-size:11px;font-weight:bold;color:#888;">상품명</th>
+              <th style="padding:10px;text-align:right;font-size:11px;font-weight:bold;color:#888;">수량</th>
+              <th style="padding:10px;text-align:right;font-size:11px;font-weight:bold;color:#888;">원가</th>
+              <th style="padding:10px;text-align:left;font-size:11px;font-weight:bold;color:#888;">수령자</th>
+              <th style="padding:10px;text-align:left;font-size:11px;font-weight:bold;color:#888;">주소</th>
+            </tr>
+          </thead>
+          <tbody>${tbodyHtml}</tbody>
+        </table>
+      </div>
+      <div style="padding:12px 22px;border-top:1px solid #eee;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#888;">
+        <span>총 ${rows.length}건 / 미매핑 SKU ${skuSet.size}개</span>
+        <button onclick="document.getElementById('ec-missing-rows-modal').remove()" style="background:#000;color:white;border:none;border-radius:18px;padding:8px 22px;cursor:pointer;font-weight:bold;">확인</button>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+}
+
 window._lastEcountLogs = null;
 function showLastEcountErrors() {
   if (!window._lastEcountLogs) { showAppAlert('내역 없음', '최근 전송 내역이 없습니다.', 'info'); return; }
