@@ -13610,7 +13610,9 @@ const AD_SITES = [
     api: { available: false } },
   { id: '쿠팡',        label: '쿠팡',
     shopAliases: ['쿠팡','COUPANG','Coupang','coupang'],
-    api: { available: true,  label: 'Coupang Wing Ads API' } },
+    // Wing API 에 /ad/reports 엔드포인트가 없음을 2026-05-01 테스트로 확정 (4개 후보 경로 모두 404).
+    // 별도 광고 API 가 Coupang 에서 일반 셀러에게 노출되지 않음 → 광고비는 엑셀 업로드만 사용.
+    api: { available: false } },
   { id: '올웨이즈',    label: '올웨이즈',
     shopAliases: ['올웨이즈','올웨이스','ALWAYZ','alwayz'],
     api: { available: false } },
