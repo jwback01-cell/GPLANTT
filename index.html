@@ -3490,6 +3490,7 @@ tailwind.config = {
                   <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap cursor-pointer hover:bg-brand-border/60 select-none" data-upload-sort="receiver" onclick="sortUploadData('receiver')">수령자명<span class="upload-sort-icon text-brand-gray/50 ml-1">↕</span></th>
                   <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap cursor-pointer hover:bg-brand-border/60 select-none" data-upload-sort="profit" onclick="sortUploadData('profit')" title="마진 = 공급가 + 택배비 − 원가 − 택배비용">마진(공급가+택배비-원가-택배비용)<span class="upload-sort-icon text-brand-gray/50 ml-1">↕</span></th>
                   <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap cursor-pointer hover:bg-brand-border/60 select-none" data-upload-sort="savedAt" onclick="sortUploadData('savedAt')">저장일시<span class="upload-sort-icon text-brand-gray/50 ml-1">↕</span></th>
+                  <th class="text-center px-4 py-3 font-bold text-xs whitespace-nowrap">수정</th>
                 </tr>
               </thead>
               <tbody id="upload-data-tbody"></tbody>
@@ -19025,6 +19026,120 @@ function _saveUploadData(arr) {
   try { localStorage.setItem(UPLOAD_DATA_KEY, JSON.stringify(arr)); } catch (_) {}
 }
 
+// 업로드 데이터 행 편집 모달 — 인덱스로 row 찾아서 폼에 채우고, 저장 시 localStorage 업데이트
+function openEditUploadDataRow(idx) {
+  const data = _loadUploadData();
+  const r = data[idx];
+  if (!r) { showAppAlert('찾을 수 없음', '편집할 행을 찾을 수 없습니다.', 'error'); return; }
+
+  const prev = document.getElementById('edit-upload-row-modal');
+  if (prev) prev.remove();
+
+  const inputCss = 'width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;box-sizing:border-box;';
+  const numInputCss = inputCss + 'text-align:right;font-family:monospace;';
+  const labelCss = 'font-size:11px;color:#666;font-weight:bold;display:block;margin-bottom:3px;';
+
+  const fld = (label, id, value, type = 'text', extraCss = '') => `
+    <div>
+      <label style="${labelCss}">${label}</label>
+      <input type="${type}" id="${id}" value="${_escapeHtml(value == null ? '' : String(value))}" style="${inputCss}${extraCss}">
+    </div>`;
+  const numFld = (label, id, value) => `
+    <div>
+      <label style="${labelCss}">${label}</label>
+      <input type="number" id="${id}" value="${value == null || value === '' ? '' : Number(value)}" style="${numInputCss}">
+    </div>`;
+
+  const m = document.createElement('div');
+  m.id = 'edit-upload-row-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  m.innerHTML = `
+    <div style="background:white;border-radius:16px;max-width:780px;width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="padding:16px 22px;border-bottom:1px solid #eee;">
+        <div style="font-weight:bold;font-size:16px;">행 수정</div>
+        <div style="color:#888;font-size:12px;margin-top:4px;">저장 시 localStorage 의 업로드 데이터가 수정됩니다. (이미 이카운트로 전송된 데이터는 자동 갱신 안 됨)</div>
+      </div>
+      <div style="padding:18px 22px;overflow:auto;flex:1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+        ${fld('거래처명 (vendor)', 'eur-vendor', r.vendor)}
+        ${fld('사이트 (site)', 'eur-site', r.site)}
+        ${fld('날짜 (YYYY-MM-DD)', 'eur-date', r.date, 'date')}
+        ${fld('거래처코드', 'eur-vendorCode', r.vendorCode)}
+        ${fld('사이트코드', 'eur-siteCode', r.siteCode)}
+        ${fld('택배코드', 'eur-shipCode', r.shipCode)}
+        ${fld('배송처코드', 'eur-depotCode', r.depotCode)}
+        ${fld('배송처명', 'eur-depotName', r.depotName)}
+        <div></div>
+        ${fld('품목코드', 'eur-itemCode', r.itemCode)}
+        <div style="grid-column:span 2;">
+          <label style="${labelCss}">품목명</label>
+          <input type="text" id="eur-itemName" value="${_escapeHtml(r.itemName || '')}" style="${inputCss}">
+        </div>
+        ${numFld('수량', 'eur-qty', r.qty)}
+        ${numFld('단가(VAT포함)', 'eur-price', r.price)}
+        ${numFld('공급가', 'eur-supply', r.supply)}
+        ${numFld('택배비', 'eur-ship', r.ship)}
+        ${numFld('택배비용', 'eur-shipCost', r.shipCost)}
+        ${numFld('원가', 'eur-cost', r.cost)}
+        ${fld('수령자명', 'eur-receiver', r.receiver)}
+        <div style="grid-column:span 2;">
+          <label style="${labelCss}">주소</label>
+          <input type="text" id="eur-address" value="${_escapeHtml(r.address || '')}" style="${inputCss}">
+        </div>
+      </div>
+      <div style="padding:12px 22px;border-top:1px solid #eee;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <span style="color:#888;font-size:11px;">저장일시: ${_escapeHtml(r.savedAt || '')}</span>
+        <div style="display:flex;gap:8px;">
+          <button onclick="document.getElementById('edit-upload-row-modal').remove()" style="padding:9px 22px;border-radius:20px;border:1px solid #ddd;background:white;cursor:pointer;font-size:13px;font-weight:bold;">취소</button>
+          <button onclick="saveEditedUploadDataRow(${idx})" style="padding:9px 26px;border-radius:20px;border:none;background:#000;color:white;cursor:pointer;font-size:13px;font-weight:bold;">저장</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+}
+
+function saveEditedUploadDataRow(idx) {
+  const data = _loadUploadData();
+  const r = data[idx];
+  if (!r) { showAppAlert('찾을 수 없음', '저장할 행을 찾을 수 없습니다.', 'error'); return; }
+
+  const v = (id) => (document.getElementById(id)?.value ?? '').trim();
+  const n = (id) => {
+    const s = v(id);
+    if (s === '') return null;
+    const x = Number(s);
+    return isNaN(x) ? null : x;
+  };
+
+  // 텍스트 필드
+  r.vendor     = v('eur-vendor');
+  r.site       = v('eur-site');
+  r.date       = v('eur-date');
+  r.vendorCode = v('eur-vendorCode');
+  r.siteCode   = v('eur-siteCode');
+  r.shipCode   = v('eur-shipCode');
+  r.depotCode  = v('eur-depotCode');
+  r.depotName  = v('eur-depotName');
+  r.itemCode   = v('eur-itemCode');
+  r.itemName   = v('eur-itemName');
+  r.receiver   = v('eur-receiver');
+  r.address    = v('eur-address');
+  // 숫자 필드 (cost 만 null 허용)
+  const qty      = n('eur-qty');      r.qty      = qty == null ? 0 : qty;
+  const price    = n('eur-price');    r.price    = price == null ? 0 : price;
+  const supply   = n('eur-supply');   r.supply   = supply == null ? 0 : supply;
+  const ship     = n('eur-ship');     r.ship     = ship == null ? 0 : ship;
+  const shipCost = n('eur-shipCost'); r.shipCost = shipCost == null ? 0 : shipCost;
+  const cost     = n('eur-cost');     r.cost     = cost;  // null 허용
+  // 마진 재계산: supply + ship − cost − shipCost (cost null 이면 profit 도 null)
+  r.profit = (cost == null) ? null
+    : (Number(r.supply) || 0) + (Number(r.ship) || 0) - Number(cost) - (Number(r.shipCost) || 0);
+
+  _saveUploadData(data);
+  document.getElementById('edit-upload-row-modal').remove();
+  showAppAlert('저장 완료', '행이 수정되었습니다.', 'success');
+  if (typeof renderUploadData === 'function') renderUploadData();
+}
+
 // ──────────────────────────────────────────────────────────
 // SKU 매칭 — 업로드 데이터 행을 현재 상품관리/세트상품으로 다시 매칭
 // 사용 시점:
@@ -19368,6 +19483,7 @@ function renderUploadData() {
       <td class="px-4 py-3">${r.receiver||''}</td>
       <td class="px-4 py-3 text-right">${_marginCell(r.profit)}</td>
       <td class="px-4 py-3 text-brand-gray text-xs">${r.savedAt||''}</td>
+      <td class="px-4 py-3 text-center"><button onclick="openEditUploadDataRow(${origIdx})" title="이 행 수정" class="text-brand-blue hover:underline text-xs font-bold">✏️ 수정</button></td>
     </tr>`;
   }).join('');
   const sum = (k) => all.reduce((s,r) => s + Number(r[k]||0), 0);
@@ -19394,6 +19510,7 @@ function renderUploadData() {
       <td class="px-4 py-3 text-right font-black">${_sumCell(sumCostObj)}</td>
       <td class="px-4 py-3"></td>
       <td class="px-4 py-3 text-right font-black">${_sumProfitCell(sumProfitObj)}</td>
+      <td class="px-4 py-3"></td>
       <td class="px-4 py-3"></td>
     </tr>`;
   const sa = document.getElementById('upload-data-select-all'); if (sa) sa.checked = false;
