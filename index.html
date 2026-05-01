@@ -3698,10 +3698,16 @@ tailwind.config = {
               <h2 class="text-[1.35rem] font-bold">순위 변동 추이</h2>
               <p class="text-brand-gray text-sm hidden md:block">상품별로 등록된 키워드들의 현재 순위와 등락을 한눈에 확인하세요.</p>
             </div>
-            <button type="button" onclick="refreshKwVolumes()" title="모든 키워드의 월 검색량을 다시 조회합니다" class="text-xs font-bold text-brand-blue hover:underline flex items-center gap-1">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-              검색량 새로고침
-            </button>
+            <div class="flex items-center gap-3">
+              <button type="button" id="kw-auto-run-btn" onclick="runKwAutoTrackNow()" title="등록된 모든 키워드의 순위를 지금 즉시 조회하여 추이에 기록합니다" class="text-xs font-bold px-3 py-1.5 rounded-full bg-brand-black text-white hover:bg-[#333] flex items-center gap-1.5">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                지금 자동 추적 실행
+              </button>
+              <button type="button" onclick="refreshKwVolumes()" title="모든 키워드의 월 검색량을 다시 조회합니다" class="text-xs font-bold text-brand-blue hover:underline flex items-center gap-1">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                검색량 새로고침
+              </button>
+            </div>
           </div>
 
           <!-- 카드 그리드 — 1/2/3열 반응형 -->
