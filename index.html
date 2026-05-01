@@ -21857,20 +21857,58 @@ function _ecCheckSettings() {
 }
 
 // ══════ 보내기: 사이트 → 이카운트 ══════
+let _ecSendMode = 'normal'; // 'normal' | 'set' — 모달이 어느 탭 데이터를 보낼지
+
 function openSendToEcountModal() {
   document.getElementById('ec-menu').classList.add('hidden');
   if (!_ecCheckSettings()) return;
 
-  const all = (typeof _allProducts !== 'undefined' ? _allProducts : []);
-  const selected = [...document.querySelectorAll('#product-list-body .product-row-cb:checked')]
-    .map(cb => Number(cb.dataset.productId));
+  // 현재 활성 탭 (일반/세트) 감지하여 보낼 데이터 종류 결정
+  _ecSendMode = (typeof _activeProductTab !== 'undefined' && _activeProductTab === 'set') ? 'set' : 'normal';
 
-  document.getElementById('ec-send-count-all').textContent = `(${all.length}개)`;
-  document.getElementById('ec-send-count-selected').textContent = `(${selected.length}개)`;
+  let allCount, selectedCount, kindLabel;
+  if (_ecSendMode === 'set') {
+    const sets = (typeof _loadSetProducts === 'function') ? _loadSetProducts() : [];
+    allCount = sets.length;
+    selectedCount = (typeof _selectedSetIds !== 'undefined' && _selectedSetIds.size) ? _selectedSetIds.size : 0;
+    kindLabel = '세트상품';
+  } else {
+    const all = (typeof _allProducts !== 'undefined' ? _allProducts : []);
+    const selected = [...document.querySelectorAll('#product-list-body .product-row-cb:checked')]
+      .map(cb => Number(cb.dataset.productId));
+    allCount = all.length;
+    selectedCount = selected.length;
+    kindLabel = '상품';
+  }
+
+  // 모달 제목/안내 문구 갱신
+  const titleEl = document.querySelector('#ec-send-backdrop h2');
+  const descEl  = titleEl ? titleEl.parentElement.querySelector('p') : null;
+  if (titleEl) titleEl.textContent = `이카운트로 ${kindLabel} 보내기`;
+  if (descEl) {
+    descEl.innerHTML = (_ecSendMode === 'set')
+      ? '세트상품을 이카운트 ERP의 품목 마스터에 등록합니다. <strong class="text-brand-blue">세트코드</strong>가 품목코드로 사용되며, 원가는 구성품 원가의 합계로 계산됩니다.'
+      : '사이트의 상품을 이카운트 ERP의 품목 마스터에 등록/갱신합니다. <strong class="text-brand-blue">품목코드(SKU)</strong>가 동일하면 자동으로 갱신됩니다.';
+  }
+  // 라디오 라벨 갱신
+  const labelAll = document.querySelector('input[name="ec-send-scope"][value="all"] + span');
+  const labelSel = document.querySelector('input[name="ec-send-scope"][value="selected"] + span');
+  if (labelAll) labelAll.innerHTML = `전체 ${kindLabel} <span id="ec-send-count-all" class="text-brand-gray font-normal"></span>`;
+  if (labelSel) labelSel.innerHTML = `선택한 ${kindLabel}만 <span id="ec-send-count-selected" class="text-brand-gray font-normal"></span>`;
+  // 매핑 안내 갱신
+  const hintEl = document.querySelector('#ec-send-backdrop .bg-brand-orange-light\\/30');
+  if (hintEl) {
+    hintEl.innerHTML = (_ecSendMode === 'set')
+      ? '💡 세트코드가 빈 세트는 건너뜁니다. 매핑: <strong>세트코드→품목코드</strong>, <strong>세트명→품목명</strong>, <strong>구성품 원가합계→입고단가</strong>, <strong>택배비용→적요</strong>.'
+      : '💡 SKU가 빈 상품은 건너뜁니다. 매핑: <strong>SKU→품목코드</strong>, <strong>상품명→품목명</strong>, <strong>원가→입고단가</strong>, <strong>공급가→출고단가</strong>, <strong>카테고리→적요</strong>.';
+  }
+
+  document.getElementById('ec-send-count-all').textContent = `(${allCount}개)`;
+  document.getElementById('ec-send-count-selected').textContent = `(${selectedCount}개)`;
 
   const radioAll = document.querySelector('input[name="ec-send-scope"][value="all"]');
   const radioSel = document.querySelector('input[name="ec-send-scope"][value="selected"]');
-  if (selected.length > 0) { radioSel.checked = true; radioSel.disabled = false; }
+  if (selectedCount > 0) { radioSel.checked = true; radioSel.disabled = false; }
   else { radioAll.checked = true; radioSel.disabled = true; }
 
   document.getElementById('ec-send-backdrop').classList.add('open');
@@ -21886,19 +21924,69 @@ async function executeSendToEcount() {
   if (!s) return;
 
   const scope = document.querySelector('input[name="ec-send-scope"]:checked')?.value || 'all';
-  const all = (typeof _allProducts !== 'undefined' ? _allProducts : []);
-  let targets = all;
-  if (scope === 'selected') {
-    const selectedIds = new Set([...document.querySelectorAll('#product-list-body .product-row-cb:checked')].map(cb => Number(cb.dataset.productId)));
-    targets = all.filter(p => selectedIds.has(Number(p.id)));
+  const isSetMode = (_ecSendMode === 'set');
+
+  // 모드별로 targets 구성 — 세트 모드는 세트 상품을 일반 상품 모양으로 정규화하여 동일 흐름 사용
+  let targets, skipped;
+  if (isSetMode) {
+    const allSets = (typeof _loadSetProducts === 'function') ? _loadSetProducts() : [];
+    let pickedSets = allSets;
+    if (scope === 'selected') {
+      pickedSets = allSets.filter(s2 => _selectedSetIds && _selectedSetIds.has(s2.id));
+    }
+    // 세트의 원가합계 = 각 구성품 원가 × 수량 합계 (구성품은 일반상품에서 SKU 매칭)
+    const productsBySku = new Map(
+      (typeof _allProducts !== 'undefined' ? _allProducts : [])
+        .filter(p => p.sku)
+        .map(p => [String(p.sku).trim(), p])
+    );
+    const sumCost = (set) => {
+      let total = 0;
+      (set.items || []).forEach(it => {
+        const p = productsBySku.get(String(it.sku || '').trim());
+        const cost = p && Number(p.cost) ? Number(p.cost) : 0;
+        total += cost * (Number(it.qty) || 0);
+      });
+      return total;
+    };
+    // 세트 자체의 택배비용 우선, 없으면 첫 구성품의 택배비용
+    const shipCostOf = (set) => {
+      if (set.shipping_cost != null && set.shipping_cost !== '') return Number(set.shipping_cost) || 0;
+      if (Array.isArray(set.items) && set.items[0]) {
+        const p = productsBySku.get(String(set.items[0].sku || '').trim());
+        if (p && Number(p.shipping_cost)) return Number(p.shipping_cost);
+      }
+      return 0;
+    };
+    // 일반상품과 같은 모양으로 정규화
+    targets = pickedSets.map(set => ({
+      id: set.id,
+      sku:  String(set.code || '').trim(),
+      name: String(set.name || '').trim(),
+      cost: sumCost(set),
+      supply_price: Number(set.price) || 0,
+      shipping_cost: shipCostOf(set),
+      category: '세트상품',
+      _isSet: true,
+    }));
+    skipped = targets.filter(t => !t.sku);
+    targets = targets.filter(t => t.sku);
+  } else {
+    const all = (typeof _allProducts !== 'undefined' ? _allProducts : []);
+    let picked = all;
+    if (scope === 'selected') {
+      const selectedIds = new Set([...document.querySelectorAll('#product-list-body .product-row-cb:checked')].map(cb => Number(cb.dataset.productId)));
+      picked = all.filter(p => selectedIds.has(Number(p.id)));
+    }
+    skipped = picked.filter(p => !String(p.sku || '').trim());
+    targets = picked.filter(p => String(p.sku || '').trim());
   }
-  // SKU 없는 상품 제외
-  const skipped = targets.filter(p => !String(p.sku || '').trim());
-  targets = targets.filter(p => String(p.sku || '').trim());
 
   if (!targets.length) {
     closeEcSendModal();
-    showAppAlert('전송할 상품이 없어요', 'SKU(품목코드)가 입력된 상품만 전송됩니다. 상품에 SKU를 먼저 등록해주세요.', { type: 'warning' });
+    const kind = isSetMode ? '세트상품' : '상품';
+    const codeName = isSetMode ? '세트코드' : 'SKU(품목코드)';
+    showAppAlert(`전송할 ${kind}이 없어요`, `${codeName}가 입력된 ${kind}만 전송됩니다. 먼저 등록해주세요.`, { type: 'warning' });
     return;
   }
 
@@ -21923,22 +22011,28 @@ async function executeSendToEcount() {
     const slice = targets.slice(i, i + CHUNK);
     _paUpdateProgress(i, targets.length, `성공 ${okSum} · 실패 ${failSum}`, `${i + 1} ~ ${Math.min(i + CHUNK, targets.length)} / ${targets.length}`);
     const payload = {
-      ProductList: slice.map((p, idx) => ({
-        Line: String(i + idx + 1),
-        BulkDatas: {
-          PROD_CD:  String(p.sku || '').trim().slice(0, 20),
-          PROD_DES: String(p.name || '').slice(0, 100),
-          SIZE_DES: '',
-          UNIT:     'EA',
-          PROD_TYPE:'',
-          BAR_CODE: '',
-          IN_PRICE:  Number(p.cost || 0) || 0,
-          IN_PRICE_VAT: '1',
-          OUT_PRICE: Number(p.supply_price || 0) || 0,
-          OUT_PRICE_VAT: '1',
-          REMARKS:  String(p.category || '').slice(0, 100),
-        }
-      }))
+      ProductList: slice.map((p, idx) => {
+        // 세트상품: 적요에 "세트상품 · 택배비용 N원" 형태로 기록
+        const remarks = p._isSet
+          ? ('세트상품' + (Number(p.shipping_cost) > 0 ? ` · 택배비용 ${Number(p.shipping_cost).toLocaleString('ko-KR')}원` : ''))
+          : String(p.category || '');
+        return {
+          Line: String(i + idx + 1),
+          BulkDatas: {
+            PROD_CD:  String(p.sku || '').trim().slice(0, 20),
+            PROD_DES: String(p.name || '').slice(0, 100),
+            SIZE_DES: '',
+            UNIT:     'EA',
+            PROD_TYPE:'',
+            BAR_CODE: '',
+            IN_PRICE:  Number(p.cost || 0) || 0,
+            IN_PRICE_VAT: '1',
+            OUT_PRICE: Number(p.supply_price || 0) || 0,
+            OUT_PRICE_VAT: '1',
+            REMARKS:  remarks.slice(0, 100),
+          }
+        };
+      })
     };
     try {
       const resp = await _ecountPost(login.zone, '/OAPI/V2/InventoryBasic/SaveBasicProduct', login.sessionId, payload);
