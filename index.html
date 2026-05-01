@@ -18818,12 +18818,14 @@ async function savePlayautoOrdersToLedger(silent) {
     const custCd = _paShopAliasOf(o) || _resolveVendorCode(shopName);
     const depotCode = String(o.depot_no || o.depot_cd || '').trim();
     const depotName = String(o.depot_name || '').trim();
+    // 거래처(vendor)는 PA 의 배송처(depot) 기준 — 배송처 없으면 쇼핑몰명 폴백
+    const vendorName = depotName || shopName;
     const supply   = Number(core.supply) || 0;
     const shipFee  = Number(core.shipFee) || 0;
     const shipCost = Number(core.shipCost) || 0;
     const profit = core.cost == null ? null : (supply + shipFee - Number(core.cost) - shipCost);
     return {
-      vendor: shopName,
+      vendor: vendorName,
       site: shopName,
       date: String(core.date || '').slice(0, 10),
       siteCode: custCd,
