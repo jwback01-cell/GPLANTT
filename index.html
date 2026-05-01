@@ -11005,7 +11005,7 @@ async function dedupProducts() {
   // SKU 정규화: 대소문자 무시 + 모든 종류의 공백/제어문자 제거
   // (regular space, tab, newline, non-breaking space, zero-width, ideographic space 등)
   const normalizeSku = (s) => String(s || '')
-    .replace(/[\s ​‌‍　⁠﻿]+/g, '')
+    .replace(/[\s ­​‌‍‎‏  ⁠　﻿]+/g, '')
     .toLowerCase();
 
   // SKU 별 그룹 (빈 SKU 는 비교 불가라 제외)
@@ -11098,27 +11098,56 @@ async function dedupProducts() {
     if (!confirm(`백업 다운로드 실패: ${e.message}\n\n그래도 삭제를 진행할까요?`)) return;
   }
 
-  // 2) 50개씩 배치 삭제
+  // 2) 50개씩 배치 삭제 (.select() 로 실제 영향받은 row 수 확인)
   const BATCH = 50;
-  let deleted = 0;
+  let attempted = 0;
+  let actuallyDeleted = 0;
   try {
     for (let i = 0; i < idsToDelete.length; i += BATCH) {
       const batch = idsToDelete.slice(i, i + BATCH);
-      const { error } = await _supabase.from('products').delete().in('id', batch);
+      const { data: deletedRows, error } = await _supabase
+        .from('products')
+        .delete()
+        .in('id', batch)
+        .select('id');
       if (error) throw error;
-      deleted += batch.length;
-      console.log(`[dedup] ${deleted}/${idsToDelete.length} 삭제 완료`);
+      const cnt = (deletedRows || []).length;
+      attempted += batch.length;
+      actuallyDeleted += cnt;
+      console.log(`[dedup] batch: ${batch.length}건 시도 → 실제 ${cnt}건 삭제 (누적 ${actuallyDeleted}/${attempted})`);
+      if (cnt === 0 && batch.length > 0) {
+        console.warn(`[dedup] ⚠ 이 배치는 0건 삭제됨 — Supabase RLS/권한 정책으로 차단된 듯. ID: ${batch.slice(0, 5).join(',')}...`);
+      }
     }
-    showAppAlert(
-      '정리 완료',
-      `${deleted}건이 삭제되었습니다.\n백업 JSON 파일이 다운로드 폴더에 저장되었습니다 — 만약 잘못 삭제됐으면 그 파일로 복원 가능합니다.`,
-      'success'
-    );
+
+    if (actuallyDeleted === 0) {
+      showAppAlert(
+        '⚠ 삭제 실패 (Supabase 권한 문제)',
+        `${attempted}건 삭제 시도했지만 실제로 0건만 삭제되었습니다.\n\n` +
+        `이건 Supabase Row-Level Security (RLS) 정책이 delete 를 차단한 상태입니다.\n` +
+        `현재 로그인한 계정이 products 테이블 delete 권한이 있는지 확인해주세요.\n\n` +
+        `백업 JSON 파일은 정상 다운로드되었으니 따로 보관 가능합니다.`,
+        'error'
+      );
+    } else if (actuallyDeleted < attempted) {
+      showAppAlert(
+        '부분 삭제',
+        `${attempted}건 시도 → 실제 ${actuallyDeleted}건만 삭제되었습니다.\n` +
+        `${attempted - actuallyDeleted}건은 RLS/권한으로 차단된 듯합니다. 콘솔(F12) 로그를 확인해주세요.`,
+        'warn'
+      );
+    } else {
+      showAppAlert(
+        '정리 완료',
+        `${actuallyDeleted}건이 삭제되었습니다.\n백업 JSON 파일이 다운로드 폴더에 저장되었습니다 — 만약 잘못 삭제됐으면 그 파일로 복원 가능합니다.`,
+        'success'
+      );
+    }
     await loadProductsFromDB();
   } catch (e) {
     showAppAlert(
       '삭제 중 오류',
-      `${deleted}건 삭제됨, 그 후 오류 발생: ${e.message || String(e)}\n\n다운로드된 백업 JSON으로 일부 복원이 필요할 수 있습니다.`,
+      `${actuallyDeleted}건 실제 삭제됨, 그 후 오류 발생: ${e.message || String(e)}\n\n다운로드된 백업 JSON으로 일부 복원이 필요할 수 있습니다.`,
       'error'
     );
     await loadProductsFromDB();
