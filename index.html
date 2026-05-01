@@ -13875,10 +13875,180 @@ function connectAdApi(siteId) {
   if (siteId === '스마트스토어') {
     return openSmartstoreSpendDialog();
   }
+  if (siteId === '쿠팡') {
+    return openCoupangSpendDialog();
+  }
   const site = AD_SITES.find(s => s.id === siteId);
   showAppAlert('API 연동 준비 중',
     `${siteId} (${site?.api?.label || ''}) 자동 조회는 준비 중입니다.\n\n현재는 사이트에서 광고비 보고서 엑셀을 다운로드 받아\n"📊 엑셀 업로드"로 올려주세요.`,
     'info');
+}
+
+// ── 쿠팡 광고비 자동 조회 ─────────────────────
+const COUPANG_KEYS_LS = 'gplan_coupang_keys_v1';
+
+function _loadCoupangKeys() {
+  try { return JSON.parse(localStorage.getItem(COUPANG_KEYS_LS) || '{}') || {}; } catch (_) { return {}; }
+}
+function _saveCoupangKeys(obj) {
+  localStorage.setItem(COUPANG_KEYS_LS, JSON.stringify(obj));
+}
+
+function openCoupangSpendDialog() {
+  // localhost 가 아니면 IP 화이트리스트 거부 거의 확정 — 미리 경고
+  const isLocal = /localhost|127\.0\.0\.1/.test(location.hostname);
+  if (!isLocal) {
+    if (!confirm(
+      '⚠ 쿠팡 광고비 API 주의\n\n' +
+      '쿠팡은 API 호출 IP를 화이트리스트로 제한합니다. 등록된 IP는 본인 PC IP 이므로,\n' +
+      'Vercel 배포본(gplantt.vercel.app)에서 호출하면 거부됩니다.\n\n' +
+      '⇒ 광고비 가져오기는 로컬 서버(http://localhost:8000)에서만 작동합니다.\n\n' +
+      '[확인] = 일단 시도해본다 (실패 가능성 높음)\n' +
+      '[취소] = 닫기'
+    )) return;
+  }
+
+  const keys = _loadCoupangKeys();
+  const prev = document.getElementById('ad-cp-modal');
+  if (prev) prev.remove();
+
+  const m = document.createElement('div');
+  m.id = 'ad-cp-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  const yest = new Date(now); yest.setDate(yest.getDate() - 1);
+  m.innerHTML = `
+    <div style="background:white;border-radius:16px;max-width:560px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);max-height:90vh;display:flex;flex-direction:column;">
+      <div style="padding:18px 22px;border-bottom:1px solid #eee;">
+        <div style="font-weight:bold;font-size:16px;">쿠팡 광고비 자동 조회</div>
+        <div style="color:#888;font-size:12px;margin-top:4px;">쿠팡 Wing API 광고 보고서로 캠페인별 일자별 광고비를 가져옵니다. (보고서 생성 후 30~60초 대기)</div>
+      </div>
+      <div style="padding:18px 22px;display:flex;flex-direction:column;gap:14px;overflow:auto;">
+        <details ${keys.accessKey ? '' : 'open'} style="border:1px solid #eee;border-radius:10px;padding:10px 14px;">
+          <summary style="cursor:pointer;font-weight:bold;font-size:13px;">🔑 API 키 등록 ${keys.accessKey ? '<span style="color:#22C55E;font-weight:normal;font-size:11px;">(저장됨)</span>' : '<span style="color:#E91E63;font-weight:normal;font-size:11px;">(미등록)</span>'}</summary>
+          <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px;">
+            <div>
+              <div style="font-size:12px;font-weight:bold;margin-bottom:4px;">Access Key</div>
+              <input type="text" id="ad-cp-access" value="${_escapeHtml(keys.accessKey || '')}" placeholder="481b5f5f-..." style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-family:monospace;font-size:12px;">
+            </div>
+            <div>
+              <div style="font-size:12px;font-weight:bold;margin-bottom:4px;">Secret Key</div>
+              <input type="password" id="ad-cp-secret" value="${_escapeHtml(keys.secretKey || '')}" placeholder="b8da5dcd..." style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-family:monospace;font-size:12px;">
+            </div>
+            <div>
+              <div style="font-size:12px;font-weight:bold;margin-bottom:4px;">업체코드 (Vendor ID, 선택)</div>
+              <input type="text" id="ad-cp-vendor" value="${_escapeHtml(keys.vendorId || '')}" placeholder="A00972338" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-family:monospace;font-size:12px;">
+            </div>
+            <div style="font-size:11px;color:#888;">키는 이 브라우저에만 저장됩니다 (localStorage). GitHub/서버에 안 올라가요.</div>
+          </div>
+        </details>
+        <div>
+          <div style="font-size:13px;font-weight:bold;margin-bottom:6px;">조회 기간 (최대 30일 권장)</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="date" id="ad-cp-from" value="${_ymdString(first)}" style="flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+            <span style="color:#888;">~</span>
+            <input type="date" id="ad-cp-to" value="${_ymdString(yest)}" style="flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+          </div>
+          <div style="color:#888;font-size:11px;margin-top:6px;">⚠ 쿠팡 보고서 생성에 시간이 걸려요. 기간이 길수록 더 오래 걸립니다.</div>
+        </div>
+        <div id="ad-cp-status" style="font-size:12px;color:#888;min-height:18px;"></div>
+      </div>
+      <div style="padding:14px 22px;border-top:1px solid #eee;display:flex;gap:8px;justify-content:flex-end;">
+        <button id="ad-cp-cancel" style="padding:9px 22px;border-radius:20px;border:1px solid #ddd;background:white;cursor:pointer;font-size:13px;font-weight:bold;">취소</button>
+        <button id="ad-cp-fetch" style="padding:9px 26px;border-radius:20px;border:none;background:#000;color:white;cursor:pointer;font-size:13px;font-weight:bold;">🔍 조회</button>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+  document.getElementById('ad-cp-cancel').onclick = () => m.remove();
+  document.getElementById('ad-cp-fetch').onclick = async () => {
+    const accessKey = document.getElementById('ad-cp-access').value.trim();
+    const secretKey = document.getElementById('ad-cp-secret').value.trim();
+    const vendorId  = document.getElementById('ad-cp-vendor').value.trim();
+    const from = document.getElementById('ad-cp-from').value;
+    const to   = document.getElementById('ad-cp-to').value;
+    if (!accessKey || !secretKey) { showAppAlert('키 필요', 'Access Key 와 Secret Key 를 입력하세요.', 'warn'); return; }
+    if (!from || !to) { showAppAlert('입력 필요', '조회 기간을 입력하세요.', 'warn'); return; }
+    if (from > to) { showAppAlert('기간 오류', '시작일이 종료일보다 늦습니다.', 'error'); return; }
+
+    _saveCoupangKeys({ accessKey, secretKey, vendorId });
+
+    const statusEl = document.getElementById('ad-cp-status');
+    const fetchBtn = document.getElementById('ad-cp-fetch');
+    fetchBtn.disabled = true; fetchBtn.style.opacity = '0.5';
+
+    const headers = {
+      'x-coupang-access-key': accessKey,
+      'x-coupang-secret-key': secretKey,
+      'x-coupang-vendor-id': vendorId,
+    };
+
+    try {
+      // 1. 보고서 생성 요청
+      statusEl.style.color = '#888';
+      statusEl.textContent = '1/3 보고서 생성 요청 중...';
+      const createUrl = `/api/coupang-ads-spend?action=create&from=${from}&to=${to}`;
+      const createR = await fetch(createUrl, { headers });
+      const createT = await createR.text();
+      let createData; try { createData = JSON.parse(createT); } catch (_) { createData = { error: 'JSON 파싱 실패', detail: createT.slice(0, 300) }; }
+      console.log('[쿠팡 광고비] create 응답:', createData);
+      if (!createR.ok || !createData.reportId) {
+        statusEl.style.color = '#E91E63';
+        statusEl.textContent = `❌ 보고서 생성 실패 (HTTP ${createR.status}): ${createData.error || ''} ${createData.hint ? '\n→ ' + createData.hint : ''}`;
+        return;
+      }
+      const reportId = createData.reportId;
+
+      // 2. 폴링 (5초 간격, 최대 24회 = 2분)
+      let rows = null, lastStatus = '';
+      for (let i = 0; i < 24; i++) {
+        statusEl.textContent = `2/3 보고서 생성 대기 중... (${i+1}/24, ${(i*5)}초 경과${lastStatus ? ', 상태: ' + lastStatus : ''})`;
+        await new Promise(res => setTimeout(res, 5000));
+        const pollUrl = `/api/coupang-ads-spend?action=poll&reportId=${encodeURIComponent(reportId)}`;
+        const pollR = await fetch(pollUrl, { headers });
+        const pollT = await pollR.text();
+        let pollData; try { pollData = JSON.parse(pollT); } catch (_) { pollData = { error: 'JSON 파싱 실패' }; }
+        console.log(`[쿠팡 광고비] poll #${i+1}:`, pollData);
+        if (!pollR.ok) {
+          statusEl.style.color = '#E91E63';
+          statusEl.textContent = `❌ 상태 조회 실패 (HTTP ${pollR.status}): ${pollData.error || ''}`;
+          return;
+        }
+        if (!pollData.pending) {
+          rows = pollData.rows || [];
+          break;
+        }
+        lastStatus = pollData.status || '';
+      }
+
+      if (rows == null) {
+        statusEl.style.color = '#E91E63';
+        statusEl.textContent = '❌ 2분 대기 후에도 완료되지 않음. 기간을 줄이거나 잠시 후 다시 시도하세요.';
+        return;
+      }
+
+      // 3. 미리보기
+      statusEl.style.color = '#22C55E';
+      statusEl.textContent = `3/3 ✅ ${rows.length}건 조회 완료`;
+      const previewRows = rows.map(r => ({
+        site: '쿠팡',
+        date: r.date,
+        amount: r.amount,
+        campaign: (r.campaign || '') + (r.clkCnt ? ` (클릭 ${r.clkCnt}, 노출 ${r.impCnt})` : ''),
+      }));
+      m.remove();
+      if (!previewRows.length) {
+        showAppAlert('조회 결과 없음', '해당 기간에 광고비가 발생한 항목이 없습니다.', 'warn');
+        return;
+      }
+      _adShowPreview('쿠팡', `쿠팡 Wing API (${from}~${to})`, previewRows, 'api');
+    } catch (e) {
+      statusEl.style.color = '#E91E63';
+      statusEl.textContent = `❌ 통신 오류: ${e.message}`;
+    } finally {
+      fetchBtn.disabled = false; fetchBtn.style.opacity = '1';
+    }
+  };
 }
 
 // 스마트스토어(네이버 검색광고) 광고비 자동 조회 모달
