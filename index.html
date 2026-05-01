@@ -11002,18 +11002,49 @@ async function dedupProducts() {
     return;
   }
 
+  // SKU 정규화: 대소문자 무시 + 모든 종류의 공백/제어문자 제거
+  // (regular space, tab, newline, non-breaking space, zero-width, ideographic space 등)
+  const normalizeSku = (s) => String(s || '')
+    .replace(/[\s ​‌‍　⁠﻿]+/g, '')
+    .toLowerCase();
+
   // SKU 별 그룹 (빈 SKU 는 비교 불가라 제외)
   const bySku = new Map();
   products.forEach(p => {
-    const sku = String(p.sku || '').trim();
-    if (!sku) return;
-    if (!bySku.has(sku)) bySku.set(sku, []);
-    bySku.get(sku).push(p);
+    const norm = normalizeSku(p.sku);
+    if (!norm) return;
+    if (!bySku.has(norm)) bySku.set(norm, []);
+    bySku.get(norm).push(p);
   });
 
   const dupGroups = [...bySku.entries()].filter(([_, arr]) => arr.length >= 2);
+
+  // 진단 로그 — 사용자가 콘솔에서 어떤 SKU가 어떻게 묶였는지 직접 확인 가능
+  console.group('[dedup] 중복 SKU 분석 결과');
+  console.log(`전체 상품: ${products.length}건, 고유 정규화 SKU: ${bySku.size}개, 중복 그룹: ${dupGroups.length}개`);
+  if (dupGroups.length) {
+    const flat = dupGroups.flatMap(([norm, arr]) => arr.map(p => ({
+      정규화SKU: norm,
+      원본SKU: JSON.stringify(p.sku),  // ← 보이지 않는 문자/공백 포함해서 보여줌
+      길이: String(p.sku || '').length,
+      이름: (p.name || '').slice(0, 30),
+      id: p.id,
+      등록: String(p.created_at || '').slice(0, 16),
+    })));
+    console.table(flat);
+  } else {
+    console.log('정규화 후에도 중복이 없습니다. 진짜로 SKU 가 다른 행일 수 있습니다.');
+  }
+  console.groupEnd();
+
   if (!dupGroups.length) {
-    showAppAlert('중복 없음', '중복된 SKU가 없습니다.', 'success');
+    showAppAlert(
+      '중복 없음',
+      `정규화(대소문자/공백 제거) 후에도 중복이 발견되지 않았습니다.\n\n` +
+      `만약 화면에 같은 SKU가 보인다면 콘솔(F12) → "[dedup] 중복 SKU 분석 결과" 그룹을 확인해주세요. ` +
+      `원본SKU 컬럼에 따옴표로 감싸진 값이 있는데, 거기 보이지 않는 문자(공백/줄바꿈)가 있을 수 있어요.`,
+      'info'
+    );
     return;
   }
 
@@ -11021,7 +11052,7 @@ async function dedupProducts() {
   const idsToDelete = [];
   const rowsToDelete = [];
   const previewLines = [];
-  dupGroups.forEach(([sku, arr]) => {
+  dupGroups.forEach(([norm, arr]) => {
     arr.sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
     for (let i = 1; i < arr.length; i++) {
       idsToDelete.push(arr[i].id);
@@ -11029,7 +11060,8 @@ async function dedupProducts() {
     }
     if (previewLines.length < 10) {
       const keepName = (arr[0].name || '').slice(0, 30);
-      previewLines.push(`• ${sku}: ${arr.length}건 (남김 "${keepName}", 삭제 ${arr.length - 1}건)`);
+      const displaySku = (arr[0].sku || norm);
+      previewLines.push(`• ${displaySku}: ${arr.length}건 (남김 "${keepName}", 삭제 ${arr.length - 1}건)`);
     }
   });
   const more = dupGroups.length > 10 ? `\n... 외 ${dupGroups.length - 10}개 SKU` : '';
