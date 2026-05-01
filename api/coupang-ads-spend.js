@@ -138,37 +138,47 @@ export default async function handler(req, res) {
 
   try {
     // ────────────────────────────────
-    // 1) action=create — 보고서 생성 요청
+    // 1) action=create — 보고서 생성 요청 (다중 경로 시도)
     // ────────────────────────────────
     if (action === 'create') {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
         res.status(400).json({ error: 'from, to 형식 오류 (YYYY-MM-DD)' });
         return;
       }
-      const path = '/v2/providers/openapi/apis/api/v1/ad/reports';
+      const PATH_CANDIDATES = [
+        '/v2/providers/marketplace_openapi/apis/api/v1/ad/reports',
+        '/v2/providers/openapi/apis/api/v2/ad/reports',
+        '/v2/providers/openapi/apis/api/v1/ad/dataReport',
+        '/v2/providers/openapi/apis/api/v1/ad/reports',
+      ];
       const body = {
         REPORT_TYPE: 'CAMPAIGN_DAILY',
         START_DATE: from.replace(/-/g, ''),
         END_DATE: to.replace(/-/g, ''),
         FORMAT: 'CSV',
       };
-      const r = await coupangCall(accessKey, secretKey, 'POST', path, '', body);
-      diag.steps.push({
-        step: 'create-report',
-        status: r.status,
-        url: r.url,
-        sentBody: body,
-        sentDatetime: r.sentDatetime,
-        responseBody: r.text.slice(0, 600),
-      });
-      if (!r.ok) {
-        res.status(r.status).json({
-          error: '보고서 생성 실패',
-          hint: r.status === 401 ? 'access-key / secret-key 확인. IP 화이트리스트 등록되어 있는지도 확인 (로컬 PC IP).' :
-                r.status === 403 ? 'IP 화이트리스트 거부. 본인 PC IP가 쿠팡에 등록되어 있고 변경되지 않았는지 확인.' :
-                r.status === 404 ? '엔드포인트 미존재 (Wing API에 광고 보고서 권한 미부여 가능성). 쿠팡 광고센터 → 도구 → API 사용 관리 확인.' :
-                undefined,
-          detail: r.text.slice(0, 500),
+      let lastR = null;
+      for (const path of PATH_CANDIDATES) {
+        const r = await coupangCall(accessKey, secretKey, 'POST', path, '', body);
+        diag.steps.push({
+          step: 'create-report-try',
+          tryPath: path,
+          status: r.status,
+          sentDatetime: r.sentDatetime,
+          responseBody: r.text.slice(0, 400),
+        });
+        lastR = r;
+        // PRECONDITION_FAILED = 경로 없음 → 다음 후보 시도
+        if (r.status === 404 && (r.text || '').includes('PRECONDITION_FAILED')) continue;
+        break;
+      }
+      const r = lastR;
+      if (!r || !r.ok) {
+        res.status(r ? r.status : 502).json({
+          error: '보고서 생성 실패 (모든 후보 경로 실패)',
+          hint: '쿠팡 Wing API 에 광고 보고서 엔드포인트가 노출되지 않은 듯합니다. ' +
+                '광고센터 → 광고보고서 메뉴에서 엑셀 다운로드 후 [📊 엑셀 업로드] 사용을 권장합니다.',
+          detail: r ? r.text.slice(0, 500) : '',
           _diag: diag,
         });
         return;
