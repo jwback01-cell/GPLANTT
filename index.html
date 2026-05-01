@@ -3460,6 +3460,10 @@ tailwind.config = {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                 SKU 매칭
               </button>
+              <button onclick="openBulkRenameVendorDialog()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg flex items-center gap-1.5" title="SKU 또는 품목명으로 거래처를 일괄 변경합니다">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                거래처 일괄 변경
+              </button>
               <button onclick="exportUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg">엑셀 내보내기</button>
               <button id="upload-data-delete-btn" onclick="deleteSelectedUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-pink hover:bg-brand-bg">선택 삭제 <span id="upload-data-sel-count" class="ml-1 text-xs text-brand-gray">(0)</span></button>
             </div>
@@ -19021,6 +19025,118 @@ function _loadUploadData() {
 }
 function _saveUploadData(arr) {
   try { localStorage.setItem(UPLOAD_DATA_KEY, JSON.stringify(arr)); } catch (_) {}
+}
+
+// 업로드 데이터의 거래처/사이트명 일괄 변경 (SKU 또는 품목명 패턴 매칭)
+function openBulkRenameVendorDialog() {
+  const prev = document.getElementById('bulk-rename-modal');
+  if (prev) prev.remove();
+
+  const m = document.createElement('div');
+  m.id = 'bulk-rename-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  m.innerHTML = `
+    <div style="background:white;border-radius:16px;max-width:560px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);max-height:90vh;display:flex;flex-direction:column;">
+      <div style="padding:18px 22px;border-bottom:1px solid #eee;">
+        <div style="font-weight:bold;font-size:16px;">거래처 일괄 변경</div>
+        <div style="color:#888;font-size:12px;margin-top:4px;">SKU 또는 품목명에 일치하는 행의 거래처/사이트명을 한 번에 변경합니다.</div>
+      </div>
+      <div style="padding:18px 22px;display:flex;flex-direction:column;gap:14px;overflow:auto;">
+        <div>
+          <div style="font-size:13px;font-weight:bold;margin-bottom:6px;">매칭 조건 — 둘 중 하나라도 일치하면 대상</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div>
+              <label style="font-size:12px;color:#888;display:block;margin-bottom:3px;">SKU(품목코드) — 정확히 일치</label>
+              <input type="text" id="brn-sku" placeholder="예: 5011" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-family:monospace;font-size:13px;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#888;display:block;margin-bottom:3px;">품목명 — 부분 일치 (포함 검색)</label>
+              <input type="text" id="brn-name" placeholder="예: 올바른" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;">
+            </div>
+          </div>
+        </div>
+        <div style="border-top:1px solid #eee;padding-top:12px;">
+          <div style="font-size:13px;font-weight:bold;margin-bottom:6px;">새 거래처명</div>
+          <input type="text" id="brn-new-vendor" placeholder="예: 올바른" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;font-weight:bold;">
+          <div style="font-size:11px;color:#888;margin-top:6px;">⚠ vendor / site 두 필드 모두 변경됩니다. 거래처코드(siteCode/vendorCode)는 그대로 유지 — 별도 매핑 화면에서 관리.</div>
+        </div>
+        <div id="brn-preview" style="font-size:12px;color:#888;background:#f5f5f5;border-radius:8px;padding:10px;min-height:40px;">
+          매칭 조건을 입력하면 영향 받는 행 수가 여기 표시됩니다.
+        </div>
+      </div>
+      <div style="padding:14px 22px;border-top:1px solid #eee;display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="document.getElementById('bulk-rename-modal').remove()" style="padding:9px 22px;border-radius:20px;border:1px solid #ddd;background:white;cursor:pointer;font-size:13px;font-weight:bold;">취소</button>
+        <button id="brn-apply" onclick="applyBulkRenameVendor()" style="padding:9px 26px;border-radius:20px;border:none;background:#000;color:white;cursor:pointer;font-size:13px;font-weight:bold;">변경 적용</button>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+
+  const updatePreview = () => {
+    const sku  = (document.getElementById('brn-sku').value || '').trim();
+    const name = (document.getElementById('brn-name').value || '').trim();
+    const newV = (document.getElementById('brn-new-vendor').value || '').trim();
+    const prev = document.getElementById('brn-preview');
+    if (!sku && !name) {
+      prev.innerHTML = '매칭 조건을 입력하면 영향 받는 행 수가 여기 표시됩니다.';
+      prev.style.color = '#888';
+      return;
+    }
+    const data = _loadUploadData();
+    const matches = data.filter(r => {
+      const code = String(r.itemCode || '').trim();
+      const item = String(r.itemName || '');
+      if (sku && code === sku) return true;
+      if (name && item.includes(name)) return true;
+      return false;
+    });
+    if (!matches.length) {
+      prev.innerHTML = '<span style="color:#E91E63;">조건에 일치하는 행이 없습니다.</span>';
+      return;
+    }
+    const willChange = newV
+      ? matches.filter(r => (r.vendor || '') !== newV).length
+      : matches.length;
+    const sample = matches.slice(0, 5).map(r =>
+      `<div style="font-family:monospace;font-size:11px;color:#444;">• ${_escapeHtml(r.date || '').slice(0,10)} | ${_escapeHtml(r.itemCode || '')} | ${_escapeHtml((r.itemName || '').slice(0, 30))} | <s>${_escapeHtml(r.vendor || '')}</s>${newV ? ` → <b style="color:#22C55E;">${_escapeHtml(newV)}</b>` : ''}</div>`
+    ).join('');
+    prev.innerHTML = `<div style="color:#000;font-weight:bold;margin-bottom:6px;">매칭: ${matches.length}건${willChange !== matches.length ? ` (실제 변경: ${willChange}건, 이미 ${newV} 인 행 ${matches.length - willChange}건 제외)` : ''}</div>${sample}${matches.length > 5 ? `<div style="color:#888;font-size:11px;margin-top:4px;">... 외 ${matches.length - 5}건</div>` : ''}`;
+  };
+  document.getElementById('brn-sku').oninput = updatePreview;
+  document.getElementById('brn-name').oninput = updatePreview;
+  document.getElementById('brn-new-vendor').oninput = updatePreview;
+}
+
+function applyBulkRenameVendor() {
+  const sku  = (document.getElementById('brn-sku').value || '').trim();
+  const name = (document.getElementById('brn-name').value || '').trim();
+  const newV = (document.getElementById('brn-new-vendor').value || '').trim();
+  if (!sku && !name) { showAppAlert('조건 필요', 'SKU 또는 품목명 중 하나는 입력해야 합니다.', 'warn'); return; }
+  if (!newV) { showAppAlert('거래처명 필요', '새 거래처명을 입력하세요.', 'warn'); return; }
+
+  const data = _loadUploadData();
+  let changed = 0;
+  data.forEach(r => {
+    const code = String(r.itemCode || '').trim();
+    const item = String(r.itemName || '');
+    const match = (sku && code === sku) || (name && item.includes(name));
+    if (match && (r.vendor !== newV || r.site !== newV)) {
+      r.vendor = newV;
+      r.site = newV;
+      changed++;
+    }
+  });
+
+  if (!changed) {
+    showAppAlert('변경 없음', '조건에 맞는 행이 없거나 이미 모두 변경된 상태입니다.', 'info');
+    return;
+  }
+
+  if (!confirm(`${changed}건의 거래처를 "${newV}"로 변경합니다.\n\n계속하시겠습니까?`)) return;
+
+  _saveUploadData(data);
+  document.getElementById('bulk-rename-modal').remove();
+  showAppAlert('변경 완료', `${changed}건의 거래처가 "${newV}"로 변경되었습니다.`, 'success');
+  if (typeof renderUploadData === 'function') renderUploadData();
 }
 
 // ──────────────────────────────────────────────────────────
