@@ -1414,6 +1414,10 @@ tailwind.config = {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             엑셀 내보내기
           </button>
+          <button onclick="dedupProducts()" title="같은 SKU가 여러 번 등록된 행을 정리합니다 (백업 자동 다운로드 후 가장 오래된 것 1건만 유지)" class="px-4 py-2.5 rounded-full bg-white border border-brand-border text-sm font-semibold hover:bg-brand-bg flex items-center gap-2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+            중복 정리
+          </button>
           <button onclick="openAddProductDrawer()" class="bg-brand-black text-white px-5 py-2.5 rounded-full text-sm font-semibold hover:-translate-y-0.5 transition-transform shadow-md flex items-center gap-2">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>상품 추가
           </button>
@@ -10987,6 +10991,106 @@ async function deleteProduct(id) {
     },
     { type: 'danger', confirmText: '삭제', confirmStyle: 'danger' }
   );
+}
+
+// SKU 중복 상품 정리 — 같은 SKU 그룹에서 가장 오래 등록된 1건만 남기고 나머지 삭제
+// 안전장치: 삭제 직전 자동으로 JSON 백업 다운로드
+async function dedupProducts() {
+  const products = Array.isArray(_allProducts) ? _allProducts : [];
+  if (!products.length) {
+    showAppAlert('데이터 없음', '상품이 없습니다.', 'info');
+    return;
+  }
+
+  // SKU 별 그룹 (빈 SKU 는 비교 불가라 제외)
+  const bySku = new Map();
+  products.forEach(p => {
+    const sku = String(p.sku || '').trim();
+    if (!sku) return;
+    if (!bySku.has(sku)) bySku.set(sku, []);
+    bySku.get(sku).push(p);
+  });
+
+  const dupGroups = [...bySku.entries()].filter(([_, arr]) => arr.length >= 2);
+  if (!dupGroups.length) {
+    showAppAlert('중복 없음', '중복된 SKU가 없습니다.', 'success');
+    return;
+  }
+
+  // 각 그룹에서 created_at 가장 오래된 것을 keep, 나머지를 delete
+  const idsToDelete = [];
+  const rowsToDelete = [];
+  const previewLines = [];
+  dupGroups.forEach(([sku, arr]) => {
+    arr.sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
+    for (let i = 1; i < arr.length; i++) {
+      idsToDelete.push(arr[i].id);
+      rowsToDelete.push(arr[i]);
+    }
+    if (previewLines.length < 10) {
+      const keepName = (arr[0].name || '').slice(0, 30);
+      previewLines.push(`• ${sku}: ${arr.length}건 (남김 "${keepName}", 삭제 ${arr.length - 1}건)`);
+    }
+  });
+  const more = dupGroups.length > 10 ? `\n... 외 ${dupGroups.length - 10}개 SKU` : '';
+
+  const ok = confirm(
+    '중복 상품 정리\n' +
+    '─────────────────────\n' +
+    `${dupGroups.length}개 SKU 에서 총 ${idsToDelete.length}건의 중복이 발견되었습니다.\n\n` +
+    `각 SKU 마다 가장 먼저 등록된 1건만 남기고 ${idsToDelete.length}건을 삭제합니다.\n\n` +
+    `미리보기:\n${previewLines.join('\n')}${more}\n\n` +
+    `⚠ 이 작업은 되돌릴 수 없습니다.\n` +
+    `[확인] = 백업 JSON 자동 다운로드 후 삭제 진행\n` +
+    `[취소] = 취소`
+  );
+  if (!ok) return;
+
+  // 1) 자동 백업 다운로드 (삭제될 행들 전부)
+  try {
+    const blob = new Blob([JSON.stringify({
+      exportedAt: new Date().toISOString(),
+      reason: 'product-dedup-backup',
+      deletedCount: rowsToDelete.length,
+      duplicateSkuCount: dupGroups.length,
+      rows: rowsToDelete,
+    }, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `GPLAN_상품중복정리_백업_${new Date().toISOString().slice(0,10)}_${rowsToDelete.length}건.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  } catch (e) {
+    if (!confirm(`백업 다운로드 실패: ${e.message}\n\n그래도 삭제를 진행할까요?`)) return;
+  }
+
+  // 2) 50개씩 배치 삭제
+  const BATCH = 50;
+  let deleted = 0;
+  try {
+    for (let i = 0; i < idsToDelete.length; i += BATCH) {
+      const batch = idsToDelete.slice(i, i + BATCH);
+      const { error } = await _supabase.from('products').delete().in('id', batch);
+      if (error) throw error;
+      deleted += batch.length;
+      console.log(`[dedup] ${deleted}/${idsToDelete.length} 삭제 완료`);
+    }
+    showAppAlert(
+      '정리 완료',
+      `${deleted}건이 삭제되었습니다.\n백업 JSON 파일이 다운로드 폴더에 저장되었습니다 — 만약 잘못 삭제됐으면 그 파일로 복원 가능합니다.`,
+      'success'
+    );
+    await loadProductsFromDB();
+  } catch (e) {
+    showAppAlert(
+      '삭제 중 오류',
+      `${deleted}건 삭제됨, 그 후 오류 발생: ${e.message || String(e)}\n\n다운로드된 백업 JSON으로 일부 복원이 필요할 수 있습니다.`,
+      'error'
+    );
+    await loadProductsFromDB();
+  }
 }
 
 function openAddProductDrawer() {
