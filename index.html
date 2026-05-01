@@ -14806,6 +14806,29 @@ async function runPaMinusCheck() {
   if (rowsZeroed > 0) {
     console.log(`[마이너스확인] 묶음 내 택배비용 단일화: ${bundlesDeduped}개 묶음에서 ${rowsZeroed}건의 행을 0원 처리 (마진 최고 1건에만 택배비용 적용)`);
   }
+  // 묶음 내 택배비(shipFee) 단일화: 가장 큰 택배비 1건만 남기고 나머지 0
+  // (PA 가 같은 bundle 의 모든 행에 동일한 shipFee 를 표시하는 경우 마진 과대평가 방지)
+  let shipFeeRowsZeroed = 0;
+  bundleGroups.forEach(indices => {
+    if (indices.length < 2) return;
+    let bestIdx = indices[0];
+    indices.forEach(i => {
+      if ((Number(_paMinusRows[i].shipFee) || 0) > (Number(_paMinusRows[bestIdx].shipFee) || 0)) bestIdx = i;
+    });
+    indices.forEach(i => {
+      if (i === bestIdx) return;
+      const curr = Number(_paMinusRows[i].shipFee) || 0;
+      if (curr > 0) {
+        _paMinusRows[i].shipFeeBeforeDedup = curr;
+        _paMinusRows[i].shipFee = 0;
+        _paMinusRows[i].shipFeeBundleApplied = true;
+        shipFeeRowsZeroed++;
+      }
+    });
+  });
+  if (shipFeeRowsZeroed > 0) {
+    console.log(`[마이너스확인] 묶음 내 택배비 단일화: ${shipFeeRowsZeroed}건의 행을 0원 처리 (가장 큰 택배비 1건만 유지)`);
+  }
 
   // 3단계: 최종 마진 = 공급가 + 택배비 − 원가 − 택배비용 (원가 없으면 null)
   _paMinusRows = _paMinusRows.map(r => {
@@ -18760,6 +18783,24 @@ async function savePlayautoOrdersToLedger(silent) {
       }
     });
   });
+  // 묶음 내 택배비(shipFee) 단일화: 가장 큰 택배비 1건만 남기고 나머지 0
+  // 같은 묶음에서 실제 배송은 1번만 일어나므로 customer-paid 택배비도 1번만 카운트
+  bundleGroups.forEach(indices => {
+    if (indices.length < 2) return;
+    let bestIdx = indices[0];
+    indices.forEach(i => {
+      if ((Number(cores[i].shipFee) || 0) > (Number(cores[bestIdx].shipFee) || 0)) bestIdx = i;
+    });
+    indices.forEach(i => {
+      if (i === bestIdx) return;
+      const curr = Number(cores[i].shipFee) || 0;
+      if (curr > 0) {
+        cores[i]._shipFeeBeforeDedup = curr;
+        cores[i].shipFee = 0;
+        cores[i]._shipFeeBundleApplied = true;
+      }
+    });
+  });
   // 3단계: 업로드 데이터 행으로 변환 (cost는 null 가능 — 마이너스와 동일하게 "-" 표시 위함)
   //         마진 = 공급가 + 택배비 − 원가 − 택배비용 (cost null이면 margin도 null)
   // ★ 버그 수정: 같은 묶음(bundle_no)에 여러 라인이 있을 때, 이전에는 skuMap.get(...)[0]로
@@ -18803,6 +18844,9 @@ async function savePlayautoOrdersToLedger(silent) {
       shipCostMatched:       !!core.shipCostMatched,
       shipCostBundleApplied: core._bundleApplied,
       shipCostBeforeDedup:   core._shipCostBeforeDedup,
+      // 택배비 묶음 적용 흔적 (가장 큰 1건만 남기고 0 처리된 행)
+      shipFeeBundleApplied:  !!core._shipFeeBundleApplied,
+      shipFeeBeforeDedup:    core._shipFeeBeforeDedup,
       receiver: core.receiver,
       address:  [o.to_state, o.to_city, o.to_addr1, o.to_addr2, o.addr1, o.addr2].filter(Boolean).join(' '),
       profit,                                // null 가능 — 마이너스의 margin과 동일
