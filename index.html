@@ -21037,6 +21037,12 @@ function _buildSalePayload(rows) {
     const gk = _shipBundleKey(r);  // 택배비 dedup 용 (이카운트 전표 그룹과 별개)
     const custDes = groupCustDes[ecountGk] || r.site || '';
     lineNo++;
+    // r.price 는 VAT 포함 라인 합계 (이미 qty 가 반영된 값) — 단가는 합계/qty 로 환산
+    const _q = Math.max(1, Number(r.qty) || 1);
+    const _priceTotalInc = Number(r.price) || 0;
+    const _priceTotalEx = Math.round(_priceTotalInc / 1.1);
+    const _priceUnitEx  = Math.round(_priceTotalInc / 1.1 / _q);
+    const _vatTotal     = Math.round(_priceTotalInc) - _priceTotalEx;
     list.push({
       Line: String(lineNo),
       BulkDatas: {
@@ -21052,10 +21058,10 @@ function _buildSalePayload(rows) {
         PROD_CD:    r.itemCode   || '',
         PROD_DES:   r.itemName   || '',
         QTY:        String(r.qty   || 0),
-        // r.price는 VAT 포함 단가 — 공급가액(VAT 제외)과 부가세(10%)로 분리
-        PRICE:      String(Math.round((r.price || 0) / 1.1)),
-        SUPPLY_AMT: String(Math.round((r.qty || 0) * ((r.price || 0) / 1.1))),
-        VAT_AMT:    String(Math.round((r.qty || 0) * (r.price || 0)) - Math.round((r.qty || 0) * ((r.price || 0) / 1.1))),
+        // r.price 는 라인 합계 → 단가는 합계/qty/1.1, 공급가액은 합계/1.1
+        PRICE:      String(_priceUnitEx),
+        SUPPLY_AMT: String(_priceTotalEx),
+        VAT_AMT:    String(_vatTotal),
         REMARKS:    (r.receiver || '')
       }
     });
@@ -21156,6 +21162,12 @@ function _buildPurchasePayload(rows) {
     const gk = _shipBundleKey(r);  // 택배비용 dedup 용 (이카운트 전표 그룹과 별개)
     const purCustDes = groupPurCustDes[ecountGk] || normDepot || _cleanVendorName(r.vendor);
     lineNo++;
+    // r.cost 는 VAT 포함 라인 합계 (수량 곱해진 값, _paExtractOrderRow 에서 cost*qty 처리됨)
+    const _q2 = Math.max(1, Number(r.qty) || 1);
+    const _costTotalInc = Number(r.cost) || 0;
+    const _costTotalEx  = Math.round(_costTotalInc / 1.1);
+    const _costUnitEx   = Math.round(_costTotalInc / 1.1 / _q2);
+    const _costVatTotal = Math.round(_costTotalInc) - _costTotalEx;
     list.push({
       Line: String(lineNo),
       BulkDatas: {
@@ -21171,9 +21183,10 @@ function _buildPurchasePayload(rows) {
         PROD_CD:    r.itemCode   || '',
         PROD_DES:   r.itemName   || '',
         QTY:        String(r.qty   || 0),
-        PRICE:      String(Math.round((r.cost || 0) / 1.1)),
-        SUPPLY_AMT: String(Math.round((r.qty || 0) * ((r.cost || 0) / 1.1))),
-        VAT_AMT:    String(Math.round((r.qty || 0) * (r.cost || 0)) - Math.round((r.qty || 0) * ((r.cost || 0) / 1.1))),
+        // r.cost 는 라인 합계 → 단가는 합계/qty/1.1, 공급가액은 합계/1.1
+        PRICE:      String(_costUnitEx),
+        SUPPLY_AMT: String(_costTotalEx),
+        VAT_AMT:    String(_costVatTotal),
         REMARKS:    r.receiver || ''
       }
     });
