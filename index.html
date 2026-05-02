@@ -1578,10 +1578,11 @@ tailwind.config = {
       <div id="products-view-receive" class="hidden flex flex-col gap-5 md:gap-6">
         <!-- 입고 등록 폼 -->
         <div class="bg-white rounded-3xl panel p-5 md:p-6">
-          <div class="font-bold text-base mb-4 flex items-center gap-2">
+          <div class="font-bold text-base mb-1 flex items-center gap-2">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            입고 등록
+            입고 등록 <span class="text-xs text-brand-gray font-normal ml-1">(카테고리 = 지플랜 상품만)</span>
           </div>
+          <div class="text-xs text-brand-gray mb-4">자동완성·검색 모두 지플랜 카테고리에서만 동작합니다.</div>
           <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
             <div class="md:col-span-4 relative">
               <label class="block text-xs font-bold text-brand-gray mb-1">SKU 또는 상품명 *</label>
@@ -11891,10 +11892,13 @@ function _rcvSkuSuggest() {
   if (!inp || !sg) return;
   const q = inp.value.trim().toLowerCase();
   if (!q) { sg.classList.add('hidden'); return; }
-  const products = (Array.isArray(_allProducts) ? _allProducts : []).filter(p =>
-    String(p.sku || '').toLowerCase().includes(q) ||
-    String(p.name || '').toLowerCase().includes(q)
-  ).slice(0, 12);
+  // 카테고리 = 지플랜 인 상품만
+  const products = (Array.isArray(_allProducts) ? _allProducts : [])
+    .filter(p => String(p.category || '').trim() === '지플랜')
+    .filter(p =>
+      String(p.sku || '').toLowerCase().includes(q) ||
+      String(p.name || '').toLowerCase().includes(q)
+    ).slice(0, 12);
   if (!products.length) { sg.classList.add('hidden'); return; }
   sg.innerHTML = products.map(p => `<div class="px-3 py-2 hover:bg-brand-bg cursor-pointer text-xs border-b border-brand-border last:border-b-0" onmousedown="_rcvPickSku('${_escapeHtml(p.sku || '')}')">
     <span class="font-mono font-bold">${_escapeHtml(p.sku || '')}</span>
@@ -11916,7 +11920,9 @@ function _rcvPickSku(sku) {
 function _rcvFindProduct(query) {
   const q = String(query || '').trim().toLowerCase();
   if (!q) return null;
-  const products = Array.isArray(_allProducts) ? _allProducts : [];
+  // 카테고리 = 지플랜 인 상품만 대상
+  const products = (Array.isArray(_allProducts) ? _allProducts : [])
+    .filter(p => String(p.category || '').trim() === '지플랜');
   // 1) SKU 정확
   let p = products.find(x => String(x.sku || '').trim().toLowerCase() === q);
   if (p) return p;
