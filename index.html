@@ -5540,8 +5540,6 @@ async function runKwAutoTrack(isAuto) {
   console.group(`[KW Auto] 자동 추적 시작 - ${list.length}개 키워드`);
   for (let listIdx = 0; listIdx < list.length; listIdx++) {
     const it = list[listIdx];
-    // 봇 감지 회피: 첫 키워드를 제외한 나머지는 800ms 간격으로 호출
-    if (listIdx > 0) await new Promise(r => setTimeout(r, 800));
     const product = _kwResolveProduct(it.productKey);
     if (!product) {
       console.warn(`[KW Auto] (${listIdx+1}/${list.length}) "${it.keyword}" 상품 연결 끊김`, it);
