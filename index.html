@@ -1428,10 +1428,11 @@ tailwind.config = {
         </div>
       </section>
 
-      <!-- 일반/세트 서브탭 -->
+      <!-- 일반/세트/재고금액 서브탭 -->
       <div class="bg-white rounded-full panel p-1.5 inline-flex gap-1 self-start">
         <button id="prod-tab-normal" onclick="switchProductTab('normal')" class="px-5 py-2 rounded-full text-sm font-bold bg-brand-black text-white">📦 일반 상품</button>
         <button id="prod-tab-set"    onclick="switchProductTab('set')"    class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black">🎁 세트 상품</button>
+        <button id="prod-tab-stockvalue" onclick="switchProductTab('stockvalue')" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black">💰 재고금액</button>
       </div>
 
       <!-- ───── 일반 상품 영역 ───── -->
@@ -1571,6 +1572,75 @@ tailwind.config = {
           </div>
         </div>
       </div><!-- /products-view-set -->
+
+      <!-- ───── 재고금액 영역 ───── -->
+      <div id="products-view-stockvalue" class="hidden flex flex-col gap-5 md:gap-6">
+        <!-- 요약 KPI -->
+        <section class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 p-1">
+          <div class="bg-white p-4 md:p-5 rounded-3xl panel flex items-center gap-3">
+            <div class="w-10 md:w-12 h-10 md:h-12 rounded-[14px] bg-brand-blue-light flex items-center justify-center shrink-0">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2"><path d="M21 15V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9"/><path d="M3 15h18M3 19h18"/></svg>
+            </div>
+            <div><div class="text-brand-gray text-xs font-bold">총 재고금액</div><div id="sv-total" class="text-lg md:text-xl font-bold">0원</div></div>
+          </div>
+          <div class="bg-white p-4 md:p-5 rounded-3xl panel flex items-center gap-3">
+            <div class="w-10 md:w-12 h-10 md:h-12 rounded-[14px] bg-brand-green-light flex items-center justify-center shrink-0">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="2"><path d="M5 8h14M5 8a2 2 0 0 1 0-4h14a2 2 0 0 1 0 4M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/></svg>
+            </div>
+            <div><div class="text-brand-gray text-xs font-bold">SKU 종수</div><div id="sv-sku-count" class="text-lg md:text-xl font-bold">0종</div></div>
+          </div>
+          <div class="bg-white p-4 md:p-5 rounded-3xl panel flex items-center gap-3">
+            <div class="w-10 md:w-12 h-10 md:h-12 rounded-[14px] bg-brand-orange-light flex items-center justify-center shrink-0">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF9800" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>
+            </div>
+            <div><div class="text-brand-gray text-xs font-bold">총 재고 수량</div><div id="sv-units" class="text-lg md:text-xl font-bold">0개</div></div>
+          </div>
+          <div class="bg-white p-4 md:p-5 rounded-3xl panel flex items-center gap-3">
+            <div class="w-10 md:w-12 h-10 md:h-12 rounded-[14px] bg-brand-pink-light flex items-center justify-center shrink-0">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E91E63" stroke-width="2"><path d="M12 2v6M12 22v-6M4.93 4.93l4.24 4.24M14.83 14.83l4.24 4.24M2 12h6M22 12h-6"/></svg>
+            </div>
+            <div><div class="text-brand-gray text-xs font-bold">SKU당 평균</div><div id="sv-avg" class="text-lg md:text-xl font-bold">0원</div></div>
+          </div>
+        </section>
+
+        <!-- 상세 표 -->
+        <div class="bg-white rounded-4xl panel flex flex-col">
+          <div class="p-4 md:p-6 border-b border-brand-border flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <div class="font-bold text-[15px]">상세 내역</div>
+              <div class="text-xs text-brand-gray mt-1">카테고리 = "지플랜" + 재고 &gt; 0 인 상품만 표시. 재고금액 = 재고 × 원가.</div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <div class="relative">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-brand-gray pointer-events-none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input id="sv-search" type="text" placeholder="SKU·상품명 검색" oninput="renderStockValueView()" class="pl-9 pr-3 py-1.5 rounded-full border border-brand-border bg-brand-bg text-sm font-medium outline-none focus:border-brand-black w-56">
+              </div>
+              <button onclick="exportStockValueExcel()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                엑셀 내보내기
+              </button>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-brand-bg/60 sticky top-0">
+                <tr class="text-brand-gray text-xs">
+                  <th class="px-4 py-3 text-left font-bold cursor-pointer hover:bg-brand-border/40 select-none whitespace-nowrap" onclick="sortStockValue('rank')">#</th>
+                  <th class="px-4 py-3 text-left font-bold cursor-pointer hover:bg-brand-border/40 select-none whitespace-nowrap" onclick="sortStockValue('sku')">SKU</th>
+                  <th class="px-4 py-3 text-left font-bold cursor-pointer hover:bg-brand-border/40 select-none">상품명</th>
+                  <th class="px-4 py-3 text-right font-bold cursor-pointer hover:bg-brand-border/40 select-none whitespace-nowrap" onclick="sortStockValue('stock')">재고</th>
+                  <th class="px-4 py-3 text-right font-bold cursor-pointer hover:bg-brand-border/40 select-none whitespace-nowrap" onclick="sortStockValue('cost')">원가</th>
+                  <th class="px-4 py-3 text-right font-bold cursor-pointer hover:bg-brand-border/40 select-none whitespace-nowrap" onclick="sortStockValue('value')">재고금액</th>
+                  <th class="px-4 py-3 text-right font-bold cursor-pointer hover:bg-brand-border/40 select-none whitespace-nowrap" onclick="sortStockValue('share')">비중</th>
+                  <th class="px-4 py-3 text-left font-bold whitespace-nowrap">상태</th>
+                </tr>
+              </thead>
+              <tbody id="sv-tbody"></tbody>
+              <tfoot id="sv-tfoot"></tfoot>
+            </table>
+          </div>
+        </div>
+      </div><!-- /products-view-stockvalue -->
     </main>
   </div>
 </div>
@@ -11666,23 +11736,148 @@ function _saveSetProducts(list) {
 
 // 일반/세트 탭 전환
 function switchProductTab(which) {
-  _activeProductTab = which === 'set' ? 'set' : 'normal';
-  const isSet = _activeProductTab === 'set';
+  // 'normal' | 'set' | 'stockvalue'
+  _activeProductTab = (which === 'set' || which === 'stockvalue') ? which : 'normal';
   const vN = document.getElementById('products-view-normal');
   const vS = document.getElementById('products-view-set');
-  if (vN) vN.classList.toggle('hidden', isSet);
-  if (vS) vS.classList.toggle('hidden', !isSet);
-  const bN = document.getElementById('prod-tab-normal');
-  const bS = document.getElementById('prod-tab-set');
-  if (bN && bS) {
-    bN.className = !isSet
+  const vV = document.getElementById('products-view-stockvalue');
+  if (vN) vN.classList.toggle('hidden', _activeProductTab !== 'normal');
+  if (vS) vS.classList.toggle('hidden', _activeProductTab !== 'set');
+  if (vV) vV.classList.toggle('hidden', _activeProductTab !== 'stockvalue');
+  const tabs = [
+    { btn: 'prod-tab-normal',     active: _activeProductTab === 'normal' },
+    { btn: 'prod-tab-set',        active: _activeProductTab === 'set' },
+    { btn: 'prod-tab-stockvalue', active: _activeProductTab === 'stockvalue' },
+  ];
+  tabs.forEach(t => {
+    const el = document.getElementById(t.btn);
+    if (!el) return;
+    el.className = t.active
       ? 'px-5 py-2 rounded-full text-sm font-bold bg-brand-black text-white'
       : 'px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black';
-    bS.className = isSet
-      ? 'px-5 py-2 rounded-full text-sm font-bold bg-brand-black text-white'
-      : 'px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black';
+  });
+  if (_activeProductTab === 'set') renderSetProductsPage();
+  if (_activeProductTab === 'stockvalue') renderStockValueView();
+}
+
+// ── 재고금액 상세 뷰 ─────────────────────────
+let _svSort = { col: 'value', dir: 'desc' };
+function sortStockValue(col) {
+  if (_svSort.col === col) _svSort.dir = _svSort.dir === 'asc' ? 'desc' : 'asc';
+  else { _svSort.col = col; _svSort.dir = (col === 'sku') ? 'asc' : 'desc'; }
+  renderStockValueView();
+}
+
+function renderStockValueView() {
+  const products = Array.isArray(_allProducts) ? _allProducts : [];
+  // 카테고리 = 지플랜 + 재고 > 0
+  const all = products.filter(p =>
+    String(p.category || '').trim() === '지플랜' && (Number(p.stock) || 0) > 0
+  );
+  // 행 데이터 준비
+  let rows = all.map(p => {
+    const stock = Number(p.stock) || 0;
+    const cost  = Number(p.cost)  || 0;
+    const safety = Number(p.safety_stock) || 0;
+    return {
+      p, sku: String(p.sku || ''), name: String(p.name || ''),
+      stock, cost, value: stock * cost, safety,
+      isLow: safety > 0 && stock < safety,
+    };
+  });
+  // 검색
+  const q = (document.getElementById('sv-search')?.value || '').trim().toLowerCase();
+  if (q) {
+    rows = rows.filter(r =>
+      r.sku.toLowerCase().includes(q) || r.name.toLowerCase().includes(q)
+    );
   }
-  if (isSet) renderSetProductsPage();
+  // 합계 계산 (필터 적용 후 기준)
+  const totalValue = rows.reduce((s, r) => s + r.value, 0);
+  const totalUnits = rows.reduce((s, r) => s + r.stock, 0);
+  const skuCount   = rows.length;
+  const avg        = skuCount > 0 ? Math.round(totalValue / skuCount) : 0;
+  // 비중 계산
+  rows.forEach(r => { r.share = totalValue > 0 ? (r.value / totalValue * 100) : 0; });
+  // 정렬
+  const dir = _svSort.dir === 'asc' ? 1 : -1;
+  rows.sort((a, b) => {
+    const k = _svSort.col;
+    if (k === 'sku' || k === 'rank') return String(a.sku).localeCompare(String(b.sku)) * dir;
+    return ((Number(a[k]) || 0) - (Number(b[k]) || 0)) * dir;
+  });
+
+  // KPI
+  const fmtW = n => Math.round(n).toLocaleString('ko-KR');
+  const setText = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+  setText('sv-total', fmtW(totalValue) + '원');
+  setText('sv-sku-count', skuCount.toLocaleString('ko-KR') + '종');
+  setText('sv-units', totalUnits.toLocaleString('ko-KR') + '개');
+  setText('sv-avg', fmtW(avg) + '원');
+
+  // 표
+  const tbody = document.getElementById('sv-tbody');
+  if (!tbody) return;
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-12 text-center text-brand-gray text-sm">표시할 재고가 없습니다. (조건: 카테고리 = "지플랜" + 재고 > 0)</td></tr>';
+    document.getElementById('sv-tfoot').innerHTML = '';
+    return;
+  }
+  tbody.innerHTML = rows.map((r, i) => {
+    const status = r.isLow
+      ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-pink-light text-brand-pink">⚠ 안전재고 미달</span>`
+      : `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-green-light text-brand-green">정상</span>`;
+    return `<tr class="border-b border-brand-border hover:bg-brand-bg/40">
+      <td class="px-4 py-3 text-xs text-brand-gray">${i + 1}</td>
+      <td class="px-4 py-3 text-xs font-mono">${_escapeHtml(r.sku)}</td>
+      <td class="px-4 py-3 text-xs truncate max-w-[280px]" title="${_escapeHtml(r.name)}">${_escapeHtml(r.name)}</td>
+      <td class="px-4 py-3 text-xs text-right font-semibold">${r.stock.toLocaleString('ko-KR')}</td>
+      <td class="px-4 py-3 text-xs text-right">${fmtW(r.cost)}원</td>
+      <td class="px-4 py-3 text-xs text-right font-bold text-brand-black">${fmtW(r.value)}원</td>
+      <td class="px-4 py-3 text-xs text-right text-brand-blue">${r.share.toFixed(1)}%</td>
+      <td class="px-4 py-3 text-xs">${status}</td>
+    </tr>`;
+  }).join('');
+  // 합계 행
+  document.getElementById('sv-tfoot').innerHTML = `<tr class="border-t-2 border-brand-black bg-brand-bg font-bold">
+    <td class="px-4 py-3 text-xs" colspan="3">합계 (${rows.length}개 SKU)</td>
+    <td class="px-4 py-3 text-xs text-right">${totalUnits.toLocaleString('ko-KR')}</td>
+    <td class="px-4 py-3"></td>
+    <td class="px-4 py-3 text-xs text-right text-brand-black">${fmtW(totalValue)}원</td>
+    <td class="px-4 py-3 text-xs text-right">100.0%</td>
+    <td class="px-4 py-3"></td>
+  </tr>`;
+}
+
+function exportStockValueExcel() {
+  const products = Array.isArray(_allProducts) ? _allProducts : [];
+  const rows = products
+    .filter(p => String(p.category || '').trim() === '지플랜' && (Number(p.stock) || 0) > 0)
+    .map(p => ({
+      sku: p.sku || '', name: p.name || '',
+      stock: Number(p.stock) || 0, cost: Number(p.cost) || 0,
+      value: (Number(p.stock) || 0) * (Number(p.cost) || 0),
+      safety: Number(p.safety_stock) || 0,
+    }))
+    .sort((a, b) => b.value - a.value);
+  if (!rows.length) { showAppAlert('데이터 없음', '내보낼 재고금액 데이터가 없습니다.', 'info'); return; }
+
+  const totalValue = rows.reduce((s, r) => s + r.value, 0);
+  const data = [
+    ['#', 'SKU', '상품명', '재고', '원가', '재고금액', '비중(%)', '안전재고', '상태'],
+    ...rows.map((r, i) => [
+      i + 1, r.sku, r.name, r.stock, r.cost, r.value,
+      totalValue > 0 ? +(r.value / totalValue * 100).toFixed(2) : 0,
+      r.safety,
+      (r.safety > 0 && r.stock < r.safety) ? '안전재고 미달' : '정상',
+    ]),
+    ['합계', `${rows.length}개`, '', rows.reduce((s,r)=>s+r.stock,0), '', totalValue, 100, '', ''],
+  ];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{wch:5},{wch:18},{wch:40},{wch:8},{wch:10},{wch:14},{wch:8},{wch:10},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, ws, '재고금액');
+  XLSX.writeFile(wb, `GPLAN_재고금액_지플랜_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
 // 세트 상품 목록 렌더링
