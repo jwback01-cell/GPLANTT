@@ -9122,12 +9122,16 @@ function syncDashboardRevenue() {
   if (ledgerLabelEl) ledgerLabelEl.textContent = '2026년 ' + current.label;
 
   // ── 순이익 동기화 ──
-  const curProfit  = current.sales - current.purchase - current.fee - current.delivery;
+  // 우선순위: 업로드 데이터의 profit 합계 (uploadProfit) → 없으면 매출-원가-수수료-배송비 폴백
+  const _profitOfMonth = m => (m && m.uploadProfit != null)
+    ? Number(m.uploadProfit)
+    : (m ? (m.sales - m.purchase - m.fee - m.delivery) : 0);
+  const curProfit  = _profitOfMonth(current);
   const profitRate = current.sales > 0 ? Math.round((curProfit / current.sales) * 100) : 0;
 
   let prevProfit = 0, profitChange = 0;
   if (prev) {
-    prevProfit = prev.sales - prev.purchase - prev.fee - prev.delivery;
+    prevProfit = _profitOfMonth(prev);
     profitChange = prevProfit > 0 ? (((curProfit - prevProfit) / prevProfit) * 100).toFixed(1) : 0;
   }
   const profitUp = profitChange >= 0;
