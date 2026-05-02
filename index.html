@@ -12726,6 +12726,24 @@ function setPeriodType(type) {
   renderPeriodChart();
 }
 
+// 업로드 데이터(장부업로드-업로드데이터)에서 월별 순이익(profit) 합계 추출
+// 반환: { 1: 1234, 2: 5678, ... } — 월 번호 → 순이익 합계
+function _buildMonthlyProfitFromUploadData() {
+  try {
+    if (typeof _loadUploadData !== 'function') return {};
+    const data = _loadUploadData();
+    const monthMap = {};
+    data.forEach(r => {
+      const d = String(r.date || '').slice(0, 10);
+      const m = parseInt(d.split('-')[1]) || 0;
+      if (m < 1 || m > 12) return;
+      if (r.profit == null || r.profit === '') return; // 원가 미입력 등으로 null 인 행은 제외
+      monthMap[m] = (monthMap[m] || 0) + (Number(r.profit) || 0);
+    });
+    return monthMap;
+  } catch (_) { return {}; }
+}
+
 function _buildMonthlyDataFromEntries() {
   if (!_ledgerEntries || !_ledgerEntries.length) return null;
   const monthMap = {};
@@ -12742,6 +12760,19 @@ function _buildMonthlyDataFromEntries() {
     monthMap[m].delivery += (r['택배비'] || 0) + (r['택배비용'] || 0);
     monthMap[m].fee      += Math.round(sales * 0.08);
   });
+  // 업로드 데이터 기반 순이익을 attach (있는 월만 — 없으면 기존 계산 폴백)
+  const uploadProfit = _buildMonthlyProfitFromUploadData();
+  Object.keys(monthMap).forEach(k => {
+    const mNum = parseInt(k);
+    if (uploadProfit[mNum] != null) monthMap[k].uploadProfit = uploadProfit[mNum];
+  });
+  // 업로드 데이터에만 있는 월도 추가
+  Object.keys(uploadProfit).forEach(k => {
+    const mNum = parseInt(k);
+    if (!monthMap[mNum]) {
+      monthMap[mNum] = { label: mNum + '월', sales: 0, purchase: 0, fee: 0, delivery: 0, uploadProfit: uploadProfit[mNum] };
+    }
+  });
   const result = Object.keys(monthMap).sort((a,b) => a - b).map(k => monthMap[k]);
   return result.length > 0 ? result : null;
 }
@@ -12754,11 +12785,20 @@ function _buildQuarterlyDataFromEntries() {
     const mNum = parseInt(m.label);
     const q = Math.ceil(mNum / 3);
     const label = q + '분기';
-    if (!qMap[q]) qMap[q] = { label, sales: 0, purchase: 0, fee: 0, delivery: 0 };
+    if (!qMap[q]) qMap[q] = { label, sales: 0, purchase: 0, fee: 0, delivery: 0, uploadProfit: 0, _hasUpload: false };
     qMap[q].sales    += m.sales;
     qMap[q].purchase += m.purchase;
     qMap[q].fee      += m.fee;
     qMap[q].delivery += m.delivery;
+    if (m.uploadProfit != null) {
+      qMap[q].uploadProfit += m.uploadProfit;
+      qMap[q]._hasUpload = true;
+    }
+  });
+  // 분기에 업로드 데이터가 한 달이라도 있으면 uploadProfit 사용, 아니면 제거
+  Object.values(qMap).forEach(q => {
+    if (!q._hasUpload) delete q.uploadProfit;
+    delete q._hasUpload;
   });
   return Object.values(qMap);
 }
@@ -12797,7 +12837,10 @@ function renderPeriodChart() {
   const totalPurchase = data.reduce((s, d) => s + d.purchase, 0);
   const totalFee      = data.reduce((s, d) => s + d.fee, 0);
   const totalDelivery = data.reduce((s, d) => s + d.delivery, 0);
-  const totalProfit   = totalSales - totalPurchase - totalFee - totalDelivery;
+  // 순이익: 업로드 데이터의 profit 합계가 있으면 그 값, 없으면 기존 계산 (매출-원가-수수료-배송비) 폴백
+  // 행별로 uploadProfit (장부업로드 -> 업로드데이터의 마진 합계) 우선 적용
+  const _profitOf = d => (d.uploadProfit != null ? Number(d.uploadProfit) : (d.sales - d.purchase - d.fee - d.delivery));
+  const totalProfit   = data.reduce((s, d) => s + _profitOf(d), 0);
   const avgSales      = Math.round(totalSales / data.length);
   const profitRate    = totalSales > 0 ? Math.round((totalProfit / totalSales) * 100) : 0;
 
@@ -12819,7 +12862,7 @@ function renderPeriodChart() {
 
   // 바 차트
   const barsHtml = data.map(d => {
-    const profit  = d.sales - d.purchase - d.fee - d.delivery;
+    const profit  = _profitOf(d);
     const salesPct  = maxSales > 0 ? Math.max(4, Math.round((d.sales  / maxSales) * 100)) : 4;
     const profitPct = maxSales > 0 ? Math.max(2, Math.round((profit   / maxSales) * 100)) : 2;
     return `
@@ -12846,7 +12889,7 @@ function renderPeriodChart() {
 
   // 테이블
   const rows = data.map((d, i) => {
-    const profit = d.sales - d.purchase - d.fee - d.delivery;
+    const profit = _profitOf(d);
     const rate   = d.sales > 0 ? Math.round((profit / d.sales) * 100) : 0;
     const bg     = i % 2 === 0 ? '' : 'bg-brand-bg/40';
     return `<tr class="${bg} border-b border-brand-border hover:bg-brand-blue-light/20 transition-colors">
@@ -12862,8 +12905,9 @@ function renderPeriodChart() {
     </tr>`;
   }).join('');
 
-  const totalProfitFinal = totalSales - totalPurchase - totalFee - totalDelivery;
-  const totalRateFinal   = Math.round((totalProfitFinal / totalSales) * 100);
+  // 합계 순이익도 totalProfit (uploadProfit 반영) 사용
+  const totalProfitFinal = totalProfit;
+  const totalRateFinal   = totalSales > 0 ? Math.round((totalProfitFinal / totalSales) * 100) : 0;
   document.getElementById('period-tbody').innerHTML = rows + `
     <tr class="bg-brand-bg font-bold border-t-2 border-brand-black">
       <td class="px-6 py-4 text-sm">합계</td>
