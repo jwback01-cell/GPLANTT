@@ -1437,9 +1437,10 @@ tailwind.config = {
       <!-- ───── 일반 상품 영역 ───── -->
       <div id="products-view-normal" class="flex flex-col gap-5 md:gap-6">
       <!-- Stats -->
-      <section class="grid grid-cols-2 gap-3 md:gap-4 p-1">
+      <section class="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 p-1">
         <div id="stat-card-all" onclick="setStatFilter('all')" class="stat-card bg-white p-4 md:p-5 rounded-3xl panel flex items-center gap-3 md:gap-4 cursor-pointer hover:-translate-y-0.5 transition-all select-none ring-2 ring-brand-black"><div class="w-10 md:w-12 h-10 md:h-12 rounded-[14px] bg-brand-border flex items-center justify-center shrink-0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" stroke-width="2"><path d="M5 8h14M5 8a2 2 0 0 1 0-4h14a2 2 0 0 1 0 4M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/></svg></div><div><div class="text-brand-gray text-xs font-medium">전체 상품수</div><div id="stat-total" class="text-lg md:text-xl font-bold">0개</div></div></div>
         <div id="stat-card-low" onclick="setStatFilter('low')" class="stat-card bg-white p-4 md:p-5 rounded-3xl panel flex items-center gap-3 md:gap-4 cursor-pointer hover:-translate-y-0.5 transition-all select-none"><div class="w-10 md:w-12 h-10 md:h-12 rounded-[14px] bg-brand-pink-light flex items-center justify-center shrink-0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E91E63" stroke-width="2"><path d="M12 9v4M12 17h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg></div><div><div class="text-brand-pink text-xs font-bold">품절 임박</div><div id="stat-low" class="text-lg md:text-xl font-bold">0개</div></div></div>
+        <div id="stat-card-stock-value" class="stat-card bg-white p-4 md:p-5 rounded-3xl panel flex items-center gap-3 md:gap-4 select-none" title="지플랜 카테고리 상품의 (재고 × 원가) 합계"><div class="w-10 md:w-12 h-10 md:h-12 rounded-[14px] bg-brand-blue-light flex items-center justify-center shrink-0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2"><path d="M21 15V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9"/><path d="M3 15h18M3 19h18M7 11h.01M11 11h.01M15 11h.01"/></svg></div><div><div class="text-brand-blue text-xs font-bold">재고금액 <span class="text-brand-gray font-normal">(지플랜)</span></div><div id="stat-stock-value" class="text-lg md:text-xl font-bold">0원</div><div id="stat-stock-value-detail" class="text-[10px] text-brand-gray mt-0.5">-</div></div></div>
       </section>
       <!-- Alert banner -->
       <div class="bg-brand-orange-light border border-brand-orange/20 rounded-2xl p-4 flex items-start gap-3">
@@ -9676,11 +9677,26 @@ function renderProductsPage() {
 
   // 통계
   let total = _allProducts.length, low = 0;
+  // 지플랜 카테고리 재고금액 = sum(stock × cost)
+  let stockValue = 0, stockSkuCount = 0, stockUnits = 0;
   _allProducts.forEach(p => {
     if (p.safety_stock > 0 && p.stock < p.safety_stock) low++;
+    if (String(p.category || '').trim() === '지플랜') {
+      const stock = Number(p.stock) || 0;
+      const cost  = Number(p.cost)  || 0;
+      if (stock > 0) {
+        stockValue += stock * cost;
+        stockUnits += stock;
+        stockSkuCount++;
+      }
+    }
   });
   document.getElementById('stat-total').textContent = total + '개';
   document.getElementById('stat-low').textContent   = low   + '개';
+  const stockValueEl = document.getElementById('stat-stock-value');
+  if (stockValueEl) stockValueEl.textContent = Math.round(stockValue).toLocaleString('ko-KR') + '원';
+  const stockDetailEl = document.getElementById('stat-stock-value-detail');
+  if (stockDetailEl) stockDetailEl.textContent = `SKU ${stockSkuCount}종 · 총 ${stockUnits.toLocaleString('ko-KR')}개`;
   const dashLow = document.getElementById('dashboard-stat-low');
   if (dashLow) dashLow.textContent = low;
 
