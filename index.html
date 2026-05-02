@@ -1428,10 +1428,11 @@ tailwind.config = {
         </div>
       </section>
 
-      <!-- 일반/세트/재고금액 서브탭 -->
-      <div class="bg-white rounded-full panel p-1.5 inline-flex gap-1 self-start">
+      <!-- 일반/세트/입고/재고금액 서브탭 -->
+      <div class="bg-white rounded-full panel p-1.5 inline-flex gap-1 self-start flex-wrap">
         <button id="prod-tab-normal" onclick="switchProductTab('normal')" class="px-5 py-2 rounded-full text-sm font-bold bg-brand-black text-white">📦 일반 상품</button>
         <button id="prod-tab-set"    onclick="switchProductTab('set')"    class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black">🎁 세트 상품</button>
+        <button id="prod-tab-receive" onclick="switchProductTab('receive')" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black">📥 입고하기</button>
         <button id="prod-tab-stockvalue" onclick="switchProductTab('stockvalue')" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black">💰 재고금액</button>
       </div>
 
@@ -1572,6 +1573,80 @@ tailwind.config = {
           </div>
         </div>
       </div><!-- /products-view-set -->
+
+      <!-- ───── 입고하기 영역 ───── -->
+      <div id="products-view-receive" class="hidden flex flex-col gap-5 md:gap-6">
+        <!-- 입고 등록 폼 -->
+        <div class="bg-white rounded-3xl panel p-5 md:p-6">
+          <div class="font-bold text-base mb-4 flex items-center gap-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            입고 등록
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+            <div class="md:col-span-4 relative">
+              <label class="block text-xs font-bold text-brand-gray mb-1">SKU 또는 상품명 *</label>
+              <input id="rcv-sku-search" type="text" placeholder="예: GB0020 또는 리서스" oninput="_rcvUpdatePreview()" class="w-full px-3 py-2 bg-brand-bg border border-brand-border rounded-xl text-sm font-mono focus:outline-none focus:border-brand-black" autocomplete="off">
+              <div id="rcv-sku-suggest" class="hidden absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-brand-border rounded-xl shadow-lg max-h-60 overflow-auto"></div>
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-xs font-bold text-brand-gray mb-1">입고 수량 *</label>
+              <input id="rcv-qty" type="number" min="1" placeholder="예: 30" oninput="_rcvUpdatePreview()" class="w-full px-3 py-2 bg-brand-bg border border-brand-border rounded-xl text-sm text-right font-mono focus:outline-none focus:border-brand-black">
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-xs font-bold text-brand-gray mb-1">입고 단가 (원/개) *</label>
+              <input id="rcv-unit-price" type="number" min="0" placeholder="예: 2500" oninput="_rcvUpdatePreview()" class="w-full px-3 py-2 bg-brand-bg border border-brand-border rounded-xl text-sm text-right font-mono focus:outline-none focus:border-brand-black">
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-xs font-bold text-brand-gray mb-1">입고 일자 *</label>
+              <input id="rcv-date" type="date" class="w-full px-3 py-2 bg-brand-bg border border-brand-border rounded-xl text-sm focus:outline-none focus:border-brand-black">
+            </div>
+            <div class="md:col-span-2 flex items-end">
+              <button onclick="submitReceiving()" class="w-full px-5 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:-translate-y-0.5 transition-transform shadow-md">📥 입고 등록</button>
+            </div>
+          </div>
+          <div class="mt-3">
+            <input id="rcv-memo" type="text" placeholder="메모(선택) — 예: A업체 4월 발주" class="w-full px-3 py-2 bg-brand-bg border border-brand-border rounded-xl text-sm focus:outline-none focus:border-brand-black">
+          </div>
+          <!-- 미리보기 -->
+          <div id="rcv-preview" class="hidden mt-4 p-4 bg-brand-blue-light/40 border border-brand-blue/20 rounded-2xl text-sm"></div>
+        </div>
+
+        <!-- 입고 내역 -->
+        <div class="bg-white rounded-3xl panel">
+          <div class="px-5 md:px-6 py-4 border-b border-brand-border flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <div class="font-bold text-base">입고 내역</div>
+              <div class="text-xs text-brand-gray mt-1">입고할 때마다 누적 기록됩니다. 삭제는 기록만 지우며 재고/원가는 그대로 유지됩니다.</div>
+            </div>
+            <div class="flex gap-2 items-center">
+              <input id="rcv-hist-search" type="text" placeholder="SKU·상품명 검색" oninput="renderReceivingHistory()" class="px-3 py-1.5 bg-brand-bg border border-brand-border rounded-full text-sm w-52 focus:outline-none focus:border-brand-black">
+              <button onclick="exportReceivingHistory()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                엑셀 내보내기
+              </button>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-brand-bg/60 sticky top-0">
+                <tr class="text-brand-gray text-xs">
+                  <th class="px-4 py-3 text-left font-bold whitespace-nowrap">입고일자</th>
+                  <th class="px-4 py-3 text-left font-bold whitespace-nowrap">SKU</th>
+                  <th class="px-4 py-3 text-left font-bold">상품명</th>
+                  <th class="px-4 py-3 text-right font-bold whitespace-nowrap">입고수량</th>
+                  <th class="px-4 py-3 text-right font-bold whitespace-nowrap">단가</th>
+                  <th class="px-4 py-3 text-right font-bold whitespace-nowrap">합계</th>
+                  <th class="px-4 py-3 text-left font-bold">메모</th>
+                  <th class="px-4 py-3 text-left font-bold whitespace-nowrap">등록시각</th>
+                  <th class="px-4 py-3 text-center font-bold whitespace-nowrap">삭제</th>
+                </tr>
+              </thead>
+              <tbody id="rcv-tbody"></tbody>
+              <tfoot id="rcv-tfoot"></tfoot>
+            </table>
+          </div>
+        </div>
+      </div><!-- /products-view-receive -->
 
       <!-- ───── 재고금액 영역 ───── -->
       <div id="products-view-stockvalue" class="hidden flex flex-col gap-5 md:gap-6">
@@ -11750,17 +11825,21 @@ function _saveSetProducts(list) {
 
 // 일반/세트 탭 전환
 function switchProductTab(which) {
-  // 'normal' | 'set' | 'stockvalue'
-  _activeProductTab = (which === 'set' || which === 'stockvalue') ? which : 'normal';
+  // 'normal' | 'set' | 'receive' | 'stockvalue'
+  const valid = ['normal','set','receive','stockvalue'];
+  _activeProductTab = valid.indexOf(which) !== -1 ? which : 'normal';
   const vN = document.getElementById('products-view-normal');
   const vS = document.getElementById('products-view-set');
+  const vR = document.getElementById('products-view-receive');
   const vV = document.getElementById('products-view-stockvalue');
   if (vN) vN.classList.toggle('hidden', _activeProductTab !== 'normal');
   if (vS) vS.classList.toggle('hidden', _activeProductTab !== 'set');
+  if (vR) vR.classList.toggle('hidden', _activeProductTab !== 'receive');
   if (vV) vV.classList.toggle('hidden', _activeProductTab !== 'stockvalue');
   const tabs = [
     { btn: 'prod-tab-normal',     active: _activeProductTab === 'normal' },
     { btn: 'prod-tab-set',        active: _activeProductTab === 'set' },
+    { btn: 'prod-tab-receive',    active: _activeProductTab === 'receive' },
     { btn: 'prod-tab-stockvalue', active: _activeProductTab === 'stockvalue' },
   ];
   tabs.forEach(t => {
@@ -11771,7 +11850,265 @@ function switchProductTab(which) {
       : 'px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black';
   });
   if (_activeProductTab === 'set') renderSetProductsPage();
+  if (_activeProductTab === 'receive') _initReceivingTab();
   if (_activeProductTab === 'stockvalue') renderStockValueView();
+}
+
+// ── 입고하기 탭 ─────────────────────────
+const RCV_HISTORY_KEY = 'gplan_receiving_history_v1';
+function _loadReceivingHistory() {
+  try { return JSON.parse(localStorage.getItem(RCV_HISTORY_KEY) || '[]') || []; } catch (_) { return []; }
+}
+function _saveReceivingHistory(arr) {
+  try { localStorage.setItem(RCV_HISTORY_KEY, JSON.stringify(arr)); } catch (_) {}
+}
+
+function _initReceivingTab() {
+  // 기본 일자 = 오늘
+  const dEl = document.getElementById('rcv-date');
+  if (dEl && !dEl.value) {
+    const t = new Date();
+    dEl.value = t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0');
+  }
+  // SKU 자동완성 핸들러 (한 번만 부착)
+  const inp = document.getElementById('rcv-sku-search');
+  if (inp && !inp._wired) {
+    inp._wired = true;
+    inp.addEventListener('focus', _rcvSkuSuggest);
+    inp.addEventListener('input', _rcvSkuSuggest);
+    inp.addEventListener('blur', () => setTimeout(() => {
+      const sg = document.getElementById('rcv-sku-suggest');
+      if (sg) sg.classList.add('hidden');
+    }, 150));
+  }
+  renderReceivingHistory();
+  _rcvUpdatePreview();
+}
+
+function _rcvSkuSuggest() {
+  const inp = document.getElementById('rcv-sku-search');
+  const sg  = document.getElementById('rcv-sku-suggest');
+  if (!inp || !sg) return;
+  const q = inp.value.trim().toLowerCase();
+  if (!q) { sg.classList.add('hidden'); return; }
+  const products = (Array.isArray(_allProducts) ? _allProducts : []).filter(p =>
+    String(p.sku || '').toLowerCase().includes(q) ||
+    String(p.name || '').toLowerCase().includes(q)
+  ).slice(0, 12);
+  if (!products.length) { sg.classList.add('hidden'); return; }
+  sg.innerHTML = products.map(p => `<div class="px-3 py-2 hover:bg-brand-bg cursor-pointer text-xs border-b border-brand-border last:border-b-0" onmousedown="_rcvPickSku('${_escapeHtml(p.sku || '')}')">
+    <span class="font-mono font-bold">${_escapeHtml(p.sku || '')}</span>
+    <span class="text-brand-gray"> · ${_escapeHtml((p.name || '').slice(0, 50))}</span>
+    <span class="text-[10px] text-brand-gray ml-2">재고 ${(Number(p.stock)||0).toLocaleString('ko-KR')} / 원가 ${(Number(p.cost)||0).toLocaleString('ko-KR')}원</span>
+  </div>`).join('');
+  sg.classList.remove('hidden');
+}
+function _rcvPickSku(sku) {
+  const inp = document.getElementById('rcv-sku-search');
+  if (inp) inp.value = sku;
+  const sg = document.getElementById('rcv-sku-suggest');
+  if (sg) sg.classList.add('hidden');
+  _rcvUpdatePreview();
+  // 다음 필드로 포커스
+  document.getElementById('rcv-qty')?.focus();
+}
+
+function _rcvFindProduct(query) {
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return null;
+  const products = Array.isArray(_allProducts) ? _allProducts : [];
+  // 1) SKU 정확
+  let p = products.find(x => String(x.sku || '').trim().toLowerCase() === q);
+  if (p) return p;
+  // 2) SKU 포함
+  p = products.find(x => String(x.sku || '').toLowerCase().includes(q));
+  if (p) return p;
+  // 3) 상품명 포함
+  return products.find(x => String(x.name || '').toLowerCase().includes(q)) || null;
+}
+
+function _rcvUpdatePreview() {
+  const box = document.getElementById('rcv-preview');
+  if (!box) return;
+  const skuQ = (document.getElementById('rcv-sku-search')?.value || '').trim();
+  const qty = Number(document.getElementById('rcv-qty')?.value) || 0;
+  const unit = Number(document.getElementById('rcv-unit-price')?.value) || 0;
+  if (!skuQ) { box.classList.add('hidden'); return; }
+  const p = _rcvFindProduct(skuQ);
+  if (!p) {
+    box.classList.remove('hidden');
+    box.innerHTML = `<span class="text-brand-pink font-bold">⚠ "${_escapeHtml(skuQ)}" 와 일치하는 상품이 없습니다.</span>`;
+    return;
+  }
+  const prevStock = Number(p.stock) || 0;
+  const prevCost  = Number(p.cost) || 0;
+  const newStock  = prevStock + qty;
+  const total     = qty * unit;
+  box.classList.remove('hidden');
+  box.innerHTML = `
+    <div class="font-bold text-brand-black mb-2">${_escapeHtml(p.name)} <span class="text-xs text-brand-gray font-mono">(${_escapeHtml(p.sku)})</span></div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+      <div><span class="text-brand-gray">재고</span> <span class="font-bold">${prevStock.toLocaleString('ko-KR')}</span> → <span class="font-bold text-brand-blue">${newStock.toLocaleString('ko-KR')}</span> <span class="text-brand-gray">(+${qty.toLocaleString('ko-KR')})</span></div>
+      <div><span class="text-brand-gray">원가</span> <span class="font-bold">${prevCost.toLocaleString('ko-KR')}원</span> → <span class="font-bold text-brand-blue">${unit > 0 ? unit.toLocaleString('ko-KR') + '원' : '(미입력)'}</span></div>
+      <div><span class="text-brand-gray">입고합계</span> <span class="font-bold text-brand-black">${total.toLocaleString('ko-KR')}원</span></div>
+      <div><span class="text-brand-gray">카테고리</span> <span class="font-bold">${_escapeHtml(p.category || '-')}</span></div>
+    </div>`;
+}
+
+async function submitReceiving() {
+  const skuQ = (document.getElementById('rcv-sku-search')?.value || '').trim();
+  const qty  = Number(document.getElementById('rcv-qty')?.value) || 0;
+  const unit = Number(document.getElementById('rcv-unit-price')?.value) || 0;
+  const date = (document.getElementById('rcv-date')?.value || '').trim();
+  const memo = (document.getElementById('rcv-memo')?.value || '').trim();
+
+  if (!skuQ)  { showAppAlert('입력 필요', 'SKU 또는 상품명을 입력하세요.', 'warn'); return; }
+  if (!qty || qty <= 0)  { showAppAlert('입력 필요', '입고 수량을 1 이상 입력하세요.', 'warn'); return; }
+  if (!unit || unit <= 0) { showAppAlert('입력 필요', '입고 단가를 입력하세요.', 'warn'); return; }
+  if (!date) { showAppAlert('입력 필요', '입고 일자를 선택하세요.', 'warn'); return; }
+
+  const product = _rcvFindProduct(skuQ);
+  if (!product) { showAppAlert('상품 없음', `"${skuQ}" 와 일치하는 상품이 없습니다.`, 'error'); return; }
+
+  const prevStock = Number(product.stock) || 0;
+  const prevCost  = Number(product.cost) || 0;
+  const newStock  = prevStock + qty;
+  const total     = qty * unit;
+
+  const ok = confirm(
+    `입고 등록 확인\n─────────────────────\n` +
+    `상품: ${product.name}\n` +
+    `SKU: ${product.sku}\n` +
+    `입고 일자: ${date}\n` +
+    `입고 수량: +${qty.toLocaleString('ko-KR')}\n` +
+    `입고 단가: ${unit.toLocaleString('ko-KR')}원\n` +
+    `입고 합계: ${total.toLocaleString('ko-KR')}원\n` +
+    (memo ? `메모: ${memo}\n` : '') +
+    `─────────────────────\n` +
+    `재고: ${prevStock.toLocaleString('ko-KR')} → ${newStock.toLocaleString('ko-KR')}\n` +
+    `원가: ${prevCost.toLocaleString('ko-KR')}원 → ${unit.toLocaleString('ko-KR')}원\n\n` +
+    `진행하시겠습니까?`
+  );
+  if (!ok) return;
+
+  // Supabase 업데이트
+  try {
+    const { error } = await _supabase.from('products')
+      .update({ stock: newStock, cost: unit })
+      .eq('id', product.id);
+    if (error) throw error;
+  } catch (e) {
+    showAppAlert('저장 실패', e.message || String(e), 'error');
+    return;
+  }
+
+  // 이력 기록
+  const hist = _loadReceivingHistory();
+  hist.unshift({
+    id: Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+    date,
+    sku: product.sku,
+    productId: product.id,
+    productName: product.name,
+    qty,
+    unitPrice: unit,
+    total,
+    memo,
+    prevStock, newStock,
+    prevCost, newCost: unit,
+    createdAt: new Date().toISOString(),
+  });
+  if (hist.length > 10000) hist.length = 10000;
+  _saveReceivingHistory(hist);
+
+  // 폼 초기화 (날짜/메모는 유지 — 연속 입고 편의)
+  document.getElementById('rcv-sku-search').value = '';
+  document.getElementById('rcv-qty').value = '';
+  document.getElementById('rcv-unit-price').value = '';
+  _rcvUpdatePreview();
+
+  showAppAlert('입고 완료', `${product.name}\n+${qty.toLocaleString('ko-KR')}개 입고 처리되었습니다.\n원가: ${unit.toLocaleString('ko-KR')}원`, 'success');
+
+  // _allProducts 새로고침 → 일반상품 / 재고금액 / 통계 카드 모두 자동 갱신
+  await loadProductsFromDB();
+  renderReceivingHistory();
+}
+
+function renderReceivingHistory() {
+  const tbody = document.getElementById('rcv-tbody');
+  const tfoot = document.getElementById('rcv-tfoot');
+  if (!tbody) return;
+  let hist = _loadReceivingHistory();
+  // 검색
+  const q = (document.getElementById('rcv-hist-search')?.value || '').trim().toLowerCase();
+  if (q) {
+    hist = hist.filter(h =>
+      String(h.sku || '').toLowerCase().includes(q) ||
+      String(h.productName || '').toLowerCase().includes(q) ||
+      String(h.memo || '').toLowerCase().includes(q)
+    );
+  }
+  // 최신순 (createdAt 기준)
+  hist.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+
+  if (!hist.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-12 text-center text-brand-gray text-sm">입고 내역이 없습니다.</td></tr>';
+    if (tfoot) tfoot.innerHTML = '';
+    return;
+  }
+  const fmt = n => Number(n || 0).toLocaleString('ko-KR');
+  tbody.innerHTML = hist.map(h => `<tr class="border-b border-brand-border hover:bg-brand-bg/40">
+    <td class="px-4 py-3 text-xs whitespace-nowrap">${_escapeHtml(h.date || '')}</td>
+    <td class="px-4 py-3 text-xs font-mono whitespace-nowrap">${_escapeHtml(h.sku || '')}</td>
+    <td class="px-4 py-3 text-xs truncate max-w-[280px]" title="${_escapeHtml(h.productName || '')}">${_escapeHtml(h.productName || '')}</td>
+    <td class="px-4 py-3 text-xs text-right font-bold text-brand-blue">+${fmt(h.qty)}</td>
+    <td class="px-4 py-3 text-xs text-right">${fmt(h.unitPrice)}원</td>
+    <td class="px-4 py-3 text-xs text-right font-bold">${fmt(h.total)}원</td>
+    <td class="px-4 py-3 text-xs truncate max-w-[180px]" title="${_escapeHtml(h.memo || '')}">${_escapeHtml(h.memo || '')}</td>
+    <td class="px-4 py-3 text-xs text-brand-gray whitespace-nowrap">${String(h.createdAt || '').slice(0, 16).replace('T', ' ')}</td>
+    <td class="px-4 py-3 text-xs text-center"><button onclick="deleteReceivingRecord('${h.id}')" class="text-brand-pink hover:underline text-xs font-bold">삭제</button></td>
+  </tr>`).join('');
+
+  // 합계
+  const totalQty = hist.reduce((s, h) => s + (Number(h.qty) || 0), 0);
+  const totalAmt = hist.reduce((s, h) => s + (Number(h.total) || 0), 0);
+  if (tfoot) tfoot.innerHTML = `<tr class="border-t-2 border-brand-black bg-brand-bg font-bold">
+    <td class="px-4 py-3 text-xs" colspan="3">합계 (${hist.length}건)</td>
+    <td class="px-4 py-3 text-xs text-right text-brand-blue">+${fmt(totalQty)}</td>
+    <td class="px-4 py-3"></td>
+    <td class="px-4 py-3 text-xs text-right">${fmt(totalAmt)}원</td>
+    <td class="px-4 py-3" colspan="3"></td>
+  </tr>`;
+}
+
+function deleteReceivingRecord(id) {
+  if (!confirm('이 입고 기록을 삭제할까요?\n\n⚠ 주의: 상품의 재고/원가는 자동으로 되돌리지 않습니다.\n필요하면 상품관리에서 직접 수정하세요.')) return;
+  const hist = _loadReceivingHistory();
+  const remain = hist.filter(h => h.id !== id);
+  _saveReceivingHistory(remain);
+  renderReceivingHistory();
+}
+
+function exportReceivingHistory() {
+  const hist = _loadReceivingHistory();
+  if (!hist.length) { showAppAlert('데이터 없음', '내보낼 입고 내역이 없습니다.', 'info'); return; }
+  hist.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  const data = [
+    ['입고일자', 'SKU', '상품명', '입고수량', '단가', '합계', '메모', '이전재고', '입고후재고', '이전원가', '새원가', '등록시각'],
+    ...hist.map(h => [
+      h.date, h.sku, h.productName,
+      Number(h.qty) || 0, Number(h.unitPrice) || 0, Number(h.total) || 0,
+      h.memo || '',
+      Number(h.prevStock) || 0, Number(h.newStock) || 0,
+      Number(h.prevCost) || 0, Number(h.newCost) || 0,
+      String(h.createdAt || '').slice(0, 19).replace('T', ' '),
+    ]),
+  ];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{wch:12},{wch:14},{wch:40},{wch:10},{wch:10},{wch:12},{wch:24},{wch:10},{wch:10},{wch:10},{wch:10},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, ws, '입고내역');
+  XLSX.writeFile(wb, `GPLAN_입고내역_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
 // ── 재고금액 상세 뷰 ─────────────────────────
