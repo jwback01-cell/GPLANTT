@@ -1418,6 +1418,10 @@ tailwind.config = {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
             중복 정리
           </button>
+          <button onclick="openSafetyStockAutoCalc()" title="장부업로드의 최근 30일 판매수량으로 안전재고 자동 계산 (지플랜 카테고리만)" class="px-4 py-2.5 rounded-full bg-white border border-brand-border text-sm font-semibold hover:bg-brand-bg flex items-center gap-2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/><polyline points="12 7 12 12 15 15"/></svg>
+            안전재고 자동
+          </button>
           <button onclick="openAddProductDrawer()" class="bg-brand-black text-white px-5 py-2.5 rounded-full text-sm font-semibold hover:-translate-y-0.5 transition-transform shadow-md flex items-center gap-2">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>상품 추가
           </button>
@@ -11022,6 +11026,204 @@ function openEditProduct(id) {
   document.getElementById('add-product-backdrop').classList.add('open');
   document.getElementById('add-product-drawer').classList.add('open');
   document.body.style.overflow = 'hidden';
+}
+
+// ── 안전재고 자동 계산 (B-1: 일평균×N일분, 일괄 적용) ─────
+// 최근 30일 업로드 데이터의 SKU별 판매수량 집계 (세트상품은 구성품으로 분배)
+// 반환: Map<sku_lowercase, total_qty>
+function _calc30DayQtyBySku() {
+  const data = (typeof _loadUploadData === 'function') ? _loadUploadData() : [];
+  const now = new Date();
+  const cutoff = new Date(now.getTime() - 30 * 86400000);
+  const cutoffStr = cutoff.getFullYear() + '-'
+    + String(cutoff.getMonth() + 1).padStart(2, '0') + '-'
+    + String(cutoff.getDate()).padStart(2, '0');
+
+  // 1) itemCode 별 직접 판매수량
+  const directQty = new Map();
+  data.forEach(r => {
+    const date = String(r.date || '').slice(0, 10);
+    if (!date || date < cutoffStr) return;
+    const code = String(r.itemCode || '').trim();
+    if (!code) return;
+    const qty = Number(r.qty) || 0;
+    if (qty <= 0) return;
+    const key = code.toLowerCase();
+    directQty.set(key, (directQty.get(key) || 0) + qty);
+  });
+
+  // 2) 세트상품: 세트코드 판매수량을 구성품 SKU 로 분배
+  const sets = (typeof _loadSetProducts === 'function') ? _loadSetProducts() : [];
+  const totalQty = new Map(directQty);
+  sets.forEach(s => {
+    const setCode = String(s.code || '').trim().toLowerCase();
+    if (!setCode) return;
+    const setSold = directQty.get(setCode) || 0;
+    if (setSold <= 0) return;
+    (s.items || []).forEach(it => {
+      const compSku = String(it.sku || '').trim().toLowerCase();
+      const compMul = Number(it.qty) || 0;
+      if (!compSku || compMul <= 0) return;
+      totalQty.set(compSku, (totalQty.get(compSku) || 0) + setSold * compMul);
+    });
+    // 세트코드 자체는 일반상품에 매칭되지 않으므로 결과에서 제거
+    totalQty.delete(setCode);
+  });
+
+  return totalQty;
+}
+
+// 안전재고 자동 계산 모달 열기 — 카테고리 지플랜 상품만, B-1 방식
+function openSafetyStockAutoCalc() {
+  const products = Array.isArray(_allProducts) ? _allProducts : [];
+  if (!products.length) {
+    showAppAlert('데이터 없음', '상품이 없습니다.', 'info');
+    return;
+  }
+  const targets = products.filter(p => String(p.category || '').trim() === '지플랜');
+  if (!targets.length) {
+    showAppAlert('대상 없음', '카테고리가 "지플랜" 인 상품이 없습니다.', 'info');
+    return;
+  }
+  const qtyMap = _calc30DayQtyBySku();
+
+  const prev = document.getElementById('safety-auto-modal');
+  if (prev) prev.remove();
+  const m = document.createElement('div');
+  m.id = 'safety-auto-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  m.innerHTML = `
+    <div style="background:white;border-radius:16px;max-width:900px;width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="padding:16px 22px;border-bottom:1px solid #eee;">
+        <div style="font-weight:bold;font-size:16px;">안전재고 자동 계산 (지플랜 카테고리)</div>
+        <div style="color:#888;font-size:12px;margin-top:4px;">최근 30일 판매수량 ÷ 30 × N일 = 안전재고. 세트상품 판매분은 구성품에 자동 분배됨. 판매 0인 상품은 기존값 유지.</div>
+      </div>
+      <div style="padding:14px 22px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:12px;">
+        <span style="font-size:13px;font-weight:bold;">안전기간 (N일):</span>
+        <input type="number" id="safety-auto-days" value="7" min="1" max="90" style="width:80px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;text-align:center;">
+        <span style="color:#888;font-size:12px;">예: 7=일주일치, 14=2주치, 30=1달치</span>
+        <button onclick="_safetyAutoRefresh()" style="margin-left:auto;padding:6px 14px;border:1px solid #ddd;border-radius:6px;background:white;cursor:pointer;font-size:12px;font-weight:bold;">미리보기 갱신</button>
+      </div>
+      <div id="safety-auto-summary" style="padding:10px 22px;border-bottom:1px solid #eee;font-size:12px;color:#666;background:#f8f8f8;"></div>
+      <div style="overflow:auto;flex:1;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead style="position:sticky;top:0;background:#f8f8f8;border-bottom:2px solid #ddd;">
+            <tr>
+              <th style="padding:10px;text-align:left;font-size:11px;font-weight:bold;color:#888;">SKU</th>
+              <th style="padding:10px;text-align:left;font-size:11px;font-weight:bold;color:#888;">상품명</th>
+              <th style="padding:10px;text-align:right;font-size:11px;font-weight:bold;color:#888;">30일 판매</th>
+              <th style="padding:10px;text-align:right;font-size:11px;font-weight:bold;color:#888;">현재 안전재고</th>
+              <th style="padding:10px;text-align:right;font-size:11px;font-weight:bold;color:#888;">권장 안전재고</th>
+              <th style="padding:10px;text-align:left;font-size:11px;font-weight:bold;color:#888;">변경</th>
+            </tr>
+          </thead>
+          <tbody id="safety-auto-tbody"></tbody>
+        </table>
+      </div>
+      <div style="padding:14px 22px;border-top:1px solid #eee;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <span style="color:#888;font-size:11px;">대상: 카테고리 "지플랜" / ${targets.length}개 상품 / 세트 ${(typeof _loadSetProducts === 'function' ? _loadSetProducts().length : 0)}개 분배 적용</span>
+        <div style="display:flex;gap:8px;">
+          <button onclick="document.getElementById('safety-auto-modal').remove()" style="padding:9px 22px;border-radius:20px;border:1px solid #ddd;background:white;cursor:pointer;font-size:13px;font-weight:bold;">취소</button>
+          <button id="safety-auto-apply" onclick="applySafetyStockAuto()" style="padding:9px 26px;border-radius:20px;border:none;background:#000;color:white;cursor:pointer;font-size:13px;font-weight:bold;">변경 적용</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+  // 캐시 + 첫 미리보기
+  m._targets = targets;
+  m._qtyMap = qtyMap;
+  _safetyAutoRefresh();
+}
+
+// 미리보기 표 갱신 (N일 입력 변경 시 호출)
+function _safetyAutoRefresh() {
+  const m = document.getElementById('safety-auto-modal');
+  if (!m) return;
+  const days = Math.max(1, Math.min(90, Number(document.getElementById('safety-auto-days').value) || 7));
+  const targets = m._targets || [];
+  const qtyMap = m._qtyMap || new Map();
+
+  let changed = 0, kept = 0, withSales = 0;
+  const rows = targets.map(p => {
+    const skuKey = String(p.sku || '').trim().toLowerCase();
+    const qty30 = qtyMap.get(skuKey) || 0;
+    const cur = Number(p.safety_stock) || 0;
+    let suggested;
+    if (qty30 <= 0) {
+      suggested = cur; // 판매 0 → 기존값 유지
+      kept++;
+    } else {
+      suggested = Math.ceil(qty30 / 30 * days);
+      withSales++;
+      if (suggested !== cur) changed++;
+    }
+    return { p, qty30, cur, suggested };
+  });
+  // 30일 판매 많은 순으로 정렬
+  rows.sort((a, b) => b.qty30 - a.qty30);
+
+  document.getElementById('safety-auto-summary').innerHTML =
+    `<b>${targets.length}개 상품</b> 중 30일 판매 발생 <b>${withSales}개</b>, 그 중 안전재고 <b style="color:#000;">변경 예정 ${changed}개</b>, 판매 0이라 유지 <b>${kept}개</b>.`;
+
+  const tbodyEl = document.getElementById('safety-auto-tbody');
+  if (!rows.length) {
+    tbodyEl.innerHTML = '<tr><td colspan="6" style="padding:30px;text-align:center;color:#888;">대상 상품이 없습니다.</td></tr>';
+    return;
+  }
+  tbodyEl.innerHTML = rows.map(r => {
+    const isChange = r.qty30 > 0 && r.suggested !== r.cur;
+    const changeBadge = isChange
+      ? (r.suggested > r.cur
+          ? `<span style="color:#E91E63;font-weight:bold;">▲ ${r.suggested - r.cur}</span>`
+          : `<span style="color:#3B82F6;font-weight:bold;">▼ ${r.cur - r.suggested}</span>`)
+      : (r.qty30 === 0 ? '<span style="color:#aaa;">(판매0, 유지)</span>' : '<span style="color:#aaa;">동일</span>');
+    return `<tr style="border-bottom:1px solid #eee;${isChange ? 'background:#fff8e1;' : ''}">
+      <td style="padding:8px 10px;font-size:12px;font-family:monospace;">${_escapeHtml(p_sku(r.p))}</td>
+      <td style="padding:8px 10px;font-size:12px;">${_escapeHtml((r.p.name || '').slice(0, 50))}</td>
+      <td style="padding:8px 10px;font-size:12px;text-align:right;">${r.qty30.toLocaleString('ko-KR')}</td>
+      <td style="padding:8px 10px;font-size:12px;text-align:right;color:#888;">${r.cur.toLocaleString('ko-KR')}</td>
+      <td style="padding:8px 10px;font-size:12px;text-align:right;font-weight:bold;">${r.suggested.toLocaleString('ko-KR')}</td>
+      <td style="padding:8px 10px;font-size:12px;">${changeBadge}</td>
+    </tr>`;
+  }).join('');
+  // 변경 적용 버튼 라벨 갱신
+  const applyBtn = document.getElementById('safety-auto-apply');
+  if (applyBtn) applyBtn.textContent = `변경 적용 (${changed}개)`;
+  // 다음 적용 시 사용할 값 캐시
+  m._rowsToApply = rows.filter(r => r.qty30 > 0 && r.suggested !== r.cur);
+}
+function p_sku(p) { return String(p && p.sku || '').trim(); }
+
+async function applySafetyStockAuto() {
+  const m = document.getElementById('safety-auto-modal');
+  if (!m) return;
+  const rows = m._rowsToApply || [];
+  if (!rows.length) {
+    showAppAlert('변경 없음', '변경할 항목이 없습니다.', 'info');
+    return;
+  }
+  if (!confirm(`${rows.length}개 상품의 안전재고를 변경합니다.\n\n계속하시겠습니까?\n(취소 후 변경 없이 닫을 수 있어요)`)) return;
+
+  const applyBtn = document.getElementById('safety-auto-apply');
+  if (applyBtn) { applyBtn.disabled = true; applyBtn.textContent = '적용 중...'; }
+  let ok = 0, fail = 0;
+  for (const r of rows) {
+    try {
+      const { error } = await _supabase.from('products').update({ safety_stock: r.suggested }).eq('id', r.p.id);
+      if (error) throw error;
+      ok++;
+    } catch (e) {
+      fail++;
+      console.error('[안전재고 자동] 실패:', r.p.sku, e);
+    }
+  }
+  m.remove();
+  showAppAlert(
+    fail === 0 ? '적용 완료' : '일부 실패',
+    `${ok}개 상품의 안전재고가 업데이트되었습니다.${fail > 0 ? `\n${fail}개 실패 — 콘솔(F12)에서 상세 확인.` : ''}`,
+    fail === 0 ? 'success' : 'warn'
+  );
+  if (typeof loadProductsFromDB === 'function') await loadProductsFromDB();
 }
 
 async function deleteProduct(id) {
