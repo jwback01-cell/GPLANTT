@@ -9839,17 +9839,8 @@ async function _productSearchDbFallback(query) {
       return;
     }
     _allProducts = (_allProducts || []).concat(added);
-    console.log(`[product-search-fallback] DB 에서 ${added.length}건 발견하여 캐시에 추가:`, added.map(p => p.sku));
-    if (typeof showAppAlert === 'function') {
-      showAppAlert(
-        '캐시 누락 상품 발견',
-        `"${q}" 로 DB 직접 조회한 결과 캐시에 없던 ${added.length}건이 발견되어 추가했습니다.\n` +
-        `SKU: ${added.slice(0, 5).map(p => p.sku).join(', ')}${added.length > 5 ? ' 외' : ''}\n\n` +
-        `캐시 자체에 누락이 있다는 뜻이에요. 새로고침(Ctrl+F5)을 권장합니다.`,
-        'warn'
-      );
-    }
-    // 다시 렌더 (재귀 호출 X — 직접 호출)
+    console.log(`[product-search-fallback] DB 에서 ${added.length}건 발견하여 캐시에 조용히 추가:`, added.map(p => p.sku));
+    // 알림 없이 조용히 다시 렌더 (사용자가 검색하면 자연스럽게 결과만 보임)
     renderProductsPage();
   } catch (e) {
     console.warn('[product-search-fallback] 예외:', e);
