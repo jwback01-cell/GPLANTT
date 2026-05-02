@@ -11186,7 +11186,7 @@ function openSafetyStockAutoCalc() {
       </div>
       <div style="padding:14px 22px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:12px;">
         <span style="font-size:13px;font-weight:bold;">안전기간 (N일):</span>
-        <input type="number" id="safety-auto-days" value="7" min="1" max="90" style="width:80px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;text-align:center;">
+        <input type="number" id="safety-auto-days" value="30" min="1" max="90" style="width:80px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;text-align:center;">
         <span style="color:#888;font-size:12px;">예: 7=일주일치, 14=2주치, 30=1달치</span>
         <button onclick="_safetyAutoRefresh()" style="margin-left:auto;padding:6px 14px;border:1px solid #ddd;border-radius:6px;background:white;cursor:pointer;font-size:12px;font-weight:bold;">미리보기 갱신</button>
       </div>
@@ -11225,7 +11225,7 @@ function openSafetyStockAutoCalc() {
 function _safetyAutoRefresh() {
   const m = document.getElementById('safety-auto-modal');
   if (!m) return;
-  const days = Math.max(1, Math.min(90, Number(document.getElementById('safety-auto-days').value) || 7));
+  const days = Math.max(1, Math.min(90, Number(document.getElementById('safety-auto-days').value) || 30));
   const targets = m._targets || [];
   const qtyMap = m._qtyMap || new Map();
 
