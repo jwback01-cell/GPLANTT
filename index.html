@@ -5535,12 +5535,19 @@ async function runKwAutoTrack(isAuto) {
   const now = new Date();
 
   let ok = 0, skipped = 0;
+  // 진단 로그 — 사용자가 콘솔에서 어디까지 진행됐는지 확인 가능
+  const errors = [];
+  console.group(`[KW Auto] 자동 추적 시작 - ${list.length}개 키워드`);
   for (let listIdx = 0; listIdx < list.length; listIdx++) {
     const it = list[listIdx];
     // 봇 감지 회피: 첫 키워드를 제외한 나머지는 800ms 간격으로 호출
     if (listIdx > 0) await new Promise(r => setTimeout(r, 800));
     const product = _kwResolveProduct(it.productKey);
-    if (!product) { skipped++; continue; }
+    if (!product) {
+      console.warn(`[KW Auto] (${listIdx+1}/${list.length}) "${it.keyword}" 상품 연결 끊김`, it);
+      skipped++;
+      continue;
+    }
     const productIds = _extractProductIds(product.url);
     const productKey = product.url || product.name;
     const keyword = it.keyword;
@@ -5571,8 +5578,30 @@ async function runKwAutoTrack(isAuto) {
         _appendKwSeries(histKey, now.toISOString(), foundRank);
       }
       ok++;
-    } catch (e) { console.warn('auto track err', keyword, e); skipped++; continue; }
+      console.log(`[KW Auto] (${listIdx+1}/${list.length}) ✅ "${keyword}" 완료`);
+    } catch (e) {
+      const errMsg = e.message || String(e);
+      console.warn(`[KW Auto] (${listIdx+1}/${list.length}) ❌ "${keyword}" 실패:`, errMsg);
+      errors.push({ keyword, error: errMsg });
+      // 실패해도 series 에 null 기록하여 "그날 시도했지만 안 잡힘" 표시 (날짜 컬럼이 사라지지 않음)
+      try {
+        rankTypes.forEach(rankType => {
+          const histKey = productKey + '||' + keyword + '||' + rankType;
+          _appendKwSeries(histKey, now.toISOString(), null);
+        });
+      } catch (_) {}
+      skipped++;
+      continue;
+    }
   }
+  console.log(`[KW Auto] 종료 - 성공 ${ok}건 / 건너뜀 ${skipped}건 / 오류 ${errors.length}건`);
+  if (errors.length) {
+    console.table(errors.slice(0, 10));
+    if (errors.length > 10) console.log(`... 외 ${errors.length - 10}건 (자세한 로그는 위 warn 참조)`);
+  }
+  console.groupEnd();
+  // 진단용 — 마지막 실행 결과 노출
+  window._lastKwAutoErrors = errors;
   _saveKwHistory(history);
 
   const s = _loadKwAuto();
@@ -5592,8 +5621,22 @@ async function runKwAutoTrackNow() {
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="animate-pulse">실행 중...</span>'; }
   const res = await runKwAutoTrack(false);
   if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+
   if (res.ok || res.skipped) {
-    alert(`자동 추적 완료: 성공 ${res.ok}건 / 건너뜀 ${res.skipped}건`);
+    const errs = (window._lastKwAutoErrors || []);
+    let msg = `자동 추적 완료: 성공 ${res.ok}건 / 건너뜀 ${res.skipped}건`;
+    if (errs.length) {
+      // 같은 에러 메시지끼리 묶어서 빈도 집계
+      const byMsg = {};
+      errs.forEach(e => { byMsg[e.error] = (byMsg[e.error] || 0) + 1; });
+      const sorted = Object.entries(byMsg).sort((a, b) => b[1] - a[1]);
+      msg += '\n\n실패 사유 TOP 5:';
+      sorted.slice(0, 5).forEach(([m, c]) => { msg += `\n• [${c}건] ${m.slice(0, 100)}`; });
+      if (errs.length > 0 && res.ok === 0) {
+        msg += '\n\n⚠ 모든 키워드 실패 — 네이버 검색이 차단됐거나 Open API 키 문제일 수 있어요.\nF12 콘솔에서 자세한 로그 확인 가능.';
+      }
+    }
+    alert(msg);
   }
 }
 
