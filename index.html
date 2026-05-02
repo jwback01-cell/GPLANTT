@@ -11182,7 +11182,7 @@ function openSafetyStockAutoCalc() {
     <div style="background:white;border-radius:16px;max-width:900px;width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
       <div style="padding:16px 22px;border-bottom:1px solid #eee;">
         <div style="font-weight:bold;font-size:16px;">안전재고 자동 계산 (지플랜 카테고리)</div>
-        <div style="color:#888;font-size:12px;margin-top:4px;">최근 30일 판매수량 ÷ 30 × N일 = 안전재고. 세트상품 판매분은 구성품에 자동 분배됨. 판매 0인 상품은 기존값 유지.</div>
+        <div style="color:#888;font-size:12px;margin-top:4px;">최근 30일 판매수량 ÷ 30 × N일 = 안전재고. 세트상품 판매분은 구성품에 자동 분배됨. <b>판매 0인 상품은 안전재고 0으로 설정.</b></div>
       </div>
       <div style="padding:14px 22px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:12px;">
         <span style="font-size:13px;font-weight:bold;">안전기간 (N일):</span>
@@ -11229,15 +11229,17 @@ function _safetyAutoRefresh() {
   const targets = m._targets || [];
   const qtyMap = m._qtyMap || new Map();
 
-  let changed = 0, kept = 0, withSales = 0;
+  let changed = 0, withSales = 0, noSalesChanged = 0, noSalesAlready0 = 0;
   const rows = targets.map(p => {
     const skuKey = String(p.sku || '').trim().toLowerCase();
     const qty30 = qtyMap.get(skuKey) || 0;
     const cur = Number(p.safety_stock) || 0;
     let suggested;
     if (qty30 <= 0) {
-      suggested = cur; // 판매 0 → 기존값 유지
-      kept++;
+      // 판매 0 → 안전재고 0 으로 설정
+      suggested = 0;
+      if (cur !== 0) { noSalesChanged++; changed++; }
+      else noSalesAlready0++;
     } else {
       suggested = Math.ceil(qty30 / 30 * days);
       withSales++;
@@ -11249,7 +11251,9 @@ function _safetyAutoRefresh() {
   rows.sort((a, b) => b.qty30 - a.qty30);
 
   document.getElementById('safety-auto-summary').innerHTML =
-    `<b>${targets.length}개 상품</b> 중 30일 판매 발생 <b>${withSales}개</b>, 그 중 안전재고 <b style="color:#000;">변경 예정 ${changed}개</b>, 판매 0이라 유지 <b>${kept}개</b>.`;
+    `<b>${targets.length}개 상품</b> 중 30일 판매 발생 <b>${withSales}개</b>, 판매 0인 상품 <b>${targets.length - withSales}개</b>` +
+    ` (그 중 안전재고가 0이 아니라 0으로 변경 예정 <b>${noSalesChanged}개</b>) — ` +
+    `<b style="color:#000;">총 변경 예정 ${changed}개</b>.`;
 
   const tbodyEl = document.getElementById('safety-auto-tbody');
   if (!rows.length) {
@@ -11257,12 +11261,22 @@ function _safetyAutoRefresh() {
     return;
   }
   tbodyEl.innerHTML = rows.map(r => {
-    const isChange = r.qty30 > 0 && r.suggested !== r.cur;
-    const changeBadge = isChange
-      ? (r.suggested > r.cur
-          ? `<span style="color:#E91E63;font-weight:bold;">▲ ${r.suggested - r.cur}</span>`
-          : `<span style="color:#3B82F6;font-weight:bold;">▼ ${r.cur - r.suggested}</span>`)
-      : (r.qty30 === 0 ? '<span style="color:#aaa;">(판매0, 유지)</span>' : '<span style="color:#aaa;">동일</span>');
+    const isChange = r.suggested !== r.cur;
+    let changeBadge;
+    if (isChange) {
+      if (r.qty30 === 0) {
+        // 판매 0인데 cur != 0 → 0으로 변경
+        changeBadge = `<span style="color:#3B82F6;font-weight:bold;">▼ ${r.cur} (판매0→0)</span>`;
+      } else if (r.suggested > r.cur) {
+        changeBadge = `<span style="color:#E91E63;font-weight:bold;">▲ ${r.suggested - r.cur}</span>`;
+      } else {
+        changeBadge = `<span style="color:#3B82F6;font-weight:bold;">▼ ${r.cur - r.suggested}</span>`;
+      }
+    } else if (r.qty30 === 0 && r.cur === 0) {
+      changeBadge = '<span style="color:#aaa;">(판매0, 이미 0)</span>';
+    } else {
+      changeBadge = '<span style="color:#aaa;">동일</span>';
+    }
     return `<tr style="border-bottom:1px solid #eee;${isChange ? 'background:#fff8e1;' : ''}">
       <td style="padding:8px 10px;font-size:12px;font-family:monospace;">${_escapeHtml(p_sku(r.p))}</td>
       <td style="padding:8px 10px;font-size:12px;">${_escapeHtml((r.p.name || '').slice(0, 50))}</td>
@@ -11275,8 +11289,8 @@ function _safetyAutoRefresh() {
   // 변경 적용 버튼 라벨 갱신
   const applyBtn = document.getElementById('safety-auto-apply');
   if (applyBtn) applyBtn.textContent = `변경 적용 (${changed}개)`;
-  // 다음 적용 시 사용할 값 캐시
-  m._rowsToApply = rows.filter(r => r.qty30 > 0 && r.suggested !== r.cur);
+  // 다음 적용 시 사용할 값 캐시 — suggested 가 cur 와 다르면 모두 적용 대상
+  m._rowsToApply = rows.filter(r => r.suggested !== r.cur);
 }
 function p_sku(p) { return String(p && p.sku || '').trim(); }
 
