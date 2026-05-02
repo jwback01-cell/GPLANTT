@@ -15497,6 +15497,39 @@ function _paGetSkuCode(o, prod) {
 }
 
 // 상품관리(_allProducts) + 세트상품(localStorage)에서 SKU 코드로 택배비용 매칭
+// 세트코드 → 구성품 원가 합계 (sum of comp.cost × item.qty)
+// 일반상품 SKU 면 null 반환 (별도 분기로 처리)
+function _paSetCostFromComponents(skuCode) {
+  if (!skuCode) return null;
+  if (typeof _loadSetProducts !== 'function') return null;
+  const sets = _loadSetProducts();
+  if (!Array.isArray(sets) || !sets.length) return null;
+  const s = String(skuCode).trim();
+  const sLow = s.toLowerCase();
+  let setHit = sets.find(x => String(x.code || '').trim() === s);
+  if (!setHit) setHit = sets.find(x => String(x.code || '').trim().toLowerCase() === sLow);
+  if (!setHit) return null;
+  if (!Array.isArray(setHit.items) || !setHit.items.length) return null;
+
+  const products = (typeof _allProducts !== 'undefined' && Array.isArray(_allProducts)) ? _allProducts : [];
+  if (!products.length) return null;
+  const bySku = new Map(products.filter(p => p.sku).map(p => [String(p.sku).trim().toLowerCase(), p]));
+
+  let total = 0;
+  let anyMatched = false;
+  for (const it of setHit.items) {
+    const sku = String(it.sku || '').trim();
+    const itQty = Number(it.qty) || 0;
+    if (!sku || itQty <= 0) continue;
+    const prod = bySku.get(sku.toLowerCase());
+    if (!prod) continue;
+    const c = Number(prod.cost) || 0;
+    total += c * itQty;
+    anyMatched = true;
+  }
+  return anyMatched ? total : null;
+}
+
 // 매칭 순서:
 //   1) 일반 상품의 SKU 일치 → 그 상품의 shipping_cost
 //   2) 세트 상품의 세트코드 일치 → 세트의 첫 번째 구성품(대표 SKU)의 shipping_cost
@@ -15589,6 +15622,11 @@ function _paExtractOrderRow(o) {
     || _paPickField(o, ['shop_sale_name', 'item_name', 'productName', 'goods_name']);
   // 수량 (PA 응답 또는 폴백 1)
   const qty = _paPickNumber(o, ['sale_cnt', 'qty', 'quantity', 'order_qty']) || 1;
+  // 세트상품 — itemCode 가 세트코드면 구성품 원가 합계로 cost 재계산 (PA 가 주는 cost 부정확할 수 있음)
+  const setUnitCost = _paSetCostFromComponents(skuCode);
+  if (setUnitCost != null && setUnitCost > 0) {
+    cost = setUnitCost; // 단가(per set) — 아래에서 qty 곱셈
+  }
   // 원가는 PA가 단가(per-unit)로 주므로 수량 곱하여 라인 합계로 저장
   // (공급가/판매가/택배비는 PA가 이미 라인 합계로 주는 것을 가정)
   const costTotal = cost == null ? null : Number(cost) * qty;
