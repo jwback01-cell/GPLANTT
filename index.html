@@ -20169,6 +20169,37 @@ async function rematchUploadDataShipCosts() {
     return;
   }
 
+  // 업로드 데이터의 모든 SKU를 DB에서 직접 조회하여 캐시 누락 상품 보완
+  // (캐시에 없어도 DB에 있으면 매칭됨)
+  try {
+    const uniqueSkus = [...new Set(
+      data.filter(r => typeof r.shipCostMatched === 'boolean' && r.skuCode)
+          .map(r => String(r.skuCode).trim())
+          .filter(Boolean)
+    )];
+    if (uniqueSkus.length) {
+      // 이미 캐시에 있는 SKU 제외
+      const cachedSkus = new Set((_allProducts || []).map(p => String(p.sku || '').trim()).filter(Boolean));
+      const missing = uniqueSkus.filter(s => !cachedSkus.has(s));
+      if (missing.length) {
+        console.log(`[rematch] 캐시에 없는 SKU ${missing.length}개 DB 직접 조회 시도`);
+        // Supabase .in 한도 (~1000) 고려 — 200개씩 청크
+        const chunkSize = 200;
+        for (let i = 0; i < missing.length; i += chunkSize) {
+          const chunk = missing.slice(i, i + chunkSize);
+          const { data: extra, error } = await _supabase.from('products').select('*').in('sku', chunk);
+          if (error) { console.warn('[rematch] DB 직접 조회 오류:', error); continue; }
+          if (extra && extra.length) {
+            _allProducts = (_allProducts || []).concat(extra);
+            console.log(`[rematch] DB에서 ${extra.length}개 발견하여 캐시에 보완`);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[rematch] DB 직접 조회 단계 실패:', e);
+  }
+
   let candidates = 0;
   let valueUpdated = 0;     // 이미 매칭이었는데 금액이 달라져서 갱신
   let newlyMatched = 0;     // 미매칭이었다가 매칭 성공
