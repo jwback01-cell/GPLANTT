@@ -20018,10 +20018,22 @@ function saveEditedUploadDataRow(idx) {
 //   4) 묶음(bundle) 재중복제거는 적용하지 않음 (저장된 행에 _bundleKey 가 없음)
 // ──────────────────────────────────────────────────────────
 async function rematchUploadDataShipCosts() {
-  // 상품 캐시 보장 (DB에서 로드)
-  if ((typeof _allProducts === 'undefined' || !Array.isArray(_allProducts) || !_allProducts.length) && typeof loadProductsFromDB === 'function') {
-    try { await loadProductsFromDB(); } catch (_) {}
+  // 상품관리 강제 새로고침 — 캐시가 부분 로드된 상태일 수 있어 매번 DB에서 새로 로드
+  if (typeof loadProductsFromDB === 'function') {
+    try { await loadProductsFromDB(); } catch (e) { console.warn('[rematch] loadProductsFromDB 실패:', e); }
   }
+  const productCount = Array.isArray(_allProducts) ? _allProducts.length : 0;
+  console.log(`[rematch] 시작 - 상품관리 캐시: ${productCount}개`);
+  // 안전장치: 캐시가 0이면 매칭 해제 위험 → 사용자 경고
+  if (productCount === 0) {
+    if (typeof showAppAlert === 'function') {
+      showAppAlert('상품관리 데이터 없음',
+        '상품관리 데이터를 가져오지 못했습니다.\n새로고침(Ctrl+F5) 후 다시 시도해주세요.\n\n(이대로 진행하면 모든 행이 매칭 해제될 위험이 있어 중단합니다.)',
+        { type: 'error' });
+    }
+    return;
+  }
+
   const data = _loadUploadData();
   if (!data.length) {
     if (typeof showAppAlert === 'function') showAppAlert('데이터 없음', '저장된 업로드 데이터가 없습니다.', { type: 'info' });
@@ -20034,6 +20046,7 @@ async function rematchUploadDataShipCosts() {
   let nowUnmatched = 0;     // 매칭이었다가 매칭 해제(상품/세트 삭제 등)
   let unchanged = 0;        // 이전과 동일
   const stillMissingSkus = [];
+  const releasedSkus = [];  // 매칭 해제된 SKU 목록 (어떤게 해제됐는지 사용자에게 보여주기 위함)
 
   data.forEach(r => {
     // 비-PA 행(엑셀 직접 업로드 등)은 매칭 메타 정보가 없으므로 건드리지 않음
@@ -20084,6 +20097,7 @@ async function rematchUploadDataShipCosts() {
       }
       nowUnmatched++;
       stillMissingSkus.push(r.skuCode);
+      releasedSkus.push(r.skuCode);  // 어떤 SKU가 해제됐는지 추적
     }
   });
 
@@ -20107,10 +20121,15 @@ async function rematchUploadDataShipCosts() {
 
   // 결과 메시지
   const lines = [];
-  lines.push(`대상 ${candidates}건 중 ${totalChanged}건이 갱신되었습니다.`);
+  lines.push(`대상 ${candidates}건 중 ${totalChanged}건이 갱신되었습니다. (상품관리 ${productCount}개 캐시 기준)`);
   if (valueUpdated > 0) lines.push(`• 택배비용 변경: ${valueUpdated}건 (예: 3,500 → 4,000)`);
   if (newlyMatched > 0) lines.push(`• 새로 매칭: ${newlyMatched}건 (이전 ⚠ 미매칭 → 매칭됨)`);
-  if (nowUnmatched > 0) lines.push(`• 매칭 해제: ${nowUnmatched}건 (상품/세트가 삭제된 듯)`);
+  if (nowUnmatched > 0) {
+    const uniqueReleased = [...new Set(releasedSkus)];
+    const sample = uniqueReleased.slice(0, 8).join(', ');
+    const more = uniqueReleased.length > 8 ? ` 외 ${uniqueReleased.length - 8}개` : '';
+    lines.push(`• 매칭 해제: ${nowUnmatched}건 (코드 ${uniqueReleased.length}종)\n  ↳ ${sample}${more}\n  ↳ 위 코드들이 정말 상품관리/세트에 없는지 확인하세요. 있는데 해제됐다면 [💰 SKU 매칭] 다시 클릭.`);
+  }
 
   // 여전히 미매칭인 SKU/세트코드 안내
   const finalUnmatched = data.filter(r => r.shipCostMatched === false && !r.shipCostBundleApplied && r.skuCode).length;
