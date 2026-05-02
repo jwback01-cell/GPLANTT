@@ -9732,31 +9732,83 @@ async function loadProductsFromDB() {
     const { data: { session } } = await _supabase.auth.getSession();
     if (!session) return;
 
-    // Supabase(PostgREST) 응답 기본 최대치가 1000건이므로 페이지네이션으로 최대 10,000건까지 조회
+    // 1) 먼저 DB의 정확한 row 개수 조회 (head:true 로 데이터 안 받고 count 만)
+    let dbCount = null;
+    try {
+      const { count, error: cntErr } = await _supabase
+        .from('products')
+        .select('id', { count: 'exact', head: true });
+      if (!cntErr && typeof count === 'number') dbCount = count;
+    } catch (_) {}
+
+    // 2) 페이지네이션 — 에러 시 1회 재시도, 실패한 페이지는 명시적으로 사용자에게 알림
     const PAGE_SIZE = 1000;
-    const MAX_TOTAL = 10000;
+    const MAX_TOTAL = 20000; // 한도 확장
     const all = [];
+    let hadError = false;
+    let lastErrMsg = '';
     for (let from = 0; from < MAX_TOTAL; from += PAGE_SIZE) {
       const to = Math.min(from + PAGE_SIZE - 1, MAX_TOTAL - 1);
-      const { data, error } = await _supabase
-        .from('products')
-        .select('*')
-        .order('created_at')
-        .range(from, to);
-      if (error) { console.error('products load error:', error); break; }
-      const rows = data || [];
-      all.push(...rows);
-      if (rows.length < PAGE_SIZE) break; // 마지막 페이지
+      let attempt = 0;
+      let pageRows = null;
+      while (attempt < 2) {
+        const { data, error } = await _supabase
+          .from('products')
+          .select('*')
+          .order('created_at')
+          .range(from, to);
+        if (!error) { pageRows = data || []; break; }
+        lastErrMsg = error.message || String(error);
+        console.error(`[products] 페이지 ${from}~${to} 로드 실패 (시도 ${attempt + 1}):`, error);
+        attempt++;
+        if (attempt < 2) await new Promise(r => setTimeout(r, 800));
+      }
+      if (pageRows == null) {
+        hadError = true;
+        // 부분 데이터로 _allProducts 덮어쓰지 않고 중단
+        break;
+      }
+      all.push(...pageRows);
+      if (pageRows.length < PAGE_SIZE) break;
+    }
+
+    // 3) 부분 로드 감지 — DB 카운트와 비교
+    const expected = dbCount;
+    const got = all.length;
+    if (hadError) {
+      console.error(`[products] ⚠ 부분 로드: ${got}건만 가져옴. 에러: ${lastErrMsg}`);
+      if (typeof showAppAlert === 'function') {
+        showAppAlert(
+          '⚠ 상품 로드 실패',
+          `상품관리 데이터 로드 중 오류가 발생했습니다.\n현재 ${got}건만 로드됨${expected != null ? ` (DB에는 ${expected}건 있음)` : ''}.\n\n` +
+          `이 상태로 작업하면 일부 상품이 안 보일 수 있어요.\n새로고침(Ctrl+F5) 후 다시 시도해주세요.\n\n` +
+          `오류: ${lastErrMsg}`,
+          'error'
+        );
+      }
+      // 부분 로드 데이터는 사용하지 않음 (기존 _allProducts 유지)
+      if (!Array.isArray(_allProducts) || !_allProducts.length) {
+        _allProducts = all; // 기존 캐시도 없으면 어쩔 수 없이 부분 데이터 사용
+      }
+      return;
+    }
+    // 4) 정상 로드 — DB 카운트와 비교 검증
+    if (expected != null && got < expected) {
+      console.warn(`[products] ⚠ 카운트 불일치: 가져온 ${got} < DB ${expected}건. 한도 ${MAX_TOTAL} 초과 가능성.`);
+      if (got >= MAX_TOTAL && typeof showAppAlert === 'function') {
+        showAppAlert('⚠ 상품 ' + MAX_TOTAL + '건 한도 초과',
+          `DB에 상품이 ${expected}개 있지만 한 번에 ${MAX_TOTAL}개까지만 로드됩니다.\n` +
+          `${expected - got}개 상품이 안 보일 수 있어요.`, 'warn');
+      }
     }
     _allProducts = all;
-    if (_allProducts.length >= MAX_TOTAL) {
-      console.warn(`[products] 최대 ${MAX_TOTAL}건까지만 로드됩니다. 그 이상의 상품이 있을 수 있습니다.`);
-    } else {
-      console.log(`[products] ${_allProducts.length}건 로드 완료`);
-    }
+    console.log(`[products] ${got}건 로드 완료${expected != null ? ` (DB ${expected}건)` : ''}`);
     renderProductsPage();
   } catch (e) {
     console.error('loadProductsFromDB 오류:', e);
+    if (typeof showAppAlert === 'function') {
+      showAppAlert('상품 로드 예외', e.message || String(e), 'error');
+    }
   }
 }
 
