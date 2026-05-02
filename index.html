@@ -9915,7 +9915,7 @@ function renderProductsPage() {
     const noResult = document.getElementById('product-no-result');
     const noMsg    = document.getElementById('product-no-result-msg');
     if (noResult) {
-      noMsg.textContent = query ? '"' + query + '"에 대한 상품을 찾을 수 없습니다.' : '등록된 상품이 없습니다.';
+      noMsg.textContent = queryRaw ? '"' + queryRaw + '"에 대한 상품을 찾을 수 없습니다.' : '등록된 상품이 없습니다.';
       noResult.classList.remove('hidden');
     }
     renderProductPagination(1);
