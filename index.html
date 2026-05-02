@@ -20387,25 +20387,25 @@ function renderUploadData() {
     const origIdx = data.indexOf(r);
     return `
     <tr class="border-t border-brand-border hover:bg-brand-bg/50">
-      <td class="px-4 py-3"><input type="checkbox" class="upload-data-cb" data-idx="${origIdx}" onchange="updateUploadDataSelCount()"></td>
-      <td class="px-4 py-3">${r.vendor||''}</td>
-      <td class="px-4 py-3">${r.site||''}</td>
-      <td class="px-4 py-3">${r.date||''}</td>
-      <td class="hidden px-4 py-3">${r.siteCode||''}</td>
-      <td class="hidden px-4 py-3">${r.vendorCode||''}</td>
-      <td class="hidden px-4 py-3">${r.shipCode||''}</td>
-      <td class="px-4 py-3">${r.itemCode||''}</td>
+      <td class="px-4 py-3 whitespace-nowrap"><input type="checkbox" class="upload-data-cb" data-idx="${origIdx}" onchange="updateUploadDataSelCount()"></td>
+      <td class="px-4 py-3 whitespace-nowrap">${r.vendor||''}</td>
+      <td class="px-4 py-3 whitespace-nowrap">${r.site||''}</td>
+      <td class="px-4 py-3 whitespace-nowrap">${r.date||''}</td>
+      <td class="hidden px-4 py-3 whitespace-nowrap">${r.siteCode||''}</td>
+      <td class="hidden px-4 py-3 whitespace-nowrap">${r.vendorCode||''}</td>
+      <td class="hidden px-4 py-3 whitespace-nowrap">${r.shipCode||''}</td>
+      <td class="px-4 py-3 whitespace-nowrap">${r.itemCode||''}</td>
       <td class="px-4 py-3">${r.itemName||''}</td>
-      <td class="px-4 py-3 text-right">${_fmt(r.qty)}</td>
-      <td class="px-4 py-3 text-right">${_fmt(r.price)}</td>
-      <td class="px-4 py-3 text-right">${_fmt(r.supply ?? r.cost ?? 0)}</td>
-      <td class="px-4 py-3 text-right">${_fmt(r.ship)}</td>
-      <td class="px-4 py-3 text-right">${_shipCostCell(r)}</td>
-      <td class="px-4 py-3 text-right">${_money(r.cost)}</td>
-      <td class="px-4 py-3">${r.receiver||''}</td>
-      <td class="px-4 py-3 text-right">${_marginCell(r.profit)}</td>
-      <td class="px-4 py-3 text-brand-gray text-xs">${r.savedAt||''}</td>
-      <td class="px-4 py-3 text-center"><button onclick="openEditUploadDataRow(${origIdx})" title="이 행 수정" class="text-brand-blue hover:underline text-xs font-bold">✏️ 수정</button></td>
+      <td class="px-4 py-3 text-right whitespace-nowrap">${_fmt(r.qty)}</td>
+      <td class="px-4 py-3 text-right whitespace-nowrap">${_fmt(r.price)}</td>
+      <td class="px-4 py-3 text-right whitespace-nowrap">${_fmt(r.supply ?? r.cost ?? 0)}</td>
+      <td class="px-4 py-3 text-right whitespace-nowrap">${_fmt(r.ship)}</td>
+      <td class="px-4 py-3 text-right whitespace-nowrap">${_shipCostCell(r)}</td>
+      <td class="px-4 py-3 text-right whitespace-nowrap">${_money(r.cost)}</td>
+      <td class="px-4 py-3 whitespace-nowrap">${r.receiver||''}</td>
+      <td class="px-4 py-3 text-right whitespace-nowrap">${_marginCell(r.profit)}</td>
+      <td class="px-4 py-3 text-brand-gray text-xs whitespace-nowrap">${r.savedAt||''}</td>
+      <td class="px-4 py-3 text-center whitespace-nowrap"><button onclick="openEditUploadDataRow(${origIdx})" title="이 행 수정" class="text-brand-blue hover:underline text-xs font-bold">✏️ 수정</button></td>
     </tr>`;
   }).join('');
   const sum = (k) => all.reduce((s,r) => s + Number(r[k]||0), 0);
