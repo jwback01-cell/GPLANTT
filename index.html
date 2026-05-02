@@ -22639,17 +22639,62 @@ async function sendToEcount() {
   }
 
   _setEcountStatusBar('데이터를 전송하는 중입니다...', true);
+  // 이카운트 SaveSale/SavePurchases 1회 한도 = 300건. 안전 마진 두고 250건씩 청크
+  // 같은 UPLOAD_SER_NO 는 동일 청크 안에 있어야 1전표로 인식됨 → groupKey 경계로만 자름
+  const ECOUNT_CHUNK_LIMIT = 250;
+  function _chunkByUploadSerNo(list) {
+    const chunks = [];
+    let cur = [];
+    let curSer = null;
+    for (let i = 0; i < list.length; i++) {
+      const item = list[i];
+      const ser = item && item.BulkDatas && item.BulkDatas.UPLOAD_SER_NO;
+      // 청크 한도 도달 + UPLOAD_SER_NO 가 바뀌는 경계 → 새 청크 시작
+      if (cur.length >= ECOUNT_CHUNK_LIMIT && ser !== curSer) {
+        chunks.push(cur);
+        cur = [];
+      }
+      cur.push(item);
+      curSer = ser;
+    }
+    if (cur.length) chunks.push(cur);
+    return chunks;
+  }
+
   let saleOk = 0, saleFail = 0, purOk = 0, purFail = 0;
   const logs = [];
   try {
     if (items.indexOf('sale') !== -1) {
       const payload = _buildSalePayload(rows);
-      const lineCount = (payload.SaleList || []).length;
-      const resp = await _ecountPost(login.zone, '/OAPI/V2/Sale/SaveSale', login.sessionId, payload);
-      const r = _countResult(resp);
-      logs.push({ type:'판매입력', resp, errors: r.errors });
-      saleOk = r.ok;
-      saleFail = (typeof r.fail === 'number' && r.fail > 0) ? r.fail : Math.max(0, lineCount - r.ok);
+      const fullList = payload.SaleList || [];
+      const chunks = _chunkByUploadSerNo(fullList);
+      console.log(`[이카운트→판매] 총 ${fullList.length}건을 ${chunks.length}개 청크(최대 ${ECOUNT_CHUNK_LIMIT}건)로 분할 전송`);
+      for (let ci = 0; ci < chunks.length; ci++) {
+        const chunkList = chunks[ci];
+        _setEcountStatusBar(`판매 전송 중... (${ci + 1}/${chunks.length} 청크 · ${chunkList.length}건)`, true);
+        const chunkPayload = { ...payload, SaleList: chunkList };
+        let resp;
+        try {
+          resp = await _ecountPost(login.zone, '/OAPI/V2/Sale/SaveSale', login.sessionId, chunkPayload);
+        } catch (e) {
+          logs.push({ type:'판매입력', resp:null, errors:[{ line:'-', msg:`청크 ${ci+1}/${chunks.length} 네트워크 오류: ${e.message || e}` }] });
+          saleFail += chunkList.length;
+          break; // 네트워크 오류면 중단
+        }
+        const r = _countResult(resp);
+        logs.push({ type:`판매입력 (청크 ${ci+1}/${chunks.length})`, resp, errors: r.errors });
+        saleOk += r.ok;
+        const chunkFail = (typeof r.fail === 'number' && r.fail > 0) ? r.fail : Math.max(0, chunkList.length - r.ok);
+        saleFail += chunkFail;
+        // 한 청크라도 실패하면 (Status 500 등) 더 보내지 않음 — 시간당 연속 오류 제한 회피
+        if (chunkFail > 0 && r.ok === 0) {
+          console.warn(`[이카운트→판매] 청크 ${ci+1} 전체 실패 → 후속 청크 ${chunks.length - ci - 1}개 전송 중단`);
+          // 미전송 청크는 fail 로 계상
+          for (let j = ci + 1; j < chunks.length; j++) saleFail += chunks[j].length;
+          break;
+        }
+        if (ci < chunks.length - 1) await new Promise(res => setTimeout(res, 1500)); // 청크 간 1.5초 대기
+      }
     }
     if (items.indexOf('purchase') !== -1) {
       let purchaseRows = rows.filter(r => !_isGplanPurchaseRow(r));
@@ -22679,12 +22724,33 @@ async function sendToEcount() {
         logs.push({ type:'구매입력', resp:null, errors:[{ line:'-', msg }] });
       } else {
         const payload = _buildPurchasePayload(purchaseRows);
-        const lineCount = (payload.PurchasesList || []).length;
-        const resp = await _ecountPost(login.zone, '/OAPI/V2/Purchases/SavePurchases', login.sessionId, payload);
-        const r = _countResult(resp);
-        logs.push({ type:'구매입력', resp, errors: r.errors });
-        purOk = r.ok;
-        purFail = (typeof r.fail === 'number' && r.fail > 0) ? r.fail : Math.max(0, lineCount - r.ok);
+        const fullList = payload.PurchasesList || [];
+        const chunks = _chunkByUploadSerNo(fullList);
+        console.log(`[이카운트→구매] 총 ${fullList.length}건을 ${chunks.length}개 청크(최대 ${ECOUNT_CHUNK_LIMIT}건)로 분할 전송`);
+        for (let ci = 0; ci < chunks.length; ci++) {
+          const chunkList = chunks[ci];
+          _setEcountStatusBar(`구매 전송 중... (${ci + 1}/${chunks.length} 청크 · ${chunkList.length}건)`, true);
+          const chunkPayload = { ...payload, PurchasesList: chunkList };
+          let resp;
+          try {
+            resp = await _ecountPost(login.zone, '/OAPI/V2/Purchases/SavePurchases', login.sessionId, chunkPayload);
+          } catch (e) {
+            logs.push({ type:'구매입력', resp:null, errors:[{ line:'-', msg:`청크 ${ci+1}/${chunks.length} 네트워크 오류: ${e.message || e}` }] });
+            purFail += chunkList.length;
+            break;
+          }
+          const r = _countResult(resp);
+          logs.push({ type:`구매입력 (청크 ${ci+1}/${chunks.length})`, resp, errors: r.errors });
+          purOk += r.ok;
+          const chunkFail = (typeof r.fail === 'number' && r.fail > 0) ? r.fail : Math.max(0, chunkList.length - r.ok);
+          purFail += chunkFail;
+          if (chunkFail > 0 && r.ok === 0) {
+            console.warn(`[이카운트→구매] 청크 ${ci+1} 전체 실패 → 후속 청크 ${chunks.length - ci - 1}개 전송 중단`);
+            for (let j = ci + 1; j < chunks.length; j++) purFail += chunks[j].length;
+            break;
+          }
+          if (ci < chunks.length - 1) await new Promise(res => setTimeout(res, 1500));
+        }
       }
     }
   } catch (err) {
