@@ -12329,7 +12329,7 @@ function exportStockValueExcel() {
 }
 
 // 세트 상품 목록 렌더링
-function renderSetProductsPage() {
+async function renderSetProductsPage() {
   const body = document.getElementById('set-list-body');
   const empty = document.getElementById('set-no-result');
   const totalEl = document.getElementById('set-stat-total');
@@ -12337,6 +12337,33 @@ function renderSetProductsPage() {
   if (!body) return;
 
   const all = _loadSetProducts();
+
+  // 캐시 누락 보완 — 세트의 구성품 SKU 가 _allProducts 에 없으면 DB 직접 조회
+  // (캐시 누락으로 "[삭제됨]" 으로 잘못 표시되는 문제 방지)
+  try {
+    const cachedSkus = new Set((_allProducts || []).map(p => String(p.sku || '').trim()).filter(Boolean));
+    const componentSkus = new Set();
+    all.forEach(s => (s.items || []).forEach(it => {
+      const sku = String(it.sku || '').trim();
+      if (sku) componentSkus.add(sku);
+    }));
+    const missing = [...componentSkus].filter(sku => !cachedSkus.has(sku));
+    if (missing.length && typeof _supabase !== 'undefined') {
+      console.log(`[세트상품] 캐시 누락 구성품 SKU ${missing.length}개 DB 직접 조회 시도`);
+      const chunkSize = 200;
+      for (let i = 0; i < missing.length; i += chunkSize) {
+        const chunk = missing.slice(i, i + chunkSize);
+        const { data: extra, error } = await _supabase.from('products').select('*').in('sku', chunk);
+        if (error) { console.warn('[세트상품] DB 직접 조회 오류:', error); continue; }
+        if (extra && extra.length) {
+          _allProducts = (_allProducts || []).concat(extra);
+          console.log(`[세트상품] DB에서 ${extra.length}개 발견하여 캐시 보완`);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[세트상품] DB 보완 단계 실패:', e);
+  }
   const q = (document.getElementById('set-search')?.value || '').trim().toLowerCase();
   const list = q ? all.filter(s => {
     const blob = [s.code, s.name, s.barcode, s.memo,
