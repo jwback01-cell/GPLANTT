@@ -9755,7 +9755,7 @@ async function loadProductsFromDB() {
         const { data, error } = await _supabase
           .from('products')
           .select('*')
-          .order('created_at')
+          .order('id', { ascending: true })  // unique 키로 정렬 (created_at 중복 시 페이지네이션 누락 방지)
           .range(from, to);
         if (!error) { pageRows = data || []; break; }
         lastErrMsg = error.message || String(error);
