@@ -15755,6 +15755,36 @@ async function runPaMinusCheck() {
     try { await loadProductsFromDB(); } catch (_) {}
   }
 
+  // 캐시 누락 SKU 직접 보완 — _paOrders 의 itemCode 중 _allProducts 에 없는 것을 DB 직접 조회하여 캐시 추가
+  // (캐시 페이지네이션 누락으로 K12105 같은 상품이 미매칭 처리되는 문제 방지)
+  try {
+    const cachedSkus = new Set((_allProducts || []).map(p => String(p.sku || '').trim().toLowerCase()).filter(Boolean));
+    const orderSkus = new Set();
+    _paOrders.forEach(o => {
+      const SKU_KEYS = ['sku_cd', 'set_cd', 'c_sale_cd', 'shop_sku_cd', 'item_code', 'stock_cd', 'model_no', 'prod_cd'];
+      const prod = (typeof _paFindProd === 'function') ? _paFindProd(o) : null;
+      const code = _paGetSkuCode ? _paGetSkuCode(o, prod)
+        : SKU_KEYS.map(k => o[k]).find(v => v != null && v !== '');
+      if (code) orderSkus.add(String(code).trim());
+    });
+    const missing = [...orderSkus].filter(s => s && !cachedSkus.has(s.toLowerCase()));
+    if (missing.length) {
+      console.log(`[마이너스확인] 캐시 누락 SKU ${missing.length}개 DB 직접 조회 시도`);
+      const chunkSize = 200;
+      for (let i = 0; i < missing.length; i += chunkSize) {
+        const chunk = missing.slice(i, i + chunkSize);
+        const { data: extra, error } = await _supabase.from('products').select('*').in('sku', chunk);
+        if (error) { console.warn('[마이너스확인] DB 직접 조회 오류:', error); continue; }
+        if (extra && extra.length) {
+          _allProducts = (_allProducts || []).concat(extra);
+          console.log(`[마이너스확인] DB에서 ${extra.length}개 발견하여 캐시 보완`);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[마이너스확인] DB 보완 단계 실패:', e);
+  }
+
   // 1단계: 각 주문 행 추출 (택배비용은 SKU 매칭값 그대로)
   _paMinusRows = _paOrders.map(o => {
     const r = _paExtractOrderRow(o);
