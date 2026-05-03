@@ -20144,6 +20144,9 @@ function saveEditedUploadDataRow(idx) {
   r.depotCode  = v('eur-depotCode');
   r.depotName  = v('eur-depotName');
   r.itemCode   = v('eur-itemCode');
+  // skuCode 는 택배비용 매칭에 사용되는 내부 키. itemCode 가 변경되면 동기화하여
+  // SKU 재매칭 / 마이너스 확인 등에서 새 코드 기준으로 매칭되도록 함.
+  if (r.itemCode) r.skuCode = r.itemCode;
   r.itemName   = v('eur-itemName');
   r.receiver   = v('eur-receiver');
   r.address    = v('eur-address');
@@ -20201,10 +20204,11 @@ async function rematchUploadDataShipCosts() {
 
   // 업로드 데이터의 모든 SKU를 DB에서 직접 조회하여 캐시 누락 상품 보완
   // (캐시에 없어도 DB에 있으면 매칭됨)
+  // 사용자가 itemCode 를 편집한 경우도 대비하여 itemCode 도 함께 수집
   try {
     const uniqueSkus = [...new Set(
-      data.filter(r => typeof r.shipCostMatched === 'boolean' && r.skuCode)
-          .map(r => String(r.skuCode).trim())
+      data.filter(r => typeof r.shipCostMatched === 'boolean')
+          .flatMap(r => [String(r.itemCode || '').trim(), String(r.skuCode || '').trim()])
           .filter(Boolean)
     )];
     if (uniqueSkus.length) {
@@ -20243,10 +20247,14 @@ async function rematchUploadDataShipCosts() {
     if (typeof r.shipCostMatched !== 'boolean') return;
     // 묶음 중복제거된 행은 보존 (다른 형제 행이 갱신될 것)
     if (r.shipCostBundleApplied) return;
-    if (!r.skuCode) return;
+    // 매칭 키: 사용자가 편집할 수 있는 itemCode 를 우선, 없으면 skuCode 폴백
+    const matchCode = String(r.itemCode || '').trim() || String(r.skuCode || '').trim();
+    if (!matchCode) return;
+    // 편집된 행이라면 skuCode 도 동기화 (이후 일관성 유지)
+    if (r.itemCode && r.skuCode !== r.itemCode) r.skuCode = r.itemCode;
     candidates++;
 
-    const newCost = (typeof _paShipCostFromProductMgmt === 'function') ? _paShipCostFromProductMgmt(r.skuCode) : null;
+    const newCost = (typeof _paShipCostFromProductMgmt === 'function') ? _paShipCostFromProductMgmt(matchCode) : null;
     const newMatched = (newCost != null);
     const oldCost = Number(r.shipCost) || 0;
     const oldMatched = r.shipCostMatched;
@@ -20254,7 +20262,7 @@ async function rematchUploadDataShipCosts() {
     // 변화 없음 → 그대로 두기
     if (newMatched === oldMatched && (!newMatched || newCost === oldCost)) {
       unchanged++;
-      if (!newMatched) stillMissingSkus.push(r.skuCode);
+      if (!newMatched) stillMissingSkus.push(matchCode);
       return;
     }
 
@@ -20286,8 +20294,8 @@ async function rematchUploadDataShipCosts() {
         r.profit = supply + ship - cost; // 택배비용 0
       }
       nowUnmatched++;
-      stillMissingSkus.push(r.skuCode);
-      releasedSkus.push(r.skuCode);  // 어떤 SKU가 해제됐는지 추적
+      stillMissingSkus.push(matchCode);
+      releasedSkus.push(matchCode);  // 어떤 SKU가 해제됐는지 추적
     }
   });
 
