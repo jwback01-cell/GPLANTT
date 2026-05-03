@@ -20146,6 +20146,15 @@ function openEditUploadDataRow(idx) {
       </div>
     </div>`;
   document.body.appendChild(m);
+  // Enter 키로 저장 (textarea 가 아닌 input 에서만)
+  m.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
+      e.preventDefault();
+      saveEditedUploadDataRow(idx);
+    } else if (e.key === 'Escape') {
+      m.remove();
+    }
+  });
 }
 
 function saveEditedUploadDataRow(idx) {
