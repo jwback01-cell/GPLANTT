@@ -22342,41 +22342,15 @@ function _renderJetReport(type) {
   const data = _loadJetReport(type);
   const summaryEl = document.getElementById('jet-' + type + '-summary');
   const tableEl = document.getElementById('jet-' + type + '-table');
-  if (!summaryEl || !tableEl) return;
+  if (!summaryEl) return;
+  if (tableEl) tableEl.innerHTML = ''; // 업로드 카드의 미리보기 테이블은 표시하지 않음 — 상세는 [업로드 데이터] 탭에서 확인
   if (!data.length) {
     summaryEl.textContent = '저장된 데이터 없음';
-    tableEl.innerHTML = '';
     return;
   }
   const total = data.reduce((s, r) => s + (Number(r.amount) || 0), 0);
   const fmt = (n) => Number(n || 0).toLocaleString('ko-KR') + '원';
-  summaryEl.innerHTML = `총 <b>${data.length.toLocaleString()}</b>건 · 합계 <b class="text-brand-black">${fmt(total)}</b> · 최근 30건 표시`;
-  // 정렬: date 내림차순
-  const sorted = [...data].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  const recent = sorted.slice(0, 30);
-  // 컬럼 구성 (type 별)
-  let cols;
-  if (type === 'io')      cols = [['date','발생일'],['orderId','주문ID'],['skuId','SKU'],['productName','상품명'],['optionName','옵션'],['qty','수량'],['amount','입출고비']];
-  else if (type === 'ship') cols = [['date','발생일'],['orderId','주문ID'],['skuId','SKU'],['productName','상품명'],['optionName','옵션'],['qty','수량'],['amount','배송비']];
-  else if (type === 'storage') cols = [['date','발생일'],['displayDate','진열일'],['period','보관기간(일)'],['skuId','SKU'],['productName','상품명'],['optionName','옵션'],['stockQty','재고'],['amount','보관비']];
-  else if (type === 'loss') cols = [['date','발생일'],['orderId','주문ID'],['type','유형'],['reason','파손/분실'],['productName','상품명'],['optionName','옵션'],['qty','수량'],['amount','보상금']];
-  else if (type === 'order') cols = [['date','발생일'],['orderId','주문ID'],['skuId','SKU'],['productName','상품명'],['optionName','옵션'],['qty','수량'],['price','판매가'],['amount','매출금액']];
-  else if (type === 'fee')   cols = [['date','발생일'],['orderId','주문ID'],['skuId','SKU'],['productName','상품명'],['optionName','옵션'],['qty','수량'],['settle','정산대상액'],['rate','수수료율(%)'],['amount','수수료(+VAT)']];
-  else cols = [];
-  const html = `
-    <table class="w-full text-xs border border-brand-border rounded-xl overflow-hidden">
-      <thead class="bg-brand-bg text-brand-gray">
-        <tr>${cols.map(c => `<th class="px-2 py-2 text-left font-bold whitespace-nowrap">${c[1]}</th>`).join('')}</tr>
-      </thead>
-      <tbody>
-        ${recent.map(r => `<tr class="border-t border-brand-border hover:bg-brand-bg/30">${cols.map(c => {
-          const v = r[c[0]];
-          if (c[0] === 'amount') return `<td class="px-2 py-1.5 text-right font-semibold">${fmt(v)}</td>`;
-          return `<td class="px-2 py-1.5 whitespace-nowrap">${escHtml(String(v == null ? '' : v))}</td>`;
-        }).join('')}</tr>`).join('')}
-      </tbody>
-    </table>`;
-  tableEl.innerHTML = html;
+  summaryEl.innerHTML = `총 <b>${data.length.toLocaleString()}</b>건 · 합계 <b class="text-brand-black">${fmt(total)}</b> <span class="text-brand-gray">— 상세 내역은 [업로드 데이터] 탭에서 확인하세요</span>`;
 }
 function _renderUploadMapping() {
   document.getElementById('upload-mapping-grid').innerHTML = UPLOAD_COLS.map(c => `
