@@ -137,6 +137,23 @@ export default async function handler(req, res) {
     return { status: r.status, data };
   };
 
+  // HTTP 헤더는 Latin-1 만 허용 — 한글/유니코드 문자가 포함된 진단 JSON 을
+  // 그대로 setHeader 하면 "Invalid character in header content" 500 발생.
+  // 안전하게 base64(utf-8) 로 인코딩 후 1900자 이내로 잘라 전송.
+  const _safeDiagHeader = (obj) => {
+    try {
+      const json = JSON.stringify(obj);
+      const b64 = Buffer.from(json, 'utf8').toString('base64');
+      return b64.slice(0, 1900);
+    } catch (_) {
+      return '';
+    }
+  };
+  const _setDiagHeaders = (diagObj) => {
+    try { res.setHeader('x-pa-trace', traceId); } catch (_) {}
+    try { res.setHeader('x-pa-diag-b64', _safeDiagHeader(diagObj)); } catch (_) {}
+  };
+
   try {
     let token;
     try {
@@ -156,8 +173,7 @@ export default async function handler(req, res) {
     if (token) {
       result = await doRequest(`Token ${token}`, 'Token');
       if (result.status >= 200 && result.status < 300) {
-        res.setHeader('x-pa-trace', traceId);
-        res.setHeader('x-pa-diag', JSON.stringify(diag).slice(0, 1900));
+        _setDiagHeaders(diag);
         return res.status(result.status).json(result.data);
       }
     }
@@ -166,8 +182,7 @@ export default async function handler(req, res) {
     if (token) {
       result = await doRequest(`Bearer ${token}`, 'Bearer');
       if (result.status >= 200 && result.status < 300) {
-        res.setHeader('x-pa-trace', traceId);
-        res.setHeader('x-pa-diag', JSON.stringify(diag).slice(0, 1900));
+        _setDiagHeaders(diag);
         return res.status(result.status).json(result.data);
       }
     }
@@ -176,8 +191,7 @@ export default async function handler(req, res) {
     if (token) {
       result = await doRequest(token, 'raw');
       if (result.status >= 200 && result.status < 300) {
-        res.setHeader('x-pa-trace', traceId);
-        res.setHeader('x-pa-diag', JSON.stringify(diag).slice(0, 1900));
+        _setDiagHeaders(diag);
         return res.status(result.status).json(result.data);
       }
     }
@@ -185,8 +199,7 @@ export default async function handler(req, res) {
     // 시도 4: Authorization 헤더 없음
     result = await doRequest(null, 'no-auth');
 
-    res.setHeader('x-pa-trace', traceId);
-    res.setHeader('x-pa-diag', JSON.stringify({ traceId, version: diag.version, tokenLen: diag.tokenLen, attemptStatuses: diag.attempts.map(a => ({ name: a.name, status: a.status })) }).slice(0, 1900));
+    _setDiagHeaders({ traceId, version: diag.version, tokenLen: diag.tokenLen, attemptStatuses: diag.attempts.map(a => ({ name: a.name, status: a.status })) });
 
     // 실패(4xx/5xx) 응답에는 진단전문(_paProxyDiag) 포함 — 프런트엔드 캡처 버튼이 사용
     const finalStatus = result ? result.status : 500;
