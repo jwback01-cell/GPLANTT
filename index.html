@@ -18891,12 +18891,16 @@ async function _doSendInvoicesToPlayauto(btn, targets, userEndpoint, fallbackCar
     _invLog('⚠️ carr_no 누락: ' + missingCarr + '건 (PA가 거부할 수 있음 — "택배사 불러오기" 후 재시도 권장)');
   }
 
+  // PA 공식 스펙 (PUT /api/order/setInvoice):
+  //   orders[] (필수), overwrite (default false), dupl_doubt_except_yn (default 'N'), change_complete (default false)
   const body = {
     orders: ordersBody,
     overwrite: true,
+    dupl_doubt_except_yn: 'N',
     change_complete: true,
   };
   _invLog('전송 페이로드 샘플: ' + JSON.stringify(body.orders[0]));
+  _invLog('전체 body 키: ' + Object.keys(body).join(', '));
 
   // 사용자가 지정한 endpoint 를 PUT/POST 두 가지 메서드로 먼저 시도하고,
   // 그래도 404 ("The page could not be found") 가 나오면 후보 경로들로 자동 폴백
