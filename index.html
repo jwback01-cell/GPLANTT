@@ -20798,6 +20798,52 @@ function _updateUploadDataSortIcons() {
   });
 }
 
+// 제트배송 jet-* 행들을 품목명별로 집계 (날짜는 범위 표시, 다른 합산 가능 컬럼은 sum)
+function _aggregateJetByItemName(rows) {
+  const map = new Map();
+  for (const r of rows) {
+    const key = (r.itemName || '').trim() || ('(품명없음)|' + (r.itemCode || ''));
+    if (!map.has(key)) {
+      map.set(key, {
+        _isJetAggregate: true,
+        _aggCount: 0,
+        template: 'jet-aggregate',
+        vendor: '쿠팡',
+        site: '쿠팡(제트배송 합계)',
+        date: '',
+        siteCode: '',
+        vendorCode: '',
+        shipCode: '',
+        itemCode: r.itemCode || '',
+        itemName: r.itemName || '',
+        qty: 0, price: 0, supply: 0, ship: 0, shipCost: 0, cost: 0, profit: 0,
+        receiver: '',
+        savedAt: '',
+        _minDate: '', _maxDate: '',
+      });
+    }
+    const a = map.get(key);
+    a._aggCount += 1;
+    a.qty      += Number(r.qty) || 0;
+    a.supply   += Number(r.supply) || 0;
+    a.ship     += Number(r.ship) || 0;
+    a.shipCost += Number(r.shipCost) || 0;
+    a.cost     += Number(r.cost) || 0;
+    a.profit   += Number(r.profit) || 0;
+    if (r.date) {
+      if (!a._minDate || r.date < a._minDate) a._minDate = r.date;
+      if (!a._maxDate || r.date > a._maxDate) a._maxDate = r.date;
+    }
+    if (r.itemCode && !a.itemCode) a.itemCode = r.itemCode;
+  }
+  return [...map.values()].map(a => ({
+    ...a,
+    date: (a._minDate && a._maxDate)
+      ? (a._minDate === a._maxDate ? a._minDate : `${a._minDate} ~ ${a._maxDate}`)
+      : '',
+  }));
+}
+
 function renderUploadData() {
   const data = _loadUploadData();
   const search = (document.getElementById('upload-data-search')?.value || '').trim().toLowerCase();
@@ -20822,6 +20868,9 @@ function renderUploadData() {
     }
     return true;
   });
+  // 필터 결과가 모두 jet-* 행이면 품목명별로 집계 — "제트배송은 날짜별이 아닌 품목명별로"
+  const allJet = all.length > 0 && all.every(r => r.template && String(r.template).startsWith('jet-'));
+  if (allJet) all = _aggregateJetByItemName(all);
   all = _applyUploadDataSort(all);
   const wrap = document.getElementById('upload-data-wrap');
   const empty = document.getElementById('upload-data-empty');
@@ -20863,10 +20912,18 @@ function renderUploadData() {
   };
   const tbody = document.getElementById('upload-data-tbody');
   tbody.innerHTML = filtered.map(r => {
-    const origIdx = data.indexOf(r);
+    const isAgg = !!r._isJetAggregate;
+    const origIdx = isAgg ? -1 : data.indexOf(r);
+    const cbCell = isAgg
+      ? `<td class="px-4 py-3 whitespace-nowrap text-brand-gray text-xs" title="집계 행 — 개별 선택 불가">∑</td>`
+      : `<td class="px-4 py-3 whitespace-nowrap"><input type="checkbox" class="upload-data-cb" data-idx="${origIdx}" onchange="updateUploadDataSelCount()"></td>`;
+    const editCell = isAgg
+      ? `<td class="px-4 py-3 text-center whitespace-nowrap"><span class="text-brand-gray text-xs" title="집계 행은 직접 수정할 수 없습니다. 원본 행은 검색창을 비우거나 [📦 제트배송만 보기] 해제 후 확인하세요.">집계</span></td>`
+      : `<td class="px-4 py-3 text-center whitespace-nowrap"><button onclick="openEditUploadDataRow(${origIdx})" title="이 행 수정" class="text-brand-blue hover:underline text-xs font-bold">✏️ 수정</button></td>`;
+    const rowClass = isAgg ? 'border-t border-brand-border bg-brand-blue-light/20 hover:bg-brand-blue-light/40 font-semibold' : 'border-t border-brand-border hover:bg-brand-bg/50';
     return `
-    <tr class="border-t border-brand-border hover:bg-brand-bg/50">
-      <td class="px-4 py-3 whitespace-nowrap"><input type="checkbox" class="upload-data-cb" data-idx="${origIdx}" onchange="updateUploadDataSelCount()"></td>
+    <tr class="${rowClass}">
+      ${cbCell}
       <td class="px-4 py-3 whitespace-nowrap">${r.vendor||''}</td>
       <td class="px-4 py-3 whitespace-nowrap">${r.site||''}</td>
       <td class="px-4 py-3 whitespace-nowrap">${r.date||''}</td>
@@ -20874,7 +20931,7 @@ function renderUploadData() {
       <td class="hidden px-4 py-3 whitespace-nowrap">${r.vendorCode||''}</td>
       <td class="hidden px-4 py-3 whitespace-nowrap">${r.shipCode||''}</td>
       <td class="px-4 py-3 whitespace-nowrap">${r.itemCode||''}</td>
-      <td class="px-4 py-3">${r.itemName||''}</td>
+      <td class="px-4 py-3">${r.itemName||''}${isAgg && r._aggCount ? `<span class="ml-2 text-xs text-brand-gray font-normal">(${r._aggCount}건 집계)</span>` : ''}</td>
       <td class="px-4 py-3 text-right whitespace-nowrap">${_fmt(r.qty)}</td>
       <td class="px-4 py-3 text-right whitespace-nowrap">${_fmt(r.price)}</td>
       <td class="px-4 py-3 text-right whitespace-nowrap">${_fmt(r.supply ?? r.cost ?? 0)}</td>
@@ -20884,7 +20941,7 @@ function renderUploadData() {
       <td class="px-4 py-3 whitespace-nowrap">${r.receiver||''}</td>
       <td class="px-4 py-3 text-right whitespace-nowrap">${_marginCell(r.profit)}</td>
       <td class="px-4 py-3 text-brand-gray text-xs whitespace-nowrap">${r.savedAt||''}</td>
-      <td class="px-4 py-3 text-center whitespace-nowrap"><button onclick="openEditUploadDataRow(${origIdx})" title="이 행 수정" class="text-brand-blue hover:underline text-xs font-bold">✏️ 수정</button></td>
+      ${editCell}
     </tr>`;
   }).join('');
   const sum = (k) => all.reduce((s,r) => s + Number(r[k]||0), 0);
