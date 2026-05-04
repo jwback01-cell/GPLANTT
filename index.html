@@ -20801,9 +20801,23 @@ function _updateUploadDataSortIcons() {
 // 제트배송 품목 상세 모달 — 어떤 jet 항목들이 합쳐졌는지 + 광고비 함께 보여줌
 function openJetItemDetail(itemName) {
   const data = _loadUploadData();
-  const matched = data.filter(r => r.template && String(r.template).startsWith('jet-') && (r.itemName || '') === (itemName || ''));
+  // 메인 화면의 날짜 필터를 그대로 적용 — "2월만 조회 중인데 1월 데이터가 보이는 문제" 수정
+  const startDate = (document.getElementById('upload-data-date-start')?.value || '').replace(/-/g,'');
+  const endDate   = (document.getElementById('upload-data-date-end')?.value   || '').replace(/-/g,'');
+  const _normD = s => String(s || '').replace(/-/g,'').replace(/\s.*$/, '').slice(0, 8);
+  const matched = data.filter(r => {
+    if (!(r.template && String(r.template).startsWith('jet-'))) return false;
+    if ((r.itemName || '') !== (itemName || '')) return false;
+    if (startDate || endDate) {
+      const d = _normD(r.date);
+      if (!d || d.length < 8) return false;
+      if (startDate && d < startDate) return false;
+      if (endDate && d > endDate) return false;
+    }
+    return true;
+  });
   if (!matched.length) {
-    showAppAlert('데이터 없음', `"${itemName}" 에 해당하는 제트배송 행을 찾을 수 없습니다.`, { type: 'warning' });
+    showAppAlert('데이터 없음', `"${itemName}" 에 해당하는 제트배송 행을 찾을 수 없습니다.${(startDate || endDate) ? '\n\n선택된 날짜 범위 내에 데이터가 없을 수 있습니다.' : ''}`, { type: 'warning' });
     return;
   }
   // 종류별 그룹
