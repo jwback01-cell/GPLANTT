@@ -3728,6 +3728,8 @@ tailwind.config = {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                 SKU 매칭
               </button>
+              <button onclick="filterUploadDataByJet()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-black hover:bg-brand-bg" title="검색창에 '제트배송' 키워드 적용">📦 제트배송만 보기</button>
+              <button onclick="syncJetReportsToUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-blue hover:bg-brand-bg" title="저장된 제트배송 리포트(입출고비/배송비/보관비/재고손실/주문/수수료) 데이터를 업로드 데이터로 가져오기">⟳ 제트배송 동기화</button>
               <button onclick="exportUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg">엑셀 내보내기</button>
               <button id="upload-data-delete-btn" onclick="deleteSelectedUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-pink hover:bg-brand-bg">선택 삭제 <span id="upload-data-sel-count" class="ml-1 text-xs text-brand-gray">(0)</span></button>
             </div>
@@ -21466,6 +21468,56 @@ function _appendJetRowsToUploadData(reportType, rows) {
     _saveUploadData(data.concat(entries));
     if (typeof renderUploadData === 'function') try { renderUploadData(); } catch(_) {}
   } catch (e) { console.warn('[jet→upload] 추가 실패', e); }
+}
+
+// 저장된 제트배송 리포트 6종 → 업로드 데이터로 일괄 동기화 (기존 jet-* 행은 모두 교체)
+function syncJetReportsToUploadData() {
+  const types = ['io','ship','storage','loss','order','fee'];
+  const counts = {};
+  let total = 0;
+  const allEntries = [];
+  for (const t of types) {
+    const rows = _loadJetReport(t);
+    counts[t] = rows.length;
+    total += rows.length;
+    rows.forEach(r => allEntries.push(_jetRowToUploadEntry(t, r)));
+  }
+  if (total === 0) {
+    showAppAlert('동기화할 데이터 없음', '저장된 제트배송 리포트 데이터가 없습니다.\n[엑셀 업로드 → 제트배송] 탭에서 먼저 리포트를 업로드해 주세요.', { type: 'warning' });
+    return;
+  }
+  const detail = types.filter(t => counts[t] > 0).map(t => `${JET_REPORT_LABELS[t]} ${counts[t].toLocaleString()}건`).join(' / ');
+  showAppConfirm(
+    '제트배송 데이터 업로드 데이터로 동기화',
+    `저장된 제트배송 리포트 ${total.toLocaleString()}건을 업로드 데이터로 가져옵니다.\n\n${detail}\n\n⚠ 업로드 데이터의 기존 제트배송(jet-*) 행은 모두 교체됩니다.\n(다른 일반 업로드 데이터는 그대로 유지됨)`,
+    () => {
+      try {
+        const data = _loadUploadData();
+        // jet-* 템플릿 제거
+        const filtered = data.filter(r => !(r.template && String(r.template).startsWith('jet-')));
+        _saveUploadData(filtered.concat(allEntries));
+        if (typeof renderUploadData === 'function') renderUploadData();
+        showAppAlert('동기화 완료', `제트배송 ${total.toLocaleString()}건이 업로드 데이터에 반영되었습니다.\n검색창에 "제트배송" 입력 또는 [📦 제트배송만 보기] 버튼으로 필터하세요.`, { type: 'success' });
+      } catch (e) {
+        console.error('[jet sync] 실패', e);
+        showAppAlert('동기화 실패', String(e.message || e), { type: 'danger' });
+      }
+    },
+    { type: 'question', confirmText: '가져오기' }
+  );
+}
+
+// 검색창에 "제트배송" 적용해 즉시 필터
+function filterUploadDataByJet() {
+  const inp = document.getElementById('upload-data-search');
+  if (!inp) return;
+  // 비어있거나 다른 키워드면 '제트배송' 으로 설정, 이미 '제트배송'이면 해제
+  if (inp.value.trim() === '제트배송') {
+    inp.value = '';
+  } else {
+    inp.value = '제트배송';
+  }
+  if (typeof renderUploadData === 'function') renderUploadData();
 }
 function _jetNumber(v) {
   if (v == null || v === '') return 0;
