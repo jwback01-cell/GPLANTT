@@ -2711,6 +2711,68 @@ tailwind.config = {
           <span id="upload-status-msg" class="font-semibold">파일을 읽는 중입니다...</span>
         </div>
 
+        <!-- 제트배송 추가 리포트 (입출고/배송비, 보관비, 재고손실보상) — 제트배송 템플릿일 때만 표시 -->
+        <div id="jet-extra-uploads" class="hidden flex flex-col gap-4">
+          <div class="bg-brand-bg/40 rounded-2xl border border-brand-border p-4">
+            <div class="font-bold text-sm mb-1">📦 제트배송 추가 정산 리포트</div>
+            <div class="text-xs text-brand-gray">위 [정산내역] 외에 입출고비/배송비, 보관비, 재고손실보상 리포트를 따로 업로드하세요. 각 리포트는 별도 보관되며 최근 30건씩 표시됩니다.</div>
+          </div>
+
+          <!-- 입출고비 + 배송비 (다중 시트 파일) -->
+          <div class="bg-white rounded-3xl panel p-6">
+            <div class="flex items-center justify-between gap-3 flex-wrap mb-3">
+              <div>
+                <div class="font-bold text-[15px]">① 입출고비 / 배송비 리포트 <span class="text-xs text-brand-gray font-normal">(한 파일에 시트 2개)</span></div>
+                <div class="text-xs text-brand-gray mt-1">시트명에 "입출고" 또는 "배송"이 포함되어 있어야 자동 분류됩니다.</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <input id="jet-io-file" type="file" accept=".xlsx,.xls" class="hidden" onchange="handleJetIoShipFile(event)">
+                <button onclick="document.getElementById('jet-io-file').click()" class="px-4 py-2 rounded-full bg-brand-black text-white text-xs font-bold hover:bg-[#333]">파일 선택</button>
+                <button onclick="clearJetReport('io_ship')" class="px-3 py-2 rounded-full border border-brand-border bg-white text-xs font-bold text-brand-gray hover:text-brand-pink hover:border-brand-pink">전체 삭제</button>
+              </div>
+            </div>
+            <div id="jet-io-status" class="hidden text-xs font-semibold mb-2"></div>
+            <div id="jet-io-summary" class="text-xs text-brand-gray"></div>
+            <div id="jet-io-table" class="mt-3 overflow-x-auto"></div>
+          </div>
+
+          <!-- 보관비 -->
+          <div class="bg-white rounded-3xl panel p-6">
+            <div class="flex items-center justify-between gap-3 flex-wrap mb-3">
+              <div>
+                <div class="font-bold text-[15px]">② 보관비 리포트</div>
+                <div class="text-xs text-brand-gray mt-1">월별 보관비 정산 데이터입니다.</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <input id="jet-storage-file" type="file" accept=".xlsx,.xls" class="hidden" onchange="handleJetStorageFile(event)">
+                <button onclick="document.getElementById('jet-storage-file').click()" class="px-4 py-2 rounded-full bg-brand-black text-white text-xs font-bold hover:bg-[#333]">파일 선택</button>
+                <button onclick="clearJetReport('storage')" class="px-3 py-2 rounded-full border border-brand-border bg-white text-xs font-bold text-brand-gray hover:text-brand-pink hover:border-brand-pink">전체 삭제</button>
+              </div>
+            </div>
+            <div id="jet-storage-status" class="hidden text-xs font-semibold mb-2"></div>
+            <div id="jet-storage-summary" class="text-xs text-brand-gray"></div>
+            <div id="jet-storage-table" class="mt-3 overflow-x-auto"></div>
+          </div>
+
+          <!-- 재고손실보상 -->
+          <div class="bg-white rounded-3xl panel p-6">
+            <div class="flex items-center justify-between gap-3 flex-wrap mb-3">
+              <div>
+                <div class="font-bold text-[15px]">③ 재고손실보상 리포트</div>
+                <div class="text-xs text-brand-gray mt-1">파손/분실 등에 대한 보상금 데이터입니다.</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <input id="jet-loss-file" type="file" accept=".xlsx,.xls" class="hidden" onchange="handleJetLossFile(event)">
+                <button onclick="document.getElementById('jet-loss-file').click()" class="px-4 py-2 rounded-full bg-brand-black text-white text-xs font-bold hover:bg-[#333]">파일 선택</button>
+                <button onclick="clearJetReport('loss')" class="px-3 py-2 rounded-full border border-brand-border bg-white text-xs font-bold text-brand-gray hover:text-brand-pink hover:border-brand-pink">전체 삭제</button>
+              </div>
+            </div>
+            <div id="jet-loss-status" class="hidden text-xs font-semibold mb-2"></div>
+            <div id="jet-loss-summary" class="text-xs text-brand-gray"></div>
+            <div id="jet-loss-table" class="mt-3 overflow-x-auto"></div>
+          </div>
+        </div>
+
         <!-- 데이터 검토 -->
         <div id="upload-review" class="hidden bg-white rounded-3xl panel overflow-hidden">
           <div class="px-6 py-4 border-b border-brand-border flex items-center justify-between gap-3 flex-wrap">
@@ -21243,6 +21305,369 @@ function setUploadTemplate(type) {
     if (!btn) return;
     btn.className = 'upload-tpl-btn px-4 py-1.5 rounded-full text-xs font-bold ' + (t === _uploadTemplate ? 'bg-brand-black text-white' : 'text-brand-gray hover:text-brand-black');
   });
+  // 제트배송 추가 리포트 영역 표시/숨김
+  const extra = document.getElementById('jet-extra-uploads');
+  if (extra) {
+    if (_uploadTemplate === 'jet') {
+      extra.classList.remove('hidden');
+      // 저장된 데이터 다시 그리기
+      try { _renderJetReport('io'); _renderJetReport('ship'); _renderJetReport('storage'); _renderJetReport('loss'); } catch(_) {}
+    } else {
+      extra.classList.add('hidden');
+    }
+  }
+}
+
+// ── 제트배송 추가 리포트 (입출고비/배송비/보관비/재고손실보상) ─────────────
+const JET_REPORT_KEYS = {
+  io:      'gplan_jet_inout_v1',
+  ship:    'gplan_jet_shipping_v1',
+  storage: 'gplan_jet_storage_v1',
+  loss:    'gplan_jet_loss_v1',
+};
+const JET_REPORT_LABELS = {
+  io:      '입출고비',
+  ship:    '배송비',
+  storage: '보관비',
+  loss:    '재고손실보상',
+};
+function _loadJetReport(type) {
+  try { return JSON.parse(localStorage.getItem(JET_REPORT_KEYS[type]) || '[]'); } catch(_) { return []; }
+}
+function _saveJetReport(type, rows) {
+  localStorage.setItem(JET_REPORT_KEYS[type], JSON.stringify(rows));
+}
+function clearJetReport(type) {
+  // io_ship 은 io+ship 둘 다 삭제
+  if (type === 'io_ship') {
+    if (!confirm('입출고비와 배송비 데이터를 모두 삭제하시겠습니까?')) return;
+    _saveJetReport('io', []); _saveJetReport('ship', []);
+    _renderJetReport('io'); _renderJetReport('ship');
+    return;
+  }
+  if (!confirm(JET_REPORT_LABELS[type] + ' 데이터를 모두 삭제하시겠습니까?')) return;
+  _saveJetReport(type, []);
+  _renderJetReport(type);
+}
+function _jetNumber(v) {
+  if (v == null || v === '') return 0;
+  const n = Number(String(v).replace(/[,\s원₩]/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+function _jetStr(v) { return (v == null) ? '' : String(v).trim(); }
+function _jetDate(v) { return (typeof _normalizeDateStr === 'function') ? _normalizeDateStr(v) : _jetStr(v); }
+// 헤더 인덱스를 키워드 매칭으로 찾는 헬퍼 (포함 검색)
+function _jetHeaderIdx(header, ...keywords) {
+  for (const kw of keywords) {
+    const i = header.findIndex(h => h && h.indexOf(kw) !== -1);
+    if (i !== -1) return i;
+  }
+  return -1;
+}
+// 시트 한 장을 AOA 로 받아서 파싱 (첫 20행 내에서 헤더 자동 탐색)
+function _jetParseSheetAoa(aoa, headerHints) {
+  let headerRowIdx = -1;
+  let header = null;
+  for (let i = 0; i < Math.min(aoa.length, 20); i++) {
+    const row = (aoa[i] || []).map(c => _jetStr(c));
+    const hits = headerHints.filter(k => row.some(v => v.indexOf(k) !== -1)).length;
+    if (hits >= Math.min(2, headerHints.length)) {
+      headerRowIdx = i; header = row; break;
+    }
+  }
+  if (headerRowIdx === -1) return null;
+  return { headerRowIdx, header };
+}
+
+// 입출고비 + 배송비 파일 (multi-sheet)
+async function handleJetIoShipFile(evt) {
+  const file = evt.target && evt.target.files && evt.target.files[0];
+  if (!file) return;
+  evt.target.value = '';
+  _jetStatus('io', '파일을 읽는 중...', 'info');
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+    let ioRows = [], shipRows = [];
+    for (const sheetName of wb.SheetNames) {
+      const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
+      // 시트명 기반 분류 — 입출고/io vs 배송/ship
+      const lower = sheetName.toLowerCase();
+      if (sheetName.indexOf('입출고') !== -1 || lower.indexOf('inout') !== -1) {
+        ioRows = ioRows.concat(_parseJetIoSheet(aoa));
+      } else if (sheetName.indexOf('배송') !== -1 || lower.indexOf('ship') !== -1 || lower.indexOf('deliv') !== -1) {
+        shipRows = shipRows.concat(_parseJetShipSheet(aoa));
+      } else {
+        // 시트명 모호 — 헤더로 판정
+        const found = _jetParseSheetAoa(aoa, ['거래유형']);
+        if (found) {
+          const txn = aoa[found.headerRowIdx + 1] && String(aoa[found.headerRowIdx + 1][found.header.indexOf('거래유형')] || '');
+          if (txn && txn.indexOf('배송') !== -1) shipRows = shipRows.concat(_parseJetShipSheet(aoa));
+          else ioRows = ioRows.concat(_parseJetIoSheet(aoa));
+        }
+      }
+    }
+    if (!ioRows.length && !shipRows.length) {
+      _jetStatus('io', '❌ 인식된 데이터가 없습니다. 시트명에 "입출고" 또는 "배송" 이 포함되어 있는지 확인해 주세요.', 'error');
+      return;
+    }
+    if (ioRows.length) {
+      const prev = _loadJetReport('io');
+      _saveJetReport('io', prev.concat(ioRows));
+    }
+    if (shipRows.length) {
+      const prev = _loadJetReport('ship');
+      _saveJetReport('ship', prev.concat(shipRows));
+    }
+    _jetStatus('io', `✅ 입출고비 ${ioRows.length}건 / 배송비 ${shipRows.length}건 추가됨`, 'ok');
+    _renderJetReport('io');
+    _renderJetReport('ship');
+  } catch (e) {
+    console.error('[jet-io-ship] parse error', e);
+    _jetStatus('io', '❌ 파일 읽기 실패: ' + (e.message || e), 'error');
+  }
+}
+
+function _parseJetIoSheet(aoa) {
+  const meta = _jetParseSheetAoa(aoa, ['주문ID','등록상품명','발생비용']);
+  if (!meta) return [];
+  const h = meta.header;
+  const I = {
+    date:  _jetHeaderIdx(h, '매출인식일','발생일'),
+    ordId: _jetHeaderIdx(h, '주문ID'),
+    shipId: _jetHeaderIdx(h, '배송ID'),
+    skuId: _jetHeaderIdx(h, 'SKU ID','SKU'),
+    prodId: _jetHeaderIdx(h, '등록상품 ID','등록상품ID'),
+    optId: _jetHeaderIdx(h, '옵션ID'),
+    name:  _jetHeaderIdx(h, '등록상품명'),
+    optName: _jetHeaderIdx(h, '옵션명'),
+    qty:   _jetHeaderIdx(h, '판매수량','수량'),
+    cost:  _jetHeaderIdx(h, '할인적용가(A-B)','할인적용가','발생비용(A)','발생비용','입출고비','입출고요금'),
+  };
+  const rows = [];
+  for (let i = meta.headerRowIdx + 1; i < aoa.length; i++) {
+    const r = aoa[i] || [];
+    if (r.every(c => _jetStr(c) === '')) continue;
+    const raw = {}; h.forEach((k, idx) => { raw[k] = _jetStr(r[idx]); });
+    rows.push({
+      date: _jetDate(I.date >= 0 ? r[I.date] : ''),
+      orderId: _jetStr(I.ordId >= 0 ? r[I.ordId] : ''),
+      shipId: _jetStr(I.shipId >= 0 ? r[I.shipId] : ''),
+      skuId: _jetStr(I.skuId >= 0 ? r[I.skuId] : ''),
+      productId: _jetStr(I.prodId >= 0 ? r[I.prodId] : ''),
+      optionId: _jetStr(I.optId >= 0 ? r[I.optId] : ''),
+      productName: _jetStr(I.name >= 0 ? r[I.name] : ''),
+      optionName: _jetStr(I.optName >= 0 ? r[I.optName] : ''),
+      qty: _jetNumber(I.qty >= 0 ? r[I.qty] : 0),
+      amount: _jetNumber(I.cost >= 0 ? r[I.cost] : 0),
+      raw,
+    });
+  }
+  return rows;
+}
+
+function _parseJetShipSheet(aoa) {
+  const meta = _jetParseSheetAoa(aoa, ['주문ID','등록상품명','최종비용','발생비용']);
+  if (!meta) return [];
+  const h = meta.header;
+  const I = {
+    date:  _jetHeaderIdx(h, '매출인식일','발생일'),
+    ordId: _jetHeaderIdx(h, '주문ID'),
+    shipId: _jetHeaderIdx(h, '배송ID'),
+    skuId: _jetHeaderIdx(h, 'SKU ID','SKU'),
+    prodId: _jetHeaderIdx(h, '등록상품 ID','등록상품ID'),
+    optId: _jetHeaderIdx(h, '옵션ID'),
+    name:  _jetHeaderIdx(h, '등록상품명'),
+    optName: _jetHeaderIdx(h, '옵션명'),
+    qty:   _jetHeaderIdx(h, '판매수량','수량'),
+    cost:  _jetHeaderIdx(h, '최종비용','할인적용가(A-B)','발생비용(A)','발생비용','배송비','배송요금'),
+  };
+  const rows = [];
+  for (let i = meta.headerRowIdx + 1; i < aoa.length; i++) {
+    const r = aoa[i] || [];
+    if (r.every(c => _jetStr(c) === '')) continue;
+    const raw = {}; h.forEach((k, idx) => { raw[k] = _jetStr(r[idx]); });
+    rows.push({
+      date: _jetDate(I.date >= 0 ? r[I.date] : ''),
+      orderId: _jetStr(I.ordId >= 0 ? r[I.ordId] : ''),
+      shipId: _jetStr(I.shipId >= 0 ? r[I.shipId] : ''),
+      skuId: _jetStr(I.skuId >= 0 ? r[I.skuId] : ''),
+      productId: _jetStr(I.prodId >= 0 ? r[I.prodId] : ''),
+      optionId: _jetStr(I.optId >= 0 ? r[I.optId] : ''),
+      productName: _jetStr(I.name >= 0 ? r[I.name] : ''),
+      optionName: _jetStr(I.optName >= 0 ? r[I.optName] : ''),
+      qty: _jetNumber(I.qty >= 0 ? r[I.qty] : 0),
+      amount: _jetNumber(I.cost >= 0 ? r[I.cost] : 0),
+      raw,
+    });
+  }
+  return rows;
+}
+
+async function handleJetStorageFile(evt) {
+  const file = evt.target && evt.target.files && evt.target.files[0];
+  if (!file) return;
+  evt.target.value = '';
+  _jetStatus('storage', '파일을 읽는 중...', 'info');
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+    const meta = _jetParseSheetAoa(aoa, ['보관기간','등록상품명','최종비용','발생비용']);
+    if (!meta) { _jetStatus('storage', '❌ 보관비 헤더 행을 찾을 수 없습니다.', 'error'); return; }
+    const h = meta.header;
+    const I = {
+      date:    _jetHeaderIdx(h, '매출인식일','발생일'),
+      display: _jetHeaderIdx(h, '진열일'),
+      period:  _jetHeaderIdx(h, '보관기간'),
+      skuId:   _jetHeaderIdx(h, 'SKU ID','SKU'),
+      prodId:  _jetHeaderIdx(h, '등록상품 ID','등록상품ID'),
+      optId:   _jetHeaderIdx(h, '옵션ID'),
+      name:    _jetHeaderIdx(h, '등록상품명'),
+      optName: _jetHeaderIdx(h, '옵션명'),
+      stockQty: _jetHeaderIdx(h, '보관재고수량'),
+      cbm:     _jetHeaderIdx(h, '개당 상품부피','상품부피','CBM'),
+      cost:    _jetHeaderIdx(h, '최종비용(A-B-C)','최종비용','할인적용가(A-B)','발생비용(A)','발생비용','보관비'),
+    };
+    const rows = [];
+    for (let i = meta.headerRowIdx + 1; i < aoa.length; i++) {
+      const r = aoa[i] || [];
+      if (r.every(c => _jetStr(c) === '')) continue;
+      const raw = {}; h.forEach((k, idx) => { raw[k] = _jetStr(r[idx]); });
+      rows.push({
+        date: _jetDate(I.date >= 0 ? r[I.date] : ''),
+        displayDate: _jetDate(I.display >= 0 ? r[I.display] : ''),
+        period: _jetNumber(I.period >= 0 ? r[I.period] : 0),
+        skuId: _jetStr(I.skuId >= 0 ? r[I.skuId] : ''),
+        productId: _jetStr(I.prodId >= 0 ? r[I.prodId] : ''),
+        optionId: _jetStr(I.optId >= 0 ? r[I.optId] : ''),
+        productName: _jetStr(I.name >= 0 ? r[I.name] : ''),
+        optionName: _jetStr(I.optName >= 0 ? r[I.optName] : ''),
+        stockQty: _jetNumber(I.stockQty >= 0 ? r[I.stockQty] : 0),
+        cbm: _jetNumber(I.cbm >= 0 ? r[I.cbm] : 0),
+        amount: _jetNumber(I.cost >= 0 ? r[I.cost] : 0),
+        raw,
+      });
+    }
+    if (!rows.length) { _jetStatus('storage', '❌ 보관비 데이터가 없습니다.', 'error'); return; }
+    const prev = _loadJetReport('storage');
+    _saveJetReport('storage', prev.concat(rows));
+    _jetStatus('storage', `✅ 보관비 ${rows.length}건 추가됨`, 'ok');
+    _renderJetReport('storage');
+  } catch (e) {
+    console.error('[jet-storage] parse error', e);
+    _jetStatus('storage', '❌ 파일 읽기 실패: ' + (e.message || e), 'error');
+  }
+}
+
+async function handleJetLossFile(evt) {
+  const file = evt.target && evt.target.files && evt.target.files[0];
+  if (!file) return;
+  evt.target.value = '';
+  _jetStatus('loss', '파일을 읽는 중...', 'info');
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+    const meta = _jetParseSheetAoa(aoa, ['보상 금액','파손/분실','등록상품명','보상금액']);
+    if (!meta) { _jetStatus('loss', '❌ 재고손실보상 헤더 행을 찾을 수 없습니다.', 'error'); return; }
+    const h = meta.header;
+    const I = {
+      date:    _jetHeaderIdx(h, '발생일'),
+      ordId:   _jetHeaderIdx(h, '주문ID'),
+      type:    _jetHeaderIdx(h, '유형'),
+      reason:  _jetHeaderIdx(h, '파손/분실','파손분실'),
+      cat:     _jetHeaderIdx(h, '카테고리'),
+      optId:   _jetHeaderIdx(h, '옵션ID'),
+      name:    _jetHeaderIdx(h, '등록상품명'),
+      optName: _jetHeaderIdx(h, '옵션명'),
+      qty:     _jetHeaderIdx(h, '판매수량(B)','판매수량'),
+      price:   _jetHeaderIdx(h, '판매가(A)','판매가'),
+      base:    _jetHeaderIdx(h, '보상 기준 금액','보상기준금액'),
+      rate:    _jetHeaderIdx(h, '보상률'),
+      compensation: _jetHeaderIdx(h, '보상 금액','보상금액'),
+    };
+    const rows = [];
+    for (let i = meta.headerRowIdx + 1; i < aoa.length; i++) {
+      const r = aoa[i] || [];
+      if (r.every(c => _jetStr(c) === '')) continue;
+      const raw = {}; h.forEach((k, idx) => { raw[k] = _jetStr(r[idx]); });
+      rows.push({
+        date: _jetDate(I.date >= 0 ? r[I.date] : ''),
+        orderId: _jetStr(I.ordId >= 0 ? r[I.ordId] : ''),
+        type: _jetStr(I.type >= 0 ? r[I.type] : ''),
+        reason: _jetStr(I.reason >= 0 ? r[I.reason] : ''),
+        category: _jetStr(I.cat >= 0 ? r[I.cat] : ''),
+        optionId: _jetStr(I.optId >= 0 ? r[I.optId] : ''),
+        productName: _jetStr(I.name >= 0 ? r[I.name] : ''),
+        optionName: _jetStr(I.optName >= 0 ? r[I.optName] : ''),
+        qty: _jetNumber(I.qty >= 0 ? r[I.qty] : 0),
+        price: _jetNumber(I.price >= 0 ? r[I.price] : 0),
+        baseAmount: _jetNumber(I.base >= 0 ? r[I.base] : 0),
+        rate: _jetStr(I.rate >= 0 ? r[I.rate] : ''),
+        amount: _jetNumber(I.compensation >= 0 ? r[I.compensation] : 0),
+        raw,
+      });
+    }
+    if (!rows.length) { _jetStatus('loss', '❌ 재고손실보상 데이터가 없습니다.', 'error'); return; }
+    const prev = _loadJetReport('loss');
+    _saveJetReport('loss', prev.concat(rows));
+    _jetStatus('loss', `✅ 재고손실보상 ${rows.length}건 추가됨`, 'ok');
+    _renderJetReport('loss');
+  } catch (e) {
+    console.error('[jet-loss] parse error', e);
+    _jetStatus('loss', '❌ 파일 읽기 실패: ' + (e.message || e), 'error');
+  }
+}
+
+function _jetStatus(type, msg, tone) {
+  // io_ship 의 경우 'io' 박스를 사용
+  const id = (type === 'io_ship') ? 'io' : type;
+  const el = document.getElementById('jet-' + id + '-status');
+  if (!el) return;
+  el.textContent = msg;
+  const color = tone === 'error' ? 'text-brand-pink' : tone === 'ok' ? 'text-brand-green' : 'text-brand-blue';
+  el.className = 'text-xs font-semibold mb-2 ' + color;
+  el.classList.remove('hidden');
+}
+
+function _renderJetReport(type) {
+  const data = _loadJetReport(type);
+  const summaryEl = document.getElementById('jet-' + type + '-summary');
+  const tableEl = document.getElementById('jet-' + type + '-table');
+  if (!summaryEl || !tableEl) return;
+  if (!data.length) {
+    summaryEl.textContent = '저장된 데이터 없음';
+    tableEl.innerHTML = '';
+    return;
+  }
+  const total = data.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  const fmt = (n) => Number(n || 0).toLocaleString('ko-KR') + '원';
+  summaryEl.innerHTML = `총 <b>${data.length.toLocaleString()}</b>건 · 합계 <b class="text-brand-black">${fmt(total)}</b> · 최근 30건 표시`;
+  // 정렬: date 내림차순
+  const sorted = [...data].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const recent = sorted.slice(0, 30);
+  // 컬럼 구성 (type 별)
+  let cols;
+  if (type === 'io')      cols = [['date','발생일'],['orderId','주문ID'],['skuId','SKU'],['productName','상품명'],['optionName','옵션'],['qty','수량'],['amount','입출고비']];
+  else if (type === 'ship') cols = [['date','발생일'],['orderId','주문ID'],['skuId','SKU'],['productName','상품명'],['optionName','옵션'],['qty','수량'],['amount','배송비']];
+  else if (type === 'storage') cols = [['date','발생일'],['displayDate','진열일'],['period','보관기간(일)'],['skuId','SKU'],['productName','상품명'],['optionName','옵션'],['stockQty','재고'],['amount','보관비']];
+  else if (type === 'loss') cols = [['date','발생일'],['orderId','주문ID'],['type','유형'],['reason','파손/분실'],['productName','상품명'],['optionName','옵션'],['qty','수량'],['amount','보상금']];
+  else cols = [];
+  const html = `
+    <table class="w-full text-xs border border-brand-border rounded-xl overflow-hidden">
+      <thead class="bg-brand-bg text-brand-gray">
+        <tr>${cols.map(c => `<th class="px-2 py-2 text-left font-bold whitespace-nowrap">${c[1]}</th>`).join('')}</tr>
+      </thead>
+      <tbody>
+        ${recent.map(r => `<tr class="border-t border-brand-border hover:bg-brand-bg/30">${cols.map(c => {
+          const v = r[c[0]];
+          if (c[0] === 'amount') return `<td class="px-2 py-1.5 text-right font-semibold">${fmt(v)}</td>`;
+          return `<td class="px-2 py-1.5 whitespace-nowrap">${escHtml(String(v == null ? '' : v))}</td>`;
+        }).join('')}</tr>`).join('')}
+      </tbody>
+    </table>`;
+  tableEl.innerHTML = html;
 }
 function _renderUploadMapping() {
   document.getElementById('upload-mapping-grid').innerHTML = UPLOAD_COLS.map(c => `
