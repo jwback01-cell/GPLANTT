@@ -21467,18 +21467,18 @@ function _jetRowToUploadEntry(reportType, r) {
   };
   const amt = Number(r.amount || 0);
   if (reportType === 'order') {
-    // 주문내역 — 매출 (수입). price=판매가(단가), 공급가는 매출금액/1.1 우선 사용
+    // 주문내역 — 매출 (수입). 공급가 = 매출금액 (그대로)
     base.price = Number(r.price || 0);
-    // 매출금액이 있으면 그것을 공급가로 (VAT 별도 환산), 아니면 product DB 값 유지
-    if (amt > 0) base.supply = Math.round(amt / 1.1);
+    base.supply = amt;
     base.profit = base.supply + base.ship - base.cost - base.shipCost;
   } else if (reportType === 'loss') {
-    // 재고손실보상 — 보상금 (수입). 보상금을 공급가로 환산
+    // 재고손실보상 — 보상금 (수입). 공급가 = 보상금
     base.price = Number(r.price || 0) || amt;
-    if (amt > 0) base.supply = Math.round(amt / 1.1);
+    base.supply = amt;
     base.profit = base.supply + base.ship - base.cost - base.shipCost;
   } else {
-    // 판매수수료 / 입출고비 / 배송비 / 보관비 — 지출 (shipCost = 비용)
+    // 판매수수료 / 입출고비 / 배송비 / 보관비 — 지출. 공급가 0, 택배비용 = 비용
+    base.supply = 0;
     base.shipCost = amt;
     base.profit = base.supply + base.ship - base.cost - base.shipCost;
   }
