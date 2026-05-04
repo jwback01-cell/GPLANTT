@@ -53,21 +53,23 @@ export default async function handler(req, res) {
   const traceId = Math.random().toString(36).slice(2, 8);
 
   // [...path] catch-all 경로
-  const segs = req.query.path;
+  // ⚠ Vercel 런타임에 따라 catch-all 파라미터가 'path' 또는 '...path' 키로 노출됨.
+  //    (직접 검증 결과 — 적어도 일부 배포에서 '...path' 로 노출. 필터하지 않으면 업스트림
+  //     URL 이 https://openapi.playauto.io/api/?...path=shops 가 되어 AWS API Gateway 가
+  //     SigV4 를 요구하며 403 을 던짐.)
+  const segs = req.query.path || req.query['...path'];
   const subPath = '/' + (Array.isArray(segs) ? segs.join('/') : (segs || ''));
 
-  // path/splat 은 catch-all 라우팅용 키 — 업스트림에 절대 보내지 말 것
-  // (누설되면 https://openapi.playauto.io/api/?path=shops 가 되어 AWS API Gateway 가
-  //  SigV4 를 요구하며 403 을 던짐 — 플레이오토 지원팀 권고 사항)
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(req.query)) {
-    if (k === 'path' || k === 'splat') continue;
+    // path / splat / ... 으로 시작하는 모든 catch-all 라우팅 키 제외
+    if (k === 'path' || k === 'splat' || k.startsWith('...')) continue;
     if (Array.isArray(v)) v.forEach(x => qs.append(k, x));
     else if (v != null) qs.set(k, v);
   }
   const qsStr = qs.toString() ? '?' + qs.toString() : '';
   const upstreamUrl = PA_BASE + subPath + qsStr;
-  console.log(`[playauto-vercel ${traceId}] ${req.method} → ${upstreamUrl}`);
+  console.log(`[playauto-vercel ${traceId}] ${req.method} → ${upstreamUrl}  (raw req.url=${req.url}, query keys=${Object.keys(req.query).join(',')})`);
 
   const bodyJson = (req.method === 'GET' || req.method === 'HEAD' || req.body == null)
     ? undefined
