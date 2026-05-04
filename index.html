@@ -764,6 +764,19 @@ tailwind.config = {
 
       <!-- List panel -->
       <div id="todo-list-panel" class="bg-white rounded-4xl panel p-6 md:p-8 flex flex-col" style="min-height:420px;">
+        <!-- 날짜 필터 -->
+        <div class="flex items-center gap-2 flex-wrap pb-4 mb-4 border-b border-brand-border">
+          <span class="text-sm font-bold text-brand-gray mr-1">날짜:</span>
+          <button type="button" onclick="shiftTodoListDate(-1)" class="w-8 h-8 rounded-full bg-brand-bg hover:bg-brand-border flex items-center justify-center" title="이전 날짜">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <input type="date" id="todo-list-date" class="drawer-input" style="width:170px;padding:8px 10px;" onchange="setTodoListDate(this.value)">
+          <button type="button" onclick="shiftTodoListDate(1)" class="w-8 h-8 rounded-full bg-brand-bg hover:bg-brand-border flex items-center justify-center" title="다음 날짜">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+          <button type="button" onclick="setTodoListDate('today')" class="px-3 py-1.5 rounded-full bg-brand-bg border border-brand-border text-xs font-bold hover:bg-white">오늘</button>
+          <span id="todo-list-date-label" class="text-sm font-semibold text-brand-gray ml-2"></span>
+        </div>
         <div class="flex items-center justify-between pb-4 mb-4 border-b border-brand-border">
           <label class="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" id="todo-select-all" class="w-4 h-4 rounded" onchange="toggleSelectAllTodos()">
@@ -9150,6 +9163,8 @@ async function handleLoginAfterAuth() {
   try { if (typeof renderUploadData === 'function') renderUploadData(); } catch(_) {}
   try { if (typeof syncLedgerFromUploadData === 'function') syncLedgerFromUploadData(); } catch(_) {}
   try { if (typeof syncDashboardRevenue === 'function') syncDashboardRevenue(); } catch(_) {}
+  // 키워드 자동 추적 — 키워드 페이지 안 들어가도 매분 체크 (오전 7시 후 자동 실행)
+  try { if (typeof _scheduleKwAutoTick === 'function') _scheduleKwAutoTick(); } catch(_) {}
 }
 
 document.getElementById('login-btn').addEventListener('click', async () => {
@@ -9462,6 +9477,7 @@ function openAddTodoModal() {
   _setModalMode('add');
   document.getElementById('todo-modal-backdrop').classList.add('open');
   document.body.style.overflow = 'hidden';
+  _bindTodoModalEnterKeys();
   setTimeout(() => document.getElementById('todo-title').focus(), 300);
 }
 
@@ -9483,6 +9499,7 @@ function todoEdit(id) {
   _setModalMode('edit');
   document.getElementById('todo-modal-backdrop').classList.add('open');
   document.body.style.overflow = 'hidden';
+  _bindTodoModalEnterKeys();
   setTimeout(() => document.getElementById('todo-title').focus(), 300);
 }
 
@@ -9496,13 +9513,29 @@ function handleTodoBackdropClick(e) {
   if (e.target === e.currentTarget) closeAddTodoModal();
 }
 
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' && document.getElementById('todo-modal-backdrop').classList.contains('open')) {
-    if (e.target.tagName === 'TEXTAREA') return;
-    e.preventDefault();
-    submitTodoModal();
+function _todoModalEnterHandler(e) {
+  if (e.key !== 'Enter') return;
+  // 한글 IME 조합 중 Enter 는 한글 확정용 — 무시
+  if (e.isComposing || e.keyCode === 229) return;
+  // 텍스트 영역(메모) 안에서는 Enter = 줄바꿈
+  if (e.target && e.target.tagName === 'TEXTAREA') return;
+  // 모달이 열려있을 때만
+  const bd = document.getElementById('todo-modal-backdrop');
+  if (!bd || !bd.classList.contains('open')) return;
+  e.preventDefault();
+  submitTodoModal();
+}
+document.addEventListener('keydown', _todoModalEnterHandler);
+
+function _bindTodoModalEnterKeys() {
+  const ids = ['todo-title','todo-due','todo-due-end','todo-team','repeat-monthly-day'];
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    if (!el || el._enterBound) continue;
+    el.addEventListener('keydown', _todoModalEnterHandler);
+    el._enterBound = true;
   }
-});
+}
 
 function selectPriority(color) {
   if (color === 'orange') color = 'blue';
@@ -13050,6 +13083,30 @@ function renderDashboardTodos() {
   }).join('');
 }
 
+// ── 할 일 목록 — 날짜 필터 ─────────────────────
+let _todoListFilterDate = null; // null = 오늘 (실시간 갱신)
+function _todoListEffectiveDateKey() {
+  if (_todoListFilterDate) return _todoListFilterDate;
+  const _now = new Date();
+  return _now.getFullYear() + '-' + String(_now.getMonth()+1).padStart(2,'0') + '-' + String(_now.getDate()).padStart(2,'0');
+}
+function setTodoListDate(v) {
+  if (v === 'today' || !v) {
+    _todoListFilterDate = null;
+  } else {
+    _todoListFilterDate = String(v);
+  }
+  renderTodoList();
+}
+function shiftTodoListDate(delta) {
+  const cur = _todoListEffectiveDateKey();
+  const d = new Date(cur + 'T00:00:00');
+  if (isNaN(d)) return;
+  d.setDate(d.getDate() + Number(delta || 0));
+  const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  setTodoListDate(key);
+}
+
 // ── Render: 할 일 목록 페이지 ─────────────────
 function renderTodoList() {
   const list    = document.getElementById('todo-list');
@@ -13060,8 +13117,24 @@ function renderTodoList() {
   const compCnt = document.getElementById('todo-completed-count');
   if (!list) return;
 
-  const _now = new Date();
-  const _todayKey = _now.getFullYear() + '-' + String(_now.getMonth()+1).padStart(2,'0') + '-' + String(_now.getDate()).padStart(2,'0');
+  const _todayKey = _todoListEffectiveDateKey();
+
+  // 날짜 입력/라벨 동기화
+  const dateInput = document.getElementById('todo-list-date');
+  if (dateInput && dateInput.value !== _todayKey) dateInput.value = _todayKey;
+  const lblEl = document.getElementById('todo-list-date-label');
+  if (lblEl) {
+    const _realToday = (() => {
+      const n = new Date();
+      return n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0') + '-' + String(n.getDate()).padStart(2,'0');
+    })();
+    const dd = new Date(_todayKey + 'T00:00:00');
+    const dow = ['일','월','화','수','목','금','토'][dd.getDay()] || '';
+    lblEl.textContent = (_todayKey === _realToday)
+      ? `오늘 (${dd.getMonth()+1}/${dd.getDate()} ${dow})`
+      : `${dd.getMonth()+1}/${dd.getDate()} ${dow}요일`;
+  }
+
   const _onToday = t => {
     if (!t.dateKey) return false;
     const end = t.endDateKey || t.dateKey;
