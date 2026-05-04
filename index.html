@@ -21421,10 +21421,27 @@ function _purgeJetFromUploadData(templates) {
   } catch (e) { console.warn('[jet→upload] 삭제 실패', e); }
 }
 
+// SKU 코드로 상품관리 DB에서 매칭 — supply_price / cost 가져오기용
+function _jetLookupProduct(skuCode) {
+  if (!skuCode) return null;
+  const sku = String(skuCode).trim().toLowerCase();
+  if (!sku) return null;
+  if (typeof _allProducts === 'undefined' || !Array.isArray(_allProducts)) return null;
+  return _allProducts.find(p => String(p.sku || '').trim().toLowerCase() === sku) || null;
+}
+
 // jet 리포트 행을 업로드 데이터 형식으로 변환
 function _jetRowToUploadEntry(reportType, r) {
   const label = JET_REPORT_LABELS[reportType] || reportType;
   const itemName = r.optionName ? `${r.productName || ''} (${r.optionName})` : (r.productName || '');
+  const itemCode = r.skuId || r.productId || '';
+  const qty = Number(r.qty || 0) || 1;
+  const prod = _jetLookupProduct(itemCode);
+  // 상품관리 DB 매칭 — 단가 단위로 제공되므로 수량을 곱해 행 단위 합계로 기록
+  const supplyPerUnit = prod ? (Number(prod.supply_price) || 0) : 0;
+  const costPerUnit   = prod ? (Number(prod.cost) || 0) : 0;
+  const supply = supplyPerUnit * qty;
+  const cost   = costPerUnit * qty;
   const base = {
     template: 'jet-' + reportType,
     rawJet: r.raw || {},
@@ -21434,31 +21451,36 @@ function _jetRowToUploadEntry(reportType, r) {
     siteCode: r.orderId || '',
     vendorCode: '',
     shipCode: '',
-    itemCode: r.skuId || r.productId || '',
+    itemCode,
     itemName,
-    qty: Number(r.qty || 0) || 1,
+    qty,
     price: 0,
+    supply,         // 공급가 (= product.supply_price × qty)
     ship: 0,
     shipCost: 0,
-    cost: 0,
+    cost,           // 원가 (= product.cost × qty)
     receiver: '',
     profit: 0,
     err: false,
-    memo: '',
+    memo: prod ? '' : (itemCode ? `미매칭 SKU(${itemCode})` : ''),
+    skuMatched: !!prod,
   };
   const amt = Number(r.amount || 0);
   if (reportType === 'order') {
-    // 주문내역 — 매출 (수입): price=판매가, profit=매출금액
+    // 주문내역 — 매출 (수입). price=판매가(단가), 공급가는 매출금액/1.1 우선 사용
     base.price = Number(r.price || 0);
-    base.profit = amt;
+    // 매출금액이 있으면 그것을 공급가로 (VAT 별도 환산), 아니면 product DB 값 유지
+    if (amt > 0) base.supply = Math.round(amt / 1.1);
+    base.profit = base.supply + base.ship - base.cost - base.shipCost;
   } else if (reportType === 'loss') {
-    // 재고손실보상 — 보상금 (수입): profit=+amount
+    // 재고손실보상 — 보상금 (수입). 보상금을 공급가로 환산
     base.price = Number(r.price || 0) || amt;
-    base.profit = amt;
+    if (amt > 0) base.supply = Math.round(amt / 1.1);
+    base.profit = base.supply + base.ship - base.cost - base.shipCost;
   } else {
-    // 판매수수료 / 입출고비 / 배송비 / 보관비 — 모두 지출: shipCost=amount, profit=-amount
+    // 판매수수료 / 입출고비 / 배송비 / 보관비 — 지출 (shipCost = 비용)
     base.shipCost = amt;
-    base.profit = -amt;
+    base.profit = base.supply + base.ship - base.cost - base.shipCost;
   }
   return base;
 }
