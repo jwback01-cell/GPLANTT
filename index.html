@@ -20798,6 +20798,174 @@ function _updateUploadDataSortIcons() {
   });
 }
 
+// 제트배송 품목 상세 모달 — 어떤 jet 항목들이 합쳐졌는지 + 광고비 함께 보여줌
+function openJetItemDetail(itemName) {
+  const data = _loadUploadData();
+  const matched = data.filter(r => r.template && String(r.template).startsWith('jet-') && (r.itemName || '') === (itemName || ''));
+  if (!matched.length) {
+    showAppAlert('데이터 없음', `"${itemName}" 에 해당하는 제트배송 행을 찾을 수 없습니다.`, { type: 'warning' });
+    return;
+  }
+  // 종류별 그룹
+  const TYPE_LABEL = {
+    'jet-order':'📋 주문내역', 'jet-fee':'💸 판매수수료', 'jet-io':'📥 입출고비',
+    'jet-ship':'🚚 배송비', 'jet-storage':'🏪 보관비', 'jet-loss':'🔧 재고손실보상',
+  };
+  const byType = {};
+  matched.forEach(r => {
+    const t = r.template;
+    if (!byType[t]) byType[t] = [];
+    byType[t].push(r);
+  });
+  const dates = matched.map(r => r.date).filter(Boolean).sort();
+  const minD = dates[0] || '';
+  const maxD = dates[dates.length - 1] || '';
+  // 같은 기간의 광고비 (사이트 단위 — 품목 매칭은 어려움, 정보로만 표시)
+  const ads = (typeof _loadAdCosts === 'function' ? _loadAdCosts() : [])
+    .filter(a => (!minD || (a.date || '') >= minD) && (!maxD || (a.date || '') <= maxD));
+  const adTotal = ads.reduce((s, a) => s + (Number(a.amount) || 0), 0);
+  const adBySite = {};
+  ads.forEach(a => { adBySite[a.site || '(미지정)'] = (adBySite[a.site || '(미지정)'] || 0) + (Number(a.amount) || 0); });
+
+  const fmt = v => Number(v || 0).toLocaleString('ko-KR');
+  const esc = (typeof escHtml === 'function') ? escHtml : (typeof _escapeHtml === 'function' ? _escapeHtml : (s => String(s||'')));
+
+  // 종류별 합계 행
+  const typeKeys = Object.keys(TYPE_LABEL);
+  const typeSummaryHtml = typeKeys.filter(k => byType[k]).map(k => {
+    const list = byType[k];
+    const sumAmt = list.reduce((s, r) => s + (Number(r.shipCost) || 0) + (Number(r.supply) || 0) - (Number(r.cost) || 0), 0);
+    // 더 명확하게: 각 type 의 핵심 금액
+    const sumSupply = list.reduce((s, r) => s + (Number(r.supply) || 0), 0);
+    const sumShipCost = list.reduce((s, r) => s + (Number(r.shipCost) || 0), 0);
+    const sumCost = list.reduce((s, r) => s + (Number(r.cost) || 0), 0);
+    const sumProfit = list.reduce((s, r) => s + (Number(r.profit) || 0), 0);
+    const profitColor = sumProfit < 0 ? 'color:#E91E63;font-weight:bold;' : (sumProfit > 0 ? 'color:#22C55E;font-weight:bold;' : '');
+    return `<tr style="border-bottom:1px solid #eee;">
+      <td style="padding:6px 10px;font-weight:600;">${TYPE_LABEL[k]}</td>
+      <td style="padding:6px 10px;text-align:right;color:#666;">${list.length}건</td>
+      <td style="padding:6px 10px;text-align:right;">${fmt(sumSupply)}</td>
+      <td style="padding:6px 10px;text-align:right;">${fmt(sumCost)}</td>
+      <td style="padding:6px 10px;text-align:right;">${fmt(sumShipCost)}</td>
+      <td style="padding:6px 10px;text-align:right;${profitColor}">${fmt(sumProfit)}</td>
+    </tr>`;
+  }).join('');
+
+  // 종류별 총합
+  const grand = matched.reduce((a, r) => {
+    a.supply += Number(r.supply) || 0;
+    a.cost += Number(r.cost) || 0;
+    a.shipCost += Number(r.shipCost) || 0;
+    a.profit += Number(r.profit) || 0;
+    return a;
+  }, { supply:0, cost:0, shipCost:0, profit:0 });
+  const profitAfterAd = grand.profit - adTotal;
+
+  // 개별 행 (날짜순)
+  const sorted = [...matched].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const detailRowsHtml = sorted.map(r => {
+    const typeLbl = TYPE_LABEL[r.template] || r.template;
+    const profitColor = (r.profit||0) < 0 ? 'color:#E91E63;' : ((r.profit||0) > 0 ? 'color:#22C55E;' : '');
+    return `<tr style="border-bottom:1px solid #f0f0f0;">
+      <td style="padding:5px 8px;color:#666;font-size:12px;">${esc(r.date || '')}</td>
+      <td style="padding:5px 8px;font-size:12px;">${typeLbl}</td>
+      <td style="padding:5px 8px;font-size:12px;color:#888;">${esc(r.siteCode || '')}</td>
+      <td style="padding:5px 8px;text-align:right;font-size:12px;">${fmt(r.qty)}</td>
+      <td style="padding:5px 8px;text-align:right;font-size:12px;">${fmt(r.supply)}</td>
+      <td style="padding:5px 8px;text-align:right;font-size:12px;">${fmt(r.cost)}</td>
+      <td style="padding:5px 8px;text-align:right;font-size:12px;">${fmt(r.shipCost)}</td>
+      <td style="padding:5px 8px;text-align:right;font-size:12px;${profitColor}">${fmt(r.profit)}</td>
+    </tr>`;
+  }).join('');
+
+  // 광고비 사이트별
+  const adRowsHtml = Object.keys(adBySite).length === 0
+    ? `<tr><td colspan="2" style="padding:10px;color:#888;text-align:center;font-size:12px;">해당 기간(${minD}~${maxD})에 업로드된 광고비 없음</td></tr>`
+    : Object.entries(adBySite).sort((a, b) => b[1] - a[1]).map(([site, amt]) =>
+        `<tr style="border-bottom:1px solid #f0f0f0;"><td style="padding:6px 10px;font-size:12px;">${esc(site)}</td><td style="padding:6px 10px;text-align:right;font-size:12px;">${fmt(amt)}</td></tr>`
+      ).join('');
+
+  // 모달 표시
+  const prev = document.getElementById('jet-detail-modal');
+  if (prev) prev.remove();
+  const m = document.createElement('div');
+  m.id = 'jet-detail-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML = `
+    <div style="background:white;border-radius:16px;max-width:1100px;width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="padding:16px 22px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;gap:12px;">
+        <div>
+          <div style="font-weight:bold;font-size:17px;">🔍 ${esc(itemName)} — 제트배송 매핑 상세</div>
+          <div style="color:#888;font-size:12px;margin-top:3px;">기간: ${minD || '-'} ~ ${maxD || '-'} · 총 ${matched.length}건</div>
+        </div>
+        <button onclick="document.getElementById('jet-detail-modal').remove()" style="background:#eee;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;">닫기 ✕</button>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:18px 22px;">
+        <!-- 종류별 합계 -->
+        <div style="font-weight:bold;font-size:14px;margin-bottom:6px;">종류별 합계</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:18px;">
+          <thead><tr style="background:#f5f5f7;">
+            <th style="padding:8px 10px;text-align:left;">종류</th>
+            <th style="padding:8px 10px;text-align:right;">건수</th>
+            <th style="padding:8px 10px;text-align:right;">공급가</th>
+            <th style="padding:8px 10px;text-align:right;">원가</th>
+            <th style="padding:8px 10px;text-align:right;">택배비용</th>
+            <th style="padding:8px 10px;text-align:right;">마진</th>
+          </tr></thead>
+          <tbody>${typeSummaryHtml}</tbody>
+          <tfoot><tr style="background:#fafafa;border-top:2px solid #333;font-weight:bold;">
+            <td style="padding:8px 10px;">전체</td>
+            <td style="padding:8px 10px;text-align:right;color:#666;">${matched.length}건</td>
+            <td style="padding:8px 10px;text-align:right;">${fmt(grand.supply)}</td>
+            <td style="padding:8px 10px;text-align:right;">${fmt(grand.cost)}</td>
+            <td style="padding:8px 10px;text-align:right;">${fmt(grand.shipCost)}</td>
+            <td style="padding:8px 10px;text-align:right;${grand.profit < 0 ? 'color:#E91E63;' : (grand.profit > 0 ? 'color:#22C55E;' : '')}">${fmt(grand.profit)}</td>
+          </tr></tfoot>
+        </table>
+
+        <!-- 광고비 -->
+        <div style="font-weight:bold;font-size:14px;margin-bottom:6px;">광고비 (해당 기간 · 사이트 단위)</div>
+        <div style="color:#888;font-size:11px;margin-bottom:6px;">⚠ 광고비는 사이트 단위로만 집계되어 품목별 직접 매칭이 어렵습니다. 정보로 표시합니다.</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px;">
+          <thead><tr style="background:#f5f5f7;">
+            <th style="padding:8px 10px;text-align:left;">사이트</th>
+            <th style="padding:8px 10px;text-align:right;">광고비</th>
+          </tr></thead>
+          <tbody>${adRowsHtml}</tbody>
+          <tfoot><tr style="background:#fafafa;border-top:2px solid #333;font-weight:bold;">
+            <td style="padding:8px 10px;">광고비 합계</td>
+            <td style="padding:8px 10px;text-align:right;">${fmt(adTotal)}</td>
+          </tr></tfoot>
+        </table>
+        <div style="background:${profitAfterAd < 0 ? '#FEE7EE' : '#E8F8EE'};padding:10px 14px;border-radius:10px;margin-bottom:18px;font-size:13px;">
+          <span style="color:#666;">참고: 마진 ${fmt(grand.profit)} − 광고비 ${fmt(adTotal)} = </span>
+          <span style="font-weight:bold;${profitAfterAd < 0 ? 'color:#E91E63;' : 'color:#22C55E;'}">실마진 ${fmt(profitAfterAd)} 원</span>
+          <span style="color:#888;font-size:11px;margin-left:6px;">(광고비는 같은 기간 사이트 전체 합계)</span>
+        </div>
+
+        <!-- 개별 행 -->
+        <div style="font-weight:bold;font-size:14px;margin-bottom:6px;">개별 항목 (${sorted.length}건)</div>
+        <div style="max-height:400px;overflow-y:auto;border:1px solid #eee;border-radius:8px;">
+          <table style="width:100%;border-collapse:collapse;">
+            <thead><tr style="background:#f5f5f7;position:sticky;top:0;">
+              <th style="padding:8px 10px;text-align:left;font-size:12px;">날짜</th>
+              <th style="padding:8px 10px;text-align:left;font-size:12px;">종류</th>
+              <th style="padding:8px 10px;text-align:left;font-size:12px;">주문ID</th>
+              <th style="padding:8px 10px;text-align:right;font-size:12px;">수량</th>
+              <th style="padding:8px 10px;text-align:right;font-size:12px;">공급가</th>
+              <th style="padding:8px 10px;text-align:right;font-size:12px;">원가</th>
+              <th style="padding:8px 10px;text-align:right;font-size:12px;">택배비용</th>
+              <th style="padding:8px 10px;text-align:right;font-size:12px;">마진</th>
+            </tr></thead>
+            <tbody>${detailRowsHtml}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+}
+
 // 제트배송 jet-* 행들을 품목명별로 집계 (날짜는 범위 표시, 다른 합산 가능 컬럼은 sum)
 function _aggregateJetByItemName(rows) {
   const map = new Map();
@@ -20918,7 +21086,7 @@ function renderUploadData() {
       ? `<td class="px-4 py-3 whitespace-nowrap text-brand-gray text-xs" title="집계 행 — 개별 선택 불가">∑</td>`
       : `<td class="px-4 py-3 whitespace-nowrap"><input type="checkbox" class="upload-data-cb" data-idx="${origIdx}" onchange="updateUploadDataSelCount()"></td>`;
     const editCell = isAgg
-      ? `<td class="px-4 py-3 text-center whitespace-nowrap"><span class="text-brand-gray text-xs" title="집계 행은 직접 수정할 수 없습니다. 원본 행은 검색창을 비우거나 [📦 제트배송만 보기] 해제 후 확인하세요.">집계</span></td>`
+      ? `<td class="px-4 py-3 text-center whitespace-nowrap"><button onclick="openJetItemDetail(${JSON.stringify(r.itemName||'').replace(/"/g, '&quot;')})" title="이 품목의 개별 매핑 내역과 광고비 보기" class="text-brand-blue hover:text-brand-black hover:underline text-sm font-bold">🔍 상세</button></td>`
       : `<td class="px-4 py-3 text-center whitespace-nowrap"><button onclick="openEditUploadDataRow(${origIdx})" title="이 행 수정" class="text-brand-blue hover:underline text-xs font-bold">✏️ 수정</button></td>`;
     const rowClass = isAgg ? 'border-t border-brand-border bg-brand-blue-light/20 hover:bg-brand-blue-light/40 font-semibold' : 'border-t border-brand-border hover:bg-brand-bg/50';
     return `
@@ -20957,9 +21125,40 @@ function renderUploadData() {
     return `<span class="${cls}">${_fmt(obj.v)}</span>`;
   };
   const tfoot = document.getElementById('upload-data-tfoot');
+  // 제트배송 집계 모드일 때 광고비 합계 행 추가 (기간 = 필터된 날짜 또는 데이터 범위)
+  let adFooterHtml = '';
+  if (allJet) {
+    const dates = [];
+    all.forEach(r => {
+      // 집계 행의 date 는 'YYYY-MM-DD ~ YYYY-MM-DD' 또는 'YYYY-MM-DD' 형식
+      const m = String(r.date || '').match(/(\d{4}-\d{2}-\d{2})/g);
+      if (m) m.forEach(d => dates.push(d));
+    });
+    dates.sort();
+    const minD = dates[0] || '';
+    const maxD = dates[dates.length - 1] || '';
+    const ads = (typeof _loadAdCosts === 'function' ? _loadAdCosts() : [])
+      .filter(a => (!minD || (a.date || '') >= minD) && (!maxD || (a.date || '') <= maxD));
+    const adTotal = ads.reduce((s, a) => s + (Number(a.amount) || 0), 0);
+    const profitAfterAd = (sumProfitObj.n ? sumProfitObj.v : 0) - adTotal;
+    const profitClass = profitAfterAd < 0 ? 'text-brand-pink' : (profitAfterAd > 0 ? 'text-brand-green' : '');
+    adFooterHtml = `
+      <tr class="border-t border-brand-border bg-brand-blue-light/30">
+        <td class="px-4 py-2 font-bold text-xs text-brand-gray" colspan="13">📣 광고비 (${minD || '?'} ~ ${maxD || '?'} · 사이트 전체)</td>
+        <td class="px-4 py-2 text-right font-black text-brand-pink">−${_fmt(adTotal)}</td>
+        <td class="px-4 py-2"></td>
+        <td class="px-4 py-2"></td>
+      </tr>
+      <tr class="border-t-2 border-brand-black bg-brand-bg">
+        <td class="px-4 py-3 font-bold text-xs text-brand-gray" colspan="13">실마진 (마진 − 광고비)</td>
+        <td class="px-4 py-3 text-right font-black ${profitClass}">${_fmt(profitAfterAd)}</td>
+        <td class="px-4 py-3"></td>
+        <td class="px-4 py-3"></td>
+      </tr>`;
+  }
   tfoot.innerHTML = `
     <tr class="border-t-2 border-brand-black bg-brand-bg">
-      <td class="px-4 py-3 font-bold text-xs text-brand-gray" colspan="6">합계 (${all.length}건)</td>
+      <td class="px-4 py-3 font-bold text-xs text-brand-gray" colspan="6">합계 (${all.length}건${allJet ? ' · 품목별 집계' : ''})</td>
       <td class="px-4 py-3 text-right font-black">${_fmt(sum('qty'))}</td>
       <td class="px-4 py-3 text-right font-black">${_fmt(sum('price'))}</td>
       <td class="px-4 py-3 text-right font-black">${_fmt(sumSupply)}</td>
@@ -20970,7 +21169,7 @@ function renderUploadData() {
       <td class="px-4 py-3 text-right font-black">${_sumProfitCell(sumProfitObj)}</td>
       <td class="px-4 py-3"></td>
       <td class="px-4 py-3"></td>
-    </tr>`;
+    </tr>${adFooterHtml}`;
   const sa = document.getElementById('upload-data-select-all'); if (sa) sa.checked = false;
   updateUploadDataSelCount();
   // 페이지 사이즈 버튼 active 표시
