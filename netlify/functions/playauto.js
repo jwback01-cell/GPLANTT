@@ -74,13 +74,32 @@ exports.handler = async (event) => {
   path = path.replace(/^\/api\/playauto/, '');
   if (!path.startsWith('/')) path = '/' + path;
 
+  // 쿼리스트링 — Netlify가 splat 등을 path 키로 주입하는 경우를 차단
+  // (path=shops 식으로 누설되면 업스트림 URL 이 https://openapi.playauto.io/api/?path=shops
+  //  가 되어 AWS API Gateway 가 SigV4 를 요구하며 403 을 던짐)
+  const cleanQuery = (qsObj) => {
+    if (!qsObj) return null;
+    const sp = new URLSearchParams();
+    for (const [k, v] of Object.entries(qsObj)) {
+      if (k === 'path' || k === 'splat') continue;
+      if (v != null) sp.set(k, v);
+    }
+    return sp.toString();
+  };
   let qsStr = '';
   if (event.rawQuery) {
-    qsStr = '?' + event.rawQuery;
-  } else if (event.queryStringParameters && Object.keys(event.queryStringParameters).length) {
-    qsStr = '?' + new URLSearchParams(event.queryStringParameters).toString();
+    // rawQuery 에서도 path= 만 정확히 제거
+    const filtered = event.rawQuery
+      .split('&')
+      .filter(p => !/^path=/.test(p) && !/^splat=/.test(p))
+      .join('&');
+    if (filtered) qsStr = '?' + filtered;
+  } else {
+    const qs = cleanQuery(event.queryStringParameters);
+    if (qs) qsStr = '?' + qs;
   }
   const upstreamUrl = PA_BASE + path + qsStr;
+  console.log(`[netlify-playauto] ${event.httpMethod} → ${upstreamUrl}`);
 
   const doRequest = async (token) => {
     const r = await fetch(upstreamUrl, {

@@ -56,14 +56,18 @@ export default async function handler(req, res) {
   const segs = req.query.path;
   const subPath = '/' + (Array.isArray(segs) ? segs.join('/') : (segs || ''));
 
+  // path/splat 은 catch-all 라우팅용 키 — 업스트림에 절대 보내지 말 것
+  // (누설되면 https://openapi.playauto.io/api/?path=shops 가 되어 AWS API Gateway 가
+  //  SigV4 를 요구하며 403 을 던짐 — 플레이오토 지원팀 권고 사항)
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(req.query)) {
-    if (k === 'path') continue;
+    if (k === 'path' || k === 'splat') continue;
     if (Array.isArray(v)) v.forEach(x => qs.append(k, x));
     else if (v != null) qs.set(k, v);
   }
   const qsStr = qs.toString() ? '?' + qs.toString() : '';
   const upstreamUrl = PA_BASE + subPath + qsStr;
+  console.log(`[playauto-vercel ${traceId}] ${req.method} → ${upstreamUrl}`);
 
   const bodyJson = (req.method === 'GET' || req.method === 'HEAD' || req.body == null)
     ? undefined
