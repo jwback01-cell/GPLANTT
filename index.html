@@ -12995,8 +12995,40 @@ async function loadTodosFromDB() {
   todos.length = 0;
   (data || []).forEach(r => todos.push(_dbRowToTodo(r)));
   _tid = todos.length > 0 ? Math.max(...todos.map(t => t.id)) + 1 : 1;
+  // 미완료 업무 자동 롤오버 — 어제(이전) 마감인 업무를 오늘로 이동
+  await _rolloverOverdueTodos();
   renderTodoList();
   renderDashboardTodos();
+}
+
+// 미완료 업무를 오늘로 이동 (단일일은 dateKey 변경, 기간 업무는 endDateKey 연장)
+// 반복 업무(repeatLabel)는 일자별로 별도 생성되므로 제외
+async function _rolloverOverdueTodos() {
+  const now = new Date();
+  const todayKey = _makeDateKey(now);
+  const todayDue = _makeDueText(now);
+  const tasks = [];
+  for (const t of todos) {
+    if (t.completed) continue;
+    if (t.repeatLabel) continue;
+    if (!t.dateKey) continue;
+    const endKey = t.endDateKey || t.dateKey;
+    if (endKey >= todayKey) continue; // 오늘 또는 미래에 걸쳐있으면 그대로
+    if (!t.endDateKey || t.endDateKey === t.dateKey) {
+      // 단일일 업무 — dateKey 를 오늘로
+      t.dateKey = todayKey;
+      t.dueText = todayDue;
+      tasks.push(updateTodoDB(t.id, { dateKey: t.dateKey, dueText: t.dueText }));
+    } else {
+      // 기간 업무 — endDateKey 를 오늘로 연장 (시작일은 유지)
+      t.endDateKey = todayKey;
+      tasks.push(updateTodoDB(t.id, { endDateKey: t.endDateKey }));
+    }
+  }
+  if (tasks.length) {
+    console.log(`[todo-rollover] ${tasks.length}개 미완료 업무를 오늘(${todayKey})로 이동`);
+    await Promise.allSettled(tasks);
+  }
 }
 
 async function insertTodoDB(item) {
