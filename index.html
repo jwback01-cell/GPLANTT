@@ -21423,27 +21423,42 @@ async function handleJetIoShipFile(evt) {
   try {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+    console.log('[jet-io-ship] 시트 목록:', wb.SheetNames);
     let ioRows = [], shipRows = [];
+    const debug = []; // 시트별 진단 정보
     for (const sheetName of wb.SheetNames) {
       const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
-      // 시트명 기반 분류 — 입출고/io vs 배송/ship
       const lower = sheetName.toLowerCase();
-      if (sheetName.indexOf('입출고') !== -1 || lower.indexOf('inout') !== -1) {
-        ioRows = ioRows.concat(_parseJetIoSheet(aoa));
-      } else if (sheetName.indexOf('배송') !== -1 || lower.indexOf('ship') !== -1 || lower.indexOf('deliv') !== -1) {
-        shipRows = shipRows.concat(_parseJetShipSheet(aoa));
-      } else {
-        // 시트명 모호 — 헤더로 판정
-        const found = _jetParseSheetAoa(aoa, ['거래유형']);
-        if (found) {
-          const txn = aoa[found.headerRowIdx + 1] && String(aoa[found.headerRowIdx + 1][found.header.indexOf('거래유형')] || '');
-          if (txn && txn.indexOf('배송') !== -1) shipRows = shipRows.concat(_parseJetShipSheet(aoa));
-          else ioRows = ioRows.concat(_parseJetIoSheet(aoa));
+      const isIo   = sheetName.indexOf('입출고') !== -1 || lower.indexOf('inout') !== -1;
+      const isShip = sheetName.indexOf('배송')   !== -1 || lower.indexOf('ship') !== -1 || lower.indexOf('deliv') !== -1;
+      let target = isIo ? 'io' : isShip ? 'ship' : 'auto';
+      // 시트명 모호 — 양쪽 다 시도해서 더 많이 추출되는 쪽 선택
+      if (target === 'auto') {
+        const tryIo = _parseJetIoSheet(aoa);
+        const tryShip = _parseJetShipSheet(aoa);
+        if (tryShip.length > tryIo.length) { shipRows = shipRows.concat(tryShip); target = 'ship(auto)'; }
+        else if (tryIo.length > 0) { ioRows = ioRows.concat(tryIo); target = 'io(auto)'; }
+        debug.push({ sheetName, target, rows: Math.max(tryIo.length, tryShip.length) });
+        continue;
+      }
+      const parsed = (target === 'io') ? _parseJetIoSheet(aoa) : _parseJetShipSheet(aoa);
+      // 1차 시도가 0건이면 반대 파서로 폴백
+      if (parsed.length === 0) {
+        const alt = (target === 'io') ? _parseJetShipSheet(aoa) : _parseJetIoSheet(aoa);
+        if (alt.length > 0) {
+          if (target === 'io') { shipRows = shipRows.concat(alt); target = 'io→ship 폴백'; }
+          else { ioRows = ioRows.concat(alt); target = 'ship→io 폴백'; }
+          debug.push({ sheetName, target, rows: alt.length });
+          continue;
         }
       }
+      if (target === 'io') ioRows = ioRows.concat(parsed);
+      else shipRows = shipRows.concat(parsed);
+      debug.push({ sheetName, target, rows: parsed.length });
     }
+    console.log('[jet-io-ship] 시트별 처리 결과:', debug);
     if (!ioRows.length && !shipRows.length) {
-      _jetStatus('io', '❌ 인식된 데이터가 없습니다. 시트명에 "입출고" 또는 "배송" 이 포함되어 있는지 확인해 주세요.', 'error');
+      _jetStatus('io', '❌ 인식된 데이터가 없습니다. F12 콘솔의 [jet-io-ship] 로그를 확인해 주세요.', 'error');
       return;
     }
     if (ioRows.length) {
@@ -21454,7 +21469,8 @@ async function handleJetIoShipFile(evt) {
       const prev = _loadJetReport('ship');
       _saveJetReport('ship', prev.concat(shipRows));
     }
-    _jetStatus('io', `✅ 입출고비 ${ioRows.length}건 / 배송비 ${shipRows.length}건 추가됨`, 'ok');
+    const detail = debug.map(d => `${d.sheetName}→${d.target}(${d.rows}건)`).join(' / ');
+    _jetStatus('io', `✅ 입출고비 ${ioRows.length}건 / 배송비 ${shipRows.length}건 추가됨 · ${detail}`, 'ok');
     _renderJetReport('io');
     _renderJetReport('ship');
   } catch (e) {
@@ -21465,7 +21481,11 @@ async function handleJetIoShipFile(evt) {
 
 function _parseJetIoSheet(aoa) {
   const meta = _jetParseSheetAoa(aoa, ['주문ID','등록상품명','발생비용']);
-  if (!meta) return [];
+  if (!meta) {
+    console.warn('[jet-io] 헤더 행 미발견. 첫 10행:', aoa.slice(0, 10).map(r => (r||[]).slice(0, 8)));
+    return [];
+  }
+  console.log('[jet-io] 헤더 행 idx=' + meta.headerRowIdx + ', 컬럼:', meta.header);
   const h = meta.header;
   const I = {
     date:  _jetHeaderIdx(h, '매출인식일','발생일'),
@@ -21503,7 +21523,11 @@ function _parseJetIoSheet(aoa) {
 
 function _parseJetShipSheet(aoa) {
   const meta = _jetParseSheetAoa(aoa, ['주문ID','등록상품명','최종비용','발생비용']);
-  if (!meta) return [];
+  if (!meta) {
+    console.warn('[jet-ship] 헤더 행 미발견. 첫 10행:', aoa.slice(0, 10).map(r => (r||[]).slice(0, 8)));
+    return [];
+  }
+  console.log('[jet-ship] 헤더 행 idx=' + meta.headerRowIdx + ', 컬럼:', meta.header);
   const h = meta.header;
   const I = {
     date:  _jetHeaderIdx(h, '매출인식일','발생일'),
