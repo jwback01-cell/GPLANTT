@@ -21386,20 +21386,86 @@ function _saveJetReport(type, rows) {
 function clearJetReport(type) {
   // io_ship 은 io+ship 둘 다 삭제
   if (type === 'io_ship') {
-    if (!confirm('입출고비와 배송비 데이터를 모두 삭제하시겠습니까?')) return;
+    if (!confirm('입출고비와 배송비 데이터를 모두 삭제하시겠습니까? (업로드 데이터에서도 함께 삭제됩니다)')) return;
     _saveJetReport('io', []); _saveJetReport('ship', []);
+    _purgeJetFromUploadData(['jet-io','jet-ship']);
     _renderJetReport('io'); _renderJetReport('ship');
     return;
   }
   if (type === 'order_fee') {
-    if (!confirm('주문내역과 판매수수료 데이터를 모두 삭제하시겠습니까?')) return;
+    if (!confirm('주문내역과 판매수수료 데이터를 모두 삭제하시겠습니까? (업로드 데이터에서도 함께 삭제됩니다)')) return;
     _saveJetReport('order', []); _saveJetReport('fee', []);
+    _purgeJetFromUploadData(['jet-order','jet-fee']);
     _renderJetReport('order'); _renderJetReport('fee');
     return;
   }
-  if (!confirm(JET_REPORT_LABELS[type] + ' 데이터를 모두 삭제하시겠습니까?')) return;
+  if (!confirm(JET_REPORT_LABELS[type] + ' 데이터를 모두 삭제하시겠습니까? (업로드 데이터에서도 함께 삭제됩니다)')) return;
   _saveJetReport(type, []);
+  _purgeJetFromUploadData(['jet-' + type]);
   _renderJetReport(type);
+}
+
+// 업로드 데이터에서 특정 jet-* 템플릿 행 제거
+function _purgeJetFromUploadData(templates) {
+  try {
+    const data = _loadUploadData();
+    const filtered = data.filter(r => !templates.includes(r.template));
+    _saveUploadData(filtered);
+    if (typeof renderUploadData === 'function') try { renderUploadData(); } catch(_) {}
+  } catch (e) { console.warn('[jet→upload] 삭제 실패', e); }
+}
+
+// jet 리포트 행을 업로드 데이터 형식으로 변환
+function _jetRowToUploadEntry(reportType, r) {
+  const label = JET_REPORT_LABELS[reportType] || reportType;
+  const itemName = r.optionName ? `${r.productName || ''} (${r.optionName})` : (r.productName || '');
+  const base = {
+    template: 'jet-' + reportType,
+    rawJet: r.raw || {},
+    vendor: '쿠팡',
+    site: '쿠팡(제트배송-' + label + ')',
+    date: r.date || '',
+    siteCode: r.orderId || '',
+    vendorCode: '',
+    shipCode: '',
+    itemCode: r.skuId || r.productId || '',
+    itemName,
+    qty: Number(r.qty || 0) || 1,
+    price: 0,
+    ship: 0,
+    shipCost: 0,
+    cost: 0,
+    receiver: '',
+    profit: 0,
+    err: false,
+    memo: '',
+  };
+  const amt = Number(r.amount || 0);
+  if (reportType === 'order') {
+    // 주문내역 — 매출 (수입): price=판매가, profit=매출금액
+    base.price = Number(r.price || 0);
+    base.profit = amt;
+  } else if (reportType === 'loss') {
+    // 재고손실보상 — 보상금 (수입): profit=+amount
+    base.price = Number(r.price || 0) || amt;
+    base.profit = amt;
+  } else {
+    // 판매수수료 / 입출고비 / 배송비 / 보관비 — 모두 지출: shipCost=amount, profit=-amount
+    base.shipCost = amt;
+    base.profit = -amt;
+  }
+  return base;
+}
+
+// 리포트 행들을 업로드 데이터에 누적 추가
+function _appendJetRowsToUploadData(reportType, rows) {
+  if (!Array.isArray(rows) || !rows.length) return;
+  try {
+    const data = _loadUploadData();
+    const entries = rows.map(r => _jetRowToUploadEntry(reportType, r));
+    _saveUploadData(data.concat(entries));
+    if (typeof renderUploadData === 'function') try { renderUploadData(); } catch(_) {}
+  } catch (e) { console.warn('[jet→upload] 추가 실패', e); }
 }
 function _jetNumber(v) {
   if (v == null || v === '') return 0;
@@ -21527,13 +21593,15 @@ async function handleJetIoShipFile(evt) {
     if (ioRows.length) {
       const prev = _loadJetReport('io');
       _saveJetReport('io', prev.concat(ioRows));
+      _appendJetRowsToUploadData('io', ioRows);
     }
     if (shipRows.length) {
       const prev = _loadJetReport('ship');
       _saveJetReport('ship', prev.concat(shipRows));
+      _appendJetRowsToUploadData('ship', shipRows);
     }
     const detail = debug.map(d => `${d.sheetName}→${d.target}(${d.rows}건)`).join(' / ');
-    _jetStatus('io', `✅ 입출고비 ${ioRows.length}건 / 배송비 ${shipRows.length}건 추가됨 · ${detail}`, 'ok');
+    _jetStatus('io', `✅ 입출고비 ${ioRows.length}건 / 배송비 ${shipRows.length}건 추가됨 (업로드 데이터에도 자동 반영) · ${detail}`, 'ok');
     _renderJetReport('io');
     _renderJetReport('ship');
   } catch (e) {
@@ -21671,10 +21739,16 @@ async function handleJetOrderFeeFile(evt) {
       _jetStatus('order', '❌ 인식된 데이터가 없습니다. F12 콘솔의 [jet-order-fee] 로그를 확인해 주세요.', 'error');
       return;
     }
-    if (orderRows.length) { const prev = _loadJetReport('order'); _saveJetReport('order', prev.concat(orderRows)); }
-    if (feeRows.length)   { const prev = _loadJetReport('fee');   _saveJetReport('fee',   prev.concat(feeRows)); }
+    if (orderRows.length) {
+      const prev = _loadJetReport('order'); _saveJetReport('order', prev.concat(orderRows));
+      _appendJetRowsToUploadData('order', orderRows);
+    }
+    if (feeRows.length) {
+      const prev = _loadJetReport('fee'); _saveJetReport('fee', prev.concat(feeRows));
+      _appendJetRowsToUploadData('fee', feeRows);
+    }
     const detail = debug.map(d => `${d.sheetName}→${d.target}(${d.rows}건)`).join(' / ');
-    _jetStatus('order', `✅ 주문내역 ${orderRows.length}건 / 판매수수료 ${feeRows.length}건 추가됨 · ${detail}`, 'ok');
+    _jetStatus('order', `✅ 주문내역 ${orderRows.length}건 / 판매수수료 ${feeRows.length}건 추가됨 (업로드 데이터에도 자동 반영) · ${detail}`, 'ok');
     _renderJetReport('order');
     _renderJetReport('fee');
   } catch (e) {
@@ -21829,7 +21903,8 @@ async function handleJetStorageFile(evt) {
     if (!rows.length) { _jetStatus('storage', '❌ 보관비 데이터가 없습니다.', 'error'); return; }
     const prev = _loadJetReport('storage');
     _saveJetReport('storage', prev.concat(rows));
-    _jetStatus('storage', `✅ 보관비 ${rows.length}건 추가됨`, 'ok');
+    _appendJetRowsToUploadData('storage', rows);
+    _jetStatus('storage', `✅ 보관비 ${rows.length}건 추가됨 (업로드 데이터에도 자동 반영)`, 'ok');
     _renderJetReport('storage');
   } catch (e) {
     console.error('[jet-storage] parse error', e);
@@ -21889,7 +21964,8 @@ async function handleJetLossFile(evt) {
     if (!rows.length) { _jetStatus('loss', '❌ 재고손실보상 데이터가 없습니다.', 'error'); return; }
     const prev = _loadJetReport('loss');
     _saveJetReport('loss', prev.concat(rows));
-    _jetStatus('loss', `✅ 재고손실보상 ${rows.length}건 추가됨`, 'ok');
+    _appendJetRowsToUploadData('loss', rows);
+    _jetStatus('loss', `✅ 재고손실보상 ${rows.length}건 추가됨 (업로드 데이터에도 자동 반영)`, 'ok');
     _renderJetReport('loss');
   } catch (e) {
     console.error('[jet-loss] parse error', e);
