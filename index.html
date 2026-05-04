@@ -20807,9 +20807,11 @@ function renderUploadData() {
   let all = data.filter(r => {
     if (search) {
       const hit = (r.vendor||'').toLowerCase().includes(search)
+               || (r.site||'').toLowerCase().includes(search)
                || (r.itemName||'').toLowerCase().includes(search)
                || (r.itemCode||'').toLowerCase().includes(search)
-               || (r.receiver||'').toLowerCase().includes(search);
+               || (r.receiver||'').toLowerCase().includes(search)
+               || (r.template||'').toLowerCase().includes(search);
       if (!hit) return false;
     }
     if (startDate || endDate) {
@@ -20987,9 +20989,11 @@ function _getVisibleUploadData() {
   let all = data.filter(r => {
     if (search) {
       const hit = (r.vendor||'').toLowerCase().includes(search)
+               || (r.site||'').toLowerCase().includes(search)
                || (r.itemName||'').toLowerCase().includes(search)
                || (r.itemCode||'').toLowerCase().includes(search)
-               || (r.receiver||'').toLowerCase().includes(search);
+               || (r.receiver||'').toLowerCase().includes(search)
+               || (r.template||'').toLowerCase().includes(search);
       if (!hit) return false;
     }
     if (startDate || endDate) {
@@ -21507,16 +21511,36 @@ function syncJetReportsToUploadData() {
   );
 }
 
-// 검색창에 "제트배송" 적용해 즉시 필터
+// 검색창에 "제트배송" 적용해 즉시 필터. 업로드 데이터에 제트 행이 없으면 동기화 권유.
 function filterUploadDataByJet() {
   const inp = document.getElementById('upload-data-search');
   if (!inp) return;
-  // 비어있거나 다른 키워드면 '제트배송' 으로 설정, 이미 '제트배송'이면 해제
+  // 토글
   if (inp.value.trim() === '제트배송') {
     inp.value = '';
-  } else {
-    inp.value = '제트배송';
+    if (typeof renderUploadData === 'function') renderUploadData();
+    return;
   }
+  // 업로드 데이터에 jet-* 행이 있는지 확인
+  const data = _loadUploadData();
+  const jetCount = data.filter(r => r.template && String(r.template).startsWith('jet-')).length;
+  if (jetCount === 0) {
+    // 저장된 제트 리포트 데이터는 있는지 확인
+    const reportTotal = ['io','ship','storage','loss','order','fee']
+      .reduce((s, t) => s + _loadJetReport(t).length, 0);
+    if (reportTotal > 0) {
+      showAppConfirm(
+        '제트배송 데이터 동기화 필요',
+        `업로드 데이터에 제트배송 행이 아직 없습니다.\n저장된 제트배송 리포트 ${reportTotal.toLocaleString()}건을 지금 업로드 데이터로 가져오시겠습니까?`,
+        () => syncJetReportsToUploadData(),
+        { type: 'question', confirmText: '지금 동기화' }
+      );
+      return;
+    }
+    showAppAlert('제트배송 데이터 없음', '저장된 제트배송 리포트가 없습니다.\n[엑셀 업로드 → 제트배송] 탭에서 입출고비/배송비/보관비/재고손실/주문/수수료 리포트를 먼저 업로드해 주세요.', { type: 'warning' });
+    return;
+  }
+  inp.value = '제트배송';
   if (typeof renderUploadData === 'function') renderUploadData();
 }
 function _jetNumber(v) {
