@@ -18806,7 +18806,10 @@ async function sendInvoicesToPlayauto() {
   // 드롭다운은 폴백용 (주문에 택배사 정보가 없을 때만 사용)
   const fallbackCarrNo = carrierSel.value;
   const fallbackCarrName = carrierSel.selectedOptions[0] ? (carrierSel.selectedOptions[0].getAttribute('data-name') || '') : '';
-  const userEndpoint = ((endpointEl.value || '').trim()) || '/order/setInvoice';
+  // 이전에 성공했던 엔드포인트가 있으면 그것 우선 (없으면 기본값)
+  let savedEndpoint = '';
+  try { savedEndpoint = localStorage.getItem('pa_inv_last_endpoint') || ''; } catch(_) {}
+  const userEndpoint = ((endpointEl.value || '').trim()) || savedEndpoint || '/order/setInvoice';
   console.log('[INV-SEND] _paOrders.length =', Array.isArray(_paOrders) ? _paOrders.length : 'not-array');
   if (!Array.isArray(_paOrders) || !_paOrders.length) {
     _invSendStatus('수집된 주문이 없습니다. 먼저 "주문 수집"을 실행하세요.', 'error');
@@ -18895,9 +18898,50 @@ async function _doSendInvoicesToPlayauto(btn, targets, userEndpoint, fallbackCar
   };
   _invLog('전송 페이로드 샘플: ' + JSON.stringify(body.orders[0]));
 
+  // 사용자가 지정한 endpoint 를 PUT/POST 두 가지 메서드로 먼저 시도하고,
+  // 그래도 404 ("The page could not be found") 가 나오면 후보 경로들로 자동 폴백
+  const _isNotFoundErr = (err) => {
+    const m = String(err && err.message || err).toLowerCase();
+    return /\bpage could not be found\b|\bnot found\b|\bcannot (post|get|put|patch)\b|\b404\b/.test(m);
+  };
+  const tryList = [
+    { method: 'PUT',   path: userEndpoint },
+    { method: 'POST',  path: userEndpoint },
+    ...INVOICE_ENDPOINT_CANDIDATES.filter(c => c.path !== userEndpoint),
+  ];
+
   let ok = 0, fail = 0;
-  try {
-    const res = await _paFetch(userEndpoint, { method: 'PUT', body: JSON.stringify(body) });
+  let res = null;
+  let succeededSpec = null;
+  let lastErr = null;
+  for (const spec of tryList) {
+    try {
+      _invLog(`→ ${spec.method} ${spec.path} 시도...`);
+      res = await _paFetch(spec.path, { method: spec.method, body: JSON.stringify(body) });
+      // PA 본문에 에러가 들어오는 경우 (HTTP 200이지만 statusCode:404 등)
+      if (_isPaErrorResponse(res)) {
+        const m = res.message || (res.response && res.response.message) || res.error || JSON.stringify(res).slice(0, 200);
+        _invLog(`  ↳ 본문 에러: ${m}`);
+        if (_isNotFoundErr({ message: m })) { lastErr = new Error(m); continue; }
+        // 다른 종류의 에러는 더 시도하지 않고 그대로 처리
+        succeededSpec = spec; break;
+      }
+      succeededSpec = spec;
+      break;
+    } catch (err) {
+      lastErr = err;
+      _invLog(`  ↳ 실패: ${err && err.message || err}`);
+      if (_isRateLimitError(err)) { _invLog('💡 429 — 몇 분 뒤 재시도'); break; }
+      if (_isNotFoundErr(err)) { continue; } // 다음 후보 시도
+      break; // 404가 아닌 다른 에러는 중단
+    }
+  }
+
+  if (!succeededSpec) {
+    fail = targets.length;
+    _invLog('❌ 모든 엔드포인트 후보 실패 — 마지막 에러: ' + (lastErr && lastErr.message || '(unknown)'));
+  } else {
+    _invLog(`✅ 성공한 엔드포인트: ${succeededSpec.method} ${succeededSpec.path}`);
     _invLog('📥 응답: ' + JSON.stringify(res).slice(0, 500));
     // 응답 형식: { result: [{bundle_no, setInvoiceResult:"성공"/"실패", setInvoiceMessage, work_no, addWorkResult, addWorkMessage}, ...] }
     // 또는 { update_list: [...], work_result: [...] } — aff_no에 따라 다름
@@ -18922,12 +18966,14 @@ async function _doSendInvoicesToPlayauto(btn, targets, userEndpoint, fallbackCar
       ok = targets.length;
       _invLog('ℹ️ 응답 형식이 문서와 다르지만 에러는 아님 — 전체 성공으로 간주');
     }
-  } catch (err) {
-    fail = targets.length;
-    _invLog('❌ 요청 실패: ' + (err && err.message || err));
-    if (_isRateLimitError(err)) {
-      _invLog('💡 429 (Rate Limit) — 몇 분 뒤 다시 시도하세요.');
-    }
+    // 성공한 엔드포인트를 hidden input 에 저장해서 다음 시도부터는 즉시 사용
+    try {
+      if (endpointEl && fail === 0) endpointEl.value = succeededSpec.path;
+      if (succeededSpec.path !== userEndpoint) {
+        try { localStorage.setItem('pa_inv_last_endpoint', succeededSpec.path); } catch(_) {}
+        try { localStorage.setItem('pa_inv_last_method',   succeededSpec.method); } catch(_) {}
+      }
+    } catch(_) {}
   }
 
   const tone = fail === 0 ? 'ok' : (ok > 0 ? 'warn' : 'error');
