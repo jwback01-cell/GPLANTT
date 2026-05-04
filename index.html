@@ -22336,21 +22336,23 @@ function _jetStatus(type, msg, tone) {
   const color = tone === 'error' ? 'text-brand-pink' : tone === 'ok' ? 'text-brand-green' : 'text-brand-blue';
   el.className = 'text-xs font-semibold mb-2 ' + color;
   el.classList.remove('hidden');
+  // 성공/정보 메시지는 5초 뒤 자동 숨김 — 다음 업로드 작업에 방해되지 않게
+  if (el._jetStatusTimer) clearTimeout(el._jetStatusTimer);
+  if (tone !== 'error') {
+    el._jetStatusTimer = setTimeout(() => {
+      el.classList.add('hidden');
+      el.textContent = '';
+    }, 5000);
+  }
 }
 
 function _renderJetReport(type) {
-  const data = _loadJetReport(type);
+  // 업로드 카드에는 요약/테이블을 일절 표시하지 않음 — 다음 업로드 작업에 방해되지 않게.
+  // 상세 내역은 [업로드 데이터] 탭에서 확인.
   const summaryEl = document.getElementById('jet-' + type + '-summary');
   const tableEl = document.getElementById('jet-' + type + '-table');
-  if (!summaryEl) return;
-  if (tableEl) tableEl.innerHTML = ''; // 업로드 카드의 미리보기 테이블은 표시하지 않음 — 상세는 [업로드 데이터] 탭에서 확인
-  if (!data.length) {
-    summaryEl.textContent = '저장된 데이터 없음';
-    return;
-  }
-  const total = data.reduce((s, r) => s + (Number(r.amount) || 0), 0);
-  const fmt = (n) => Number(n || 0).toLocaleString('ko-KR') + '원';
-  summaryEl.innerHTML = `총 <b>${data.length.toLocaleString()}</b>건 · 합계 <b class="text-brand-black">${fmt(total)}</b> <span class="text-brand-gray">— 상세 내역은 [업로드 데이터] 탭에서 확인하세요</span>`;
+  if (summaryEl) summaryEl.innerHTML = '';
+  if (tableEl) tableEl.innerHTML = '';
 }
 function _renderUploadMapping() {
   document.getElementById('upload-mapping-grid').innerHTML = UPLOAD_COLS.map(c => `
