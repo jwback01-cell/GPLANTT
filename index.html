@@ -21869,8 +21869,10 @@ function _jetParseSheetAoa(aoa, headerHints) {
   const hasSubHeader = nextRow.some(v => subKeywords.some(k => v.indexOf(k) !== -1));
   let dataStartIdx = headerRowIdx + 1;
   if (hasSubHeader) {
-    // 메인 헤더 빈 컬럼을 서브 헤더 값으로 채움 (반대로 메인이 차있으면 유지)
-    const merged = header.map((v, i) => v || nextRow[i] || '');
+    // 서브 헤더가 있으면 서브 값을 우선 (메인 셀이 "쿠팡풀필먼트서비스(CFS) 배송비 (VAT 별도)" 같은
+    // 배너 텍스트인 경우 발생비용(A)/할인(B)/최종비용 같은 실제 컬럼명을 잃지 않게).
+    // 서브가 비어있으면 메인 사용 (대부분 컬럼).
+    const merged = header.map((v, i) => (nextRow[i] && String(nextRow[i]).trim()) || v || '');
     header = merged;
     dataStartIdx = headerRowIdx + 2;
     console.log('[jet] 2행 병합 헤더 감지 — 합쳐진 컬럼:', header);
@@ -21996,7 +21998,8 @@ function _parseJetIoSheet(aoa) {
     name:  _jetHeaderIdx(h, '등록상품명'),
     optName: _jetHeaderIdx(h, '옵션명'),
     qty:   _jetHeaderIdx(h, '판매수량','수량'),
-    cost:  _jetHeaderIdx(h, '할인적용가(A-B)','할인적용가','발생비용(A)','발생비용','입출고비','입출고요금'),
+    // 입출고비: 발생비용(A) 우선 (사용자 요청대로 raw cost). 없으면 할인적용가/최종비용/입출고비 폴백
+    cost:  _jetHeaderIdx(h, '발생비용(A)','발생비용','할인적용가(A-B)','할인적용가','최종비용','입출고비','입출고요금'),
   };
   const rows = [];
   for (let i = (meta.dataStartIdx != null ? meta.dataStartIdx : meta.headerRowIdx + 1); i < aoa.length; i++) {
@@ -22038,7 +22041,8 @@ function _parseJetShipSheet(aoa) {
     name:  _jetHeaderIdx(h, '등록상품명'),
     optName: _jetHeaderIdx(h, '옵션명'),
     qty:   _jetHeaderIdx(h, '판매수량','수량'),
-    cost:  _jetHeaderIdx(h, '최종비용','할인적용가(A-B)','발생비용(A)','발생비용','배송비','배송요금'),
+    // 배송비: 발생비용(A) 우선 (사용자 요청대로 raw cost — 최종비용은 추가비용 포함되어 더 큼)
+    cost:  _jetHeaderIdx(h, '발생비용(A)','발생비용','할인적용가(A-B)','할인적용가','최종비용','배송비','배송요금'),
   };
   const rows = [];
   for (let i = (meta.dataStartIdx != null ? meta.dataStartIdx : meta.headerRowIdx + 1); i < aoa.length; i++) {
@@ -22235,6 +22239,7 @@ async function handleJetStorageFile(evt) {
     const meta = _jetParseSheetAoa(aoa, ['보관기간','등록상품명','최종비용','발생비용']);
     if (!meta) { _jetStatus('storage', '❌ 보관비 헤더 행을 찾을 수 없습니다.', 'error'); return; }
     const h = meta.header;
+    console.log('[jet-storage] 헤더 행 idx=' + meta.headerRowIdx + ', dataStartIdx=' + meta.dataStartIdx + ', 컬럼:', h);
     const I = {
       date:    _jetHeaderIdx(h, '매출인식일','발생일'),
       display: _jetHeaderIdx(h, '진열일'),
