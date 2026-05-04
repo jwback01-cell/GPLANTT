@@ -18794,17 +18794,32 @@ async function _tryInvoiceEndpoint(spec, payload, opts) {
 }
 
 async function sendInvoicesToPlayauto() {
+  console.log('[INV-SEND] sendInvoicesToPlayauto() 호출됨');
   const btn = document.getElementById('pa-inv-send-btn');
   const carrierSel = document.getElementById('pa-inv-carrier');
   const endpointEl = document.getElementById('pa-inv-endpoint');
-  if (!carrierSel || !endpointEl) return;
+  if (!carrierSel || !endpointEl) {
+    console.error('[INV-SEND] DOM 요소 누락', { carrierSel, endpointEl });
+    showAppAlert('내부 오류', '필수 DOM 요소를 찾지 못했습니다 (pa-inv-carrier / pa-inv-endpoint). 페이지를 새로고침해 주세요.', { type: 'danger' });
+    return;
+  }
   // 드롭다운은 폴백용 (주문에 택배사 정보가 없을 때만 사용)
   const fallbackCarrNo = carrierSel.value;
   const fallbackCarrName = carrierSel.selectedOptions[0] ? (carrierSel.selectedOptions[0].getAttribute('data-name') || '') : '';
   const userEndpoint = ((endpointEl.value || '').trim()) || '/order/setInvoice';
-  if (!Array.isArray(_paOrders) || !_paOrders.length) { _invSendStatus('수집된 주문이 없습니다. 먼저 "주문 수집"을 실행하세요.', 'error'); return; }
+  console.log('[INV-SEND] _paOrders.length =', Array.isArray(_paOrders) ? _paOrders.length : 'not-array');
+  if (!Array.isArray(_paOrders) || !_paOrders.length) {
+    _invSendStatus('수집된 주문이 없습니다. 먼저 "주문 수집"을 실행하세요.', 'error');
+    showAppAlert('전송 불가', '수집된 주문이 없습니다.\n먼저 [플레이오토 출고관리 탭 가져오기] 를 실행하세요.', { type: 'warning' });
+    return;
+  }
   const targets = _paOrders.filter(o => o.invoice_no && String(o.invoice_no).trim());
-  if (!targets.length) { _invSendStatus('송장번호가 저장된 주문이 없습니다. 송장 파일을 먼저 업로드해주세요.', 'error'); return; }
+  console.log('[INV-SEND] 송장 있는 주문 targets =', targets.length, '건');
+  if (!targets.length) {
+    _invSendStatus('송장번호가 저장된 주문이 없습니다. 송장 파일을 먼저 업로드해주세요.', 'error');
+    showAppAlert('전송 불가', '송장번호가 저장된 주문이 없습니다.\n송장 파일을 먼저 업로드 & 매칭해 주세요.', { type: 'warning' });
+    return;
+  }
 
   // 택배사 목록 선로딩 (carr_no 재조회용) — 업로드 후 PA에 없던 택배사가 뒤늦게 해결될 수 있음
   await _ensureCarriersLoaded();
@@ -18820,7 +18835,8 @@ async function sendInvoicesToPlayauto() {
   // 이름도 없는 주문만 차단 (드롭다운 폴백도 없을 때)
   const noName = targets.filter(o => !o.invoice_carrier_name && !fallbackCarrName).length;
   if (noName > 0) {
-    _invSendStatus('택배사 이름이 지정되지 않은 주문이 ' + noName + '건 있습니다. 엑셀 J열에 택배사 이름을 입력하거나 드롭다운에서 폴백 택배사를 선택하세요.', 'error');
+    _invSendStatus('택배사 이름이 지정되지 않은 주문이 ' + noName + '건 있습니다.', 'error');
+    showAppAlert('전송 불가', '택배사 이름이 지정되지 않은 주문이 ' + noName + '건 있습니다.\n엑셀 J열에 택배사 이름을 입력해 주세요.', { type: 'warning' });
     return;
   }
 
@@ -18918,6 +18934,10 @@ async function _doSendInvoicesToPlayauto(btn, targets, userEndpoint, fallbackCar
   _invSendStatus('전송 완료 · 성공 ' + ok + '건 / 실패 ' + fail + '건', tone);
   _invLog('=== 완료: 성공 ' + ok + ' / 실패 ' + fail + ' ===');
   if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+  // 전송 로그 박스로 스크롤 + 결과 alert (사용자가 화면 아래쪽 status를 못 보고 지나치는 것 방지)
+  try { document.getElementById('pa-inv-send-log-box')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(_) {}
+  const resultType = fail === 0 ? 'success' : (ok > 0 ? 'warning' : 'danger');
+  showAppAlert('송장 전송 완료', `성공 ${ok}건 / 실패 ${fail}건\n\n자세한 내역은 화면 아래의 [전송 로그] 를 확인하세요.`, { type: resultType });
 }
 
 // 이카운트 연동 내부 서브탭 전환 (데이터 전송 / 매핑 / 이카운트 연동)
