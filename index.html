@@ -19687,9 +19687,9 @@ async function fetchPlayautoOrders() {
     const status = document.getElementById('pa-order-status').value || '';
     const dateType = document.getElementById('pa-order-date-type')?.value || 'shipped_time';
 
-    // PA API는 date_type이 wdate/mdate만 허용. 사용자가 선택한 날짜 필드는 응답 받은 뒤
-    // 클라이언트에서 필터링한다. 조회 범위는 주문수집일 기준으로 뒤로 30일 더 넓게 잡는다.
-    const widenStart = startDate ? _paAddDays(startDate, -30) : '';
+    // PA API는 date_type이 wdate/mdate만 허용. dateType 이 wdate/mdate 면 그대로,
+    // 그 외(shipped_time 등) 는 수령일 기준이라 wdate 로 받은 뒤 클라이언트 필터링.
+    // ⚠ 이전엔 30일 widening 으로 PA 응답이 항상 사용자 선택 범위보다 +30일치였음 — 제거.
     const baseBody = {
       start: 0,
       length: 500,
@@ -19698,7 +19698,7 @@ async function fetchPlayautoOrders() {
       bundle_yn: false,
       orderby: 'wdate desc',
     };
-    if (widenStart) baseBody.sdate = widenStart + ' 00:00:00';
+    if (startDate) baseBody.sdate = startDate + ' 00:00:00';
     if (endDate) baseBody.edate = endDate + ' 23:59:59';
 
     // 1차: 상태 후보 배열로 조회 (PA 라벨 편차 흡수)
@@ -19709,9 +19709,9 @@ async function fetchPlayautoOrders() {
       method: 'POST',
       body: JSON.stringify(body1),
     });
-    console.log('[PA] /orders raw response:', data);
     let orders = _paUnwrap(data);
     let usedFallback = false;
+    console.log('[PA] /orders 응답 — 주문 수:', orders.length);
 
     // 2차 폴백: 상태 필터로 0건이면 필터 제거 후 전체 조회 → 사용자가 주문을 볼 수 있도록
     if (!orders.length && status) {
@@ -19720,20 +19720,8 @@ async function fetchPlayautoOrders() {
         method: 'POST',
         body: JSON.stringify(baseBody),
       });
-      console.log('[PA] /orders fallback (status 제거) raw response:', data2);
       orders = _paUnwrap(data2);
-    }
-
-    // 첫 주문의 모든 날짜 필드를 로그로 출력 (필드명 탐색용)
-    if (orders.length) {
-      const first = orders[0];
-      const dateLike = {};
-      Object.keys(first).forEach(k => {
-        const v = first[k];
-        if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) dateLike[k] = v;
-      });
-      console.log('[PA] 첫 주문의 날짜 필드 목록:', dateLike);
-      console.log('[PA] 첫 주문 전체 키:', Object.keys(first));
+      console.log('[PA] /orders 폴백 (status 제거) — 주문 수:', orders.length);
     }
 
     // 클라이언트 필터링: 선택한 조회 기준 필드 값이 startDate ~ endDate 범위에 있는지 확인
@@ -19918,20 +19906,7 @@ function _renderPaOrders(orders) {
   const _fmt = v => Number(v || 0).toLocaleString('ko-KR');
   const dateType = document.getElementById('pa-order-date-type')?.value || 'shipped_time';
   const dateFields = (_PA_DATE_FIELDS[dateType] || [dateType]).concat(['ord_time', 'wdate', 'order_date']);
-
-  // 디버그: 첫 주문의 전체 키와 번호·가격·배송 관련 후보 값들을 콘솔에 출력
-  if (orders[0]) {
-    const o = orders[0];
-    const relKeys = Object.keys(o).filter(k => /no$|id$|price|cost|total|amount|pay|depot|warehouse|ship|carrier|out_|원가|공급|매입|buy|purch|origin/i.test(k));
-    console.log('[PA] 첫 주문 관련 필드:', relKeys.reduce((acc, k) => (acc[k] = o[k], acc), {}));
-    console.log('[PA] 첫 주문 전체 키:', Object.keys(o));
-    if (_paOrdersProd[0]) {
-      const p = _paOrdersProd[0];
-      const pk = Object.keys(p).filter(k => /price|cost|total|amount|pay|depot|warehouse|ship|carrier|out_|원가|공급|매입|buy|purch|origin/i.test(k));
-      console.log('[PA] 첫 results_prod 관련 필드:', pk.reduce((acc, k) => (acc[k] = p[k], acc), {}));
-      console.log('[PA] 첫 results_prod 전체 키:', Object.keys(p));
-    }
-  }
+  // (이전 디버그 로그 제거 — 응답 본문 전체 직렬화가 시간 잡아먹음)
 
   const ordNoFields = ['shop_ord_no', 'shop_order_no', 'order_no', 'ord_no', 'orderNo', 'order_id', 'ord_id', 'ord_opt_seq', 'ord_opt_no', 'bundle_no'];
   const priceFields = [
