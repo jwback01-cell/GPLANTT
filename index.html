@@ -4802,6 +4802,7 @@ const GPLAN_SYNC_KEYS = [
   'gplan_ecount_vendor_map_v1',     // 이카운트 거래처 매핑
   'gplan_ecount_depot_map_v1',      // 이카운트 창고 매핑
   'gplan_ecount_ship_cost_map_v1',  // 이카운트 배송비 매핑
+  'gplan_ad_costs_v1',              // 광고비 업로드 데이터 (스마트스토어 A/B/C, 쿠팡 등)
   'kw_extra_products',              // 키워드 추가 상품
   'kw_naver_api',                   // 네이버 API 키
   'kw_rank_history',                // 키워드 순위 이력
@@ -4841,6 +4842,8 @@ async function gplanCloudPullAll() {
     }
     _gplanCloudReady = true;
     console.log('[cloud-sync] pulled', pulled, 'keys');
+    // PULL 완료 후 매출장부가 이미 열려있다면 활성 탭 재렌더링 (광고비 포함 모든 데이터 반영)
+    try { if (typeof _refreshActiveLedgerTab === 'function') _refreshActiveLedgerTab(); } catch (_) {}
     return pulled;
   } catch (e) { console.warn('[cloud-pull] failed', e); return 0; }
 }
@@ -4968,7 +4971,7 @@ function navigate(page) {
   updateNavItems(page);
   closeSidebar();
   if (page === 'dashboard') { syncLedgerFromUploadData(); syncDashboardRevenue(); animateBars(); }
-  if (page === 'ledger') { syncLedgerFromUploadData(); syncDashboardRevenue(); animateDonut(); }
+  if (page === 'ledger') { syncLedgerFromUploadData(); syncDashboardRevenue(); animateDonut(); try { if (typeof _refreshActiveLedgerTab === 'function') _refreshActiveLedgerTab(); } catch(_) {} }
   if (page === 'upload') { try { _fillEcountSettingsForm(); _renderEcountHistory && _renderEcountHistory(); } catch(_) {} }
   if (page === 'products') loadProductsFromDB();
   if (page === 'accounts') filterAccounts();
@@ -15858,6 +15861,26 @@ function _loadAdCosts() {
 }
 function _saveAdCosts(rows) {
   localStorage.setItem(AD_COSTS_KEY, JSON.stringify(rows));
+  // 광고비 데이터가 바뀌면 매출장부 활성 탭도 다시 그려서 KPI/표 즉시 갱신
+  try { if (typeof _refreshActiveLedgerTab === 'function') _refreshActiveLedgerTab(); } catch (_) {}
+}
+
+// 현재 활성화된 매출장부 탭을 다시 렌더링 (광고비 등 외부 데이터 변경 후 즉시 반영)
+function _refreshActiveLedgerTab() {
+  const tabsEl = document.getElementById('ledger-tabs');
+  if (!tabsEl) return;
+  const active = tabsEl.querySelector('.tab-btn.active');
+  const tab = active && active.dataset.tab;
+  if (!tab) return;
+  try {
+    if (tab === 'monthly')  { if (typeof syncDashboardRevenue === 'function') syncDashboardRevenue(); if (typeof animateDonut === 'function') animateDonut(); }
+    if (tab === 'daily')    { if (typeof renderDailyTab === 'function') renderDailyTab(); }
+    if (tab === 'period')   { if (typeof renderPeriodChart === 'function') renderPeriodChart(); }
+    if (tab === 'product')  { if (typeof renderProductTab === 'function') renderProductTab(_detailPeriod?.product || 0); }
+    if (tab === 'supplier') { if (typeof renderSupplierTab === 'function') renderSupplierTab(_detailPeriod?.supplier || 0); }
+    if (tab === 'channel')  { if (typeof renderChannelTab === 'function') renderChannelTab(_detailPeriod?.channel || 0); }
+    if (tab === 'analysis') { if (typeof renderAnalysisTab === 'function') renderAnalysisTab(_detailPeriod?.analysis || 0); }
+  } catch (e) { console.warn('[ledger refresh] 실패:', e); }
 }
 
 // PA 주문의 shop_name → 광고비 사이트 id 매핑 (마이너스 확인 통합용)
