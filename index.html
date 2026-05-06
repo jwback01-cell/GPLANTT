@@ -923,7 +923,7 @@ tailwind.config = {
     <main class="flex-1 flex flex-col overflow-hidden">
       <section class="mt-2 pl-1 md:pl-2 flex flex-col md:flex-row justify-between items-start md:items-end gap-4 shrink-0 mb-5 md:mb-6">
         <div>
-          <h1 class="text-[1.8rem] md:text-[2.25rem] font-bold tracking-tight mb-2">매출 장부 📊 <span class="ml-2 text-xs font-bold align-middle px-2 py-0.5 rounded-full bg-brand-pink-light text-brand-pink">💸 광고비 v3</span></h1>
+          <h1 class="text-[1.8rem] md:text-[2.25rem] font-bold tracking-tight mb-2">매출 장부 📊</h1>
           <p class="text-brand-gray text-base md:text-[1.1rem]">매출·매입·수수료·택배비를 날짜별로 입력하고, 데이터를 분석하세요.</p>
         </div>
         <button class="bg-white border border-brand-border px-4 md:px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-gray-50 transition-all flex items-center gap-2 whitespace-nowrap">
@@ -14509,17 +14509,15 @@ function renderDailyTab() {
     kpi.innerHTML = [
       { label: `누적 매출 (${days.length}일)`, value: fmtN(kpiSum.sales) + '원', accent: '' },
       { label: '누적 순이익', value: fmtN(kpiSum.profit) + '원', accent: kpiSum.profit >= 0 ? 'text-brand-green' : 'text-brand-pink' },
-      { label: '💸 누적 광고비', value: fmtN(kpiSum.adCost) + '원', accent: 'text-brand-pink', highlight: true },
+      { label: '누적 광고비', value: fmtN(kpiSum.adCost) + '원', accent: 'text-brand-pink' },
       { label: '실순이익 (순이익-광고비)', value: fmtN(realProfit) + '원', accent: realProfit >= 0 ? 'text-brand-green' : 'text-brand-pink' },
       { label: '일평균 매출', value: fmtN(avgSales) + '원', accent: 'text-brand-blue' },
       { label: '평균 수익률', value: (profitRate === '-' ? '-' : profitRate + '%'), accent: 'text-brand-orange' },
-    ].map(k => {
-      const cls = k.highlight ? 'p-5 rounded-3xl bg-brand-pink-light/40 border-2 border-brand-pink' : 'bg-white p-5 rounded-3xl panel';
-      return `<div class="${cls}">
-        <div class="${k.highlight ? 'text-brand-pink' : 'text-brand-gray'} text-xs font-bold mb-2 tracking-wide">${k.label}</div>
+    ].map(k => `
+      <div class="bg-white p-5 rounded-3xl panel">
+        <div class="text-brand-gray text-xs font-bold mb-2 tracking-wide">${k.label}</div>
         <div class="text-lg md:text-xl font-bold tracking-tight ${k.accent}">${k.value}</div>
-      </div>`;
-    }).join('');
+      </div>`).join('');
   }
 
   // 바 차트 — 매출(회색)과 순이익(파랑)을 같은 칼럼 안에 겹쳐 표시
@@ -14774,17 +14772,15 @@ function renderPeriodChart() {
   document.getElementById('period-kpi').innerHTML = [
     { label:'누적 매출', value: fmtM(totalSales), color:'' },
     { label:'누적 순이익', value: fmtM(totalProfit), color:'text-brand-green' },
-    { label:'💸 누적 광고비', value: fmtM(totalAd) + '원', color:'text-brand-pink', highlight: true },
+    { label:'누적 광고비', value: fmtM(totalAd), color:'text-brand-pink' },
     { label:'실순이익 (순이익-광고비)', value: fmtM(totalReal), color: totalReal >= 0 ? 'text-brand-green' : 'text-brand-pink' },
     { label:'기간 평균 매출', value: fmtM(avgSales), color:'' },
     { label:'평균 수익률', value: profitRate + '%', color:'text-brand-blue' },
-  ].map(k => {
-    const cls = k.highlight ? 'p-5 rounded-3xl bg-brand-pink-light/40 border-2 border-brand-pink' : 'bg-white p-5 rounded-3xl panel';
-    return `<div class="${cls}">
-      <div class="${k.highlight ? 'text-brand-pink' : 'text-brand-gray'} text-xs font-bold mb-2 tracking-wide">${k.label}</div>
+  ].map(k => `
+    <div class="bg-white p-5 rounded-3xl panel">
+      <div class="text-brand-gray text-xs font-bold mb-2 tracking-wide">${k.label}</div>
       <div class="text-xl md:text-2xl font-bold ${k.color}">${k.value}</div>
-    </div>`;
-  }).join('');
+    </div>`).join('');
 
   // 바 차트
   const barsHtml = data.map(d => {
@@ -15063,23 +15059,25 @@ function renderProductTab(m, idxs) {
     { label:'베스트셀러',    value: best ? best.name : '-', small:true },
     { label:'1위 상품 매출', value: best ? best.sales.toLocaleString('ko-KR') : '-' },
     { label:'평균 수익률',   value: avgMargin + '%', color:'text-brand-green' },
-    { label:'💸 기간 광고비',   value: totalAd.toLocaleString('ko-KR') + '원', color:'text-brand-pink', highlight: true },
-  ].map(k => {
-    const cls = k.highlight ? 'bg-brand-pink-light/40 border-2 border-brand-pink rounded-3xl px-5 py-4 flex flex-col gap-1' : 'bg-white rounded-3xl panel px-5 py-4 flex flex-col gap-1';
-    return `<div class="${cls}">
-      <div class="text-xs font-bold ${k.highlight ? 'text-brand-pink' : 'text-brand-gray'} tracking-wide">${k.label}</div>
-      <div class="font-black mt-1 ${k.color||''} ${k.small ? 'text-xl truncate' : 'text-2xl'}">${k.value}</div>
-    </div>`;
-  }).join('');
+    { label:'기간 광고비',   value: totalAd.toLocaleString('ko-KR'), color:'text-brand-pink' },
+  ].map(k => `<div class="bg-white rounded-3xl panel px-5 py-4 flex flex-col gap-1">
+    <div class="text-xs font-bold text-brand-gray tracking-wide">${k.label}</div>
+    <div class="font-black mt-1 ${k.color||''} ${k.small ? 'text-xl truncate' : 'text-2xl'}">${k.value}</div>
+  </div>`).join('');
 
   // 상품별 광고비 분배:
-  //  1) 리워드 광고비 (template==='reward', rewardProducts 매칭) → 해당 상품에 직접 귀속
-  //  2) 일반 광고비 (그 외) → 매출 비례로 상품들에 안분
+  //  1) 리워드 광고비 (rewardProducts 매칭) → 대상 상품들의 "매출 비례"로 분배
+  //     (예: 리워드 대상 A 매출 100, B 매출 300 이면 광고비 25%/75% 로 안분)
+  //     매출이 모두 0이면 균등 분배(N등분) 폴백
+  //  2) 일반 광고비 (그 외) → 전체 상품들의 매출 비례로 안분
   const adByProduct = (function () {
     const result = new Map();
     const ads = (typeof _adCostsRaw === 'function') ? _adCostsRaw() : [];
     if (!_range) return result;
-    let directRewardSum = 0;
+    // 상품명 → 매출 lookup
+    const salesByName = new Map();
+    rows.forEach(r => salesByName.set(r.name, Number(r.sales) || 0));
+
     let nonRewardSum = 0;
     ads.forEach(r => {
       const d = String(r.date || '').slice(0, 10);
@@ -15087,15 +15085,26 @@ function renderProductTab(m, idxs) {
       if (d < _range.start || d > _range.end) return;
       const amt = Number(r.amount) || 0;
       if (amt <= 0) return;
-      // 리워드 광고비 — 대상 상품들에 균등 분배
       if (r.template === 'reward' && Array.isArray(r.rewardProducts) && r.rewardProducts.length) {
-        const per = amt / r.rewardProducts.length;
-        r.rewardProducts.forEach(p => {
-          const key = String(p.name || '').trim();
-          if (!key) return;
-          result.set(key, (result.get(key) || 0) + per);
-          directRewardSum += per;
-        });
+        // 리워드 대상 상품들의 매출 합계
+        const targetNames = r.rewardProducts
+          .map(p => String(p.name || '').trim())
+          .filter(Boolean);
+        if (!targetNames.length) return;
+        const targetSalesSum = targetNames.reduce((s, n) => s + (salesByName.get(n) || 0), 0);
+        if (targetSalesSum > 0) {
+          // 매출 비례 분배
+          targetNames.forEach(n => {
+            const ratio = (salesByName.get(n) || 0) / targetSalesSum;
+            result.set(n, (result.get(n) || 0) + amt * ratio);
+          });
+        } else {
+          // 매출 모두 0 → 균등 분배 폴백
+          const per = amt / targetNames.length;
+          targetNames.forEach(n => {
+            result.set(n, (result.get(n) || 0) + per);
+          });
+        }
       } else {
         nonRewardSum += amt;
       }
@@ -15188,14 +15197,11 @@ function renderSupplierTab(m, idxs) {
     { label:'주요 매입처',    value: top ? top.name : '-', small:true },
     { label:'총 매입 원가',   value: totalAmount.toLocaleString('ko-KR') },
     { label:'매입처 다변화',  value: rows.length + '개사', color:'text-brand-blue' },
-    { label:'💸 기간 광고비',    value: totalAd.toLocaleString('ko-KR') + '원', color:'text-brand-pink', highlight: true },
-  ].map(k => {
-    const cls = k.highlight ? 'bg-brand-pink-light/40 border-2 border-brand-pink rounded-3xl px-5 py-4 flex flex-col gap-1' : 'bg-white rounded-3xl panel px-5 py-4 flex flex-col gap-1';
-    return `<div class="${cls}">
-      <div class="text-xs font-bold ${k.highlight ? 'text-brand-pink' : 'text-brand-gray'} tracking-wide">${k.label}</div>
-      <div class="font-black mt-1 ${k.color||''} ${k.small ? 'text-xl truncate' : 'text-2xl'}">${k.value}</div>
-    </div>`;
-  }).join('');
+    { label:'기간 광고비',    value: totalAd.toLocaleString('ko-KR'), color:'text-brand-pink' },
+  ].map(k => `<div class="bg-white rounded-3xl panel px-5 py-4 flex flex-col gap-1">
+    <div class="text-xs font-bold text-brand-gray tracking-wide">${k.label}</div>
+    <div class="font-black mt-1 ${k.color||''} ${k.small ? 'text-xl truncate' : 'text-2xl'}">${k.value}</div>
+  </div>`).join('');
 
   document.getElementById('supplier-tbody').innerHTML = rows.map(r => {
     const pct = totalAmount > 0 ? (r.amount / totalAmount * 100).toFixed(1) : '0.0';
@@ -15252,14 +15258,11 @@ function renderChannelTab(m, idxs) {
     { label:'주력 채널',       value: top ? top.name : '-', small:true },
     { label:'주력 채널 비중',  value: topPct + '%', color:'text-brand-orange' },
     { label:'평균 수수료율',   value: avgFeeRate + '%' },
-    { label:'💸 누적 광고비',     value: _fmtW(totalAd) + '원', color:'text-brand-pink', highlight: true },
-  ].map(k => {
-    const cls = k.highlight ? 'bg-brand-pink-light/40 border-2 border-brand-pink rounded-3xl px-5 py-4 flex flex-col gap-1' : 'bg-white rounded-3xl panel px-5 py-4 flex flex-col gap-1';
-    return `<div class="${cls}">
-      <div class="text-xs font-bold ${k.highlight ? 'text-brand-pink' : 'text-brand-gray'} tracking-wide">${k.label}</div>
-      <div class="font-black mt-1 ${k.color||''} ${k.small ? 'text-xl truncate' : 'text-2xl'}">${k.value}</div>
-    </div>`;
-  }).join('');
+    { label:'누적 광고비',     value: _fmtW(totalAd), color:'text-brand-pink' },
+  ].map(k => `<div class="bg-white rounded-3xl panel px-5 py-4 flex flex-col gap-1">
+    <div class="text-xs font-bold text-brand-gray tracking-wide">${k.label}</div>
+    <div class="font-black mt-1 ${k.color||''} ${k.small ? 'text-xl truncate' : 'text-2xl'}">${k.value}</div>
+  </div>`).join('');
 
   document.getElementById('channel-bars').innerHTML = rows.map(r => {
     const pct = totalSales > 0 ? (r.sales / totalSales * 100).toFixed(1) : '0.0';
@@ -15330,17 +15333,14 @@ function renderAnalysisTab(m, idxs) {
   document.getElementById('analysis-kpi').innerHTML = [
     { label:'총 매출',    value: totalSales.toLocaleString('ko-KR') },
     { label:'총 순이익',  value: totalProfit.toLocaleString('ko-KR'), color:'text-brand-green' },
-    { label:'💸 총 광고비',  value: totalAd.toLocaleString('ko-KR') + '원', color:'text-brand-pink', highlight: true },
+    { label:'총 광고비',  value: totalAd.toLocaleString('ko-KR'), color:'text-brand-pink' },
     { label:'실순이익',   value: totalReal.toLocaleString('ko-KR'), color: totalReal >= 0 ? 'text-brand-green' : 'text-brand-pink' },
     { label:'평균 수익률', value: avgMargin + '%', color:'text-brand-blue' },
     { label:'최고 채널',  value: topCh ? topCh.name : '-', small:true },
-  ].map(k => {
-    const cls = k.highlight ? 'bg-brand-pink-light/40 border-2 border-brand-pink rounded-3xl px-5 py-4 flex flex-col gap-1' : 'bg-white rounded-3xl panel px-5 py-4 flex flex-col gap-1';
-    return `<div class="${cls}">
-      <div class="text-xs font-bold ${k.highlight ? 'text-brand-pink' : 'text-brand-gray'} tracking-wide">${k.label}</div>
-      <div class="font-black mt-1 ${k.color||''} ${k.small ? 'text-xl truncate' : 'text-2xl'}">${k.value}</div>
-    </div>`;
-  }).join('');
+  ].map(k => `<div class="bg-white rounded-3xl panel px-5 py-4 flex flex-col gap-1">
+    <div class="text-xs font-bold text-brand-gray tracking-wide">${k.label}</div>
+    <div class="font-black mt-1 ${k.color||''} ${k.small ? 'text-xl truncate' : 'text-2xl'}">${k.value}</div>
+  </div>`).join('');
 
   document.getElementById('analysis-product-rank').innerHTML = pRows.slice(0, 6).map((r, i) => `
     <div class="flex items-center gap-4 px-6 py-4">
