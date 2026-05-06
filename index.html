@@ -14268,8 +14268,29 @@ function sortLedgerEntryByCol(colIdx, type) {
 }
 // ── 광고비 집계 헬퍼 (매출장부 각 탭에서 사용) ─────────
 // _loadAdCosts 가 광고비 업로드 데이터의 단일 출처
+// localStorage 직접 접근 폴백 — _loadAdCosts 가 호출 시점에 미정의이거나
+// 다른 키 충돌로 비어있을 때 안전망
+function _adCostsRaw() {
+  // 1) _loadAdCosts 우선
+  if (typeof _loadAdCosts === 'function') {
+    try {
+      const r = _loadAdCosts();
+      if (Array.isArray(r) && r.length) return r;
+    } catch (_) {}
+  }
+  // 2) 직접 localStorage 읽기 (키: gplan_ad_costs_v1)
+  try {
+    const raw = localStorage.getItem('gplan_ad_costs_v1');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (_) {}
+  return [];
+}
+
 function _adCostsInRange(start, end) {
-  const all = (typeof _loadAdCosts === 'function') ? _loadAdCosts() : [];
+  const all = _adCostsRaw();
   if (!start && !end) return all;
   return all.filter(r => {
     const d = String(r.date || '').slice(0, 10);
@@ -14284,7 +14305,7 @@ function _adCostSumInRange(start, end) {
 }
 // 월(1~12) → 광고비 합계
 function _adCostSumByMonth(monthNum) {
-  const all = (typeof _loadAdCosts === 'function') ? _loadAdCosts() : [];
+  const all = _adCostsRaw();
   return all.reduce((s, r) => {
     const d = String(r.date || '').slice(0, 10);
     const m = parseInt(d.split('-')[1]) || 0;
@@ -14308,6 +14329,21 @@ function _adCostBySite(start, end) {
   });
   return map;
 }
+// 디버그용 — F12 콘솔에서 _adDebug() 호출하면 광고비 데이터 진단 출력
+window._adDebug = function () {
+  const raw = _adCostsRaw();
+  const sample = raw.slice(0, 5).map(r => ({ date: r.date, site: r.site, amount: r.amount, _key: r._key }));
+  const months = {};
+  raw.forEach(r => { const m = parseInt(String(r.date || '').split('-')[1]) || 0; months[m] = (months[m] || 0) + (Number(r.amount) || 0); });
+  const totalSum = raw.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  console.log('[광고비 디버그]');
+  console.log(' 총 행수:', raw.length);
+  console.log(' 총 합계:', totalSum.toLocaleString('ko-KR'), '원');
+  console.log(' 월별 합계:', months);
+  console.log(' 첫 5건 샘플:', sample);
+  console.log(' localStorage 직접:', (localStorage.getItem('gplan_ad_costs_v1') || '').slice(0, 200) + '...');
+  return { count: raw.length, totalSum, byMonth: months, sample };
+};
 // 채널명(매출장부 사이트명) → 광고비 site 매칭. PA shop_name 매핑 헬퍼 재사용
 function _adCostForChannel(channelName, start, end) {
   const target = (typeof _adSiteFromShopName === 'function') ? _adSiteFromShopName(channelName) : null;
