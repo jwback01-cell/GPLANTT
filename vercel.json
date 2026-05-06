@@ -1,5 +1,8 @@
 {
   "version": 2,
+  "rewrites": [
+    { "source": "/api/playauto/:path*", "destination": "/api/playauto/[...path]" }
+  ],
   "functions": {
     "api/**/*.js": {
       "runtime": "@vercel/node@3.2.0",
