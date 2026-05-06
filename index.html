@@ -19003,7 +19003,9 @@ async function sendTrackingToPlayauto() {
 
   let outboundOrders = [];
   try {
-    // 최근 90일 출고완료 상태 주문 조회
+    // 최근 90일 주문을 가져와 클라이언트에서 출고완료 상태만 필터링.
+    // (status 배열 필터를 PA가 OR 로 처리하지 않는 사례 확인 — 단일 '출고완료' 만 보내거나
+    //  필터 없이 가져온 뒤 클라이언트에서 필터하는 게 안전함)
     const today = new Date();
     const start = new Date(today); start.setDate(today.getDate() - 90);
     const startDate = _fmtYmd(start);
@@ -19014,11 +19016,22 @@ async function sendTrackingToPlayauto() {
       date_type: 'wdate', masking_yn: false, bundle_yn: false, orderby: 'wdate desc',
       sdate: widenStart + ' 00:00:00',
       edate: endDate + ' 23:59:59',
-      status: PA_STATUS_CANDIDATES['출고완료'] || ['출고완료'],
     };
-    const data = await _paFetch('/orders', { method: 'POST', body: JSON.stringify(baseBody) });
-    outboundOrders = _paUnwrap(data);
-    console.log('[TRACK-SEND] 출고완료 주문', outboundOrders.length, '건 조회됨');
+    // 1차: 단일 상태 필터로 시도
+    const body1 = { ...baseBody, status: ['출고완료'] };
+    const data1 = await _paFetch('/orders', { method: 'POST', body: JSON.stringify(body1) });
+    outboundOrders = _paUnwrap(data1);
+    console.log('[TRACK-SEND] 1차(상태 필터): 출고완료 주문', outboundOrders.length, '건');
+    // 2차: 0건이면 필터 없이 가져와서 클라이언트에서 필터
+    if (!outboundOrders.length) {
+      const data2 = await _paFetch('/orders', { method: 'POST', body: JSON.stringify(baseBody) });
+      const allOrders = _paUnwrap(data2);
+      outboundOrders = allOrders.filter(o => {
+        const st = String(_paPickField(o, ['ord_status', 'status', 'order_status']) || '').trim();
+        return st === '출고완료' || st === '출고' || st.includes('출고완료');
+      });
+      console.log(`[TRACK-SEND] 2차(클라이언트 필터): 전체 ${allOrders.length}건 중 출고완료 ${outboundOrders.length}건`);
+    }
   } catch (e) {
     if (btn) { btn.disabled = false; btn.innerHTML = orig; }
     _invSendStatus('출고완료 주문 조회 실패: ' + (e.message || e), 'error');
@@ -19028,24 +19041,37 @@ async function sendTrackingToPlayauto() {
 
   if (btn) { btn.disabled = false; btn.innerHTML = orig; }
 
-  // 송장번호가 있는 주문만
-  const targets = outboundOrders.filter(o => o.invoice_no && String(o.invoice_no).trim());
+  // 송장번호가 있는 주문만 — 출고완료 주문은 invoice_no 필드명이 다를 수 있어 후보 폭 확대
+  const _pickInv = o => _paPickField(o, ['invoice_no', 'invoice_num', 'invoiceNo', 'tracking_no', 'tracking_number', 'shipping_invoice_no', 'shipInvoice', 'shipping_no']);
+  const targets = outboundOrders.filter(o => {
+    const inv = _pickInv(o);
+    return inv && String(inv).trim();
+  });
   if (!targets.length) {
-    showAppAlert('전송 가능한 주문 없음', `최근 90일 내 출고완료 상태 주문 ${outboundOrders.length}건 중 송장번호가 있는 주문이 없습니다.`, { type: 'warning' });
+    showAppAlert('전송 가능한 주문 없음', `최근 90일 내 출고완료 상태 주문 ${outboundOrders.length}건 중 송장번호가 있는 주문이 없습니다.\n\n${outboundOrders.length === 0 ? '출고완료 상태 주문 자체가 조회되지 않았습니다. F12 콘솔의 [TRACK-SEND] 로그를 확인해 주세요.' : '응답에 invoice_no 필드가 다를 수 있습니다. F12 콘솔에 첫 주문 키 출력해 진단해 보세요.'}`, { type: 'warning' });
+    if (outboundOrders[0]) {
+      console.log('[TRACK-SEND] 첫 출고완료 주문 키:', Object.keys(outboundOrders[0]));
+      console.log('[TRACK-SEND] 첫 출고완료 주문 송장 후보:', {
+        invoice_no: outboundOrders[0].invoice_no,
+        tracking_no: outboundOrders[0].tracking_no,
+        carr_no: outboundOrders[0].carr_no,
+        carr_name: outboundOrders[0].carr_name,
+      });
+    }
     return;
   }
 
   await _ensureCarriersLoaded();
-  // 각 주문의 carr_no 보정 (없으면 carrier_name → 코드 매핑)
+  // 각 주문의 carr_no/carr_name/invoice_no 표준화
   targets.forEach(o => {
+    if (!o.invoice_no) o.invoice_no = _pickInv(o);
+    if (!o.invoice_carrier_no && o.carr_no) o.invoice_carrier_no = String(o.carr_no);
+    if (!o.invoice_carrier_name && o.carr_name) o.invoice_carrier_name = String(o.carr_name);
     if (!o.invoice_carrier_no && o.invoice_carrier_name) {
       const c = _findCarrierByName(o.invoice_carrier_name);
       const cno = _carrierNoOf(c);
       if (cno) o.invoice_carrier_no = cno;
     }
-    // 출고완료 주문은 PA 응답의 carr_no 필드가 invoice_carrier_no 가 아닐 수 있음 — 보강
-    if (!o.invoice_carrier_no && o.carr_no) o.invoice_carrier_no = String(o.carr_no);
-    if (!o.invoice_carrier_name && o.carr_name) o.invoice_carrier_name = String(o.carr_name);
   });
 
   const summary = {};
