@@ -15949,6 +15949,8 @@ function _paExtractOrderRow(o) {
   // SKU상품명: results_prod.prod_name → o.prod_list[].prod_name → o.prod_name → 쇼핑몰 상품명 폴백
   const skuItemName = _paGetSkuName(o, prod)
     || _paPickField(o, ['shop_sale_name', 'item_name', 'productName', 'goods_name']);
+  // 온라인(쇼핑몰 노출) 상품명: 쇼핑몰에 등록된 그대로의 상품명 — SKU상품명과 다를 수 있음
+  const onlineName = _paPickField(o, ['shop_sale_name', 'shop_prod_name', 'shopProductName', 'sale_name', 'item_name', 'goods_name', 'prod_name']);
   // 수량 (PA 응답 또는 폴백 1)
   const qty = _paPickNumber(o, ['sale_cnt', 'qty', 'quantity', 'order_qty']) || 1;
   // 세트상품 — itemCode 가 세트코드면 구성품 원가 합계로 cost 재계산 (PA 가 주는 cost 부정확할 수 있음)
@@ -15964,6 +15966,7 @@ function _paExtractOrderRow(o) {
     shop: shopName,
     date: _paPickDate(o, dateFields),
     name: skuItemName,
+    onlineName,                 // 쇼핑몰 노출 상품명 (SKU상품명과 다를 수 있음)
     qty,
     price,
     supply,
@@ -16151,6 +16154,7 @@ function renderPaMinus() {
     filtered = filtered.filter(r =>
       (r.shop || '').toLowerCase().includes(search)
       || (r.name || '').toLowerCase().includes(search)
+      || (r.onlineName || '').toLowerCase().includes(search)
       || (r.receiver || '').toLowerCase().includes(search)
       || (r.skuCode || '').toLowerCase().includes(search)
       || (r.ordNo || '').toString().toLowerCase().includes(search)
@@ -16162,20 +16166,21 @@ function renderPaMinus() {
   // 헤더 (정렬 가능)
   if (thead) {
     const cols = [
-      { key: 'shop',     label: '쇼핑몰',  align: '',           extra: 'pl-5' },
-      { key: 'date',     label: '주문일',  align: '',           extra: '' },
-      { key: 'skuCode',  label: 'SKU코드', align: '',           extra: '' },
-      { key: 'name',     label: 'SKU상품명', align: '',          extra: '' },
-      { key: 'qty',      label: '수량',    align: 'text-right',  extra: '' },
-      { key: 'price',    label: '판매가',  align: 'text-right',  extra: '' },
-      { key: 'supply',   label: '공급가',  align: 'text-right',  extra: '' },
-      { key: 'shipFee',  label: '택배비',  align: 'text-right',  extra: '' },
-      { key: 'cost',     label: '원가',    align: 'text-right',  extra: '' },
-      { key: 'shipCost', label: '택배비용', align: 'text-right',  extra: '' },
-      { key: 'margin',   label: '마진(공급가+택배비−원가−택배비용)', align: 'text-right', extra: '' },
-      { key: 'adCost',        label: '광고비',  align: 'text-right',  extra: '' },
+      { key: 'shop',       label: '쇼핑몰',     align: '',           extra: 'pl-5' },
+      { key: 'date',       label: '주문일',     align: '',           extra: '' },
+      { key: 'skuCode',    label: 'SKU코드',    align: '',           extra: '' },
+      { key: 'name',       label: 'SKU상품명',  align: '',           extra: '' },
+      { key: 'onlineName', label: '온라인 상품명', align: '',         extra: '' },
+      { key: 'qty',        label: '수량',       align: 'text-right', extra: '' },
+      { key: 'price',      label: '판매가',     align: 'text-right', extra: '' },
+      { key: 'supply',     label: '공급가',     align: 'text-right', extra: '' },
+      { key: 'shipFee',    label: '택배비',     align: 'text-right', extra: '' },
+      { key: 'cost',       label: '원가',       align: 'text-right', extra: '' },
+      { key: 'shipCost',   label: '택배비용',   align: 'text-right', extra: '' },
+      { key: 'margin',     label: '마진(공급가+택배비−원가−택배비용)', align: 'text-right', extra: '' },
+      { key: 'adCost',     label: '광고비',     align: 'text-right', extra: '' },
       { key: 'marginAfterAd', label: '실마진(광고비차감)', align: 'text-right', extra: '' },
-      { key: 'receiver', label: '수령자',  align: '',           extra: 'pr-5' },
+      { key: 'receiver',   label: '수령자',     align: '',           extra: 'pr-5' },
     ];
     thead.innerHTML = '<tr class="text-brand-gray text-xs">' + cols.map(c => {
       const active = _paMinusSort.col === c.key;
@@ -16214,6 +16219,7 @@ function renderPaMinus() {
       <td class="p-3 text-xs">${_escapeHtml(String(r.date).slice(0, 10))}</td>
       <td class="p-3 text-xs font-mono text-brand-gray" title="${_escapeHtml(r.skuCode || '')}">${r.skuCode ? _escapeHtml(r.skuCode) : '<span class="text-brand-gray">-</span>'}</td>
       <td class="p-3 text-xs truncate max-w-[220px]" title="${_escapeHtml(r.name)}">${_escapeHtml(r.name)}</td>
+      <td class="p-3 text-xs truncate max-w-[260px] text-brand-gray" title="${_escapeHtml(r.onlineName || '')}">${r.onlineName ? _escapeHtml(r.onlineName) : '<span class="text-brand-gray">-</span>'}</td>
       <td class="p-3 text-right text-xs">${fmt(r.qty)}</td>
       <td class="p-3 text-right text-xs font-semibold">${money(r.price)}</td>
       <td class="p-3 text-right text-xs">${money(r.supply)}</td>
@@ -16249,7 +16255,7 @@ function renderPaMinus() {
       const marginCls = sum.margin < 0 ? 'text-brand-pink font-bold' : (sum.margin > 0 ? 'text-brand-green font-bold' : '');
       const realMarginCls = sum.realMargin < 0 ? 'text-brand-pink font-bold' : (sum.realMargin > 0 ? 'text-brand-green font-bold' : '');
       tfoot.innerHTML = `<tr class="border-t-2 border-brand-border font-bold">
-        <td class="p-3 pl-5 text-xs" colspan="4">합계 (${rows.length}건)</td>
+        <td class="p-3 pl-5 text-xs" colspan="5">합계 (${rows.length}건)</td>
         <td class="p-3 text-right text-xs">${fmt(sum.qty)}</td>
         <td class="p-3 text-right text-xs">${fmt(sum.price)}원</td>
         <td class="p-3 text-right text-xs">${fmt(sum.supply)}원</td>
@@ -16284,13 +16290,13 @@ function exportPaMinus() {
     return a;
   }, { qty: 0, price: 0, supply: 0, shipFee: 0, cost: 0, shipCost: 0, margin: 0, adCost: 0, realMargin: 0 });
   const data = [
-    ['쇼핑몰', '주문일', 'SKU코드', 'SKU상품명', '수량', '판매가', '공급가', '택배비', '원가', '택배비용', '마진(공급가+택배비-원가-택배비용)', '광고비', '실마진(광고비차감)', '수령자', '마이너스'],
-    ...rows.map(r => [r.shop, String(r.date).slice(0, 10), r.skuCode || '', r.name, r.qty, r.price, r.supply, r.shipFee || 0, r.cost == null ? '' : r.cost, r.shipCost || 0, r.margin == null ? '' : r.margin, r.adCost || 0, r.marginAfterAd != null ? r.marginAfterAd : (r.margin == null ? '' : r.margin), r.receiver, r.isMinus ? 'Y' : 'N']),
-    ['합계', '', '', `${rows.length}건`, sum.qty, sum.price, sum.supply, sum.shipFee, sum.cost, sum.shipCost, sum.margin, sum.adCost, sum.realMargin, '', ''],
+    ['쇼핑몰', '주문일', 'SKU코드', 'SKU상품명', '온라인 상품명', '수량', '판매가', '공급가', '택배비', '원가', '택배비용', '마진(공급가+택배비-원가-택배비용)', '광고비', '실마진(광고비차감)', '수령자', '마이너스'],
+    ...rows.map(r => [r.shop, String(r.date).slice(0, 10), r.skuCode || '', r.name, r.onlineName || '', r.qty, r.price, r.supply, r.shipFee || 0, r.cost == null ? '' : r.cost, r.shipCost || 0, r.margin == null ? '' : r.margin, r.adCost || 0, r.marginAfterAd != null ? r.marginAfterAd : (r.margin == null ? '' : r.margin), r.receiver, r.isMinus ? 'Y' : 'N']),
+    ['합계', '', '', `${rows.length}건`, '', sum.qty, sum.price, sum.supply, sum.shipFee, sum.cost, sum.shipCost, sum.margin, sum.adCost, sum.realMargin, '', ''],
   ];
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{wch:10},{wch:12},{wch:14},{wch:40},{wch:6},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:22},{wch:10},{wch:18},{wch:10},{wch:8}];
+  ws['!cols'] = [{wch:10},{wch:12},{wch:14},{wch:40},{wch:40},{wch:6},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:22},{wch:10},{wch:18},{wch:10},{wch:8}];
   XLSX.utils.book_append_sheet(wb, ws, '마이너스확인');
   XLSX.writeFile(wb, `GPLAN_마이너스확인_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
