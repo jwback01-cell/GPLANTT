@@ -9942,6 +9942,323 @@ function setStatFilter(type) {
 // ── Product Stats ─────────────────────────────
 let _allProducts = []; // DB에서 로드한 전체 상품 캐시
 
+// ── 재고 연동 그룹 헬퍼 ─────────────────────────
+// 같은 stock_link_group 값을 가진 상품들끼리 재고/안전재고/원가/공급가를 공유
+const _STOCK_LINK_FIELDS = ['stock', 'safety_stock', 'cost', 'supply_price'];
+
+// schema 가 아직 마이그레이션되지 않은 환경에서 column missing 에러 발생 시
+// 한 세션 동안 동기화를 비활성화 — 사용자에게 SQL 안내는 별도 알림으로
+let _stockLinkSchemaMissing = false;
+
+function _isSchemaMissingError(err) {
+  const msg = String((err && (err.message || err.details)) || '').toLowerCase();
+  return msg.includes('stock_link_group') && (msg.includes('column') || msg.includes('does not exist') || msg.includes('schema'));
+}
+
+// 특정 상품과 같은 그룹의 멤버 배열 반환 (자기 자신 포함). 그룹 없으면 null.
+function _getStockLinkGroup(productId) {
+  if (!Array.isArray(_allProducts)) return null;
+  const p = _allProducts.find(x => x.id === productId);
+  if (!p || !p.stock_link_group) return null;
+  const gid = p.stock_link_group;
+  const members = _allProducts.filter(x => x.stock_link_group === gid);
+  if (members.length < 2) return null; // 1명짜리 그룹은 무의미
+  return { groupId: gid, members };
+}
+
+// 소스 상품의 fields 값을 같은 그룹의 다른 멤버들에게 복제
+// fields 는 { stock, safety_stock, cost, supply_price } 중 일부
+async function _syncLinkedFields(sourceProductId, fields) {
+  if (_stockLinkSchemaMissing) return 0;
+  const grp = _getStockLinkGroup(sourceProductId);
+  if (!grp) return 0;
+  const targets = grp.members.filter(m => m.id !== sourceProductId);
+  if (!targets.length) return 0;
+  const updateObj = {};
+  for (const k of _STOCK_LINK_FIELDS) {
+    if (k in fields && fields[k] != null) updateObj[k] = fields[k];
+  }
+  if (!Object.keys(updateObj).length) return 0;
+  let synced = 0;
+  for (const t of targets) {
+    try {
+      const { error } = await _supabase.from('products').update(updateObj).eq('id', t.id);
+      if (error) {
+        if (_isSchemaMissingError(error)) { _stockLinkSchemaMissing = true; return 0; }
+        console.error('[연동] sync 실패:', t.sku, error);
+        continue;
+      }
+      // 로컬 캐시도 즉시 반영 (loadProductsFromDB 가 호출되기 전에도 일관성 유지)
+      Object.assign(t, updateObj);
+      synced++;
+    } catch (e) {
+      console.error('[연동] sync 예외:', t.sku, e);
+    }
+  }
+  if (synced > 0) {
+    console.log(`[연동] ${grp.groupId.slice(0, 8)} 그룹: ${synced}개 상품 동기화`, updateObj);
+  }
+  return synced;
+}
+
+// 새 그룹 ID 생성 (UUID-like, crypto 우선)
+function _newStockLinkGroupId() {
+  try {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  } catch (_) {}
+  return 'lg_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+}
+
+// 그룹 멤버 정보 보기 (배지 클릭)
+function showLinkedGroupInfo(productId) {
+  const grp = _getStockLinkGroup(productId);
+  if (!grp) {
+    showAppAlert('연동 정보 없음', '이 상품은 현재 재고 연동 그룹에 속해있지 않습니다.', 'info');
+    return;
+  }
+  const list = grp.members.map(m =>
+    `• [${m.sku || '-'}] ${m.name}\n   재고 ${m.stock || 0} · 안전재고 ${m.safety_stock || 0} · 원가 ${(m.cost || 0).toLocaleString('ko-KR')}원 · 공급가 ${(m.supply_price || 0).toLocaleString('ko-KR')}원`
+  ).join('\n\n');
+  showAppAlert(
+    `🔗 재고 연동 그룹 (${grp.members.length}개)`,
+    `이 그룹의 모든 상품은 재고/안전재고/원가/공급가가 항상 같이 변경됩니다.\n\n${list}\n\n해제하려면 행의 ⋮ 메뉴 → "연동 해제" 를 누르세요.`,
+    'info'
+  );
+}
+
+// 연동 추가 모달 열기 — 트리거 상품을 미리 체크해놓고, 함께 묶을 다른 상품을 선택
+function openStockLinkModal(productId) {
+  _openProductMenuId = null;
+  // 닫혀있던 메뉴 정리
+  document.querySelectorAll('[id^="product-menu-"]').forEach(el => el.classList.add('hidden'));
+
+  const source = _allProducts.find(p => p.id === productId);
+  if (!source) { showAppAlert('상품 없음', '상품을 찾을 수 없습니다.', 'error'); return; }
+
+  // 이미 그룹에 속해있으면 — 같은 그룹에 더 추가하는 형태
+  const existingGroupId = source.stock_link_group || null;
+
+  // 후보: 같은 그룹은 자동 포함, 다른 그룹 멤버는 제외(동시에 두 그룹에 속할 수 없음)
+  const candidates = _allProducts.filter(p => {
+    if (p.id === source.id) return true;
+    if (!p.stock_link_group) return true;
+    if (existingGroupId && p.stock_link_group === existingGroupId) return true;
+    return false; // 다른 그룹 소속은 제외 (해제 후 다시 추가해야 함)
+  });
+
+  // 기존 모달 제거
+  const prev = document.getElementById('stock-link-modal');
+  if (prev) prev.remove();
+
+  const m = document.createElement('div');
+  m.id = 'stock-link-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  m.innerHTML = `
+    <div style="background:white;border-radius:16px;max-width:720px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="padding:16px 22px;border-bottom:1px solid #eee;">
+        <div style="font-weight:bold;font-size:16px;">🔗 재고 연동 ${existingGroupId ? '추가' : '만들기'}</div>
+        <div style="color:#888;font-size:12px;margin-top:4px;">선택한 상품들의 <b>재고 / 안전재고 / 원가 / 공급가</b>가 항상 같이 변경됩니다. (어떤 상품이 팔리면 그룹 전체 재고가 차감)</div>
+      </div>
+      <div style="padding:12px 22px;border-bottom:1px solid #eee;display:flex;gap:10px;align-items:center;">
+        <input type="text" id="link-modal-search" placeholder="상품명 또는 SKU 검색"
+               style="flex:1;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+        <span id="link-modal-count" style="font-size:12px;color:#666;font-weight:600;">선택 0</span>
+      </div>
+      <div id="link-modal-list" style="overflow:auto;flex:1;padding:6px 12px;"></div>
+      <div style="padding:12px 22px;border-top:1px solid #eee;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <div style="font-size:11px;color:#888;">기준 상품: <b>${escHtml(source.name)}</b></div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="document.getElementById('stock-link-modal').remove()" style="padding:9px 22px;border-radius:20px;border:1px solid #ddd;background:white;cursor:pointer;font-size:13px;font-weight:bold;">취소</button>
+          <button onclick="confirmStockLink(${source.id}, ${existingGroupId ? `'${existingGroupId}'` : 'null'})" style="padding:9px 26px;border-radius:20px;border:none;background:#000;color:white;cursor:pointer;font-size:13px;font-weight:bold;">연동 ${existingGroupId ? '추가' : '만들기'}</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+
+  // 캐시 + 렌더
+  m._sourceId = source.id;
+  m._existingGroupId = existingGroupId;
+  m._candidates = candidates;
+  // 초기 선택 = 기존 그룹 멤버 + 트리거 상품
+  m._selected = new Set(candidates.filter(p => p.id === source.id || (existingGroupId && p.stock_link_group === existingGroupId)).map(p => p.id));
+
+  _renderStockLinkModalList();
+
+  document.getElementById('link-modal-search').oninput = _renderStockLinkModalList;
+  setTimeout(() => { try { document.getElementById('link-modal-search').focus(); } catch(_){} }, 80);
+}
+
+function _renderStockLinkModalList() {
+  const m = document.getElementById('stock-link-modal');
+  if (!m) return;
+  const q = (document.getElementById('link-modal-search')?.value || '').trim().toLowerCase();
+  const tokens = q ? q.split(/[\s,;]+/).filter(Boolean) : [];
+  const candidates = m._candidates || [];
+  const selected = m._selected;
+  const sourceId = m._sourceId;
+  const existingGroupId = m._existingGroupId;
+
+  const filtered = candidates.filter(p => {
+    if (!tokens.length) return true;
+    const name = (p.name || '').toLowerCase();
+    const sku  = (p.sku  || '').toLowerCase();
+    return tokens.some(t => name.includes(t) || sku.includes(t));
+  });
+
+  // 선택된 항목을 위로
+  filtered.sort((a, b) => {
+    const sa = selected.has(a.id) ? 0 : 1;
+    const sb = selected.has(b.id) ? 0 : 1;
+    if (sa !== sb) return sa - sb;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+  const list = document.getElementById('link-modal-list');
+  if (!filtered.length) {
+    list.innerHTML = '<div style="padding:30px;text-align:center;color:#888;font-size:13px;">검색 결과가 없습니다.</div>';
+    return;
+  }
+  list.innerHTML = filtered.slice(0, 200).map(p => {
+    const isChecked = selected.has(p.id);
+    const isSource = p.id === sourceId;
+    const isExisting = existingGroupId && p.stock_link_group === existingGroupId && !isSource;
+    const lockNote = isSource ? ' <span style="color:#888;">(기준 상품 — 항상 포함)</span>'
+                  : isExisting ? ' <span style="color:#92400E;font-weight:600;">(이미 같은 그룹)</span>'
+                  : '';
+    return `<label style="display:flex;align-items:center;gap:10px;padding:10px 8px;border-bottom:1px solid #f0f0f0;cursor:pointer;${isSource ? 'background:#FEF3C7;' : ''}">
+      <input type="checkbox" data-pid="${p.id}" ${isChecked ? 'checked' : ''} ${isSource ? 'disabled' : ''} onchange="_toggleLinkCandidate(${p.id}, this.checked)" style="width:16px;height:16px;flex-shrink:0;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;font-size:13px;">${escHtml(p.name)}${lockNote}</div>
+        <div style="color:#888;font-size:11px;">SKU: ${escHtml(p.sku || '-')} · 재고 ${p.stock || 0} · 안전 ${p.safety_stock || 0} · 원가 ${(p.cost || 0).toLocaleString('ko-KR')}원 · 공급 ${(p.supply_price || 0).toLocaleString('ko-KR')}원</div>
+      </div>
+    </label>`;
+  }).join('');
+  document.getElementById('link-modal-count').textContent = `선택 ${selected.size}`;
+}
+
+function _toggleLinkCandidate(pid, checked) {
+  const m = document.getElementById('stock-link-modal');
+  if (!m) return;
+  if (checked) m._selected.add(pid);
+  else m._selected.delete(pid);
+  document.getElementById('link-modal-count').textContent = `선택 ${m._selected.size}`;
+}
+
+async function confirmStockLink(sourceId, existingGroupId) {
+  const m = document.getElementById('stock-link-modal');
+  if (!m) return;
+  const selected = [...m._selected];
+  if (selected.length < 2) {
+    showAppAlert('선택 부족', '연동하려면 최소 2개 이상의 상품을 선택해야 합니다.', 'warn');
+    return;
+  }
+  const source = _allProducts.find(p => p.id === sourceId);
+  if (!source) { showAppAlert('오류', '기준 상품을 찾을 수 없습니다.', 'error'); return; }
+
+  // 그룹 멤버들 — 기준 상품의 현재값으로 동기화
+  const groupId = existingGroupId || _newStockLinkGroupId();
+  const syncFields = {
+    stock:        Number(source.stock) || 0,
+    safety_stock: Number(source.safety_stock) || 0,
+    cost:         Number(source.cost) || 0,
+    supply_price: Number(source.supply_price) || 0,
+  };
+  const targets = _allProducts.filter(p => selected.includes(p.id));
+  // 다른 그룹 소속 상품은 미리 거른 상태이지만, 안전상 한번 더 확인
+  const conflicting = targets.filter(p => p.stock_link_group && p.stock_link_group !== groupId && existingGroupId && p.stock_link_group !== existingGroupId);
+  if (conflicting.length) {
+    showAppAlert('충돌', `다른 그룹에 속한 상품이 포함되어 있습니다:\n${conflicting.map(p => '• ' + p.name).join('\n')}\n\n먼저 해당 상품의 연동을 해제한 뒤 다시 시도해주세요.`, 'error');
+    return;
+  }
+
+  // confirm
+  const confirmed = confirm(
+    `🔗 재고 연동 ${existingGroupId ? '추가' : '만들기'}\n────────────────────\n` +
+    `${targets.length}개 상품을 하나의 그룹으로 묶습니다.\n\n` +
+    `※ 모든 멤버의 값이 기준 상품(${source.name})의 값으로 통일됩니다:\n` +
+    `   재고: ${syncFields.stock}, 안전재고: ${syncFields.safety_stock}\n` +
+    `   원가: ${syncFields.cost.toLocaleString('ko-KR')}원, 공급가: ${syncFields.supply_price.toLocaleString('ko-KR')}원\n\n` +
+    `진행하시겠습니까?`
+  );
+  if (!confirmed) return;
+
+  // 적용
+  let ok = 0, fail = 0;
+  for (const t of targets) {
+    try {
+      const updateObj = { stock_link_group: groupId, ...syncFields };
+      const { error } = await _supabase.from('products').update(updateObj).eq('id', t.id);
+      if (error) {
+        if (_isSchemaMissingError(error)) {
+          showAppAlert('DB 마이그레이션 필요',
+            'Supabase products 테이블에 stock_link_group 컬럼이 없습니다.\n\n' +
+            'Supabase → SQL Editor에서 아래 SQL을 한 번만 실행한 뒤 다시 시도해 주세요.',
+            { type: 'error', code: 'ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_link_group TEXT;\nCREATE INDEX IF NOT EXISTS idx_products_stock_link_group ON products(stock_link_group) WHERE stock_link_group IS NOT NULL;' });
+          return;
+        }
+        console.error('[연동 추가] DB 실패:', t.sku, error);
+        fail++;
+        continue;
+      }
+      ok++;
+    } catch (e) {
+      console.error('[연동 추가] 예외:', t.sku, e);
+      fail++;
+    }
+  }
+
+  m.remove();
+  showAppAlert(
+    fail === 0 ? '연동 완료' : '일부 실패',
+    `${ok}개 상품이 연동 그룹으로 묶였습니다.${fail > 0 ? `\n${fail}개 실패 — 콘솔(F12)에서 상세 확인.` : ''}`,
+    fail === 0 ? 'success' : 'warn'
+  );
+  await loadProductsFromDB();
+}
+
+async function unlinkStockGroup(productId) {
+  _openProductMenuId = null;
+  document.querySelectorAll('[id^="product-menu-"]').forEach(el => el.classList.add('hidden'));
+  const grp = _getStockLinkGroup(productId);
+  if (!grp) {
+    showAppAlert('연동 없음', '이 상품은 연동 그룹에 속해있지 않습니다.', 'info');
+    return;
+  }
+  const me = grp.members.find(m => m.id === productId);
+  const others = grp.members.filter(m => m.id !== productId);
+
+  showAppConfirm(
+    '연동 해제',
+    `"${me ? me.name : '이 상품'}" 을(를) 연동 그룹에서 제외할까요?\n\n` +
+    `이 상품 이후의 재고/원가/공급가 변경은 다른 멤버들과 동기화되지 않습니다.\n` +
+    (others.length === 1 ? `\n그룹에 1명만 남게 되므로 ${others[0].name} 의 연동도 같이 해제됩니다.` : `\n남은 멤버 ${others.length}개는 그대로 유지됩니다.`),
+    async () => {
+      const idsToUnlink = [productId];
+      // 1명짜리 그룹은 무의미 → 같이 해제
+      if (others.length === 1) idsToUnlink.push(others[0].id);
+      let ok = 0, fail = 0;
+      for (const id of idsToUnlink) {
+        try {
+          const { error } = await _supabase.from('products').update({ stock_link_group: null }).eq('id', id);
+          if (error) {
+            if (_isSchemaMissingError(error)) { _stockLinkSchemaMissing = true; }
+            console.error('[연동 해제] DB 실패:', id, error);
+            fail++;
+            continue;
+          }
+          ok++;
+        } catch (e) {
+          console.error('[연동 해제] 예외:', id, e);
+          fail++;
+        }
+      }
+      showAppAlert(fail === 0 ? '해제 완료' : '일부 실패', `${ok}개 상품의 연동을 해제했습니다.`, fail === 0 ? 'success' : 'warn');
+      await loadProductsFromDB();
+    },
+    { type: 'warning', confirmText: '해제', confirmStyle: 'danger' }
+  );
+}
+
 async function loadProductsFromDB() {
   try {
     const { data: { session } } = await _supabase.auth.getSession();
@@ -10179,6 +10496,14 @@ function renderProductsPage() {
   const noResult = document.getElementById('product-no-result');
   if (noResult) noResult.classList.add('hidden');
 
+  // 연동 그룹별 멤버 수 캐시 (배지 표시용)
+  const _linkGroupCount = new Map();
+  _allProducts.forEach(p => {
+    if (p.stock_link_group) {
+      _linkGroupCount.set(p.stock_link_group, (_linkGroupCount.get(p.stock_link_group) || 0) + 1);
+    }
+  });
+
   listBody.innerHTML = pageItems.map(function(p, i) {
     var ci = (startIdx + i) % colorPairs.length;
     var bg = colorPairs[ci][0], fg = colorPairs[ci][1];
@@ -10188,11 +10513,20 @@ function renderProductsPage() {
       ? '<span class="px-2.5 md:px-3 py-1 rounded-full text-xs font-bold bg-brand-pink-light text-brand-pink">부족</span>'
       : '<span class="px-2.5 md:px-3 py-1 rounded-full text-xs font-bold bg-brand-blue-light text-brand-blue">정상</span>';
     var stockClass = isLow ? 'input-stock warn' : 'input-stock';
+    // 연동 그룹 배지 (그룹 멤버 ≥ 2일 때만)
+    var linkN = (p.stock_link_group && _linkGroupCount.get(p.stock_link_group)) || 0;
+    var linkBadge = linkN >= 2
+      ? '<span class="ml-1.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold" style="background:#FEF3C7;color:#92400E;cursor:pointer;" onclick="event.stopPropagation();showLinkedGroupInfo(' + p.id + ')" title="재고 연동 — 클릭하여 그룹 멤버 보기">🔗 연동(' + linkN + ')</span>'
+      : '';
+    // 연동 그룹 메뉴 항목
+    var linkMenuHtml = linkN >= 2
+      ? '<button onclick="unlinkStockGroup(' + p.id + ')" class="w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-brand-bg transition-colors flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 0 1 4 8"/><line x1="2" y1="2" x2="22" y2="22"/></svg>연동 해제</button>'
+      : '<button onclick="openStockLinkModal(' + p.id + ')" class="w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-brand-bg transition-colors flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>재고 연동</button>';
     return '<div class="grid items-center px-4 md:px-6 py-4 md:py-5 border-b border-[#F9F9FB] hover:bg-brand-bg transition-colors" data-db-id="' + p.id + '" style="grid-template-columns: 36px 1fr 100px 100px 80px 40px;">' +
       '<div class="flex items-center"><input type="checkbox" class="product-row-cb w-4 h-4 rounded border-brand-border" data-product-id="' + p.id + '" onchange="updateProductSelectLabel()"></div>' +
       '<div class="flex items-center gap-3 md:gap-4 cursor-pointer rounded-xl -mx-1 px-1 py-1 hover:bg-brand-bg transition-colors" onclick="openEditProduct(' + p.id + ')" title="클릭하여 수정">' +
         '<div class="w-12 md:w-14 h-12 md:h-14 rounded-xl ' + bg + ' ' + fg + ' flex items-center justify-center font-bold shrink-0">' + escHtml(initials) + '</div>' +
-        '<div><div class="font-bold text-sm mb-0.5">' + escHtml(p.name) + '</div>' +
+        '<div><div class="font-bold text-sm mb-0.5">' + escHtml(p.name) + linkBadge + '</div>' +
         '<div class="text-brand-gray text-xs font-medium">SKU: ' + escHtml(p.sku||'') + ' | ' + escHtml(p.category||'') + (p.cost ? ' | 원가 ' + Number(p.cost).toLocaleString('ko-KR') + '원' : '') + (p.supply_price ? ' | 공급가 ' + Number(p.supply_price).toLocaleString('ko-KR') + '원' : '') + (p.shipping_fee ? ' | 택배비 ' + Number(p.shipping_fee).toLocaleString('ko-KR') + '원' : '') + (p.shipping_cost ? ' | 택배비용 ' + Number(p.shipping_cost).toLocaleString('ko-KR') + '원' : '') + (p.created_at ? ' | 등록 ' + String(p.created_at).slice(0, 10) : '') + '</div></div>' +
       '</div>' +
       '<div class="text-right"><input type="number" value="' + p.stock + '" class="' + stockClass + '"></div>' +
@@ -10202,9 +10536,10 @@ function renderProductsPage() {
         '<button onclick="toggleProductMenu(' + p.id + ', event)" class="text-brand-gray hover:text-brand-black p-1 md:p-2">' +
           '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>' +
         '</button>' +
-        '<div id="product-menu-' + p.id + '" class="hidden absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-brand-border py-1 z-50 w-28">' +
+        '<div id="product-menu-' + p.id + '" class="hidden absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-brand-border py-1 z-50 w-32">' +
           '<button onclick="openEditProduct(' + p.id + ')" class="w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-brand-bg transition-colors flex items-center gap-2">' +
             '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>수정</button>' +
+          linkMenuHtml +
           '<button onclick="deleteProduct(' + p.id + ')" class="w-full text-left px-4 py-2.5 text-sm font-medium text-brand-pink hover:bg-brand-pink-light/30 transition-colors flex items-center gap-2">' +
             '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>삭제</button>' +
         '</div>' +
@@ -10388,6 +10723,16 @@ async function submitBulkEditProducts() {
     );
   } else {
     showAppAlert('일괄 수정 완료', `${updatedCount}개 상품의 [${summary}] 항목을 변경했습니다.`, { type: 'success' });
+  }
+
+  // 재고 연동: 변경된 상품 중 연동 그룹에 속한 것들의 멤버 동기화
+  // (payload에 stock_link_group 와 관련된 필드만 추출해서 동기화)
+  const linkedFields = {};
+  for (const k of _STOCK_LINK_FIELDS) if (k in payload) linkedFields[k] = payload[k];
+  if (Object.keys(linkedFields).length) {
+    for (const id of ids) {
+      try { await _syncLinkedFields(id, linkedFields); } catch (_) {}
+    }
   }
 
   await loadProductsFromDB();
@@ -11694,6 +12039,8 @@ async function applySafetyStockAuto() {
       const { error } = await _supabase.from('products').update({ safety_stock: r.suggested }).eq('id', r.p.id);
       if (error) throw error;
       ok++;
+      // 재고 연동: 같은 그룹 멤버에게 안전재고 동기화
+      try { await _syncLinkedFields(r.p.id, { safety_stock: r.suggested }); } catch (_) {}
     } catch (e) {
       fail++;
       console.error('[안전재고 자동] 실패:', r.p.sku, e);
@@ -11997,6 +12344,10 @@ async function submitAddProduct() {
     const full = isEditing ? fullBase : { user_id: session.user.id, ...fullBase };
     const error = await tryWrite(full);
     if (error) { showErr((isEditing ? '수정 실패: ' : '상품 추가 실패: ') + error.message + (error.details ? ` (${error.details})` : '')); return; }
+    // 재고 연동: 수정인 경우 같은 그룹 멤버에게 재고/안전재고/원가/공급가 동기화
+    if (isEditing) {
+      try { await _syncLinkedFields(_editingProductId, { stock, safety_stock: safety, cost, supply_price: supply }); } catch (_) {}
+    }
   } catch (e) {
     showErr('예외 발생: ' + (e.message || e));
     return;
@@ -12313,6 +12664,9 @@ async function submitReceiving() {
     showAppAlert('저장 실패', e.message || String(e), 'error');
     return;
   }
+
+  // 재고 연동: 같은 그룹의 다른 상품도 동일하게 업데이트
+  try { await _syncLinkedFields(product.id, { stock: newStock, cost: unit }); } catch (_) {}
 
   // 이력 기록
   const hist = _loadReceivingHistory();
@@ -15304,6 +15658,10 @@ function renderAdSiteCards() {
     const apiBtn = site.api.available
       ? `<button onclick="connectAdApi('${site.id}')" class="flex-1 px-3 py-1.5 rounded-full bg-white border border-brand-border text-xs font-bold hover:bg-brand-bg" title="${_escapeHtml(site.api.label)} (준비 중)">🔗 API</button>`
       : '';
+    // 스마트스토어 전용: 리워드 업로드 버튼
+    const rewardBtn = (site.id === '스마트스토어')
+      ? `<button onclick="openRewardUpload()" class="flex-1 px-3 py-1.5 rounded-full bg-white border border-brand-border text-xs font-bold hover:bg-brand-bg" style="color:#92400E;border-color:#FCD34D;" title="상품 선택 후 리워드 금액 입력">🎁 리워드</button>`
+      : '';
     return `
       <div class="border border-brand-border rounded-2xl p-4 flex flex-col gap-3 hover:shadow-md transition-shadow">
         <div class="flex items-center justify-between">
@@ -15311,12 +15669,176 @@ function renderAdSiteCards() {
           ${apiBadge}
         </div>
         <div class="text-xs text-brand-gray">이번 달: <span class="font-mono font-bold text-brand-black">${total.toLocaleString('ko-KR')}원</span></div>
-        <div class="flex gap-2">
-          <button onclick="openAdUpload('${site.id}')" class="flex-1 px-3 py-1.5 rounded-full bg-brand-black text-white text-xs font-bold hover:bg-[#333]">📊 엑셀 업로드</button>
+        <div class="flex gap-2 flex-wrap">
+          <button onclick="openAdUpload('${site.id}')" class="flex-1 px-3 py-1.5 rounded-full bg-brand-black text-white text-xs font-bold hover:bg-[#333]" style="min-width:100px;">📊 엑셀 업로드</button>
           ${apiBtn}
+          ${rewardBtn}
         </div>
       </div>`;
   }).join('');
+}
+
+// ── 리워드 업로드 (스마트스토어 전용) ────────────────
+// 상품 1개 이상 선택 + 금액 입력 → 광고비로 저장 (template: 'reward')
+function openRewardUpload() {
+  // 상품 캐시 보장
+  const products = (typeof _allProducts !== 'undefined' && Array.isArray(_allProducts)) ? _allProducts : [];
+  if (!products.length) {
+    if (typeof loadProductsFromDB === 'function') {
+      loadProductsFromDB().then(() => {
+        if (_allProducts && _allProducts.length) openRewardUpload();
+        else showAppAlert('상품 없음', '등록된 상품이 없습니다. 먼저 상품관리에서 상품을 추가해 주세요.', 'warn');
+      });
+      return;
+    }
+    showAppAlert('상품 없음', '등록된 상품이 없습니다.', 'warn');
+    return;
+  }
+
+  // 기존 모달 제거
+  const prev = document.getElementById('reward-upload-modal');
+  if (prev) prev.remove();
+
+  const today = (new Date()).toISOString().slice(0, 10);
+
+  const m = document.createElement('div');
+  m.id = 'reward-upload-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  m.innerHTML = `
+    <div style="background:white;border-radius:16px;max-width:760px;width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="padding:16px 22px;border-bottom:1px solid #eee;background:#FFFBEB;border-radius:16px 16px 0 0;">
+        <div style="font-weight:bold;font-size:16px;">🎁 스마트스토어 리워드 업로드</div>
+        <div style="color:#92400E;font-size:12px;margin-top:4px;">상품을 1개 이상 선택하고 리워드 금액을 입력하세요. 광고비로 저장되어 마이너스 확인 시 자동 차감됩니다.</div>
+      </div>
+      <div style="padding:14px 22px;border-bottom:1px solid #eee;display:grid;grid-template-columns:160px 1fr;gap:10px 14px;align-items:center;">
+        <label style="font-size:13px;font-weight:600;">날짜</label>
+        <input type="date" id="reward-date" value="${today}" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;width:200px;">
+
+        <label style="font-size:13px;font-weight:600;">리워드 금액 (원)</label>
+        <input type="number" id="reward-amount" placeholder="예: 50000" min="0" step="100" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;width:200px;">
+
+        <label style="font-size:13px;font-weight:600;">메모 (선택)</label>
+        <input type="text" id="reward-memo" placeholder="예: 신규고객 리뷰이벤트" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+      </div>
+      <div style="padding:10px 22px;border-bottom:1px solid #eee;display:flex;gap:10px;align-items:center;">
+        <input type="text" id="reward-search" placeholder="상품명 또는 SKU 검색"
+               style="flex:1;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+        <span id="reward-count" style="font-size:12px;color:#666;font-weight:600;">선택 0</span>
+      </div>
+      <div id="reward-product-list" style="overflow:auto;flex:1;padding:6px 12px;min-height:240px;"></div>
+      <div style="padding:12px 22px;border-top:1px solid #eee;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <div style="font-size:11px;color:#888;">스마트스토어 광고비 항목으로 1건 저장됩니다.</div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="document.getElementById('reward-upload-modal').remove()" style="padding:9px 22px;border-radius:20px;border:1px solid #ddd;background:white;cursor:pointer;font-size:13px;font-weight:bold;">취소</button>
+          <button onclick="saveRewardUpload()" style="padding:9px 26px;border-radius:20px;border:none;background:#000;color:white;cursor:pointer;font-size:13px;font-weight:bold;">저장</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+
+  m._selected = new Set();
+  _renderRewardProductList();
+  document.getElementById('reward-search').oninput = _renderRewardProductList;
+  setTimeout(() => { try { document.getElementById('reward-amount').focus(); } catch(_){} }, 80);
+}
+
+function _renderRewardProductList() {
+  const m = document.getElementById('reward-upload-modal');
+  if (!m) return;
+  const q = (document.getElementById('reward-search')?.value || '').trim().toLowerCase();
+  const tokens = q ? q.split(/[\s,;]+/).filter(Boolean) : [];
+  const products = (typeof _allProducts !== 'undefined' && Array.isArray(_allProducts)) ? _allProducts : [];
+  const selected = m._selected;
+
+  const filtered = products.filter(p => {
+    if (!tokens.length) return true;
+    const name = (p.name || '').toLowerCase();
+    const sku  = (p.sku  || '').toLowerCase();
+    return tokens.some(t => name.includes(t) || sku.includes(t));
+  });
+
+  // 선택된 항목을 위로
+  filtered.sort((a, b) => {
+    const sa = selected.has(a.id) ? 0 : 1;
+    const sb = selected.has(b.id) ? 0 : 1;
+    if (sa !== sb) return sa - sb;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+  const list = document.getElementById('reward-product-list');
+  if (!filtered.length) {
+    list.innerHTML = '<div style="padding:30px;text-align:center;color:#888;font-size:13px;">검색 결과가 없습니다.</div>';
+    document.getElementById('reward-count').textContent = `선택 ${selected.size}`;
+    return;
+  }
+  list.innerHTML = filtered.slice(0, 200).map(p => {
+    const isChecked = selected.has(p.id);
+    return `<label style="display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid #f0f0f0;cursor:pointer;${isChecked ? 'background:#FFFBEB;' : ''}">
+      <input type="checkbox" data-pid="${p.id}" ${isChecked ? 'checked' : ''} onchange="_toggleRewardProduct(${p.id}, this.checked)" style="width:16px;height:16px;flex-shrink:0;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;font-size:13px;">${escHtml(p.name)}</div>
+        <div style="color:#888;font-size:11px;">SKU: ${escHtml(p.sku || '-')} · ${escHtml(p.category || '-')}</div>
+      </div>
+    </label>`;
+  }).join('');
+  document.getElementById('reward-count').textContent = `선택 ${selected.size}`;
+}
+
+function _toggleRewardProduct(pid, checked) {
+  const m = document.getElementById('reward-upload-modal');
+  if (!m) return;
+  if (checked) m._selected.add(pid);
+  else m._selected.delete(pid);
+  document.getElementById('reward-count').textContent = `선택 ${m._selected.size}`;
+}
+
+function saveRewardUpload() {
+  const m = document.getElementById('reward-upload-modal');
+  if (!m) return;
+  const date = (document.getElementById('reward-date')?.value || '').trim();
+  const amount = Number(document.getElementById('reward-amount')?.value) || 0;
+  const memo = (document.getElementById('reward-memo')?.value || '').trim();
+  const selected = [...m._selected];
+
+  if (!date) { showAppAlert('입력 필요', '날짜를 선택해 주세요.', 'warn'); return; }
+  if (amount <= 0) { showAppAlert('입력 필요', '리워드 금액을 0원보다 큰 값으로 입력해 주세요.', 'warn'); return; }
+  if (selected.length === 0) { showAppAlert('상품 선택 필요', '리워드 대상 상품을 1개 이상 선택해 주세요.', 'warn'); return; }
+
+  const products = (typeof _allProducts !== 'undefined' && Array.isArray(_allProducts)) ? _allProducts : [];
+  const picked = products.filter(p => selected.includes(p.id));
+  const productInfo = picked.map(p => ({ id: p.id, sku: p.sku || '', name: p.name || '' }));
+  const productNames = picked.map(p => p.name || '').filter(Boolean);
+  const labelMain = productNames.length === 1
+    ? productNames[0]
+    : `${productNames[0]} 외 ${productNames.length - 1}개`;
+  const campaign = `[리워드] ${labelMain}` + (memo ? ` — ${memo}` : '');
+
+  const stamp = new Date().toISOString();
+  const all = _loadAdCosts();
+  all.push({
+    site: '스마트스토어',
+    date,
+    amount,
+    campaign,
+    template: 'reward',
+    rewardProducts: productInfo,
+    rewardMemo: memo || '',
+    source: '리워드(수동)',
+    fileName: '',
+    uploadedAt: stamp,
+    _key: `${stamp}_reward_${Math.random().toString(36).slice(2, 8)}`,
+  });
+  _saveAdCosts(all);
+
+  m.remove();
+  showAppAlert(
+    '리워드 저장 완료',
+    `🎁 ${date} · 스마트스토어 리워드 ${amount.toLocaleString('ko-KR')}원 저장됨\n대상 상품 ${picked.length}개:\n${productNames.slice(0, 5).map(n => '• ' + n).join('\n')}${productNames.length > 5 ? `\n... 외 ${productNames.length - 5}개` : ''}`,
+    'success'
+  );
+  if (typeof renderAdSiteCards === 'function') renderAdSiteCards();
+  if (typeof renderAdSummary === 'function') renderAdSummary();
+  if (typeof renderAdDetail === 'function') renderAdDetail();
 }
 
 // 엑셀 업로드 시작 — file input 클릭 트리거
@@ -21019,27 +21541,40 @@ async function _applyStockFromUploadRows(rows, direction, opts) {
     const k = String(p.sku || '').trim().toLowerCase();
     if (k) prodBySku.set(k, p);
   });
-  // 변경 계획 작성
-  const updates = [];
+  // 변경 계획 작성 — 연동 그룹은 단일 단위로 합산
+  // groupKey: 연동 그룹이면 'g_<groupId>', 아니면 'p_<productId>'
+  const byGroup = new Map(); // groupKey -> { primary, members[], totalDelta }
   const missing = [];
   for (const [skuKey, totalQty] of skuQty) {
     const prod = prodBySku.get(skuKey);
     if (!prod) { missing.push({ sku: skuKey, qty: totalQty }); continue; }
-    const oldStock = Number(prod.stock || 0);
     const delta = direction * totalQty;
-    const newStock = Math.max(0, oldStock + delta); // 음수 방지
-    updates.push({ id: prod.id, sku: prod.sku, oldStock, newStock, delta });
+    const groupKey = prod.stock_link_group ? ('g_' + prod.stock_link_group) : ('p_' + prod.id);
+    if (!byGroup.has(groupKey)) {
+      const members = prod.stock_link_group
+        ? _allProducts.filter(p => p.stock_link_group === prod.stock_link_group)
+        : [prod];
+      byGroup.set(groupKey, { primary: prod, members, totalDelta: 0 });
+    }
+    byGroup.get(groupKey).totalDelta += delta;
   }
-  // Supabase 업데이트 (순차)
+  // Supabase 업데이트 (그룹 단위, 모든 멤버에 같은 newStock 적용)
+  const updates = [];
   let updated = 0;
-  for (const u of updates) {
-    try {
-      const { error } = await _supabase.from('products').update({ stock: u.newStock }).eq('id', u.id);
-      if (error) { console.error('[재고연동] DB 업데이트 실패:', u.sku, error); continue; }
-      updated++;
-      console.log(`[재고연동] ${u.sku}: ${u.oldStock} → ${u.newStock} (${u.delta > 0 ? '+' : ''}${u.delta})`);
-    } catch (e) {
-      console.error('[재고연동] DB 업데이트 예외:', u.sku, e);
+  for (const [, g] of byGroup) {
+    const oldStock = Number(g.primary.stock || 0);
+    const newStock = Math.max(0, oldStock + g.totalDelta);
+    for (const m of g.members) {
+      try {
+        const { error } = await _supabase.from('products').update({ stock: newStock }).eq('id', m.id);
+        if (error) { console.error('[재고연동] DB 업데이트 실패:', m.sku, error); continue; }
+        updated++;
+        const tag = (g.members.length > 1) ? ` (🔗 그룹 ${g.members.length}개 동기화)` : '';
+        console.log(`[재고연동] ${m.sku}: ${Number(m.stock || 0)} → ${newStock} (${g.totalDelta > 0 ? '+' : ''}${g.totalDelta})${tag}`);
+        updates.push({ id: m.id, sku: m.sku, oldStock: Number(m.stock || 0), newStock, delta: newStock - Number(m.stock || 0) });
+      } catch (e) {
+        console.error('[재고연동] DB 업데이트 예외:', m.sku, e);
+      }
     }
   }
   // 캐시 새로고침
