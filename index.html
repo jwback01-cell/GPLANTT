@@ -1067,7 +1067,7 @@ tailwind.config = {
               <div class="border-t border-brand-border w-full"></div>
             </div>
             <div id="daily-bars" class="flex items-end gap-1 md:gap-1.5 pb-3 h-[180px] md:h-[220px] z-10 relative overflow-x-auto"></div>
-            <div id="daily-labels" class="flex text-brand-gray text-[0.7rem] font-semibold mt-3 overflow-x-auto"></div>
+            <div id="daily-labels" class="flex gap-1 md:gap-1.5 text-brand-gray text-[0.7rem] font-semibold mt-3 overflow-x-auto"></div>
           </div>
         </div>
 
@@ -14010,7 +14010,8 @@ function renderDailyTab() {
       labelsEl.innerHTML = '';
     } else {
       const maxV = Math.max(1, ...days.map(d => Math.max(d.sales, Math.abs(d.profit || 0))));
-      const minBarWidth = 22;
+      // 라벨 "12/31" (4글자) 가 깔끔히 들어가도록 28px. 바와 라벨 모두 동일 폭으로 정렬
+      const minBarWidth = 28;
       barsEl.innerHTML = days.map(d => {
         const salesH = Math.round((d.sales / maxV) * 100);
         const profitH = Math.round((Math.max(0, d.profit) / maxV) * 100);
@@ -14023,7 +14024,8 @@ function renderDailyTab() {
       labelsEl.innerHTML = days.map(d => {
         const dt = new Date(d.date + 'T00:00:00');
         const md = `${dt.getMonth()+1}/${dt.getDate()}`;
-        return `<div class="text-center" style="min-width:${minBarWidth}px;">${md}</div>`;
+        // 바와 동일 폭, 가운데 정렬, 줄바꿈 방지
+        return `<div class="text-center whitespace-nowrap" style="min-width:${minBarWidth}px;width:${minBarWidth}px;flex-shrink:0;">${md}</div>`;
       }).join('');
     }
   }
