@@ -19973,7 +19973,10 @@ async function fetchPlayautoOrders() {
 
     // PA API는 date_type이 wdate/mdate만 허용. dateType 이 wdate/mdate 면 그대로,
     // 그 외(shipped_time 등) 는 수령일 기준이라 wdate 로 받은 뒤 클라이언트 필터링.
-    // ⚠ 이전엔 30일 widening 으로 PA 응답이 항상 사용자 선택 범위보다 +30일치였음 — 제거.
+    // ⚠ dateType 이 wdate 가 아니면 사용자가 고른 기간 외에 출고/배송이 일어났을 수 있어
+    //   wdate 기준으로 30일 더 일찍부터 받아야 누락 안 됨.
+    //   (예: 5/3 주문되어 5/6 출고완료 — 출고완료일 5/6 만 보면 wdate 5/6 만 보내서 놓침)
+    const widenStart = (dateType !== 'wdate' && startDate) ? _paAddDays(startDate, -30) : startDate;
     const baseBody = {
       start: 0,
       length: 500,
@@ -19982,7 +19985,7 @@ async function fetchPlayautoOrders() {
       bundle_yn: false,
       orderby: 'wdate desc',
     };
-    if (startDate) baseBody.sdate = startDate + ' 00:00:00';
+    if (widenStart) baseBody.sdate = widenStart + ' 00:00:00';
     if (endDate) baseBody.edate = endDate + ' 23:59:59';
 
     // 1차: 상태 후보 배열로 조회 (PA 라벨 편차 흡수)
