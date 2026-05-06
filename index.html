@@ -15700,6 +15700,10 @@ function openRewardUpload() {
   if (prev) prev.remove();
 
   const today = (new Date()).toISOString().slice(0, 10);
+  const _ymd = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  const _now = new Date();
+  const _monthStart = _ymd(new Date(_now.getFullYear(), _now.getMonth(), 1));
+  const _monthEnd = _ymd(new Date(_now.getFullYear(), _now.getMonth() + 1, 0));
 
   const m = document.createElement('div');
   m.id = 'reward-upload-modal';
@@ -15708,14 +15712,24 @@ function openRewardUpload() {
     <div style="background:white;border-radius:16px;max-width:760px;width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
       <div style="padding:16px 22px;border-bottom:1px solid #eee;background:#FFFBEB;border-radius:16px 16px 0 0;">
         <div style="font-weight:bold;font-size:16px;">🎁 스마트스토어 리워드 업로드</div>
-        <div style="color:#92400E;font-size:12px;margin-top:4px;">상품을 1개 이상 선택하고 리워드 금액을 입력하세요. 광고비로 저장되어 마이너스 확인 시 자동 차감됩니다.</div>
+        <div style="color:#92400E;font-size:12px;margin-top:4px;">상품을 1개 이상 선택하고 리워드 금액을 입력하세요. 기간을 여러 날로 잡으면 입력 금액이 일자별로 균등 분배되어 저장됩니다.</div>
       </div>
       <div style="padding:14px 22px;border-bottom:1px solid #eee;display:grid;grid-template-columns:160px 1fr;gap:10px 14px;align-items:center;">
-        <label style="font-size:13px;font-weight:600;">날짜</label>
-        <input type="date" id="reward-date" value="${today}" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;width:200px;">
+        <label style="font-size:13px;font-weight:600;">기간</label>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <input type="date" id="reward-date-start" value="${today}" onchange="_rewardDateChanged()" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;width:160px;">
+          <span style="color:#888;">~</span>
+          <input type="date" id="reward-date-end" value="${today}" onchange="_rewardDateChanged()" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;width:160px;">
+          <button type="button" onclick="_rewardSetRange('today')" style="padding:5px 10px;border:1px solid #ddd;border-radius:14px;background:white;font-size:11px;font-weight:bold;cursor:pointer;">오늘</button>
+          <button type="button" onclick="_rewardSetRange('thisMonth')" style="padding:5px 10px;border:1px solid #ddd;border-radius:14px;background:white;font-size:11px;font-weight:bold;cursor:pointer;">이번 달 1~말일</button>
+          <button type="button" onclick="_rewardSetRange('lastMonth')" style="padding:5px 10px;border:1px solid #ddd;border-radius:14px;background:white;font-size:11px;font-weight:bold;cursor:pointer;">지난 달</button>
+        </div>
 
         <label style="font-size:13px;font-weight:600;">리워드 금액 (원)</label>
-        <input type="number" id="reward-amount" placeholder="예: 50000" min="0" step="100" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;width:200px;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <input type="number" id="reward-amount" placeholder="예: 50000" min="0" step="100" oninput="_rewardUpdateSplit()" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;width:200px;">
+          <span id="reward-split-info" style="font-size:11px;color:#92400E;font-weight:600;"></span>
+        </div>
 
         <label style="font-size:13px;font-weight:600;">메모 (선택)</label>
         <input type="text" id="reward-memo" placeholder="예: 신규고객 리뷰이벤트" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
@@ -15727,7 +15741,7 @@ function openRewardUpload() {
       </div>
       <div id="reward-product-list" style="overflow:auto;flex:1;padding:6px 12px;min-height:240px;"></div>
       <div style="padding:12px 22px;border-top:1px solid #eee;display:flex;justify-content:space-between;align-items:center;gap:8px;">
-        <div style="font-size:11px;color:#888;">스마트스토어 광고비 항목으로 1건 저장됩니다.</div>
+        <div style="font-size:11px;color:#888;">스마트스토어 광고비로 저장 — 기간 2일 이상이면 일자별 N건으로 분할 저장됩니다.</div>
         <div style="display:flex;gap:8px;">
           <button onclick="document.getElementById('reward-upload-modal').remove()" style="padding:9px 22px;border-radius:20px;border:1px solid #ddd;background:white;cursor:pointer;font-size:13px;font-weight:bold;">취소</button>
           <button onclick="saveRewardUpload()" style="padding:9px 26px;border-radius:20px;border:none;background:#000;color:white;cursor:pointer;font-size:13px;font-weight:bold;">저장</button>
@@ -15736,10 +15750,82 @@ function openRewardUpload() {
     </div>`;
   document.body.appendChild(m);
 
+  // 이번 달 범위 캐시 (빠른 선택용)
+  m._monthStart = _monthStart;
+  m._monthEnd = _monthEnd;
   m._selected = new Set();
+
   _renderRewardProductList();
+  _rewardUpdateSplit();
   document.getElementById('reward-search').oninput = _renderRewardProductList;
   setTimeout(() => { try { document.getElementById('reward-amount').focus(); } catch(_){} }, 80);
+}
+
+// 기간 빠른 선택 (오늘 / 이번 달 / 지난 달)
+function _rewardSetRange(kind) {
+  const startEl = document.getElementById('reward-date-start');
+  const endEl = document.getElementById('reward-date-end');
+  if (!startEl || !endEl) return;
+  const fmt = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  const now = new Date();
+  if (kind === 'today') {
+    const v = fmt(now);
+    startEl.value = v; endEl.value = v;
+  } else if (kind === 'thisMonth') {
+    startEl.value = fmt(new Date(now.getFullYear(), now.getMonth(), 1));
+    endEl.value   = fmt(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+  } else if (kind === 'lastMonth') {
+    startEl.value = fmt(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+    endEl.value   = fmt(new Date(now.getFullYear(), now.getMonth(), 0));
+  }
+  _rewardUpdateSplit();
+}
+
+function _rewardDateChanged() {
+  // 시작일 > 종료일 이면 종료일을 시작일로 맞춤
+  const s = document.getElementById('reward-date-start');
+  const e = document.getElementById('reward-date-end');
+  if (s && e && s.value && e.value && s.value > e.value) e.value = s.value;
+  _rewardUpdateSplit();
+}
+
+// 일자수 × 건당 금액 미리보기
+function _rewardUpdateSplit() {
+  const info = document.getElementById('reward-split-info');
+  if (!info) return;
+  const start = document.getElementById('reward-date-start')?.value || '';
+  const end   = document.getElementById('reward-date-end')?.value   || '';
+  const amount = Number(document.getElementById('reward-amount')?.value) || 0;
+  if (!start || !end) { info.textContent = ''; return; }
+  const n = _rewardDaysBetween(start, end);
+  if (n <= 0) { info.textContent = ''; return; }
+  if (n === 1) {
+    info.textContent = `→ 1일 · 1건 저장`;
+  } else if (amount > 0) {
+    const per = Math.floor(amount / n);
+    info.textContent = `→ ${n}일 · 일자별 ${per.toLocaleString('ko-KR')}원 × ${n}건으로 분할 저장`;
+  } else {
+    info.textContent = `→ ${n}일 · ${n}건으로 분할 저장`;
+  }
+}
+
+// 시작일~종료일 사이의 모든 날짜 (YYYY-MM-DD) 배열
+function _rewardEnumerateDays(start, end) {
+  const out = [];
+  const [sy, sm, sd] = start.split('-').map(Number);
+  const [ey, em, ed] = end.split('-').map(Number);
+  const startD = new Date(sy, sm - 1, sd);
+  const endD   = new Date(ey, em - 1, ed);
+  if (startD > endD) return out;
+  const cur = new Date(startD);
+  while (cur <= endD) {
+    out.push(cur.getFullYear() + '-' + String(cur.getMonth()+1).padStart(2,'0') + '-' + String(cur.getDate()).padStart(2,'0'));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+}
+function _rewardDaysBetween(start, end) {
+  return _rewardEnumerateDays(start, end).length;
 }
 
 function _renderRewardProductList() {
@@ -15795,14 +15881,19 @@ function _toggleRewardProduct(pid, checked) {
 function saveRewardUpload() {
   const m = document.getElementById('reward-upload-modal');
   if (!m) return;
-  const date = (document.getElementById('reward-date')?.value || '').trim();
+  const start = (document.getElementById('reward-date-start')?.value || '').trim();
+  const end   = (document.getElementById('reward-date-end')?.value   || '').trim();
   const amount = Number(document.getElementById('reward-amount')?.value) || 0;
   const memo = (document.getElementById('reward-memo')?.value || '').trim();
   const selected = [...m._selected];
 
-  if (!date) { showAppAlert('입력 필요', '날짜를 선택해 주세요.', 'warn'); return; }
+  if (!start || !end) { showAppAlert('입력 필요', '시작일과 종료일을 모두 선택해 주세요.', 'warn'); return; }
+  if (start > end) { showAppAlert('기간 오류', '시작일이 종료일보다 늦을 수 없습니다.', 'warn'); return; }
   if (amount <= 0) { showAppAlert('입력 필요', '리워드 금액을 0원보다 큰 값으로 입력해 주세요.', 'warn'); return; }
   if (selected.length === 0) { showAppAlert('상품 선택 필요', '리워드 대상 상품을 1개 이상 선택해 주세요.', 'warn'); return; }
+
+  const days = _rewardEnumerateDays(start, end);
+  if (!days.length) { showAppAlert('기간 오류', '유효한 날짜 범위가 아닙니다.', 'warn'); return; }
 
   const products = (typeof _allProducts !== 'undefined' && Array.isArray(_allProducts)) ? _allProducts : [];
   const picked = products.filter(p => selected.includes(p.id));
@@ -15811,29 +15902,43 @@ function saveRewardUpload() {
   const labelMain = productNames.length === 1
     ? productNames[0]
     : `${productNames[0]} 외 ${productNames.length - 1}개`;
-  const campaign = `[리워드] ${labelMain}` + (memo ? ` — ${memo}` : '');
+  const campaignBase = `[리워드] ${labelMain}` + (memo ? ` — ${memo}` : '');
+
+  // 일자별 균등 분배 (반올림 손실을 마지막 날에 흡수)
+  const N = days.length;
+  const per = Math.floor(amount / N);
+  const remainder = amount - per * N;
 
   const stamp = new Date().toISOString();
   const all = _loadAdCosts();
-  all.push({
-    site: '스마트스토어',
-    date,
-    amount,
-    campaign,
-    template: 'reward',
-    rewardProducts: productInfo,
-    rewardMemo: memo || '',
-    source: '리워드(수동)',
-    fileName: '',
-    uploadedAt: stamp,
-    _key: `${stamp}_reward_${Math.random().toString(36).slice(2, 8)}`,
+  days.forEach((d, i) => {
+    const dayAmount = per + (i === N - 1 ? remainder : 0);
+    if (dayAmount <= 0 && N > 1) return; // 0원 행은 건너뜀 (예: 입력 0)
+    const campaign = N > 1 ? `${campaignBase} (${i + 1}/${N}일)` : campaignBase;
+    all.push({
+      site: '스마트스토어',
+      date: d,
+      amount: dayAmount,
+      campaign,
+      template: 'reward',
+      rewardProducts: productInfo,
+      rewardMemo: memo || '',
+      rewardRange: { start, end, dayIndex: i + 1, dayCount: N, totalAmount: amount },
+      source: '리워드(수동)',
+      fileName: '',
+      uploadedAt: stamp,
+      _key: `${stamp}_reward_${i}_${Math.random().toString(36).slice(2, 6)}`,
+    });
   });
   _saveAdCosts(all);
 
   m.remove();
+  const rangeLabel = (start === end) ? start : `${start} ~ ${end} (${N}일)`;
   showAppAlert(
     '리워드 저장 완료',
-    `🎁 ${date} · 스마트스토어 리워드 ${amount.toLocaleString('ko-KR')}원 저장됨\n대상 상품 ${picked.length}개:\n${productNames.slice(0, 5).map(n => '• ' + n).join('\n')}${productNames.length > 5 ? `\n... 외 ${productNames.length - 5}개` : ''}`,
+    `🎁 ${rangeLabel} · 스마트스토어 리워드 ${amount.toLocaleString('ko-KR')}원 저장됨` +
+    (N > 1 ? `\n→ 일자별 ${per.toLocaleString('ko-KR')}원 × ${N}건으로 분할 저장` : '') +
+    `\n\n대상 상품 ${picked.length}개:\n${productNames.slice(0, 5).map(n => '• ' + n).join('\n')}${productNames.length > 5 ? `\n... 외 ${productNames.length - 5}개` : ''}`,
     'success'
   );
   if (typeof renderAdSiteCards === 'function') renderAdSiteCards();
