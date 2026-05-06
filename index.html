@@ -16538,6 +16538,8 @@ async function downloadSeoulLiving(mode, actionType) {
       '', '', '',
       _extDeliveryMsg(o),
     ];
+    // 서울리빙 의류 탭은 상품명 앞에 "*" 표시 (배송처 사이드에서 구분 용도)
+    const _clothMark = (n) => mode === 'cloth' ? ('*' + (n || '')) : n;
     const set = _resolveSetForOrder(o, prod);
     if (set && Array.isArray(set.items) && set.items.length) {
       // 세트상품 → 구성품 행으로 분해
@@ -16551,7 +16553,7 @@ async function downloadSeoulLiving(mode, actionType) {
         const finalName = compQty >= 2 ? `[${compQty}개]${compName}` : compName;
         const row = baseRow.slice();
         row[6] = compQty;
-        row[7] = finalName;
+        row[7] = _clothMark(finalName);
         rows.push(row);
         expandedRows++;
       });
@@ -16559,7 +16561,7 @@ async function downloadSeoulLiving(mode, actionType) {
       // 일반 상품 — 기존 로직
       const r = baseRow.slice();
       r[6] = orderQty;
-      r[7] = _extItemName(o, prod);
+      r[7] = _clothMark(_extItemName(o, prod));
       rows.push(r);
     }
   });
