@@ -3482,9 +3482,13 @@ tailwind.config = {
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
                 플레이오토 출고관리 탭 가져오기
               </button>
-              <button id="pa-inv-send-btn" type="button" onclick="sendInvoicesToPlayauto()" class="px-5 py-2.5 rounded-full text-xs font-bold bg-brand-black text-white hover:bg-[#333] flex items-center gap-1.5">
+              <button id="pa-inv-send-btn" type="button" onclick="sendInvoicesToPlayauto()" class="px-5 py-2.5 rounded-full text-xs font-bold bg-brand-black text-white hover:bg-[#333] flex items-center gap-1.5" title="송장번호 + 택배사 정보를 PA에 전송하여 출고완료 상태로 변경 (change_complete=true)">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                 송장 전송
+              </button>
+              <button id="pa-tracking-send-btn" type="button" onclick="sendTrackingToPlayauto()" class="px-5 py-2.5 rounded-full text-xs font-bold bg-brand-orange text-white hover:opacity-90 flex items-center gap-1.5" title="이미 출고완료된 주문에 송장번호 + 택배사를 다시 전송 (운송장출력 상태)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                운송장 전송
               </button>
               <div id="pa-inv-fetch-status" class="text-xs font-semibold text-brand-gray ml-2"></div>
             </div>
@@ -18970,12 +18974,96 @@ async function sendInvoicesToPlayauto() {
   showAppConfirm(
     '플레이오토로 송장 전송',
     '총 ' + targets.length + '건의 주문에 대해 플레이오토로 송장을 전송합니다.\n택배사 분포: ' + summaryStr + codeWarn,
-    () => _doSendInvoicesToPlayauto(btn, targets, userEndpoint, fallbackCarrNo, summaryStr),
+    () => _doSendInvoicesToPlayauto(btn, targets, userEndpoint, fallbackCarrNo, summaryStr, true),
     { type: 'info', confirmText: '전송 시작' }
   );
 }
 
-async function _doSendInvoicesToPlayauto(btn, targets, userEndpoint, fallbackCarrNo, summaryStr) {
+// 출고완료 상태 주문에 송장+택배사 다시 전송 (운송장 전송 — change_complete=false → 운송장출력 상태)
+async function sendTrackingToPlayauto() {
+  console.log('[TRACK-SEND] sendTrackingToPlayauto() 호출됨');
+  const btn = document.getElementById('pa-tracking-send-btn');
+  const endpointEl = document.getElementById('pa-inv-endpoint');
+  if (!endpointEl) {
+    showAppAlert('내부 오류', '필수 DOM 요소를 찾지 못했습니다. 페이지를 새로고침해 주세요.', { type: 'danger' });
+    return;
+  }
+  let savedEndpoint = '';
+  try { savedEndpoint = localStorage.getItem('pa_inv_last_endpoint') || ''; } catch(_) {}
+  const userEndpoint = ((endpointEl.value || '').trim()) || savedEndpoint || '/order/setInvoice';
+
+  if (!_loadPaKey() || !_loadPaAuth()) {
+    showAppAlert('설정 필요', '플레이오토 API 설정이 필요합니다. [플레이오토연동] 탭에서 먼저 등록하세요.', { type: 'warning' });
+    return;
+  }
+
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="animate-pulse">출고완료 주문 조회 중...</span>'; }
+  _invSendStatus('출고완료 주문 조회 중...', 'info');
+
+  let outboundOrders = [];
+  try {
+    // 최근 90일 출고완료 상태 주문 조회
+    const today = new Date();
+    const start = new Date(today); start.setDate(today.getDate() - 90);
+    const startDate = _fmtYmd(start);
+    const endDate = _fmtYmd(today);
+    const widenStart = _paAddDays(startDate, -30);
+    const baseBody = {
+      start: 0, length: 500,
+      date_type: 'wdate', masking_yn: false, bundle_yn: false, orderby: 'wdate desc',
+      sdate: widenStart + ' 00:00:00',
+      edate: endDate + ' 23:59:59',
+      status: PA_STATUS_CANDIDATES['출고완료'] || ['출고완료'],
+    };
+    const data = await _paFetch('/orders', { method: 'POST', body: JSON.stringify(baseBody) });
+    outboundOrders = _paUnwrap(data);
+    console.log('[TRACK-SEND] 출고완료 주문', outboundOrders.length, '건 조회됨');
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+    _invSendStatus('출고완료 주문 조회 실패: ' + (e.message || e), 'error');
+    showAppAlert('조회 실패', '출고완료 주문 조회 실패\n\n' + (e.message || e), { type: 'danger' });
+    return;
+  }
+
+  if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+
+  // 송장번호가 있는 주문만
+  const targets = outboundOrders.filter(o => o.invoice_no && String(o.invoice_no).trim());
+  if (!targets.length) {
+    showAppAlert('전송 가능한 주문 없음', `최근 90일 내 출고완료 상태 주문 ${outboundOrders.length}건 중 송장번호가 있는 주문이 없습니다.`, { type: 'warning' });
+    return;
+  }
+
+  await _ensureCarriersLoaded();
+  // 각 주문의 carr_no 보정 (없으면 carrier_name → 코드 매핑)
+  targets.forEach(o => {
+    if (!o.invoice_carrier_no && o.invoice_carrier_name) {
+      const c = _findCarrierByName(o.invoice_carrier_name);
+      const cno = _carrierNoOf(c);
+      if (cno) o.invoice_carrier_no = cno;
+    }
+    // 출고완료 주문은 PA 응답의 carr_no 필드가 invoice_carrier_no 가 아닐 수 있음 — 보강
+    if (!o.invoice_carrier_no && o.carr_no) o.invoice_carrier_no = String(o.carr_no);
+    if (!o.invoice_carrier_name && o.carr_name) o.invoice_carrier_name = String(o.carr_name);
+  });
+
+  const summary = {};
+  targets.forEach(o => {
+    const nm = o.invoice_carrier_name || o.carr_name || '(미지정)';
+    summary[nm] = (summary[nm] || 0) + 1;
+  });
+  const summaryStr = Object.keys(summary).map(k => k + ' ' + summary[k] + '건').join(' / ');
+
+  showAppConfirm(
+    '플레이오토로 운송장 재전송',
+    `출고완료 상태 주문 중 송장번호가 있는 ${targets.length}건의 운송장 정보를 PA에 다시 전송합니다.\n택배사 분포: ${summaryStr}\n\n※ 주문 상태가 "운송장출력" 으로 변경됩니다 (change_complete=false).\n※ 이미 출고완료 상태인 주문은 PA 정책상 거부될 수 있으니 결과 로그를 확인해 주세요.`,
+    () => _doSendInvoicesToPlayauto(btn, targets, userEndpoint, '', summaryStr, false),
+    { type: 'info', confirmText: '운송장 전송' }
+  );
+}
+
+async function _doSendInvoicesToPlayauto(btn, targets, userEndpoint, fallbackCarrNo, summaryStr, changeComplete) {
   const orig = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="animate-pulse">전송 중...</span>'; }
   _invSendStatus('송장 전송 중: 총 ' + targets.length + '건 배치 전송', 'info');
@@ -19007,14 +19095,15 @@ async function _doSendInvoicesToPlayauto(btn, targets, userEndpoint, fallbackCar
 
   // PA 공식 스펙 (PUT /api/order/setInvoice):
   //   orders[] (필수), overwrite (default false), dupl_doubt_except_yn (default 'N'), change_complete (default false)
+  // changeComplete 인자: true → 출고완료 상태로 변경, false → 운송장출력 상태로 변경 (운송장 전송용)
   const body = {
     orders: ordersBody,
     overwrite: true,
     dupl_doubt_except_yn: 'N',
-    change_complete: true,
+    change_complete: changeComplete !== false, // 기본 true (송장 전송), 명시 false 일 때만 운송장 전송 모드
   };
   _invLog('전송 페이로드 샘플: ' + JSON.stringify(body.orders[0]));
-  _invLog('전체 body 키: ' + Object.keys(body).join(', '));
+  _invLog('전체 body 키: ' + Object.keys(body).join(', ') + ' / change_complete=' + body.change_complete);
 
   // 사용자가 지정한 endpoint 를 PUT/POST 두 가지 메서드로 먼저 시도하고,
   // 그래도 404 ("The page could not be found") 가 나오면 후보 경로들로 자동 폴백
