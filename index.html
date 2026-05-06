@@ -23711,12 +23711,15 @@ function previewEcountTransfer() {
   const countEl = document.getElementById('ecount-preview-count');
   const body = document.getElementById('ecount-preview-body');
   const saleCount     = items.indexOf('sale')     !== -1 ? rows.length : 0;
-  const purchaseRows  = rows.filter(r => !_isGplanPurchaseRow(r));
+  const purchaseAll   = rows.filter(r => !_isGplanPurchaseRow(r));
+  const purchaseExcluded = purchaseAll.filter(r => _isExcludedFromEcountPurchase(r));
+  const purchaseRows  = purchaseAll.filter(r => !_isExcludedFromEcountPurchase(r));
   const purchaseCount = items.indexOf('purchase') !== -1 ? purchaseRows.length : 0;
   const total = saleCount + purchaseCount;
   const dupMsg = dup.length > 0 ? ' · 중복 ' + dup.length + '건 제외' : '';
+  const exclMsg = purchaseExcluded.length > 0 ? ` · ${ECOUNT_PURCHASE_EXCLUDED_VENDORS.join('/')} ${purchaseExcluded.length}건 제외` : '';
   countEl.textContent =
-    '판매입력 ' + saleCount + '건, 구매입력 ' + purchaseCount + '건 (지플랜 제외)' + dupMsg + ' — 총 ' + total + '건이 전송될 예정입니다.';
+    '판매입력 ' + saleCount + '건, 구매입력 ' + purchaseCount + '건 (지플랜 제외' + exclMsg + ')' + dupMsg + ' — 총 ' + total + '건이 전송될 예정입니다.';
   if (items.length === 0) {
     body.innerHTML = '<div class="p-6 text-sm text-brand-pink">전송 항목(판매입력/구매입력)을 하나 이상 선택해 주세요.</div>';
     document.getElementById('ecount-preview').scrollIntoView({behavior:'smooth', block:'start'});
@@ -23804,6 +23807,17 @@ function _isGplanVendor(v) {
 // 구매입력 제외 대상 — 쇼핑몰(vendor) 또는 배송처(depotName)가 지플랜인 행
 function _isGplanPurchaseRow(r) {
   return _isGplanVendor(r.vendor) || _isGplanVendor(r.depotName);
+}
+
+// 이카운트 구매입력에서 제외할 거래처 (사용자 요청 — 거래처 미등록으로 오류 발생)
+const ECOUNT_PURCHASE_EXCLUDED_VENDORS = ['머레이', '셀파이', '베이식스'];
+function _isExcludedFromEcountPurchase(r) {
+  const vendor = String(r.vendor || '').replace(/\s+/g, '');
+  const depot  = String(r.depotName || '').replace(/\s+/g, '');
+  return ECOUNT_PURCHASE_EXCLUDED_VENDORS.some(name => {
+    const k = name.replace(/\s+/g, '');
+    return vendor === k || vendor.includes(k) || depot === k || depot.includes(k);
+  });
 }
 // 제주도 추가 배송비 — 주소에 "제주"가 포함되면 구매입력에 추가 라인으로 넣음
 const JEJU_EXTRA_SHIP_CODE = 'SK0003';
@@ -24369,10 +24383,9 @@ async function sendToEcount() {
         saleOk += r.ok;
         const chunkFail = (typeof r.fail === 'number' && r.fail > 0) ? r.fail : Math.max(0, chunkList.length - r.ok);
         saleFail += chunkFail;
-        // 한 청크라도 실패하면 (Status 500 등) 더 보내지 않음 — 시간당 연속 오류 제한 회피
-        if (chunkFail > 0 && r.ok === 0) {
-          console.warn(`[이카운트→판매] 청크 ${ci+1} 전체 실패 → 후속 청크 ${chunks.length - ci - 1}개 전송 중단`);
-          // 미전송 청크는 fail 로 계상
+        // ⚠ 1건이라도 실패하면 후속 청크 전송 중단 (사용자 정책 — "오류 1건이라도 있으면 다른 값도 전송 안 됨")
+        if (chunkFail > 0) {
+          console.warn(`[이카운트→판매] 청크 ${ci+1} 에 ${chunkFail}건 실패 발견 → 후속 청크 ${chunks.length - ci - 1}개 전송 중단`);
           for (let j = ci + 1; j < chunks.length; j++) saleFail += chunks[j].length;
           break;
         }
@@ -24380,7 +24393,19 @@ async function sendToEcount() {
       }
     }
     if (items.indexOf('purchase') !== -1) {
-      let purchaseRows = rows.filter(r => !_isGplanPurchaseRow(r));
+      // 1차 필터: 지플랜 + 미등록 거래처(머레이/셀파이/베이식스) 제외
+      const allCandidates = rows.filter(r => !_isGplanPurchaseRow(r));
+      const excludedByVendor = allCandidates.filter(r => _isExcludedFromEcountPurchase(r));
+      let purchaseRows = allCandidates.filter(r => !_isExcludedFromEcountPurchase(r));
+      if (excludedByVendor.length) {
+        console.log(`[이카운트→구매] 거래처 제외(${ECOUNT_PURCHASE_EXCLUDED_VENDORS.join('/')}): ${excludedByVendor.length}건 — 구매입력에서 제외`);
+        const byVendor = {};
+        excludedByVendor.forEach(r => {
+          const v = r.vendor || r.depotName || '(미지정)';
+          byVendor[v] = (byVendor[v] || 0) + 1;
+        });
+        logs.push({ type:'구매입력 안내', resp:null, errors:[{ line:'-', msg:`거래처 미등록 정책으로 ${excludedByVendor.length}건 자동 제외 (${Object.entries(byVendor).map(([k,v]) => k+':'+v+'건').join(', ')})` }] });
+      }
       const purchaseCandidateCount = purchaseRows.length;
       // SKU별 택배발송비 매핑 검증 — 미매핑 SKU는 구매입력에서 제외 (완료 모달에 통합 표시)
       const missingShipCostRows = purchaseRows.filter(r => !(_resolveShipCostBySku(r.itemCode) > 0));
@@ -24427,8 +24452,9 @@ async function sendToEcount() {
           purOk += r.ok;
           const chunkFail = (typeof r.fail === 'number' && r.fail > 0) ? r.fail : Math.max(0, chunkList.length - r.ok);
           purFail += chunkFail;
-          if (chunkFail > 0 && r.ok === 0) {
-            console.warn(`[이카운트→구매] 청크 ${ci+1} 전체 실패 → 후속 청크 ${chunks.length - ci - 1}개 전송 중단`);
+          // ⚠ 1건이라도 실패하면 후속 청크 전송 중단 (사용자 정책)
+          if (chunkFail > 0) {
+            console.warn(`[이카운트→구매] 청크 ${ci+1} 에 ${chunkFail}건 실패 발견 → 후속 청크 ${chunks.length - ci - 1}개 전송 중단`);
             for (let j = ci + 1; j < chunks.length; j++) purFail += chunks[j].length;
             break;
           }
