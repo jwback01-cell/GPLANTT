@@ -3758,19 +3758,47 @@ tailwind.config = {
               <div class="font-bold text-[15px]">업로드된 광고비 상세</div>
               <div class="text-xs text-brand-gray mt-1">엑셀 / API로 업로드된 모든 광고비 항목 (날짜·캠페인 단위)</div>
             </div>
-            <div class="flex gap-2 items-center">
-              <select id="ad-detail-site-filter" class="bg-brand-bg border border-brand-border rounded-lg px-3 py-1.5 text-sm" onchange="renderAdDetail()">
+            <div class="flex items-center gap-3 flex-wrap">
+              <div class="flex items-center gap-1.5 bg-brand-bg rounded-full px-1 py-1 border border-brand-border">
+                <input id="ad-detail-date-start" type="date" onchange="renderAdDetail()" class="bg-white rounded-full px-3 py-1.5 text-xs font-semibold border border-brand-border outline-none focus:border-brand-black">
+                <span class="text-xs text-brand-gray">~</span>
+                <input id="ad-detail-date-end" type="date" onchange="renderAdDetail()" class="bg-white rounded-full px-3 py-1.5 text-xs font-semibold border border-brand-border outline-none focus:border-brand-black">
+              </div>
+              <div class="flex gap-1">
+                <button type="button" onclick="setAdDetailDate('today')" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">오늘</button>
+                <button type="button" onclick="setAdDetailDate('yesterday')" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">어제</button>
+                <button type="button" onclick="setAdDetailDate('7days')" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">7일</button>
+                <button type="button" onclick="setAdDetailDate('month')" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">이번 달</button>
+                <button type="button" onclick="setAdDetailDate('all')" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">전체</button>
+              </div>
+              <div class="relative">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-brand-gray pointer-events-none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input id="ad-detail-search" type="text" placeholder="캠페인·사이트·출처 검색" oninput="renderAdDetail()" class="pl-9 pr-3 py-1.5 rounded-full border border-brand-border bg-brand-bg text-sm font-medium outline-none focus:border-brand-black w-56">
+              </div>
+              <select id="ad-detail-site-filter" class="bg-brand-bg border border-brand-border rounded-full px-3 py-1.5 text-sm" onchange="renderAdDetail()">
                 <option value="">전체 사이트</option>
               </select>
-              <button onclick="exportAdCosts()" class="px-4 py-1.5 rounded-full bg-white border border-brand-border text-sm font-bold hover:bg-brand-bg">📥 백업 다운로드</button>
-              <button onclick="importAdCosts()" class="px-4 py-1.5 rounded-full bg-white border border-brand-border text-sm font-bold hover:bg-brand-bg">📤 백업 복원</button>
+              <button onclick="exportAdCosts()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg">📥 백업 다운로드</button>
+              <button onclick="importAdCosts()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg">📤 백업 복원</button>
+              <button id="ad-detail-delete-btn" onclick="deleteSelectedAdDetail()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-pink hover:bg-brand-bg">선택 삭제 <span id="ad-detail-sel-count" class="ml-1 text-xs text-brand-gray">(0)</span></button>
             </div>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead id="ad-detail-thead"></thead>
               <tbody id="ad-detail-tbody"></tbody>
+              <tfoot id="ad-detail-tfoot"></tfoot>
             </table>
+          </div>
+          <div id="ad-detail-pager" class="flex items-center justify-between gap-3 px-6 py-4 border-t border-brand-border flex-wrap">
+            <div class="flex items-center gap-2 text-sm">
+              <span class="text-brand-gray font-semibold">페이지당</span>
+              <button data-size="100"  onclick="setAdDetailPageSize(100)"  class="ad-detail-size px-3 py-1 rounded-full border border-brand-border text-xs font-bold">100</button>
+              <button data-size="500"  onclick="setAdDetailPageSize(500)"  class="ad-detail-size px-3 py-1 rounded-full border border-brand-border text-xs font-bold">500</button>
+              <button data-size="1000" onclick="setAdDetailPageSize(1000)" class="ad-detail-size px-3 py-1 rounded-full border border-brand-border text-xs font-bold">1000</button>
+              <span id="ad-detail-range" class="text-brand-gray ml-2 text-xs"></span>
+            </div>
+            <div id="ad-detail-pages" class="flex items-center gap-1 flex-wrap"></div>
           </div>
         </div>
 
@@ -16710,49 +16738,186 @@ function renderAdSummary() {
 }
 
 // 상세 테이블 — 사이트 필터 + 행별 삭제
+// 페이지/페이지크기 상태
+let _adDetailPage = 1;
+let _adDetailPageSize = 100;
+function setAdDetailPageSize(n) { _adDetailPageSize = n; _adDetailPage = 1; renderAdDetail(); }
+function setAdDetailPage(n)     { _adDetailPage = n; renderAdDetail(); }
+function setAdDetailDate(mode) {
+  const startEl = document.getElementById('ad-detail-date-start');
+  const endEl   = document.getElementById('ad-detail-date-end');
+  if (!startEl || !endEl) return;
+  const fmt = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  const today = new Date();
+  if (mode === 'all')        { startEl.value = ''; endEl.value = ''; }
+  else if (mode === 'today') { const v = fmt(today); startEl.value = v; endEl.value = v; }
+  else if (mode === 'yesterday') { const v = fmt(new Date(today.getTime() - 86400000)); startEl.value = v; endEl.value = v; }
+  else if (mode === '7days') { startEl.value = fmt(new Date(today.getTime() - 6 * 86400000)); endEl.value = fmt(today); }
+  else if (mode === 'month') { startEl.value = fmt(new Date(today.getFullYear(), today.getMonth(), 1)); endEl.value = fmt(today); }
+  _adDetailPage = 1;
+  renderAdDetail();
+}
+
+function toggleAllAdDetail(cb) {
+  document.querySelectorAll('#ad-detail-tbody .ad-detail-row-cb').forEach(c => c.checked = cb.checked);
+  updateAdDetailSelCount();
+}
+function updateAdDetailSelCount() {
+  const cbs = document.querySelectorAll('#ad-detail-tbody .ad-detail-row-cb');
+  const sel = [...cbs].filter(c => c.checked).length;
+  const elCnt = document.getElementById('ad-detail-sel-count');
+  if (elCnt) elCnt.textContent = `(${sel})`;
+  const all = document.getElementById('ad-detail-select-all');
+  if (all) all.checked = cbs.length > 0 && sel === cbs.length;
+}
+function deleteSelectedAdDetail() {
+  const checked = [...document.querySelectorAll('#ad-detail-tbody .ad-detail-row-cb:checked')];
+  if (checked.length === 0) {
+    showAppAlert('선택 없음', '삭제할 항목을 체크해 주세요.', 'info');
+    return;
+  }
+  if (!confirm(`선택한 ${checked.length}건의 광고비 항목을 삭제할까요?`)) return;
+  const keys = new Set(checked.map(cb => cb.dataset.key));
+  const remain = _loadAdCosts().filter(r => !keys.has(r._key));
+  _saveAdCosts(remain);
+  showAppAlert('삭제 완료', `${checked.length}건 삭제됨.`, 'success');
+  if (typeof renderAdSiteCards === 'function') renderAdSiteCards();
+  if (typeof renderAdSummary === 'function') renderAdSummary();
+  renderAdDetail();
+}
+
 function renderAdDetail() {
   const theadEl = document.getElementById('ad-detail-thead');
   const tbodyEl = document.getElementById('ad-detail-tbody');
+  const tfootEl = document.getElementById('ad-detail-tfoot');
   const filterEl = document.getElementById('ad-detail-site-filter');
   if (!tbodyEl || !theadEl) return;
 
-  // 필터 옵션 — 9개 사이트 한 번만 채우기
-  if (filterEl && filterEl.options.length <= 1) {
+  // 필터 옵션 — 사이트 드롭다운 한 번만 채우기 (옵션이 비어있거나 누락되면 재구성)
+  if (filterEl) {
+    const have = new Set([...filterEl.options].map(o => o.value));
     AD_SITES.forEach(s => {
-      const o = document.createElement('option');
-      o.value = s.id; o.textContent = s.label;
-      filterEl.appendChild(o);
+      if (!have.has(s.id)) {
+        const o = document.createElement('option');
+        o.value = s.id; o.textContent = s.label;
+        filterEl.appendChild(o);
+      }
     });
   }
   const filterSite = filterEl?.value || '';
+  const startDate  = (document.getElementById('ad-detail-date-start')?.value || '').trim();
+  const endDate    = (document.getElementById('ad-detail-date-end')?.value   || '').trim();
+  const q          = (document.getElementById('ad-detail-search')?.value    || '').trim().toLowerCase();
+
   let rows = _loadAdCosts();
   if (filterSite) rows = rows.filter(r => r.site === filterSite);
+  if (startDate) rows = rows.filter(r => String(r.date || '').slice(0, 10) >= startDate);
+  if (endDate)   rows = rows.filter(r => String(r.date || '').slice(0, 10) <= endDate);
+  if (q) {
+    rows = rows.filter(r => {
+      const fields = [r.site, r.campaign, r.source, r.fileName].map(v => String(v || '').toLowerCase());
+      return fields.some(f => f.includes(q));
+    });
+  }
   rows.sort((a, b) => String(b.uploadedAt || '').localeCompare(String(a.uploadedAt || ''))
     || String(b.date || '').localeCompare(String(a.date || '')));
 
-  theadEl.innerHTML = `<tr class="text-brand-gray text-xs border-b border-brand-border">
-    <th class="p-3 text-left font-semibold pl-5">사이트</th>
-    <th class="p-3 text-left font-semibold">날짜</th>
-    <th class="p-3 text-left font-semibold">캠페인/광고명</th>
-    <th class="p-3 text-right font-semibold">광고비</th>
-    <th class="p-3 text-left font-semibold">출처</th>
-    <th class="p-3 text-left font-semibold">업로드</th>
-    <th class="p-3 text-center font-semibold pr-5">삭제</th>
+  // 헤더 — 체크박스 + 정렬 가능한 컬럼
+  theadEl.innerHTML = `<tr class="bg-brand-bg text-brand-gray">
+    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap"><input id="ad-detail-select-all" type="checkbox" onchange="toggleAllAdDetail(this)"></th>
+    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">사이트</th>
+    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">날짜</th>
+    <th class="text-left px-4 py-3 font-bold text-xs">캠페인/광고명</th>
+    <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap">광고비</th>
+    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">출처</th>
+    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">업로드</th>
+    <th class="text-center px-4 py-3 font-bold text-xs whitespace-nowrap">삭제</th>
   </tr>`;
 
-  if (!rows.length) {
-    tbodyEl.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-brand-gray text-sm">업로드된 광고비가 없습니다.</td></tr>';
-    return;
+  // 합계 (필터 적용된 전체 기준)
+  const totalAmount = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  const totalCount  = rows.length;
+
+  // 페이지네이션
+  const pageSize = _adDetailPageSize > 0 ? _adDetailPageSize : 100;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  if (_adDetailPage > totalPages) _adDetailPage = 1;
+  const startIdx = (_adDetailPage - 1) * pageSize;
+  const pageRows = rows.slice(startIdx, startIdx + pageSize);
+
+  if (!totalCount) {
+    tbodyEl.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-brand-gray text-sm">조건에 맞는 광고비 데이터가 없습니다.</td></tr>';
+    if (tfootEl) tfootEl.innerHTML = '';
+  } else {
+    tbodyEl.innerHTML = pageRows.map(r => `<tr class="border-b border-brand-border hover:bg-brand-bg/40">
+      <td class="px-4 py-3 text-xs"><input type="checkbox" class="ad-detail-row-cb" data-key="${_escapeHtml(r._key || '')}" onchange="updateAdDetailSelCount()"></td>
+      <td class="px-4 py-3 text-xs font-semibold whitespace-nowrap">${_escapeHtml(r.site)}</td>
+      <td class="px-4 py-3 text-xs whitespace-nowrap">${_escapeHtml(r.date)}</td>
+      <td class="px-4 py-3 text-xs truncate max-w-[360px]" title="${_escapeHtml(r.campaign || '')}">${_escapeHtml(r.campaign || '-')}</td>
+      <td class="px-4 py-3 text-right text-xs font-semibold tabular-nums">${Number(r.amount).toLocaleString('ko-KR')}원</td>
+      <td class="px-4 py-3 text-xs whitespace-nowrap">${_escapeHtml(r.source || '-')}</td>
+      <td class="px-4 py-3 text-xs text-brand-gray whitespace-nowrap" title="${_escapeHtml(r.fileName || '')}">${String(r.uploadedAt || '').slice(0, 16).replace('T',' ')}</td>
+      <td class="px-4 py-3 text-xs text-center"><button onclick="deleteAdCost('${r._key || ''}')" class="text-brand-pink hover:underline font-bold">삭제</button></td>
+    </tr>`).join('');
+
+    if (tfootEl) {
+      tfootEl.innerHTML = `<tr class="bg-brand-bg border-t-2 border-brand-black font-bold text-sm">
+        <td class="px-4 py-3"></td>
+        <td class="px-4 py-3 text-xs text-brand-gray whitespace-nowrap" colspan="3">합계 (${totalCount.toLocaleString('ko-KR')}건)</td>
+        <td class="px-4 py-3 text-right tabular-nums text-brand-pink">${totalAmount.toLocaleString('ko-KR')}원</td>
+        <td colspan="3"></td>
+      </tr>`;
+    }
   }
-  tbodyEl.innerHTML = rows.map(r => `<tr class="border-b border-brand-border hover:bg-brand-bg/40">
-    <td class="p-3 text-xs pl-5 font-semibold">${_escapeHtml(r.site)}</td>
-    <td class="p-3 text-xs">${_escapeHtml(r.date)}</td>
-    <td class="p-3 text-xs truncate max-w-[260px]" title="${_escapeHtml(r.campaign || '')}">${_escapeHtml(r.campaign || '-')}</td>
-    <td class="p-3 text-right text-xs font-semibold tabular-nums">${Number(r.amount).toLocaleString('ko-KR')}원</td>
-    <td class="p-3 text-xs">${_escapeHtml(r.source || '-')}</td>
-    <td class="p-3 text-xs text-brand-gray" title="${_escapeHtml(r.fileName || '')}">${String(r.uploadedAt || '').slice(0, 16).replace('T',' ')}</td>
-    <td class="p-3 text-xs text-center pr-5"><button onclick="deleteAdCost('${r._key || ''}')" class="text-brand-pink hover:underline font-bold">삭제</button></td>
-  </tr>`).join('');
+
+  // 페이지 크기 active state
+  document.querySelectorAll('.ad-detail-size').forEach(b => {
+    const size = Number(b.dataset.size);
+    if (size === pageSize) {
+      b.classList.add('bg-brand-black','text-white');
+      b.classList.remove('bg-white','text-brand-black');
+    } else {
+      b.classList.remove('bg-brand-black','text-white');
+      b.classList.add('bg-white');
+    }
+  });
+
+  // 페이지 번호 렌더 (... 압축, 1/2/3 ... 마지막)
+  const pagesEl = document.getElementById('ad-detail-pages');
+  const rangeEl = document.getElementById('ad-detail-range');
+  if (rangeEl) {
+    const from = totalCount === 0 ? 0 : startIdx + 1;
+    const to = Math.min(startIdx + pageRows.length, totalCount);
+    rangeEl.textContent = totalCount === 0 ? '' : `${from.toLocaleString('ko-KR')}-${to.toLocaleString('ko-KR')} / 총 ${totalCount.toLocaleString('ko-KR')}건`;
+  }
+  if (pagesEl) {
+    if (totalPages <= 1) {
+      pagesEl.innerHTML = '';
+    } else {
+      const cur = _adDetailPage;
+      const btn = (label, p, active = false, disabled = false) =>
+        `<button ${disabled ? 'disabled' : ''} onclick="${disabled ? '' : `setAdDetailPage(${p})`}" class="min-w-[32px] h-8 px-2 rounded-full text-xs font-bold border ${active ? 'bg-brand-black text-white border-brand-black' : 'bg-white border-brand-border hover:bg-brand-bg'} ${disabled ? 'opacity-40 cursor-not-allowed' : ''}">${label}</button>`;
+      let html = '';
+      html += btn('‹', Math.max(1, cur - 1), false, cur === 1);
+      const winSize = 5;
+      let s = Math.max(1, cur - 2);
+      let e = Math.min(totalPages, s + winSize - 1);
+      s = Math.max(1, e - winSize + 1);
+      if (s > 1) {
+        html += btn(1, 1, cur === 1);
+        if (s > 2) html += `<span class="px-1 text-brand-gray text-xs">…</span>`;
+      }
+      for (let p = s; p <= e; p++) html += btn(p, p, cur === p);
+      if (e < totalPages) {
+        if (e < totalPages - 1) html += `<span class="px-1 text-brand-gray text-xs">…</span>`;
+        html += btn(totalPages, totalPages, cur === totalPages);
+      }
+      html += btn('›', Math.min(totalPages, cur + 1), false, cur === totalPages);
+      pagesEl.innerHTML = html;
+    }
+  }
+
+  updateAdDetailSelCount();
 }
 
 function deleteAdCost(key) {
