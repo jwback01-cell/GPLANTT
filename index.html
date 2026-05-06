@@ -933,6 +933,7 @@ tailwind.config = {
       </section>
       <!-- Tabs -->
       <div id="ledger-tabs" class="border-b border-brand-border flex gap-5 md:gap-7 px-1 md:px-2 overflow-x-auto shrink-0" style="padding-bottom:1px;">        <button class="tab-btn active shrink-0" data-tab="monthly"  onclick="switchLedgerTab('monthly')">월별 요약</button>
+        <button class="tab-btn shrink-0"         data-tab="daily"    onclick="switchLedgerTab('daily')">일별 요약</button>
         <button class="tab-btn shrink-0"         data-tab="period"   onclick="switchLedgerTab('period')">기간별 매출</button>
         <button class="tab-btn shrink-0"         data-tab="product"  onclick="switchLedgerTab('product')">상품별</button>
         <button class="tab-btn shrink-0"         data-tab="supplier" onclick="switchLedgerTab('supplier')">매입처별</button>
@@ -1025,6 +1026,81 @@ tailwind.config = {
         </div>
       </section>
       </div><!-- /ledger-panel-monthly -->
+
+      <!-- ── Panel: 일별 요약 ── -->
+      <div id="ledger-panel-daily" class="flex flex-col gap-6 md:gap-8" style="display:none;">
+        <!-- 날짜 범위 컨트롤 -->
+        <div class="bg-white rounded-3xl panel p-5 md:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 flex-wrap">
+          <div class="flex items-center gap-3 flex-wrap">
+            <span class="text-sm font-bold text-brand-gray">기간:</span>
+            <input id="daily-start" type="date" onchange="renderDailyTab()" class="bg-brand-bg rounded-full px-3 py-1.5 text-sm font-semibold border border-brand-border outline-none focus:border-brand-black">
+            <span class="text-brand-gray">~</span>
+            <input id="daily-end" type="date" onchange="renderDailyTab()" class="bg-brand-bg rounded-full px-3 py-1.5 text-sm font-semibold border border-brand-border outline-none focus:border-brand-black">
+            <button type="button" onclick="setDailyRange('today')" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">오늘</button>
+            <button type="button" onclick="setDailyRange('7days')" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">최근 7일</button>
+            <button type="button" onclick="setDailyRange('30days')" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">최근 30일</button>
+            <button type="button" onclick="setDailyRange('thismonth')" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">이번 달</button>
+          </div>
+          <span id="daily-range-label" class="text-brand-gray text-sm font-semibold"></span>
+        </div>
+
+        <!-- KPI 카드 -->
+        <div id="daily-kpi" class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4"></div>
+
+        <!-- 바 차트 -->
+        <div class="bg-white p-6 md:p-8 rounded-4xl panel flex flex-col" style="min-height:300px;">
+          <div class="flex items-center justify-between mb-6 md:mb-8 shrink-0 flex-wrap gap-3">
+            <div class="flex items-center gap-3">
+              <div class="w-2 h-6 bg-brand-black rounded-full"></div>
+              <h2 class="text-[1.1rem] md:text-[1.25rem] font-bold">일별 매출/순이익 추이</h2>
+            </div>
+            <div class="flex items-center gap-4 text-xs font-bold text-brand-gray">
+              <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded" style="background:#D1D1D6"></span>매출</span>
+              <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded bg-brand-blue"></span>순이익</span>
+            </div>
+          </div>
+          <div class="flex-1 flex flex-col justify-end relative">
+            <div class="absolute inset-0 flex flex-col justify-between pointer-events-none" style="padding-bottom:44px;">
+              <div class="border-t border-dashed border-brand-border w-full"></div>
+              <div class="border-t border-dashed border-brand-border w-full"></div>
+              <div class="border-t border-dashed border-brand-border w-full"></div>
+              <div class="border-t border-brand-border w-full"></div>
+            </div>
+            <div id="daily-bars" class="flex items-end gap-1 md:gap-1.5 pb-3 h-[180px] md:h-[220px] z-10 relative overflow-x-auto"></div>
+            <div id="daily-labels" class="flex text-brand-gray text-[0.7rem] font-semibold mt-3 overflow-x-auto"></div>
+          </div>
+        </div>
+
+        <!-- 일별 비교 (전일 대비) -->
+        <div class="bg-white rounded-4xl panel overflow-hidden">
+          <div class="px-6 md:px-8 py-5 border-b border-brand-border flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-3">
+              <div class="w-2 h-6 bg-brand-black rounded-full"></div>
+              <h2 class="text-[1.1rem] md:text-[1.25rem] font-bold">일별 상세 비교</h2>
+            </div>
+            <button type="button" onclick="exportDailyExcel()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">엑셀 내보내기</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="bg-brand-bg text-brand-gray">
+                  <th class="sortable text-left px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',0,'text')">날짜<span class="sort-icon"></span></th>
+                  <th class="sortable text-left px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',1,'text')">요일<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',2,'num')">주문 건수<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',3,'num')">총 매출<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',4,'num')">매입 원가<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',5,'num')">택배비용<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',6,'num')">순이익<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',7,'num')">수익률<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',8,'num')">전일대비<span class="sort-icon"></span></th>
+                </tr>
+              </thead>
+              <tbody id="daily-tbody"></tbody>
+              <tfoot id="daily-tfoot" class="bg-brand-bg font-bold"></tfoot>
+            </table>
+          </div>
+        </div>
+      </div><!-- /ledger-panel-daily -->
 
       <!-- ── Panel: 기간별 매출 ── -->
       <div id="ledger-panel-period" class="flex flex-col gap-6 md:gap-8" style="display:none;">
@@ -13796,7 +13872,7 @@ function sortLedgerEntryByCol(colIdx, type) {
   renderLedgerEntries();
 }
 function switchLedgerTab(tab) {
-  ['monthly','period','product','supplier','channel','entry','analysis'].forEach(p => {
+  ['monthly','daily','period','product','supplier','channel','entry','analysis'].forEach(p => {
     const el = document.getElementById('ledger-panel-' + p);
     if (el) el.style.display = (p === tab) ? '' : 'none';
   });
@@ -13806,6 +13882,7 @@ function switchLedgerTab(tab) {
       btn.classList.toggle('active', btn.dataset.tab === tab);
     });
   }
+  if (tab === 'daily')    renderDailyTab();
   if (tab === 'period')   renderPeriodChart();
   if (tab === 'product')  renderProductTab(_detailPeriod.product);
   if (tab === 'supplier') renderSupplierTab(_detailPeriod.supplier);
@@ -13827,6 +13904,202 @@ function setPeriodType(type) {
     }
   });
   renderPeriodChart();
+}
+
+// ── 일별 요약 탭 ─────────────────────────────────
+// 업로드 데이터에서 일자별로 집계
+function _buildDailyDataFromUploadData(startDate, endDate) {
+  try {
+    if (typeof _loadUploadData !== 'function') return [];
+    const data = _loadUploadData();
+    const dayMap = {};
+    data.forEach(r => {
+      const d = String(r.date || '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+      if (startDate && d < startDate) return;
+      if (endDate && d > endDate) return;
+      if (!dayMap[d]) dayMap[d] = { date: d, count: 0, sales: 0, supply: 0, cost: 0, shipCost: 0, profit: 0, _hasProfit: false };
+      const m = dayMap[d];
+      m.count += 1;
+      const supply = Number((r.supply ?? r.cost) || 0);
+      m.supply += supply;
+      m.sales += supply; // 공급가를 매출로 간주 (업로드 데이터의 supply 가 실제 매출)
+      if (r.cost != null) m.cost += Number(r.cost) || 0;
+      m.shipCost += Number(r.shipCost) || 0;
+      if (r.profit != null && r.profit !== '') {
+        m.profit += Number(r.profit) || 0;
+        m._hasProfit = true;
+      }
+    });
+    return Object.values(dayMap).sort((a, b) => a.date.localeCompare(b.date));
+  } catch (e) {
+    console.warn('[daily] build error:', e);
+    return [];
+  }
+}
+
+function setDailyRange(type) {
+  const today = new Date();
+  const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const startEl = document.getElementById('daily-start');
+  const endEl = document.getElementById('daily-end');
+  if (!startEl || !endEl) return;
+  let start = new Date(today), end = new Date(today);
+  if (type === 'today') { /* same date */ }
+  else if (type === '7days') { start.setDate(today.getDate() - 6); }
+  else if (type === '30days') { start.setDate(today.getDate() - 29); }
+  else if (type === 'thismonth') { start = new Date(today.getFullYear(), today.getMonth(), 1); }
+  startEl.value = fmt(start);
+  endEl.value = fmt(end);
+  renderDailyTab();
+}
+
+const DOW_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
+
+function renderDailyTab() {
+  const startEl = document.getElementById('daily-start');
+  const endEl = document.getElementById('daily-end');
+  // 기본값 설정 (최초 진입 시)
+  if (startEl && !startEl.value) {
+    const today = new Date();
+    const start = new Date(today); start.setDate(today.getDate() - 29);
+    const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    startEl.value = fmt(start);
+    endEl.value = fmt(today);
+  }
+  const startDate = startEl?.value || '';
+  const endDate = endEl?.value || '';
+  const labelEl = document.getElementById('daily-range-label');
+  if (labelEl) labelEl.textContent = startDate && endDate ? `${startDate} ~ ${endDate}` : '데이터 없음';
+
+  const days = _buildDailyDataFromUploadData(startDate, endDate);
+  const fmtN = n => Number(n || 0).toLocaleString('ko-KR');
+
+  // KPI 집계
+  const kpiSum = days.reduce((a, d) => {
+    a.sales += d.sales; a.cost += d.cost; a.shipCost += d.shipCost;
+    if (d._hasProfit) { a.profit += d.profit; a.profitDays++; }
+    a.count += d.count;
+    return a;
+  }, { sales: 0, cost: 0, shipCost: 0, profit: 0, profitDays: 0, count: 0 });
+  const dayCount = days.length || 1;
+  const avgSales = Math.round(kpiSum.sales / dayCount);
+  const avgProfit = kpiSum.profitDays ? Math.round(kpiSum.profit / kpiSum.profitDays) : 0;
+  const profitRate = kpiSum.sales > 0 && kpiSum.profitDays ? ((kpiSum.profit / kpiSum.sales) * 100).toFixed(1) : '-';
+
+  const kpi = document.getElementById('daily-kpi');
+  if (kpi) {
+    kpi.innerHTML = [
+      { label: `누적 매출 (${days.length}일)`, value: fmtN(kpiSum.sales) + '원', accent: '' },
+      { label: '누적 순이익', value: fmtN(kpiSum.profit) + '원', accent: kpiSum.profit >= 0 ? 'text-brand-green' : 'text-brand-pink' },
+      { label: '일평균 매출', value: fmtN(avgSales) + '원', accent: 'text-brand-blue' },
+      { label: '평균 수익률', value: (profitRate === '-' ? '-' : profitRate + '%'), accent: 'text-brand-orange' },
+    ].map(k => `
+      <div class="bg-white p-5 rounded-3xl panel">
+        <div class="text-brand-gray text-xs font-bold mb-2 tracking-wide">${k.label}</div>
+        <div class="text-lg md:text-xl font-bold tracking-tight ${k.accent}">${k.value}</div>
+      </div>`).join('');
+  }
+
+  // 바 차트 — 매출(회색)과 순이익(파랑)을 같은 칼럼 안에 겹쳐 표시
+  const barsEl = document.getElementById('daily-bars');
+  const labelsEl = document.getElementById('daily-labels');
+  if (barsEl && labelsEl) {
+    if (!days.length) {
+      barsEl.innerHTML = '<div class="text-brand-gray text-sm m-auto">선택한 기간에 데이터 없음</div>';
+      labelsEl.innerHTML = '';
+    } else {
+      const maxV = Math.max(1, ...days.map(d => Math.max(d.sales, Math.abs(d.profit || 0))));
+      const minBarWidth = 22;
+      barsEl.innerHTML = days.map(d => {
+        const salesH = Math.round((d.sales / maxV) * 100);
+        const profitH = Math.round((Math.max(0, d.profit) / maxV) * 100);
+        return `
+          <div class="flex flex-col items-center justify-end relative" style="min-width:${minBarWidth}px;height:100%;">
+            <div class="absolute bottom-0 w-full rounded-t" style="background:#D1D1D6;height:${salesH}%;" title="${d.date} 매출 ${fmtN(d.sales)}원"></div>
+            <div class="absolute bottom-0 rounded-t" style="background:#2196F3;width:60%;left:20%;height:${profitH}%;opacity:0.85;" title="${d.date} 순이익 ${fmtN(d.profit)}원"></div>
+          </div>`;
+      }).join('');
+      labelsEl.innerHTML = days.map(d => {
+        const dt = new Date(d.date + 'T00:00:00');
+        const md = `${dt.getMonth()+1}/${dt.getDate()}`;
+        return `<div class="text-center" style="min-width:${minBarWidth}px;">${md}</div>`;
+      }).join('');
+    }
+  }
+
+  // 테이블
+  const tbody = document.getElementById('daily-tbody');
+  const tfoot = document.getElementById('daily-tfoot');
+  if (tbody) {
+    if (!days.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="px-6 py-8 text-center text-brand-gray">선택한 기간에 데이터 없음</td></tr>';
+      if (tfoot) tfoot.innerHTML = '';
+    } else {
+      tbody.innerHTML = days.map((d, i) => {
+        const dt = new Date(d.date + 'T00:00:00');
+        const dow = DOW_NAMES[dt.getDay()];
+        const dowCls = dt.getDay() === 0 ? 'text-brand-pink' : dt.getDay() === 6 ? 'text-brand-blue' : '';
+        const profitCls = d._hasProfit ? (d.profit >= 0 ? 'text-brand-green' : 'text-brand-pink') : 'text-brand-gray';
+        const rate = d.sales > 0 && d._hasProfit ? ((d.profit / d.sales) * 100).toFixed(1) + '%' : '-';
+        // 전일 대비 매출 차이
+        const prev = i > 0 ? days[i-1] : null;
+        let diffHtml = '<span class="text-brand-gray">-</span>';
+        if (prev && prev.sales > 0) {
+          const diff = d.sales - prev.sales;
+          const pct = ((diff / prev.sales) * 100).toFixed(1);
+          const sign = diff > 0 ? '+' : '';
+          const cls = diff > 0 ? 'text-brand-green' : diff < 0 ? 'text-brand-pink' : '';
+          diffHtml = `<span class="${cls} font-semibold">${sign}${fmtN(diff)} <span class="text-xs">(${sign}${pct}%)</span></span>`;
+        }
+        return `<tr class="border-t border-brand-border hover:bg-brand-bg/30">
+          <td class="px-6 py-3 font-semibold whitespace-nowrap">${d.date}</td>
+          <td class="px-4 py-3 ${dowCls} font-bold whitespace-nowrap">${dow}</td>
+          <td class="px-4 py-3 text-right whitespace-nowrap">${fmtN(d.count)}건</td>
+          <td class="px-4 py-3 text-right whitespace-nowrap font-semibold">${fmtN(d.sales)}</td>
+          <td class="px-4 py-3 text-right whitespace-nowrap">${fmtN(d.cost)}</td>
+          <td class="px-4 py-3 text-right whitespace-nowrap">${fmtN(d.shipCost)}</td>
+          <td class="px-4 py-3 text-right whitespace-nowrap ${profitCls} font-bold">${d._hasProfit ? fmtN(d.profit) : '-'}</td>
+          <td class="px-4 py-3 text-right whitespace-nowrap">${rate}</td>
+          <td class="px-6 py-3 text-right whitespace-nowrap">${diffHtml}</td>
+        </tr>`;
+      }).join('');
+      if (tfoot) {
+        tfoot.innerHTML = `<tr class="border-t-2 border-brand-black">
+          <td class="px-6 py-3" colspan="2">합계 (${days.length}일)</td>
+          <td class="px-4 py-3 text-right">${fmtN(kpiSum.count)}건</td>
+          <td class="px-4 py-3 text-right">${fmtN(kpiSum.sales)}</td>
+          <td class="px-4 py-3 text-right">${fmtN(kpiSum.cost)}</td>
+          <td class="px-4 py-3 text-right">${fmtN(kpiSum.shipCost)}</td>
+          <td class="px-4 py-3 text-right ${kpiSum.profit >= 0 ? 'text-brand-green' : 'text-brand-pink'}">${fmtN(kpiSum.profit)}</td>
+          <td class="px-4 py-3 text-right">${profitRate === '-' ? '-' : profitRate + '%'}</td>
+          <td class="px-6"></td>
+        </tr>`;
+      }
+    }
+  }
+}
+
+function exportDailyExcel() {
+  const startEl = document.getElementById('daily-start');
+  const endEl = document.getElementById('daily-end');
+  const startDate = startEl?.value || '';
+  const endDate = endEl?.value || '';
+  const days = _buildDailyDataFromUploadData(startDate, endDate);
+  if (!days.length) { showAppAlert('내보낼 데이터 없음', '선택한 기간에 데이터가 없습니다.', { type: 'warning' }); return; }
+  const data = [
+    ['날짜', '요일', '주문 건수', '총 매출', '매입 원가', '택배비용', '순이익', '수익률(%)'],
+    ...days.map(d => {
+      const dt = new Date(d.date + 'T00:00:00');
+      const rate = d.sales > 0 && d._hasProfit ? ((d.profit / d.sales) * 100).toFixed(1) : '';
+      return [d.date, DOW_NAMES[dt.getDay()], d.count, d.sales, d.cost, d.shipCost, d._hasProfit ? d.profit : '', rate];
+    }),
+  ];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{wch:12},{wch:6},{wch:10},{wch:14},{wch:14},{wch:12},{wch:14},{wch:10}];
+  XLSX.utils.book_append_sheet(wb, ws, '일별요약');
+  XLSX.writeFile(wb, `GPLAN_일별요약_${startDate}_${endDate}.xlsx`);
 }
 
 // 업로드 데이터(장부업로드-업로드데이터)에서 월별 순이익(profit) 합계 추출
