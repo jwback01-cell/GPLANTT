@@ -1045,7 +1045,7 @@ tailwind.config = {
         </div>
 
         <!-- KPI 카드 -->
-        <div id="daily-kpi" class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4"></div>
+        <div id="daily-kpi" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4"></div>
 
         <!-- 바 차트 -->
         <div class="bg-white p-6 md:p-8 rounded-4xl panel flex flex-col" style="min-height:300px;">
@@ -1090,9 +1090,11 @@ tailwind.config = {
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',3,'num')">총 매출<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',4,'num')">매입 원가<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',5,'num')">택배비용<span class="sort-icon"></span></th>
-                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',6,'num')">순이익<span class="sort-icon"></span></th>
-                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',7,'num')">수익률<span class="sort-icon"></span></th>
-                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',8,'num')">전일대비<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',6,'num')">광고비<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',7,'num')">순이익<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',8,'num')">실순이익<span class="sort-icon" title="순이익 - 광고비"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',9,'num')">수익률<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',10,'num')">전일대비<span class="sort-icon"></span></th>
                 </tr>
               </thead>
               <tbody id="daily-tbody"></tbody>
@@ -1113,7 +1115,7 @@ tailwind.config = {
           <span id="period-range-label" class="text-brand-gray text-sm font-semibold">2026년 1월 ~ 5월 누적</span>
         </div>
         <!-- KPI 카드 -->
-        <div id="period-kpi" class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4"></div>
+        <div id="period-kpi" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4"></div>
         <!-- 바 차트 -->
         <div class="bg-white p-6 md:p-8 rounded-4xl panel flex flex-col" style="min-height:300px;">
           <div class="flex items-center justify-between mb-6 md:mb-8 shrink-0">
@@ -1154,8 +1156,10 @@ tailwind.config = {
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',2,'num')">매입 원가<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',3,'num')">수수료<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',4,'num')">택배비<span class="sort-icon"></span></th>
-                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',5,'num')">순이익<span class="sort-icon"></span></th>
-                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',6,'num')">수익률<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',5,'num')">광고비<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',6,'num')">순이익<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',7,'num')">실순이익<span class="sort-icon" title="순이익 - 광고비"></span></th>
+                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',8,'num')">수익률<span class="sort-icon"></span></th>
                 </tr>
               </thead>
               <tbody id="period-tbody"></tbody>
@@ -1187,7 +1191,7 @@ tailwind.config = {
             </button>
           </div>
         </div>
-        <div id="product-kpi" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+        <div id="product-kpi" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3"></div>
         <div class="bg-white rounded-3xl panel overflow-hidden">
           <div class="px-6 py-4 border-b border-brand-border flex items-center justify-between gap-3 flex-wrap">
             <div class="font-bold text-[15px] shrink-0">상품별 매출 현황</div>
@@ -1242,7 +1246,7 @@ tailwind.config = {
             </button>
           </div>
         </div>
-        <div id="supplier-kpi" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+        <div id="supplier-kpi" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3"></div>
         <div class="bg-white rounded-3xl panel overflow-hidden">
           <div class="px-6 py-4 border-b border-brand-border flex items-center justify-between">
             <div class="font-bold text-[15px]">매입처별 거래 현황</div>
@@ -1291,7 +1295,7 @@ tailwind.config = {
             </button>
           </div>
         </div>
-        <div id="channel-kpi" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+        <div id="channel-kpi" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3"></div>
         <div class="bg-white rounded-3xl panel px-6 py-5">
           <div class="font-bold text-[15px] mb-5">채널별 매출 비중</div>
           <div id="channel-bars" class="flex flex-col gap-3.5"></div>
@@ -1310,8 +1314,10 @@ tailwind.config = {
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('channel',2,'num')">총 매출<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('channel',3,'num')">수수료<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('channel',4,'num')">수수료율<span class="sort-icon"></span></th>
-                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('channel',5,'num')">순이익<span class="sort-icon"></span></th>
-                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('channel',6,'num')">비중<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('channel',5,'num')">광고비<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('channel',6,'num')">순이익<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('channel',7,'num')">실순이익<span class="sort-icon" title="순이익 - 광고비"></span></th>
+                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('channel',8,'num')">비중<span class="sort-icon"></span></th>
                 </tr>
               </thead>
               <tbody id="channel-tbody"></tbody>
@@ -1344,7 +1350,7 @@ tailwind.config = {
             </button>
           </div>
         </div>
-        <div id="analysis-kpi" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+        <div id="analysis-kpi" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3"></div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div class="bg-white rounded-3xl panel overflow-hidden">
             <div class="px-6 py-4 border-b border-brand-border">
@@ -9518,6 +9524,13 @@ function animateDonut() {
     totalFee      += d.fee      || 0;
     totalDelivery += d.delivery || 0;
   });
+  // 마케팅 비용(fee 자리) — 실제 광고비 업로드 데이터(이번 달 합계)로 대체
+  // 기존: fee = sales * 0.08 추정값
+  // 변경: 광고비 업로드의 이번 달 실 사용액
+  const _now = new Date();
+  const _curMonth = _now.getMonth() + 1;
+  const _adThisMonth = (typeof _adCostSumByMonth === 'function') ? _adCostSumByMonth(_curMonth) : 0;
+  if (_adThisMonth > 0) totalFee = _adThisMonth;
   const totalExpense = totalPurchase + totalFee + totalDelivery;
   const pctPurchase = totalExpense > 0 ? Math.round(totalPurchase / totalExpense * 100) : 0;
   const pctFee      = totalExpense > 0 ? Math.round(totalFee / totalExpense * 100) : 0;
@@ -14225,6 +14238,71 @@ function sortLedgerEntryByCol(colIdx, type) {
   });
   renderLedgerEntries();
 }
+// ── 광고비 집계 헬퍼 (매출장부 각 탭에서 사용) ─────────
+// _loadAdCosts 가 광고비 업로드 데이터의 단일 출처
+function _adCostsInRange(start, end) {
+  const all = (typeof _loadAdCosts === 'function') ? _loadAdCosts() : [];
+  if (!start && !end) return all;
+  return all.filter(r => {
+    const d = String(r.date || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+    if (start && d < start) return false;
+    if (end && d > end) return false;
+    return true;
+  });
+}
+function _adCostSumInRange(start, end) {
+  return _adCostsInRange(start, end).reduce((s, r) => s + (Number(r.amount) || 0), 0);
+}
+// 월(1~12) → 광고비 합계
+function _adCostSumByMonth(monthNum) {
+  const all = (typeof _loadAdCosts === 'function') ? _loadAdCosts() : [];
+  return all.reduce((s, r) => {
+    const d = String(r.date || '').slice(0, 10);
+    const m = parseInt(d.split('-')[1]) || 0;
+    return (m === monthNum) ? s + (Number(r.amount) || 0) : s;
+  }, 0);
+}
+function _adCostByDate(start, end) {
+  const map = {};
+  _adCostsInRange(start, end).forEach(r => {
+    const d = String(r.date || '').slice(0, 10);
+    map[d] = (map[d] || 0) + (Number(r.amount) || 0);
+  });
+  return map;
+}
+// 사이트(채널)별 합계 — channel 탭에서 PA shop_name → 광고비 site 매핑 시 사용
+function _adCostBySite(start, end) {
+  const map = {};
+  _adCostsInRange(start, end).forEach(r => {
+    const s = r.site || '미지정';
+    map[s] = (map[s] || 0) + (Number(r.amount) || 0);
+  });
+  return map;
+}
+// 채널명(매출장부 사이트명) → 광고비 site 매칭. PA shop_name 매핑 헬퍼 재사용
+function _adCostForChannel(channelName, start, end) {
+  const target = (typeof _adSiteFromShopName === 'function') ? _adSiteFromShopName(channelName) : null;
+  if (!target) {
+    // 직접 이름이 일치하는 경우 (예: "스마트스토어")
+    const bySite = _adCostBySite(start, end);
+    return bySite[channelName] || 0;
+  }
+  const bySite = _adCostBySite(start, end);
+  return bySite[target] || 0;
+}
+// 1~12월 (m=0 → 전체) → start/end ISO 문자열 반환
+function _monthRangeFromIdx(m) {
+  if (!m || m === 0) {
+    const yr = new Date().getFullYear();
+    return { start: `${yr}-01-01`, end: `${yr}-12-31` };
+  }
+  const yr = new Date().getFullYear();
+  const mm = String(m).padStart(2, '0');
+  const lastDay = new Date(yr, m, 0).getDate();
+  return { start: `${yr}-${mm}-01`, end: `${yr}-${mm}-${String(lastDay).padStart(2, '0')}` };
+}
+
 function switchLedgerTab(tab) {
   ['monthly','daily','period','product','supplier','channel','entry','analysis'].forEach(p => {
     const el = document.getElementById('ledger-panel-' + p);
@@ -14329,16 +14407,32 @@ function renderDailyTab() {
   const days = _buildDailyDataFromUploadData(startDate, endDate);
   const fmtN = n => Number(n || 0).toLocaleString('ko-KR');
 
+  // 광고비를 일자별로 집계해서 days 배열에 attach
+  const adByDate = (typeof _adCostByDate === 'function') ? _adCostByDate(startDate, endDate) : {};
+  let totalAdInRange = 0;
+  days.forEach(d => {
+    d.adCost = adByDate[d.date] || 0;
+    totalAdInRange += d.adCost;
+  });
+  // 광고비 행만 있고 매출 데이터는 없는 날도 표시되도록 days 에 보강
+  Object.keys(adByDate).forEach(d => {
+    if (!days.find(x => x.date === d)) {
+      days.push({ date: d, count: 0, sales: 0, supply: 0, cost: 0, shipCost: 0, profit: 0, _hasProfit: false, adCost: adByDate[d] });
+    }
+  });
+  days.sort((a, b) => a.date.localeCompare(b.date));
+
   // KPI 집계
   const kpiSum = days.reduce((a, d) => {
     a.sales += d.sales; a.cost += d.cost; a.shipCost += d.shipCost;
     if (d._hasProfit) { a.profit += d.profit; a.profitDays++; }
     a.count += d.count;
+    a.adCost += (d.adCost || 0);
     return a;
-  }, { sales: 0, cost: 0, shipCost: 0, profit: 0, profitDays: 0, count: 0 });
+  }, { sales: 0, cost: 0, shipCost: 0, profit: 0, profitDays: 0, count: 0, adCost: 0 });
   const dayCount = days.length || 1;
   const avgSales = Math.round(kpiSum.sales / dayCount);
-  const avgProfit = kpiSum.profitDays ? Math.round(kpiSum.profit / kpiSum.profitDays) : 0;
+  const realProfit = kpiSum.profit - kpiSum.adCost;
   const profitRate = kpiSum.sales > 0 && kpiSum.profitDays ? ((kpiSum.profit / kpiSum.sales) * 100).toFixed(1) : '-';
 
   const kpi = document.getElementById('daily-kpi');
@@ -14346,6 +14440,8 @@ function renderDailyTab() {
     kpi.innerHTML = [
       { label: `누적 매출 (${days.length}일)`, value: fmtN(kpiSum.sales) + '원', accent: '' },
       { label: '누적 순이익', value: fmtN(kpiSum.profit) + '원', accent: kpiSum.profit >= 0 ? 'text-brand-green' : 'text-brand-pink' },
+      { label: '누적 광고비', value: fmtN(kpiSum.adCost) + '원', accent: 'text-brand-pink' },
+      { label: '실순이익 (순이익-광고비)', value: fmtN(realProfit) + '원', accent: realProfit >= 0 ? 'text-brand-green' : 'text-brand-pink' },
       { label: '일평균 매출', value: fmtN(avgSales) + '원', accent: 'text-brand-blue' },
       { label: '평균 수익률', value: (profitRate === '-' ? '-' : profitRate + '%'), accent: 'text-brand-orange' },
     ].map(k => `
@@ -14389,7 +14485,7 @@ function renderDailyTab() {
   const tfoot = document.getElementById('daily-tfoot');
   if (tbody) {
     if (!days.length) {
-      tbody.innerHTML = '<tr><td colspan="9" class="px-6 py-8 text-center text-brand-gray">선택한 기간에 데이터 없음</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="11" class="px-6 py-8 text-center text-brand-gray">선택한 기간에 데이터 없음</td></tr>';
       if (tfoot) tfoot.innerHTML = '';
     } else {
       tbody.innerHTML = days.map((d, i) => {
@@ -14397,6 +14493,8 @@ function renderDailyTab() {
         const dow = DOW_NAMES[dt.getDay()];
         const dowCls = dt.getDay() === 0 ? 'text-brand-pink' : dt.getDay() === 6 ? 'text-brand-blue' : '';
         const profitCls = d._hasProfit ? (d.profit >= 0 ? 'text-brand-green' : 'text-brand-pink') : 'text-brand-gray';
+        const realDay = (d.profit || 0) - (d.adCost || 0);
+        const realCls = (d._hasProfit || d.adCost) ? (realDay >= 0 ? 'text-brand-green' : 'text-brand-pink') : 'text-brand-gray';
         const rate = d.sales > 0 && d._hasProfit ? ((d.profit / d.sales) * 100).toFixed(1) + '%' : '-';
         // 전일 대비 매출 차이
         const prev = i > 0 ? days[i-1] : null;
@@ -14415,7 +14513,9 @@ function renderDailyTab() {
           <td class="px-4 py-3 text-right whitespace-nowrap font-semibold">${fmtN(d.sales)}</td>
           <td class="px-4 py-3 text-right whitespace-nowrap">${fmtN(d.cost)}</td>
           <td class="px-4 py-3 text-right whitespace-nowrap">${fmtN(d.shipCost)}</td>
+          <td class="px-4 py-3 text-right whitespace-nowrap ${d.adCost ? 'text-brand-pink font-semibold' : 'text-brand-gray'}">${d.adCost ? fmtN(d.adCost) : '-'}</td>
           <td class="px-4 py-3 text-right whitespace-nowrap ${profitCls} font-bold">${d._hasProfit ? fmtN(d.profit) : '-'}</td>
+          <td class="px-4 py-3 text-right whitespace-nowrap ${realCls} font-bold">${(d._hasProfit || d.adCost) ? fmtN(realDay) : '-'}</td>
           <td class="px-4 py-3 text-right whitespace-nowrap">${rate}</td>
           <td class="px-6 py-3 text-right whitespace-nowrap">${diffHtml}</td>
         </tr>`;
@@ -14427,7 +14527,9 @@ function renderDailyTab() {
           <td class="px-4 py-3 text-right">${fmtN(kpiSum.sales)}</td>
           <td class="px-4 py-3 text-right">${fmtN(kpiSum.cost)}</td>
           <td class="px-4 py-3 text-right">${fmtN(kpiSum.shipCost)}</td>
+          <td class="px-4 py-3 text-right text-brand-pink">${fmtN(kpiSum.adCost)}</td>
           <td class="px-4 py-3 text-right ${kpiSum.profit >= 0 ? 'text-brand-green' : 'text-brand-pink'}">${fmtN(kpiSum.profit)}</td>
+          <td class="px-4 py-3 text-right ${realProfit >= 0 ? 'text-brand-green' : 'text-brand-pink'}">${fmtN(realProfit)}</td>
           <td class="px-4 py-3 text-right">${profitRate === '-' ? '-' : profitRate + '%'}</td>
           <td class="px-6"></td>
         </tr>`;
@@ -14443,17 +14545,20 @@ function exportDailyExcel() {
   const endDate = endEl?.value || '';
   const days = _buildDailyDataFromUploadData(startDate, endDate);
   if (!days.length) { showAppAlert('내보낼 데이터 없음', '선택한 기간에 데이터가 없습니다.', { type: 'warning' }); return; }
+  const adByDate = (typeof _adCostByDate === 'function') ? _adCostByDate(startDate, endDate) : {};
   const data = [
-    ['날짜', '요일', '주문 건수', '총 매출', '매입 원가', '택배비용', '순이익', '수익률(%)'],
+    ['날짜', '요일', '주문 건수', '총 매출', '매입 원가', '택배비용', '광고비', '순이익', '실순이익(순이익-광고비)', '수익률(%)'],
     ...days.map(d => {
       const dt = new Date(d.date + 'T00:00:00');
       const rate = d.sales > 0 && d._hasProfit ? ((d.profit / d.sales) * 100).toFixed(1) : '';
-      return [d.date, DOW_NAMES[dt.getDay()], d.count, d.sales, d.cost, d.shipCost, d._hasProfit ? d.profit : '', rate];
+      const ad = adByDate[d.date] || 0;
+      const real = (d._hasProfit ? d.profit : 0) - ad;
+      return [d.date, DOW_NAMES[dt.getDay()], d.count, d.sales, d.cost, d.shipCost, ad, d._hasProfit ? d.profit : '', (d._hasProfit || ad) ? real : '', rate];
     }),
   ];
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{wch:12},{wch:6},{wch:10},{wch:14},{wch:14},{wch:12},{wch:14},{wch:10}];
+  ws['!cols'] = [{wch:12},{wch:6},{wch:10},{wch:14},{wch:14},{wch:12},{wch:12},{wch:14},{wch:16},{wch:10}];
   XLSX.utils.book_append_sheet(wb, ws, '일별요약');
   XLSX.writeFile(wb, `GPLAN_일별요약_${startDate}_${endDate}.xlsx`);
 }
@@ -14558,21 +14663,35 @@ function renderPeriodChart() {
     document.getElementById('period-bars').innerHTML = '';
     document.getElementById('period-labels').innerHTML = '';
     document.getElementById('period-tbody').innerHTML = `
-      <tr><td colspan="7" class="px-6 py-12 text-center text-brand-gray text-sm">매출 데이터가 없습니다. "장부 업로드"에서 데이터를 추가하면 여기에 집계됩니다.</td></tr>`;
+      <tr><td colspan="9" class="px-6 py-12 text-center text-brand-gray text-sm">매출 데이터가 없습니다. "장부 업로드"에서 데이터를 추가하면 여기에 집계됩니다.</td></tr>`;
     return;
   }
 
   const prefix = _periodType === 'quarterly' ? '2026년 ' : '2026년 ';
   const maxSales = Math.max(...data.map(d => d.sales));
 
+  // 행별 광고비 attach — 월별이면 monthNum, 분기별이면 분기 내 3개월 합
+  data.forEach(d => {
+    if (_periodType === 'quarterly') {
+      const q = parseInt(d.label) || 0;
+      let sum = 0;
+      for (let m = (q - 1) * 3 + 1; m <= q * 3; m++) sum += _adCostSumByMonth(m);
+      d.adCost = sum;
+    } else {
+      const m = parseInt(d.label) || 0;
+      d.adCost = _adCostSumByMonth(m);
+    }
+  });
+
   const totalSales    = data.reduce((s, d) => s + d.sales, 0);
   const totalPurchase = data.reduce((s, d) => s + d.purchase, 0);
   const totalFee      = data.reduce((s, d) => s + d.fee, 0);
   const totalDelivery = data.reduce((s, d) => s + d.delivery, 0);
+  const totalAd       = data.reduce((s, d) => s + (d.adCost || 0), 0);
   // 순이익: 업로드 데이터의 profit 합계가 있으면 그 값, 없으면 기존 계산 (매출-원가-수수료-배송비) 폴백
-  // 행별로 uploadProfit (장부업로드 -> 업로드데이터의 마진 합계) 우선 적용
   const _profitOf = d => (d.uploadProfit != null ? Number(d.uploadProfit) : (d.sales - d.purchase - d.fee - d.delivery));
   const totalProfit   = data.reduce((s, d) => s + _profitOf(d), 0);
+  const totalReal     = totalProfit - totalAd;
   const avgSales      = Math.round(totalSales / data.length);
   const profitRate    = totalSales > 0 ? Math.round((totalProfit / totalSales) * 100) : 0;
 
@@ -14584,6 +14703,8 @@ function renderPeriodChart() {
   document.getElementById('period-kpi').innerHTML = [
     { label:'누적 매출', value: fmtM(totalSales), color:'' },
     { label:'누적 순이익', value: fmtM(totalProfit), color:'text-brand-green' },
+    { label:'누적 광고비', value: fmtM(totalAd), color:'text-brand-pink' },
+    { label:'실순이익 (순이익-광고비)', value: fmtM(totalReal), color: totalReal >= 0 ? 'text-brand-green' : 'text-brand-pink' },
     { label:'기간 평균 매출', value: fmtM(avgSales), color:'' },
     { label:'평균 수익률', value: profitRate + '%', color:'text-brand-blue' },
   ].map(k => `
@@ -14622,6 +14743,9 @@ function renderPeriodChart() {
   // 테이블
   const rows = data.map((d, i) => {
     const profit = _profitOf(d);
+    const ad = Number(d.adCost || 0);
+    const real = profit - ad;
+    const realCls = real >= 0 ? 'text-brand-green' : 'text-brand-pink';
     const rate   = d.sales > 0 ? Math.round((profit / d.sales) * 100) : 0;
     const bg     = i % 2 === 0 ? '' : 'bg-brand-bg/40';
     return `<tr class="${bg} border-b border-brand-border hover:bg-brand-blue-light/20 transition-colors">
@@ -14630,7 +14754,9 @@ function renderPeriodChart() {
       <td class="px-4 py-4 text-right text-brand-gray whitespace-nowrap">${fmt(d.purchase)}</td>
       <td class="px-4 py-4 text-right text-brand-gray whitespace-nowrap">${fmt(d.fee)}</td>
       <td class="px-4 py-4 text-right text-brand-gray whitespace-nowrap">${fmt(d.delivery)}</td>
+      <td class="px-4 py-4 text-right whitespace-nowrap ${ad ? 'text-brand-pink font-semibold' : 'text-brand-gray'}">${ad ? fmt(ad) : '-'}</td>
       <td class="px-4 py-4 text-right font-bold text-brand-green whitespace-nowrap">${fmt(profit)}</td>
+      <td class="px-4 py-4 text-right font-bold ${realCls} whitespace-nowrap">${fmt(real)}</td>
       <td class="px-6 py-4 text-right whitespace-nowrap">
         <span class="bg-brand-green-light text-brand-green text-xs font-bold px-2.5 py-1 rounded-lg">${rate}%</span>
       </td>
@@ -14640,6 +14766,7 @@ function renderPeriodChart() {
   // 합계 순이익도 totalProfit (uploadProfit 반영) 사용
   const totalProfitFinal = totalProfit;
   const totalRateFinal   = totalSales > 0 ? Math.round((totalProfitFinal / totalSales) * 100) : 0;
+  const totalRealCls = totalReal >= 0 ? 'text-brand-green' : 'text-brand-pink';
   document.getElementById('period-tbody').innerHTML = rows + `
     <tr class="bg-brand-bg font-bold border-t-2 border-brand-black">
       <td class="px-6 py-4 text-sm">합계</td>
@@ -14647,7 +14774,9 @@ function renderPeriodChart() {
       <td class="px-4 py-4 text-right text-brand-gray whitespace-nowrap">${fmt(totalPurchase)}</td>
       <td class="px-4 py-4 text-right text-brand-gray whitespace-nowrap">${fmt(totalFee)}</td>
       <td class="px-4 py-4 text-right text-brand-gray whitespace-nowrap">${fmt(totalDelivery)}</td>
+      <td class="px-4 py-4 text-right text-brand-pink whitespace-nowrap">${fmt(totalAd)}</td>
       <td class="px-4 py-4 text-right text-brand-green whitespace-nowrap">${fmt(totalProfitFinal)}</td>
+      <td class="px-4 py-4 text-right ${totalRealCls} whitespace-nowrap">${fmt(totalReal)}</td>
       <td class="px-6 py-4 text-right whitespace-nowrap">
         <span class="bg-brand-green-light text-brand-green text-xs font-bold px-2.5 py-1 rounded-lg">${totalRateFinal}%</span>
       </td>
@@ -14852,11 +14981,16 @@ function renderProductTab(m, idxs) {
   const avgMargin = totalSales > 0 ? +(totalProfit / totalSales * 100).toFixed(1) : 0;
   const best = rows[0];
 
+  // 광고비 합계 (선택 기간 전체)
+  const _range = (typeof _monthRangeFromIdx === 'function') ? _monthRangeFromIdx(m) : null;
+  const totalAd = (_range && typeof _adCostSumInRange === 'function') ? _adCostSumInRange(_range.start, _range.end) : 0;
+
   document.getElementById('product-kpi').innerHTML = [
     { label:'취급 상품 수',  value: rows.length + '개' },
     { label:'베스트셀러',    value: best ? best.name : '-', small:true },
     { label:'1위 상품 매출', value: best ? best.sales.toLocaleString('ko-KR') : '-' },
     { label:'평균 수익률',   value: avgMargin + '%', color:'text-brand-green' },
+    { label:'기간 광고비',   value: totalAd.toLocaleString('ko-KR'), color:'text-brand-pink' },
   ].map(k => `<div class="bg-white rounded-3xl panel px-5 py-4 flex flex-col gap-1">
     <div class="text-xs font-bold text-brand-gray tracking-wide">${k.label}</div>
     <div class="font-black mt-1 ${k.color||''} ${k.small ? 'text-xl truncate' : 'text-2xl'}">${k.value}</div>
@@ -14919,11 +15053,16 @@ function renderSupplierTab(m, idxs) {
   const totalAmount = rows.reduce((s,r) => s + r.amount, 0);
   const top = rows[0];
 
+  // 광고비 — 매입처와 직접 매핑은 어려워서 기간 합계만 표시
+  const _range = (typeof _monthRangeFromIdx === 'function') ? _monthRangeFromIdx(m) : null;
+  const totalAd = (_range && typeof _adCostSumInRange === 'function') ? _adCostSumInRange(_range.start, _range.end) : 0;
+
   document.getElementById('supplier-kpi').innerHTML = [
     { label:'거래 매입처 수', value: rows.length + '곳' },
     { label:'주요 매입처',    value: top ? top.name : '-', small:true },
     { label:'총 매입 원가',   value: totalAmount.toLocaleString('ko-KR') },
     { label:'매입처 다변화',  value: rows.length + '개사', color:'text-brand-blue' },
+    { label:'기간 광고비',    value: totalAd.toLocaleString('ko-KR'), color:'text-brand-pink' },
   ].map(k => `<div class="bg-white rounded-3xl panel px-5 py-4 flex flex-col gap-1">
     <div class="text-xs font-bold text-brand-gray tracking-wide">${k.label}</div>
     <div class="font-black mt-1 ${k.color||''} ${k.small ? 'text-xl truncate' : 'text-2xl'}">${k.value}</div>
@@ -14966,8 +15105,15 @@ function renderChannelTab(m, idxs) {
   const entryRows = _getChannelRowsFromEntries(m);
   // 실제 입력 데이터가 없으면 빈 배열 (하드코딩 샘플로 폴백하지 않음)
   const rows = entryRows || [];
+  // 채널별 광고비 attach — 월(0=전체) 또는 idxs(직접선택 기간) 기준
+  const _range = (typeof _monthRangeFromIdx === 'function') ? _monthRangeFromIdx(m) : null;
+  rows.forEach(r => {
+    r.adCost = (typeof _adCostForChannel === 'function' && _range)
+      ? _adCostForChannel(r.name, _range.start, _range.end) : 0;
+  });
   const totalSales = rows.reduce((s,r) => s + r.sales, 0);
   const totalFee = rows.reduce((s,r) => s + r.fee, 0);
+  const totalAd  = rows.reduce((s,r) => s + (r.adCost || 0), 0);
   const avgFeeRate = totalSales > 0 ? (totalFee / totalSales * 100).toFixed(1) : '0.0';
   const top = rows[0];
   const topPct = (top && totalSales > 0) ? (top.sales / totalSales * 100).toFixed(1) : '0.0';
@@ -14977,6 +15123,7 @@ function renderChannelTab(m, idxs) {
     { label:'주력 채널',       value: top ? top.name : '-', small:true },
     { label:'주력 채널 비중',  value: topPct + '%', color:'text-brand-orange' },
     { label:'평균 수수료율',   value: avgFeeRate + '%' },
+    { label:'누적 광고비',     value: _fmtW(totalAd), color:'text-brand-pink' },
   ].map(k => `<div class="bg-white rounded-3xl panel px-5 py-4 flex flex-col gap-1">
     <div class="text-xs font-bold text-brand-gray tracking-wide">${k.label}</div>
     <div class="font-black mt-1 ${k.color||''} ${k.small ? 'text-xl truncate' : 'text-2xl'}">${k.value}</div>
@@ -14993,13 +15140,18 @@ function renderChannelTab(m, idxs) {
 
   document.getElementById('channel-tbody').innerHTML = rows.map(r => {
     const pct = totalSales > 0 ? (r.sales / totalSales * 100).toFixed(1) : '0.0';
+    const ad = Number(r.adCost || 0);
+    const real = (r.profit || 0) - ad;
+    const realCls = real >= 0 ? 'text-brand-green' : 'text-brand-pink';
     return `<tr class="border-t border-brand-border hover:bg-brand-bg/50 transition-colors">
       <td class="px-6 py-4 font-bold">${escHtml(r.name)}</td>
       <td class="px-4 py-4 text-right">${_fmtW(r.orders)}</td>
       <td class="px-4 py-4 text-right font-bold">${_fmtW(r.sales)}</td>
       <td class="px-4 py-4 text-right text-brand-pink">${_fmtW(r.fee)}</td>
       <td class="px-4 py-4 text-right text-brand-gray">${(r.fr*100).toFixed(1)}%</td>
+      <td class="px-4 py-4 text-right ${ad ? 'text-brand-pink font-semibold' : 'text-brand-gray'}">${ad ? _fmtW(ad) : '-'}</td>
       <td class="px-4 py-4 text-right font-bold text-brand-green">${_fmtW(r.profit)}</td>
+      <td class="px-4 py-4 text-right font-bold ${realCls}">${_fmtW(real)}</td>
       <td class="px-6 py-4 text-right"><span class="px-2.5 py-0.5 rounded-full bg-brand-gray/10 text-brand-gray text-xs font-bold">${pct}%</span></td>
     </tr>`;
   }).join('');
@@ -15007,7 +15159,9 @@ function renderChannelTab(m, idxs) {
   const sumOrders = rows.reduce((s,r) => s + (r.orders||0), 0);
   const sumSales  = rows.reduce((s,r) => s + (r.sales||0), 0);
   const sumFee    = rows.reduce((s,r) => s + (r.fee||0), 0);
+  const sumAd     = totalAd;
   const sumProfit = rows.reduce((s,r) => s + (r.profit||0), 0);
+  const sumReal   = sumProfit - sumAd;
   const feeRate   = sumSales > 0 ? (sumFee / sumSales * 100).toFixed(1) : '0.0';
   const margin    = sumSales > 0 ? (sumProfit / sumSales * 100).toFixed(1) : '0.0';
   const cFoot = document.getElementById('channel-tfoot');
@@ -15019,7 +15173,9 @@ function renderChannelTab(m, idxs) {
         <td class="px-4 py-4 text-right font-black">${_fmtW(sumSales)}</td>
         <td class="px-4 py-4 text-right font-black text-brand-pink">${_fmtW(sumFee)}</td>
         <td class="px-4 py-4 text-right font-black text-brand-gray">${feeRate}%</td>
+        <td class="px-4 py-4 text-right font-black text-brand-pink">${_fmtW(sumAd)}</td>
         <td class="px-4 py-4 text-right font-black text-brand-green">${_fmtW(sumProfit)}</td>
+        <td class="px-4 py-4 text-right font-black ${sumReal >= 0 ? 'text-brand-green' : 'text-brand-pink'}">${_fmtW(sumReal)}</td>
         <td class="px-6 py-4 text-right font-black text-brand-green">${margin}%</td>
       </tr>`;
   }
@@ -15031,12 +15187,19 @@ function renderAnalysisTab(m, idxs) {
   const cRows = _getChannelRowsFromEntries(m) || [];
   const totalSales  = cRows.reduce((s,r) => s + r.sales, 0);
   const totalProfit = pRows.reduce((s,r) => s + r.profit, 0);
+  // 광고비 — 월별/전체 모두 _monthRangeFromIdx 로 계산
+  const _range = (typeof _monthRangeFromIdx === 'function') ? _monthRangeFromIdx(m) : null;
+  const totalAd = (_range && typeof _adCostSumInRange === 'function')
+    ? _adCostSumInRange(_range.start, _range.end) : 0;
+  const totalReal = totalProfit - totalAd;
   const avgMargin   = totalSales > 0 ? +(totalProfit / totalSales * 100).toFixed(1) : 0;
   const topCh = cRows[0];
 
   document.getElementById('analysis-kpi').innerHTML = [
     { label:'총 매출',    value: totalSales.toLocaleString('ko-KR') },
     { label:'총 순이익',  value: totalProfit.toLocaleString('ko-KR'), color:'text-brand-green' },
+    { label:'총 광고비',  value: totalAd.toLocaleString('ko-KR'), color:'text-brand-pink' },
+    { label:'실순이익',   value: totalReal.toLocaleString('ko-KR'), color: totalReal >= 0 ? 'text-brand-green' : 'text-brand-pink' },
     { label:'평균 수익률', value: avgMargin + '%', color:'text-brand-blue' },
     { label:'최고 채널',  value: topCh ? topCh.name : '-', small:true },
   ].map(k => `<div class="bg-white rounded-3xl panel px-5 py-4 flex flex-col gap-1">
