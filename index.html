@@ -784,7 +784,7 @@ tailwind.config = {
           </label>
           <button onclick="deleteSelectedTodos()" class="text-sm font-bold text-brand-pink hover:opacity-80 flex items-center gap-1">선택 삭제</button>
         </div>
-        <div class="flex flex-col gap-3 md:gap-4" id="todo-list">
+        <div class="flex flex-col gap-3 md:gap-4 overflow-y-auto" id="todo-list" style="max-height:62vh;">
           <div class="todo-row flex items-center justify-between p-4 md:p-5 border border-brand-border rounded-[24px] hover:bg-brand-bg transition-all group" data-team="디자인팀" data-due="오늘 18:00 마감" data-accent="blue">
             <div class="flex items-center gap-4 md:gap-5 min-w-0">
               <div class="w-6 md:w-7 h-6 md:h-7 rounded-full border-2 border-brand-blue-light flex items-center justify-center cursor-pointer bg-white group-hover:border-brand-blue transition-colors shrink-0" onclick="completeTodo(this, event)"></div>
@@ -880,7 +880,7 @@ tailwind.config = {
           </div>
           <button onclick="clearAllCompleted()" class="text-xs text-brand-gray hover:text-brand-pink font-semibold transition-colors">전체 삭제</button>
         </div>
-        <div id="todo-completed-list" class="flex flex-col gap-1.5"></div>
+        <div id="todo-completed-list" class="flex flex-col gap-1.5 overflow-y-auto" style="max-height:30vh;"></div>
       </div>
     </main>
   </div>
