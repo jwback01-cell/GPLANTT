@@ -15883,6 +15883,39 @@ function _refreshActiveLedgerTab() {
   } catch (e) { console.warn('[ledger refresh] 실패:', e); }
 }
 
+// 광고비 row 수 변화 감시 — 페이지 로드 직후 cloud-sync 가 늦게 도착해도 자동 재렌더
+// (페이지 로드 후 최대 30초간, 0.8초 주기로 row 수가 변하면 즉시 활성 탭 재렌더)
+(function _watchAdCostsArrival() {
+  let lastCount = -1;
+  let lastSum   = -1;
+  let ticks     = 0;
+  const MAX_TICKS = 38; // 0.8초 × 38 ≈ 30초
+  const _snapshot = () => {
+    try {
+      const raw = (typeof _adCostsRaw === 'function') ? _adCostsRaw() : [];
+      const cnt = raw.length;
+      const sum = raw.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+      return { cnt, sum };
+    } catch (_) { return { cnt: 0, sum: 0 }; }
+  };
+  const tick = () => {
+    ticks++;
+    const { cnt, sum } = _snapshot();
+    if (cnt !== lastCount || sum !== lastSum) {
+      lastCount = cnt;
+      lastSum   = sum;
+      try { if (typeof _refreshActiveLedgerTab === 'function') _refreshActiveLedgerTab(); } catch (_) {}
+    }
+    if (ticks < MAX_TICKS) setTimeout(tick, 800);
+  };
+  // DOM 준비 후 시작
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => setTimeout(tick, 300));
+  } else {
+    setTimeout(tick, 300);
+  }
+})();
+
 // PA 주문의 shop_name → 광고비 사이트 id 매핑 (마이너스 확인 통합용)
 function _adSiteFromShopName(shopName) {
   if (!shopName) return null;
