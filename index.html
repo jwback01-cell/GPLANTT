@@ -16199,7 +16199,23 @@ function _paExtractOrderRow(o) {
   // 배송비(고객 부담) — 주문 단의 배송비 필드 후보
   const shipFeeFields = ['ship_cost', 'shop_ship_cost', 'delivery_cost', 'delivery_fee', 'ship_fee', 'invoice_ship_cost', 'basic_ship_cost'];
   const dateType = document.getElementById('pa-order-date-type')?.value || 'wdate';
-  const dateFields = (_PA_DATE_FIELDS[dateType] || [dateType]).concat(['ord_time', 'wdate', 'order_date']);
+  const primaryFields = _PA_DATE_FIELDS[dateType] || [dateType];
+  // ⚠ 첫 호출 시: PA 응답의 날짜 관련 필드 전체 키를 콘솔에 출력 (출고완료일 등 정확한 필드명 진단용)
+  if (!_paExtractOrderRow._dateFieldsLogged) {
+    _paExtractOrderRow._dateFieldsLogged = true;
+    try {
+      const dateLike = {};
+      Object.keys(o).forEach(k => {
+        const v = o[k];
+        if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) dateLike[k] = v;
+        if (typeof k === 'string' && /(time|date|day|day$|wdate|mdate)/i.test(k) && v != null && v !== '') {
+          if (!(k in dateLike)) dateLike[k] = v;
+        }
+      });
+      console.log(`[PA→장부] 첫 주문의 날짜 필드 전체 (dateType=${dateType}, primaryFields=${primaryFields.join('/')}):`, dateLike);
+    } catch(_) {}
+  }
+  const dateFields = primaryFields.concat(['ord_time', 'wdate', 'order_date']);
   const ordNo = _paPickField(o, ordNoFields);
   // 주문 객체 전체로 매칭 (link 키 후보를 폭넓게 비교)
   const prod = _paFindProd(o) || _paFindProd(ordNo);
@@ -19789,7 +19805,16 @@ function _renderPaCarriers(carriers) {
 
 // 조회 기준 → PlayAuto 응답 내 날짜 필드 (실제 키만 정확히 매핑 — 폴백 금지)
 const _PA_DATE_FIELDS = {
-  shipped_time: ['out_time'],       // 출고완료일
+  // 출고완료일 — PA 응답에서 "출고완료" 관련 필드 후보 폭 확장 (out_time 외에도 변형 다수 존재)
+  shipped_time: [
+    'out_time', 'out_date',
+    'shipped_time', 'shipping_time', 'shipping_complete_time',
+    'send_time', 'send_date', 'send_complete_time',
+    'complete_time', 'complete_date', 'completion_time',
+    'finished_time', 'delivered_time',
+    'shop_send_time', 'shop_complete_time',
+    'ship_time', 'ship_date',
+  ],
   ord_time:     ['ord_time'],       // 주문일
   pay_time:     ['pay_time'],       // 결제일
   wdate:        ['wdate'],          // 주문수집일
@@ -20370,6 +20395,8 @@ async function savePlayautoOrdersToLedger(silent) {
   if (!_paOrders.length) { if (!silent) showAppAlert('저장할 주문 없음', '먼저 "주문 수집"을 실행해 주세요.', 'warn'); return 0; }
   const now = new Date();
   const stamp = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  // 매번 새로 진단 로그 — 첫 주문의 날짜 필드 보고용
+  _paExtractOrderRow._dateFieldsLogged = false;
   // 선택한 조회 기준에 해당하는 날짜로 저장 (이카운트 전송 범위와 일치시키기 위함)
   const dateType = document.getElementById('pa-order-date-type')?.value || 'ord_time';
   const dateFields = (_PA_DATE_FIELDS[dateType] || [dateType]).concat(['ord_time', 'order_date', 'wdate']);
