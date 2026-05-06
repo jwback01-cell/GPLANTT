@@ -15668,7 +15668,7 @@ function renderAdSiteCards() {
           <div class="font-bold text-sm">${_escapeHtml(site.label)}</div>
           ${apiBadge}
         </div>
-        <div class="text-xs text-brand-gray">이번 달: <span class="font-mono font-bold text-brand-black">${total.toLocaleString('ko-KR')}원</span></div>
+        <div class="text-xs text-brand-gray">이번 달: <span class="font-bold text-brand-black tabular-nums">${total.toLocaleString('ko-KR')}원</span></div>
         <div class="flex gap-2 flex-wrap">
           <button onclick="openAdUpload('${site.id}')" class="flex-1 px-3 py-1.5 rounded-full bg-brand-black text-white text-xs font-bold hover:bg-[#333]" style="min-width:100px;">📊 엑셀 업로드</button>
           ${apiBtn}
@@ -16468,9 +16468,9 @@ function renderAdSummary() {
     totalAd += ad; totalMargin += margin;
     return `<tr class="border-b border-brand-border hover:bg-brand-bg/40">
       <td class="p-3 text-xs font-semibold pl-5">${_escapeHtml(siteId)}</td>
-      <td class="p-3 text-right text-xs font-mono">${ad.toLocaleString('ko-KR')}원</td>
-      <td class="p-3 text-right text-xs font-mono">${margin.toLocaleString('ko-KR')}원</td>
-      <td class="p-3 text-right text-xs font-mono ${realCls}">${real.toLocaleString('ko-KR')}원</td>
+      <td class="p-3 text-right text-xs font-semibold tabular-nums">${ad.toLocaleString('ko-KR')}원</td>
+      <td class="p-3 text-right text-xs font-semibold tabular-nums">${margin.toLocaleString('ko-KR')}원</td>
+      <td class="p-3 text-right text-xs font-semibold tabular-nums ${realCls}">${real.toLocaleString('ko-KR')}원</td>
       <td class="p-3 text-right text-xs pr-5">${roas}</td>
     </tr>`;
   }).join('');
@@ -16479,9 +16479,9 @@ function renderAdSummary() {
   const roasTotal = totalAd > 0 ? (totalMargin / totalAd * 100).toFixed(1) + '%' : '-';
   const totalRow = `<tr class="border-t-2 border-brand-border font-bold bg-brand-bg/50">
     <td class="p-3 text-xs pl-5">합계</td>
-    <td class="p-3 text-right text-xs font-mono">${totalAd.toLocaleString('ko-KR')}원</td>
-    <td class="p-3 text-right text-xs font-mono">${totalMargin.toLocaleString('ko-KR')}원</td>
-    <td class="p-3 text-right text-xs font-mono ${realCls}">${realTotal.toLocaleString('ko-KR')}원</td>
+    <td class="p-3 text-right text-xs tabular-nums">${totalAd.toLocaleString('ko-KR')}원</td>
+    <td class="p-3 text-right text-xs tabular-nums">${totalMargin.toLocaleString('ko-KR')}원</td>
+    <td class="p-3 text-right text-xs tabular-nums ${realCls}">${realTotal.toLocaleString('ko-KR')}원</td>
     <td class="p-3 text-right text-xs pr-5">${roasTotal}</td>
   </tr>`;
   tbodyEl.innerHTML = rowsHtml + totalRow;
@@ -16526,7 +16526,7 @@ function renderAdDetail() {
     <td class="p-3 text-xs pl-5 font-semibold">${_escapeHtml(r.site)}</td>
     <td class="p-3 text-xs">${_escapeHtml(r.date)}</td>
     <td class="p-3 text-xs truncate max-w-[260px]" title="${_escapeHtml(r.campaign || '')}">${_escapeHtml(r.campaign || '-')}</td>
-    <td class="p-3 text-right text-xs font-mono">${Number(r.amount).toLocaleString('ko-KR')}원</td>
+    <td class="p-3 text-right text-xs font-semibold tabular-nums">${Number(r.amount).toLocaleString('ko-KR')}원</td>
     <td class="p-3 text-xs">${_escapeHtml(r.source || '-')}</td>
     <td class="p-3 text-xs text-brand-gray" title="${_escapeHtml(r.fileName || '')}">${String(r.uploadedAt || '').slice(0, 16).replace('T',' ')}</td>
     <td class="p-3 text-xs text-center pr-5"><button onclick="deleteAdCost('${r._key || ''}')" class="text-brand-pink hover:underline font-bold">삭제</button></td>
