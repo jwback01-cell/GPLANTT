@@ -3482,13 +3482,9 @@ tailwind.config = {
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
                 플레이오토 출고관리 탭 가져오기
               </button>
-              <button id="pa-inv-send-btn" type="button" onclick="sendInvoicesToPlayauto()" class="px-5 py-2.5 rounded-full text-xs font-bold bg-brand-black text-white hover:bg-[#333] flex items-center gap-1.5" title="송장번호 + 택배사 정보를 PA에 전송하여 출고완료 상태로 변경 (change_complete=true)">
+              <button id="pa-inv-send-btn" type="button" onclick="sendInvoicesToPlayauto()" class="px-5 py-2.5 rounded-full text-xs font-bold bg-brand-black text-white hover:bg-[#333] flex items-center gap-1.5" title="송장번호 + 택배사 정보를 PA에 전송하여 출고완료 상태로 변경">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                 송장 전송
-              </button>
-              <button id="pa-tracking-send-btn" type="button" onclick="sendTrackingToPlayauto()" class="px-5 py-2.5 rounded-full text-xs font-bold bg-brand-orange text-white hover:opacity-90 flex items-center gap-1.5" title="이미 출고완료된 주문에 송장번호 + 택배사를 다시 전송 (운송장출력 상태)">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-                운송장 전송
               </button>
               <div id="pa-inv-fetch-status" class="text-xs font-semibold text-brand-gray ml-2"></div>
             </div>
@@ -18976,116 +18972,6 @@ async function sendInvoicesToPlayauto() {
     '총 ' + targets.length + '건의 주문에 대해 플레이오토로 송장을 전송합니다.\n택배사 분포: ' + summaryStr + codeWarn,
     () => _doSendInvoicesToPlayauto(btn, targets, userEndpoint, fallbackCarrNo, summaryStr, true),
     { type: 'info', confirmText: '전송 시작' }
-  );
-}
-
-// 출고완료 상태 주문에 송장+택배사 다시 전송 (운송장 전송 — change_complete=false → 운송장출력 상태)
-async function sendTrackingToPlayauto() {
-  console.log('[TRACK-SEND] sendTrackingToPlayauto() 호출됨');
-  const btn = document.getElementById('pa-tracking-send-btn');
-  const endpointEl = document.getElementById('pa-inv-endpoint');
-  if (!endpointEl) {
-    showAppAlert('내부 오류', '필수 DOM 요소를 찾지 못했습니다. 페이지를 새로고침해 주세요.', { type: 'danger' });
-    return;
-  }
-  let savedEndpoint = '';
-  try { savedEndpoint = localStorage.getItem('pa_inv_last_endpoint') || ''; } catch(_) {}
-  const userEndpoint = ((endpointEl.value || '').trim()) || savedEndpoint || '/order/setInvoice';
-
-  if (!_loadPaKey() || !_loadPaAuth()) {
-    showAppAlert('설정 필요', '플레이오토 API 설정이 필요합니다. [플레이오토연동] 탭에서 먼저 등록하세요.', { type: 'warning' });
-    return;
-  }
-
-  const orig = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="animate-pulse">출고완료 주문 조회 중...</span>'; }
-  _invSendStatus('출고완료 주문 조회 중...', 'info');
-
-  let outboundOrders = [];
-  try {
-    // 최근 90일 주문을 가져와 클라이언트에서 출고완료 상태만 필터링.
-    // (status 배열 필터를 PA가 OR 로 처리하지 않는 사례 확인 — 단일 '출고완료' 만 보내거나
-    //  필터 없이 가져온 뒤 클라이언트에서 필터하는 게 안전함)
-    const today = new Date();
-    const start = new Date(today); start.setDate(today.getDate() - 90);
-    const startDate = _fmtYmd(start);
-    const endDate = _fmtYmd(today);
-    const widenStart = _paAddDays(startDate, -30);
-    const baseBody = {
-      start: 0, length: 500,
-      date_type: 'wdate', masking_yn: false, bundle_yn: false, orderby: 'wdate desc',
-      sdate: widenStart + ' 00:00:00',
-      edate: endDate + ' 23:59:59',
-    };
-    // 1차: 단일 상태 필터로 시도
-    const body1 = { ...baseBody, status: ['출고완료'] };
-    const data1 = await _paFetch('/orders', { method: 'POST', body: JSON.stringify(body1) });
-    outboundOrders = _paUnwrap(data1);
-    console.log('[TRACK-SEND] 1차(상태 필터): 출고완료 주문', outboundOrders.length, '건');
-    // 2차: 0건이면 필터 없이 가져와서 클라이언트에서 필터
-    if (!outboundOrders.length) {
-      const data2 = await _paFetch('/orders', { method: 'POST', body: JSON.stringify(baseBody) });
-      const allOrders = _paUnwrap(data2);
-      outboundOrders = allOrders.filter(o => {
-        const st = String(_paPickField(o, ['ord_status', 'status', 'order_status']) || '').trim();
-        return st === '출고완료' || st === '출고' || st.includes('출고완료');
-      });
-      console.log(`[TRACK-SEND] 2차(클라이언트 필터): 전체 ${allOrders.length}건 중 출고완료 ${outboundOrders.length}건`);
-    }
-  } catch (e) {
-    if (btn) { btn.disabled = false; btn.innerHTML = orig; }
-    _invSendStatus('출고완료 주문 조회 실패: ' + (e.message || e), 'error');
-    showAppAlert('조회 실패', '출고완료 주문 조회 실패\n\n' + (e.message || e), { type: 'danger' });
-    return;
-  }
-
-  if (btn) { btn.disabled = false; btn.innerHTML = orig; }
-
-  // 송장번호가 있는 주문만 — 출고완료 주문은 invoice_no 필드명이 다를 수 있어 후보 폭 확대
-  const _pickInv = o => _paPickField(o, ['invoice_no', 'invoice_num', 'invoiceNo', 'tracking_no', 'tracking_number', 'shipping_invoice_no', 'shipInvoice', 'shipping_no']);
-  const targets = outboundOrders.filter(o => {
-    const inv = _pickInv(o);
-    return inv && String(inv).trim();
-  });
-  if (!targets.length) {
-    showAppAlert('전송 가능한 주문 없음', `최근 90일 내 출고완료 상태 주문 ${outboundOrders.length}건 중 송장번호가 있는 주문이 없습니다.\n\n${outboundOrders.length === 0 ? '출고완료 상태 주문 자체가 조회되지 않았습니다. F12 콘솔의 [TRACK-SEND] 로그를 확인해 주세요.' : '응답에 invoice_no 필드가 다를 수 있습니다. F12 콘솔에 첫 주문 키 출력해 진단해 보세요.'}`, { type: 'warning' });
-    if (outboundOrders[0]) {
-      console.log('[TRACK-SEND] 첫 출고완료 주문 키:', Object.keys(outboundOrders[0]));
-      console.log('[TRACK-SEND] 첫 출고완료 주문 송장 후보:', {
-        invoice_no: outboundOrders[0].invoice_no,
-        tracking_no: outboundOrders[0].tracking_no,
-        carr_no: outboundOrders[0].carr_no,
-        carr_name: outboundOrders[0].carr_name,
-      });
-    }
-    return;
-  }
-
-  await _ensureCarriersLoaded();
-  // 각 주문의 carr_no/carr_name/invoice_no 표준화
-  targets.forEach(o => {
-    if (!o.invoice_no) o.invoice_no = _pickInv(o);
-    if (!o.invoice_carrier_no && o.carr_no) o.invoice_carrier_no = String(o.carr_no);
-    if (!o.invoice_carrier_name && o.carr_name) o.invoice_carrier_name = String(o.carr_name);
-    if (!o.invoice_carrier_no && o.invoice_carrier_name) {
-      const c = _findCarrierByName(o.invoice_carrier_name);
-      const cno = _carrierNoOf(c);
-      if (cno) o.invoice_carrier_no = cno;
-    }
-  });
-
-  const summary = {};
-  targets.forEach(o => {
-    const nm = o.invoice_carrier_name || o.carr_name || '(미지정)';
-    summary[nm] = (summary[nm] || 0) + 1;
-  });
-  const summaryStr = Object.keys(summary).map(k => k + ' ' + summary[k] + '건').join(' / ');
-
-  showAppConfirm(
-    '플레이오토로 운송장 재전송',
-    `출고완료 상태 주문 중 송장번호가 있는 ${targets.length}건의 운송장 정보를 PA에 다시 전송합니다.\n택배사 분포: ${summaryStr}\n\n※ 주문 상태가 "운송장출력" 으로 변경됩니다 (change_complete=false).\n※ 이미 출고완료 상태인 주문은 PA 정책상 거부될 수 있으니 결과 로그를 확인해 주세요.`,
-    () => _doSendInvoicesToPlayauto(btn, targets, userEndpoint, '', summaryStr, false),
-    { type: 'info', confirmText: '운송장 전송' }
   );
 }
 
