@@ -23132,14 +23132,14 @@ function _reconcileCompare(ledgerRows) {
     if (!candidates.length) { onlyLedger.push(L); return; }
     const G = candidates[0];
     usedGplan.add(G._idx);
-    // 값 비교 — 수량/단가/공급가
+    // 값 비교 — 수량 / 단가 / 원가(GPLAN cost 필드)
     const gQty   = Number(G.qty) || 0;
     const gPrice = Number(G.price) || 0;
-    const gSupply= Number(G.supply ?? G.cost) || 0;
+    const gCost  = Number(G.cost) || 0;
     const diffs = [];
     if (gQty !== L.qty)        diffs.push({ field: '수량', ledger: L.qty, gplan: gQty });
     if (L.unit && gPrice !== L.unit) diffs.push({ field: '단가', ledger: L.unit, gplan: gPrice });
-    if (L.sale && gSupply !== L.sale) diffs.push({ field: '공급가/매출', ledger: L.sale, gplan: gSupply });
+    if (L.sale && gCost !== L.sale)  diffs.push({ field: '원가/매출', ledger: L.sale, gplan: gCost });
     if (diffs.length) matched.push({ ledger: L, gplan: G, diffs });
     else matchedSame.push({ ledger: L, gplan: G });
   });
@@ -23206,7 +23206,7 @@ function _reconcileShowResult(ledgerRows, fileName) {
       <td style="padding:6px 10px;font-size:12px;">${_escapeHtml(G.itemName || '')}</td>
       <td style="padding:6px 10px;font-size:12px;text-align:right;">${fmt(G.qty)}</td>
       <td style="padding:6px 10px;font-size:12px;text-align:right;">${fmt(G.price)}</td>
-      <td style="padding:6px 10px;font-size:12px;text-align:right;">${fmt(G.supply ?? G.cost)}</td>
+      <td style="padding:6px 10px;font-size:12px;text-align:right;">${fmt(G.cost)}</td>
     </tr>`).join('');
   const onlyGplanHtml = onlyGplan.length ? `
     <div style="overflow:auto;max-height:240px;border:1px solid #eee;border-radius:8px;">
@@ -23217,7 +23217,7 @@ function _reconcileShowResult(ledgerRows, fileName) {
           <th style="padding:6px 10px;text-align:left;font-size:11px;color:#92400E;">품명</th>
           <th style="padding:6px 10px;text-align:right;font-size:11px;color:#92400E;">수량</th>
           <th style="padding:6px 10px;text-align:right;font-size:11px;color:#92400E;">단가</th>
-          <th style="padding:6px 10px;text-align:right;font-size:11px;color:#92400E;">공급가</th>
+          <th style="padding:6px 10px;text-align:right;font-size:11px;color:#92400E;">원가</th>
         </tr></thead>
         <tbody>${onlyGplanRows}</tbody>
       </table>
@@ -23261,8 +23261,8 @@ function _reconcileShowResult(ledgerRows, fileName) {
       <div style="padding:18px 22px;overflow:auto;flex:1;">
         ${sec('🔴 누락 (거래원장에는 있지만 GPLAN 에 없음)', '#DC2626', onlyLedger.length, onlyLedgerHtml)}
         ${sec('🟡 추가 (GPLAN 에는 있지만 거래원장에 없음)', '#D97706', onlyGplan.length, onlyGplanHtml)}
-        ${sec('🟠 값 불일치 (양쪽에 있지만 수량/단가/공급가 다름)', '#EA580C', matched.length, matchHtml)}
-        ${sec('🟢 일치 (양쪽에 있고 수량/단가/공급가 모두 같음)', '#16A34A', matchedSame.length, _renderReconcileSameHtml(matchedSame))}
+        ${sec('🟠 값 불일치 (양쪽에 있지만 수량/단가/원가 다름)', '#EA580C', matched.length, matchHtml)}
+        ${sec('🟢 일치 (양쪽에 있고 수량/단가/원가 모두 같음)', '#16A34A', matchedSame.length, _renderReconcileSameHtml(matchedSame))}
       </div>
       <div style="padding:14px 22px;border-top:1px solid #eee;display:flex;gap:8px;justify-content:space-between;align-items:center;">
         <span style="font-size:11px;color:#888;">파일 다운로드: 누락 / 추가 / 값 불일치 3개 시트로 구성</span>
@@ -23366,13 +23366,13 @@ function _reconcileExportExcel() {
       Number(L.balance) || '',
     ];
     if (G) {
-      const gValue = Number(G.supply ?? G.cost ?? G.price) || 0;
+      const gCost  = Number(G.cost) || 0;
       const lValue = Number(L.sale) || 0;
-      const diff = lValue - gValue;
+      const diff = lValue - gCost;
       const right = [
         G.itemName || '',
         G.receiver || '',
-        gValue,
+        gCost,
         diff, // 0 이면 일치, 양수/음수면 차이
       ];
       rows.push([...left, ...right]);
@@ -23389,12 +23389,12 @@ function _reconcileExportExcel() {
     extraSection.push([`▼ GPLAN 에만 있고 거래원장에 없는 행 (${onlyGplan.length}건)`]);
     extraSection.push(header); // 같은 헤더 반복
     onlyGplan.forEach(G => {
-      const gValue = Number(G.supply ?? G.cost ?? G.price) || 0;
+      const gCost = Number(G.cost) || 0;
       extraSection.push([
         G.date || '', '매출', '', '', Number(G.qty) || 0, Number(G.price) || 0, '', '', '',
         G.itemName || '',
         G.receiver || '',
-        gValue,
+        gCost,
         '거래원장에 없음',
       ]);
     });
@@ -23405,7 +23405,7 @@ function _reconcileExportExcel() {
   const summaryBlock = [
     [`서울리빙 거래원장 대조 결과 — ${srcFile}`],
     [`거래원장 ${ledgerCount}건 / GPLAN(서울리빙 계열) ${gplanCount}건 / 일치 ${matchedSame.length}건 · 차이 ${totalDiff}건 (값 불일치 ${matched.length} · 누락 ${onlyLedger.length} · 추가 ${onlyGplan.length})`],
-    [`차이 컬럼: 거래원장 매출 − GPLAN 원가. 0 이면 일치, 다르면 차액 표시. "값 없음" 은 GPLAN 에 매칭 행이 없음.`],
+    [`차이 컬럼: 거래원장 매출/지급 − GPLAN 원가(cost). 0 이면 일치, 다르면 차액 표시. "값 없음" 은 GPLAN 에 매칭 행이 없음.`],
     [], // 빈 줄
   ];
 
