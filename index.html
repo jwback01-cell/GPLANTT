@@ -22728,8 +22728,9 @@ function renderUploadData() {
   tbody.innerHTML = filtered.map(r => {
     const isAgg = !!r._isJetAggregate;
     const origIdx = isAgg ? -1 : data.indexOf(r);
+    // 집계 행도 선택 가능 — 체크 시 해당 itemName 의 모든 제트배송 개별 행이 함께 삭제됨
     const cbCell = isAgg
-      ? `<td class="px-4 py-3 whitespace-nowrap text-brand-gray text-xs" title="집계 행 — 개별 선택 불가">∑</td>`
+      ? `<td class="px-4 py-3 whitespace-nowrap"><input type="checkbox" class="upload-data-cb upload-data-cb-jet" data-jet-name="${_escapeHtml(r.itemName || '')}" data-jet-count="${r._aggCount || 0}" onchange="updateUploadDataSelCount()" title="이 품목의 제트배송 ${r._aggCount || 0}건이 모두 함께 삭제됩니다"></td>`
       : `<td class="px-4 py-3 whitespace-nowrap"><input type="checkbox" class="upload-data-cb" data-idx="${origIdx}" onchange="updateUploadDataSelCount()"></td>`;
     const editCell = isAgg
       ? `<td class="px-4 py-3 text-center whitespace-nowrap"><button onclick="openJetItemDetail(${JSON.stringify(r.itemName||'').replace(/"/g, '&quot;')})" title="이 품목의 개별 매핑 내역과 광고비 보기" class="text-brand-blue hover:text-brand-black hover:underline text-sm font-bold">🔍 상세</button></td>`
@@ -22858,14 +22859,50 @@ function toggleAllUploadData(cb) {
   updateUploadDataSelCount();
 }
 async function deleteSelectedUploadData() {
-  const idxs = Array.from(document.querySelectorAll('.upload-data-cb:checked')).map(c => parseInt(c.getAttribute('data-idx'),10)).filter(n => !isNaN(n));
-  if (idxs.length === 0) { showAppAlert('선택 항목 없음', '삭제할 행을 먼저 선택해 주세요.', 'warn'); return; }
+  // 일반 행 선택 (data-idx 기반)
+  const checkedRows = Array.from(document.querySelectorAll('.upload-data-cb:checked'));
+  const directIdxs = checkedRows
+    .filter(c => !c.classList.contains('upload-data-cb-jet'))
+    .map(c => parseInt(c.getAttribute('data-idx'),10))
+    .filter(n => !isNaN(n));
+  // 제트배송 집계 행 선택 (itemName 기반 — 같은 품목명의 모든 jet- 행 묶어서 삭제)
+  const jetNames = checkedRows
+    .filter(c => c.classList.contains('upload-data-cb-jet'))
+    .map(c => c.getAttribute('data-jet-name') || '');
+
+  if (directIdxs.length === 0 && jetNames.length === 0) {
+    showAppAlert('선택 항목 없음', '삭제할 행을 먼저 선택해 주세요.', 'warn');
+    return;
+  }
+
+  // 실제 삭제 대상 인덱스 산정 — 일반 + 제트 집계 매칭 행
+  const data = _loadUploadData();
+  const remove = new Set(directIdxs);
+  let jetExpandedCount = 0;
+  if (jetNames.length) {
+    const nameSet = new Set(jetNames.map(n => String(n || '').trim()));
+    data.forEach((r, i) => {
+      const isJet = r.template && String(r.template).startsWith('jet-');
+      if (!isJet) return;
+      const itemName = String(r.itemName || '').trim();
+      if (nameSet.has(itemName)) { remove.add(i); jetExpandedCount++; }
+    });
+  }
+
+  const totalToDelete = remove.size;
+  if (totalToDelete === 0) {
+    showAppAlert('삭제 대상 없음', '선택한 집계 행에 매칭되는 개별 데이터가 없습니다.', 'warn');
+    return;
+  }
+
+  const summaryLines = [];
+  if (directIdxs.length) summaryLines.push(`• 개별 행 ${directIdxs.length}건`);
+  if (jetNames.length) summaryLines.push(`• 제트배송 집계 ${jetNames.length}품목 → 개별 ${jetExpandedCount}건 함께 삭제`);
+
   showAppConfirm(
     '선택한 항목을 삭제할까요?',
-    `총 ${idxs.length}건의 업로드 데이터가 삭제됩니다. 매출 차감된 상품 재고는 자동으로 복구됩니다.`,
+    `총 ${totalToDelete}건의 업로드 데이터가 삭제됩니다.\n${summaryLines.join('\n')}\n\n매출 차감된 상품 재고는 자동으로 복구됩니다.`,
     async () => {
-      const data = _loadUploadData();
-      const remove = new Set(idxs);
       const removed = data.filter((_, i) => remove.has(i));
       const next = data.filter((_, i) => !remove.has(i));
       _saveUploadData(next);
@@ -22873,9 +22910,9 @@ async function deleteSelectedUploadData() {
       const stockRes = await _applyStockFromUploadRows(removed, +1);
       renderUploadData();
       if (stockRes.updated > 0) {
-        showAppAlert('삭제 완료', `${idxs.length}건 삭제 완료\n📦 재고 복구: ${stockRes.updated}개 SKU (총 ${stockRes.totalDelta}개 증가)`, 'success');
+        showAppAlert('삭제 완료', `${totalToDelete}건 삭제 완료\n📦 재고 복구: ${stockRes.updated}개 SKU (총 ${stockRes.totalDelta}개 증가)`, 'success');
       } else {
-        showAppAlert('삭제 완료', `${idxs.length}건 삭제 완료`, 'success');
+        showAppAlert('삭제 완료', `${totalToDelete}건 삭제 완료`, 'success');
       }
     },
     { type: 'danger', confirmText: '삭제', confirmStyle: 'danger' }
