@@ -22393,6 +22393,8 @@ function convertPaClaimsToReturns() {
         addr:     String(o.to_addr1 || '') + (o.to_addr2 ? ' ' + o.to_addr2 : ''),
         qty:      _claimGet(o, 'qty'),
         itemName: _claimGet(o, 'itemName'),
+        sku:      _claimGet(o, 'sku'),                  // SKU 도 같이 저장 — 재고 복원 시 우선 매칭
+        skuName:  _claimGet(o, 'skuName'),
         shipType: '',
         payType:  '',
         orderNo:  String(o.shop_ord_no || o.bundle_no || o.ord_no || ''),
@@ -22416,8 +22418,11 @@ function convertPaClaimsToReturns() {
       // 자동 재고 복원
       try {
         const { updated, missing } = await _restoreStockFromReturns(newRows);
-        const missMsg = missing.length ? `\n\n⚠ 매칭 실패 ${missing.length}건 — 상품명 표기 차이일 수 있어요.` : '';
-        const restoreMsg = updated > 0 ? `\n📦 재고 복원: ${updated}개 SKU 자동 +수량 적용됨` : '';
+        const missDetail = missing.slice(0, 5).map(m => `· ${m.sku || '(SKU없음)'} / ${m.name || '(상품명없음)'} (${m.qty}개)`).join('\n');
+        const missMsg = missing.length
+          ? `\n\n⚠ 매칭 실패 ${missing.length}건 — 상품관리에 SKU 등록 후 다시 시도하세요.\n${missDetail}${missing.length > 5 ? `\n…외 ${missing.length - 5}건` : ''}`
+          : '';
+        const restoreMsg = updated > 0 ? `\n📦 재고 복원: ${updated}개 상품 자동 +수량 적용됨` : '';
         showAppAlert('변환 완료', `${newRows.length}건이 반품 데이터로 저장되었습니다.${restoreMsg}${missMsg}`, 'success');
       } catch (e) {
         showAppAlert('변환 완료', `${newRows.length}건이 반품 데이터로 저장되었습니다.`, 'success');
@@ -25010,6 +25015,7 @@ function _processUploadAoa(aoa) {
       addr:       rIdx(['받는분주소']),
       qty:        rIdx(['수량']),
       itemName:   rIdx(['상품명','품목명']),
+      sku:        rIdx(['SKU코드','SKU 코드','sku코드','SKU','sku','품목코드','상품코드']),
       shipType:   rIdx(['운임TYPE','운임type','운임 TYPE']),
       payType:    rIdx(['지불조건']),
       orderNo:    rIdx(['출고번호']),
@@ -25025,9 +25031,10 @@ function _processUploadAoa(aoa) {
       const row = aoa[i] || [];
       const recvName = _str(row[I.name]);
       const itemName = _str(row[I.itemName]);
+      const sku = (I.sku >= 0) ? _str(row[I.sku]) : '';
       const qty = _num(row[I.qty]);
       // 모두 비어있으면 스킵
-      if (!recvName && !itemName && !qty) continue;
+      if (!recvName && !itemName && !qty && !sku) continue;
       newRows.push({
         recvName,
         phoneEtc:  _str(row[I.phoneEtc]),
@@ -25037,6 +25044,7 @@ function _processUploadAoa(aoa) {
         addr:      _str(row[I.addr]),
         qty,
         itemName,
+        sku,
         shipType:  _str(row[I.shipType]),
         payType:   _str(row[I.payType]),
         orderNo:   _str(row[I.orderNo]),
@@ -25059,10 +25067,13 @@ function _processUploadAoa(aoa) {
     _saveReturns(all);
     _refreshReturnKpi();
 
-    // 자동 재고 복원 — 상품명 매칭 후 stock += qty
+    // 자동 재고 복원 — SKU 우선 → 상품명 폴백
     _restoreStockFromReturns(newRows).then(({ updated, missing }) => {
-      const missMsg = missing.length ? `\n\n⚠ 상품 매칭 실패 ${missing.length}건 — 상품명 표기가 상품관리와 다를 수 있어요.` : '';
-      const restoreMsg = updated > 0 ? `\n📦 재고 복원: ${updated}개 SKU 자동 +수량 적용됨` : '';
+      const missDetail = missing.slice(0, 5).map(m => `· ${m.sku || '(SKU없음)'} / ${m.name || '(상품명없음)'} (${m.qty}개)`).join('\n');
+      const missMsg = missing.length
+        ? `\n\n⚠ 상품 매칭 실패 ${missing.length}건 — 상품관리에 SKU/상품명 확인 후 다시 시도하세요.\n${missDetail}${missing.length > 5 ? `\n…외 ${missing.length - 5}건` : ''}`
+        : '';
+      const restoreMsg = updated > 0 ? `\n📦 재고 복원: ${updated}개 상품 자동 +수량 적용됨` : '';
       showAppAlert(
         '반품 업로드 완료',
         `${newRows.length}건의 반품 데이터가 저장되었습니다.\n누적 ${all.length}건.${restoreMsg}${missMsg}`,
@@ -25500,27 +25511,46 @@ async function _restoreStockFromReturns(returnRows) {
   const products = (typeof _allProducts !== 'undefined' && Array.isArray(_allProducts)) ? _allProducts : [];
   if (!products.length) return { updated: 0, missing: [] };
 
-  // 상품명 정규화 인덱스 (공백/특수문자 제거 후 매칭)
+  // 정규화 — SKU/상품명 모두 동일 정규화
   const _norm = s => String(s || '').replace(/\s+/g,'').replace(/[\(\)\[\]\.,_\-\/·]/g,'').toLowerCase();
+  // SKU 인덱스 (1순위)
+  const bySku = new Map();
+  // 상품명 인덱스 (2순위 — SKU 매칭 실패 시 폴백)
   const byName = new Map();
   products.forEach(p => {
-    const k = _norm(p.name);
-    if (k && !byName.has(k)) byName.set(k, p);
+    const sk = _norm(p.sku);
+    if (sk && !bySku.has(sk)) bySku.set(sk, p);
+    const nk = _norm(p.name);
+    if (nk && !byName.has(nk)) byName.set(nk, p);
   });
 
-  // 동일 itemName 별 합산
-  const byItem = new Map();
-  returnRows.forEach(r => {
-    const key = _norm(r.itemName || '');
-    if (!key) return;
-    byItem.set(key, (byItem.get(key) || 0) + (Number(r.qty) || 0));
-  });
-
+  // 행마다 매칭 → 상품 ID 별 누적 수량
+  const byProdId = new Map(); // productId -> { product, qty }
   const missing = [];
+  returnRows.forEach(r => {
+    const qty = Number(r.qty) || 0;
+    if (!qty) return;
+    let prod = null;
+    // 1) SKU 매칭 우선
+    const skuKey = _norm(r.sku || r.skuCode || r.itemCode);
+    if (skuKey && bySku.has(skuKey)) prod = bySku.get(skuKey);
+    // 2) 상품명 폴백
+    if (!prod) {
+      const nameKey = _norm(r.itemName);
+      if (nameKey && byName.has(nameKey)) prod = byName.get(nameKey);
+    }
+    if (!prod) {
+      missing.push({ sku: r.sku || '', name: r.itemName || '', qty });
+      return;
+    }
+    if (!byProdId.has(prod.id)) byProdId.set(prod.id, { product: prod, qty: 0 });
+    byProdId.get(prod.id).qty += qty;
+  });
+
   let updated = 0;
-  for (const [k, qty] of byItem) {
-    const prod = byName.get(k);
-    if (!prod) { missing.push({ name: k, qty }); continue; }
+  for (const [, agg] of byProdId) {
+    const prod = agg.product;
+    const qty = agg.qty;
     const prevStock = Number(prod.stock) || 0;
     const newStock = prevStock + qty;
     try {
@@ -25531,7 +25561,7 @@ async function _restoreStockFromReturns(returnRows) {
         if (typeof _logStockMove === 'function') _logStockMove({
           productId: prod.id, sku: prod.sku, productName: prod.name,
           type: '반품복원', delta: qty, prevStock, newStock,
-          note: `반품 데이터 ${qty}건 복원`
+          note: `반품 데이터 ${qty}건 복원 (SKU/상품명 매칭)`
         });
       } catch (_) {}
       // 재고 연동 그룹 동기화도 적용
