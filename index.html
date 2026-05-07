@@ -21724,29 +21724,35 @@ function _claimGet(o, kind) {
   if (o._edits && o._edits[kind] !== undefined) return o._edits[kind];
 
   // SKU/SKU상품명 — 사용자 편집 외엔 PA 응답에서 직접 추출
+  // PA 응답에서 가능한 모든 SKU 후보 + 중첩 배열 탐색
+  const _firstNonEmpty = (...vals) => vals.find(v => v !== undefined && v !== null && v !== '' && String(v).trim() !== '') || '';
+  const _claimNestedItem = obj => {
+    const candidates = ['prod_list','products','items','set_pack_list','sku_list','order_items'];
+    for (const k of candidates) {
+      if (Array.isArray(obj[k]) && obj[k].length) return obj[k][0];
+    }
+    return null;
+  };
   if (kind === 'sku') {
-    // 1) 최상위 필드 후보
-    const top = String(
-      o.sku_cd || o.sku || o.shop_sku_cd ||
-      o.set_cd || o.set_no || o.set_pack_cd || ''
-    ).trim();
-    if (top) return top;
-    // 2) prod_list[0].sku_cd 등 중첩 배열
-    const list = Array.isArray(o.prod_list) ? o.prod_list : (Array.isArray(o.products) ? o.products : []);
-    if (list.length) {
-      const first = list[0] || {};
-      return String(first.sku_cd || first.sku || first.set_cd || first.prod_no || '').trim();
+    const top = _firstNonEmpty(
+      o.sku_cd, o.sku, o.shop_sku_cd, o.set_cd, o.set_no, o.set_pack_cd,
+      o.SKU, o.skuCd, o.skuCode, o.sku_code, o.product_sku
+    );
+    if (top) return String(top).trim();
+    const nested = _claimNestedItem(o);
+    if (nested) {
+      const fromNested = _firstNonEmpty(nested.sku_cd, nested.sku, nested.set_cd, nested.set_no, nested.SKU);
+      if (fromNested) return String(fromNested).trim();
     }
     return '';
   }
   if (kind === 'skuName') {
-    const v = String(o.prod_name || o.sku_name || o.set_pack_name || o.set_name || '').trim();
-    if (v) return v;
-    // prod_list 안의 첫 항목의 prod_name
-    const list = Array.isArray(o.prod_list) ? o.prod_list : (Array.isArray(o.products) ? o.products : []);
-    if (list.length) {
-      const fname = String((list[0] && (list[0].prod_name || list[0].sku_name)) || '').trim();
-      if (fname) return fname;
+    const top = _firstNonEmpty(o.prod_name, o.sku_name, o.set_pack_name, o.set_name, o.product_name_alt);
+    if (top) return String(top).trim();
+    const nested = _claimNestedItem(o);
+    if (nested) {
+      const fromNested = _firstNonEmpty(nested.prod_name, nested.sku_name, nested.set_pack_name, nested.set_name, nested.name);
+      if (fromNested) return String(fromNested).trim();
     }
     // SKU 매칭 시 상품관리 이름 폴백
     const prod = _findProductBySku(_claimGet(o, 'sku'));
@@ -21953,6 +21959,11 @@ async function enrichPaClaimsWithDetail() {
     try {
       const detail = await _paFetch('/order/' + encodeURIComponent(uniq), { method: 'GET' });
       const d = (detail && (detail.data || detail.result || detail)) || {};
+      // 진단 — 첫 1건만 console 에 출력 (디버그용)
+      if (i === 0 && typeof console !== 'undefined') {
+        console.log('[PA 클레임 상세] 응답 키:', Object.keys(d).sort());
+        console.log('[PA 클레임 상세] 첫 응답 전체:', d);
+      }
       // detail 에서 사유/공급가/원가/택배비용 후보 추출
       const reason = String(d.claim_reason || d.cancel_reason || d.return_reason || d.exchange_reason || d.claim_msg || d.memo || '').trim();
       const supply = Number(d.shop_supply_price || d.supply_price || 0);
@@ -21982,6 +21993,15 @@ async function enrichPaClaimsWithDetail() {
   }
   _renderPaClaims();
   _msg(`상세 보충 완료 — 성공 ${updated}건${failed ? ` / 실패 ${failed}건` : ''}`, failed ? 'warn' : 'ok');
+  // SKU 추출 진단 — 각 클레임에 어떤 SKU 가 잡혔는지
+  if (typeof console !== 'undefined') {
+    const skuReport = _paClaims.map(o => ({
+      uniq: o.uniq, sku: _claimGet(o, 'sku'), skuName: _claimGet(o, 'skuName'),
+      sku_cd: o.sku_cd, set_cd: o.set_cd, prod_name: o.prod_name,
+      hasProdList: Array.isArray(o.prod_list), prodListLen: (o.prod_list || []).length,
+    }));
+    console.log('[PA 클레임 SKU 진단]', skuReport);
+  }
 }
 
 function exportPaClaims() {
