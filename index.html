@@ -21727,7 +21727,7 @@ function _claimGet(o, kind) {
   // PA 응답에서 가능한 모든 SKU 후보 + 중첩 배열 탐색
   const _firstNonEmpty = (...vals) => vals.find(v => v !== undefined && v !== null && v !== '' && String(v).trim() !== '') || '';
   const _claimNestedItem = obj => {
-    const candidates = ['prod_list','products','items','set_pack_list','sku_list','order_items'];
+    const candidates = ['prod_list','ord_opt_list','products','items','set_pack_list','sku_list','order_items'];
     for (const k of candidates) {
       if (Array.isArray(obj[k]) && obj[k].length) return obj[k][0];
     }
@@ -21958,11 +21958,21 @@ async function enrichPaClaimsWithDetail() {
     _msg(`상세 조회 중... (${i+1}/${_paClaims.length})`, 'info');
     try {
       const detail = await _paFetch('/order/' + encodeURIComponent(uniq), { method: 'GET' });
-      const d = (detail && (detail.data || detail.result || detail)) || {};
+      const raw = (detail && (detail.data || detail.result || detail)) || {};
+      // PA 주문 상세 응답 구조:
+      //   { order_data: {...}, prod_list: [...], ord_opt_list: [...], memo_list: [...] }
+      // 평탄화해서 d 로 통합 (order_data 기본 + prod_list[0]/ord_opt_list[0] 의 SKU 정보 병합)
+      const od = (raw && typeof raw.order_data === 'object' && raw.order_data) ? raw.order_data : raw;
+      const prodList = Array.isArray(raw.prod_list) ? raw.prod_list : [];
+      const ordOptList = Array.isArray(raw.ord_opt_list) ? raw.ord_opt_list : [];
+      const skuItem = prodList[0] || ordOptList[0] || {};
+      const d = { ...od, ...skuItem };
       // 진단 — 첫 1건만 console 에 출력 (디버그용)
       if (i === 0 && typeof console !== 'undefined') {
-        console.log('[PA 클레임 상세] 응답 키:', Object.keys(d).sort());
-        console.log('[PA 클레임 상세] 첫 응답 전체:', d);
+        console.log('[PA 클레임 상세] 응답 키:', Object.keys(raw).sort());
+        console.log('[PA 클레임 상세] order_data 키:', Object.keys(od).sort());
+        console.log('[PA 클레임 상세] skuItem 키:', Object.keys(skuItem).sort());
+        console.log('[PA 클레임 상세] 첫 응답 전체:', raw);
       }
       // detail 에서 사유/공급가/원가/택배비용 후보 추출
       const reason = String(d.claim_reason || d.cancel_reason || d.return_reason || d.exchange_reason || d.claim_msg || d.memo || '').trim();
@@ -21976,13 +21986,22 @@ async function enrichPaClaimsWithDetail() {
       if (cost   && o._edits.cost   === undefined) o._edits.cost   = cost;
       if (shipCost && o._edits.shipCost === undefined) o._edits.shipCost = shipCost;
 
-      // SKU 관련 필드 — list API 에서 누락된 경우 detail 에서 보충해 _paClaims 객체에 머지
-      const skuCandidates = ['sku_cd','sku','shop_sku_cd','set_cd','set_no','set_pack_cd','prod_name','sku_name','set_pack_name','set_name','prod_list','products','pack_unit','set_pack_unit'];
+      // SKU/품명/세트 관련 필드 — d (평탄화) 에서 보충해 _paClaims 객체에 머지
+      const skuCandidates = [
+        'sku_cd','sku','shop_sku_cd','set_cd','set_no','set_pack_cd',
+        'prod_name','sku_name','set_pack_name','set_name',
+        'pack_unit','set_pack_unit','sale_cnt'
+      ];
       skuCandidates.forEach(k => {
         if (d[k] !== undefined && d[k] !== null && d[k] !== '' && (o[k] === undefined || o[k] === '' || o[k] === null)) {
           o[k] = d[k];
         }
       });
+      // 중첩 배열도 보존 (_claimGet 의 nested 폴백용)
+      if (prodList.length && !Array.isArray(o.prod_list)) o.prod_list = prodList;
+      if (ordOptList.length && !Array.isArray(o.ord_opt_list)) o.ord_opt_list = ordOptList;
+      // _uploadMatch 캐시 무효화 (보충된 값으로 다시 매칭하도록)
+      delete o._uploadMatch;
       updated++;
       // 부드러운 진행을 위해 매 5건마다 렌더 갱신
       if (i % 5 === 0) _renderPaClaims();
