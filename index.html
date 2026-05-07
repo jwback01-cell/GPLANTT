@@ -3195,6 +3195,7 @@ tailwind.config = {
         <!-- Sub-tabs (4개) -->
         <div class="flex gap-1 p-1 bg-brand-bg rounded-full border border-brand-border w-fit flex-wrap">
           <button id="pa-sub-tab-order" class="pa-sub-btn px-4 py-2 rounded-full text-xs font-bold bg-brand-black text-white" onclick="switchPlayautoSubTab('order')">주문수집</button>
+          <button id="pa-sub-tab-claim" class="pa-sub-btn px-4 py-2 rounded-full text-xs font-bold text-brand-gray hover:text-brand-black" onclick="switchPlayautoSubTab('claim')">클레임 관리</button>
           <button id="pa-sub-tab-minus" class="pa-sub-btn px-4 py-2 rounded-full text-xs font-bold text-brand-gray hover:text-brand-black" onclick="switchPlayautoSubTab('minus')">마이너스 확인</button>
           <button id="pa-sub-tab-external" class="pa-sub-btn px-4 py-2 rounded-full text-xs font-bold text-brand-gray hover:text-brand-black" onclick="switchPlayautoSubTab('external')">외부업체 주문</button>
           <button id="pa-sub-tab-invoice" class="pa-sub-btn px-4 py-2 rounded-full text-xs font-bold text-brand-gray hover:text-brand-black" onclick="switchPlayautoSubTab('invoice')">송장 업로드</button>
@@ -3332,6 +3333,100 @@ tailwind.config = {
         </div>
         </div>
         <!-- /Sub-panel: 주문수집 -->
+
+        <!-- Sub-panel: 클레임 관리 -->
+        <div id="pa-sub-panel-claim" class="hidden flex flex-col gap-6">
+          <div class="bg-white rounded-3xl panel p-5 flex flex-col gap-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-brand-orange-light flex items-center justify-center shrink-0">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF9800" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              </div>
+              <div>
+                <div class="font-bold text-[15px]">클레임 관리 주문 가져오기</div>
+                <div class="text-xs text-brand-gray mt-1">PA 클레임 관리 탭의 취소/반품/교환 주문을 일괄 가져옵니다.</div>
+              </div>
+            </div>
+
+            <!-- 필터 -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div>
+                <div class="text-xs font-bold text-brand-gray mb-1">조회 시작일</div>
+                <input id="pa-claim-start" type="date" class="w-full bg-brand-bg border border-brand-border rounded-xl px-3 py-2 text-sm outline-none focus:border-brand-black">
+              </div>
+              <div>
+                <div class="text-xs font-bold text-brand-gray mb-1">조회 종료일</div>
+                <input id="pa-claim-end" type="date" class="w-full bg-brand-bg border border-brand-border rounded-xl px-3 py-2 text-sm outline-none focus:border-brand-black">
+              </div>
+              <div>
+                <div class="text-xs font-bold text-brand-gray mb-1">상태 필터</div>
+                <select id="pa-claim-status" class="w-full bg-brand-bg border border-brand-border rounded-xl px-3 py-2 text-sm outline-none focus:border-brand-black">
+                  <option value="all">전체 (취소/반품/교환)</option>
+                  <option value="cancel">취소요청 + 취소완료</option>
+                  <option value="return">반품 (요청/접수/회수완료/완료)</option>
+                  <option value="exchange">교환 (요청/접수/회수완료/완료)</option>
+                  <option value="cross">맞교환 (요청/완료)</option>
+                  <option value="reconfirm">주문재확인</option>
+                </select>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-brand-gray mb-1">조회 기준</div>
+                <select id="pa-claim-date-type" class="w-full bg-brand-bg border border-brand-border rounded-xl px-3 py-2 text-sm outline-none focus:border-brand-black">
+                  <option value="wdate">주문수집일(wdate)</option>
+                  <option value="claim_time">클레임 발생일</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="flex gap-2 flex-wrap">
+              <button onclick="setPaClaimDateRange('today')" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">오늘</button>
+              <button onclick="setPaClaimDateRange('yesterday')" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">어제</button>
+              <button onclick="setPaClaimDateRange('7days')" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">최근 7일</button>
+              <button onclick="setPaClaimDateRange('30days')" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">최근 30일</button>
+              <button onclick="setPaClaimDateRange('thismonth')" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">이번 달</button>
+            </div>
+
+            <button id="pa-claim-fetch-btn" onclick="fetchPlayautoClaims()" class="bg-brand-black text-white px-5 py-3 rounded-full font-bold hover:-translate-y-0.5 transition-transform shadow-md flex items-center justify-center gap-2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              클레임 주문 수집
+            </button>
+            <div id="pa-claim-status-msg" class="hidden text-sm font-semibold px-1"></div>
+          </div>
+
+          <!-- 결과 표 -->
+          <div class="bg-white rounded-3xl panel overflow-hidden">
+            <div class="px-6 py-4 border-b border-brand-border flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <div class="font-bold text-[15px]">수집된 클레임 주문 <span id="pa-claim-count" class="text-brand-gray font-medium">0건</span></div>
+                <div class="text-xs text-brand-gray mt-1">상태별로 분류된 클레임 주문 목록 — 반품 데이터로 자동 변환 가능</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button onclick="exportPaClaims()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg">📥 엑셀 내보내기</button>
+                <button id="pa-claim-to-returns" onclick="convertPaClaimsToReturns()" class="px-4 py-2 rounded-full bg-brand-pink-light text-brand-pink text-sm font-bold border border-brand-pink hover:bg-brand-pink hover:text-white transition-colors">📦 반품 데이터로 저장</button>
+              </div>
+            </div>
+            <!-- 상태별 KPI -->
+            <div id="pa-claim-kpi" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 p-4 bg-brand-bg/30"></div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="bg-brand-bg text-brand-gray">
+                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">상태</th>
+                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">쇼핑몰</th>
+                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">주문일</th>
+                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">주문번호</th>
+                    <th class="text-left px-4 py-3 font-bold text-xs">상품명</th>
+                    <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap">수량</th>
+                    <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap">판매가</th>
+                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">수령자</th>
+                    <th class="text-left px-4 py-3 font-bold text-xs">사유</th>
+                  </tr>
+                </thead>
+                <tbody id="pa-claim-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <!-- /Sub-panel: 클레임 관리 -->
 
         <!-- Sub-panel: 마이너스 확인 -->
         <div id="pa-sub-panel-minus" class="hidden flex flex-col gap-6">
@@ -19900,7 +19995,7 @@ function _paDownloadUploadResults() {
 
 // 플레이오토 연동 내부 서브탭 전환
 function switchPlayautoSubTab(sub) {
-  const subs = ['order', 'minus', 'external', 'invoice', 'config'];
+  const subs = ['order', 'claim', 'minus', 'external', 'invoice', 'config'];
   if (subs.indexOf(sub) === -1) sub = 'order';
   subs.forEach(s => {
     const btn = document.getElementById('pa-sub-tab-' + s);
@@ -19910,6 +20005,7 @@ function switchPlayautoSubTab(sub) {
   });
   if (sub === 'invoice') { try { _initInvoiceSubTab(); } catch(_) {} }
   if (sub === 'external') { try { _renderExternalOrderUpload(_loadExternalOrderUpload()); } catch(_) {} }
+  if (sub === 'claim') { try { _initClaimSubTab(); } catch(_) {} }
 }
 
 // ── 송장 업로드 (플레이오토 연동 서브탭) ─────────────
@@ -21431,6 +21527,256 @@ const PA_STATUS_CANDIDATES = {
   '배송완료': ['배송완료'],
   '구매확정': ['구매확정', '구매결정'],
 };
+
+// PA 클레임 관리 상태 — 상태 그룹별로 모든 후보 매핑
+const PA_CLAIM_STATUS = {
+  cancel:    ['취소요청', '취소완료'],
+  return:    ['반품요청', '반품접수', '반품회수완료', '반품완료'],
+  exchange:  ['교환요청', '교환접수', '교환회수완료', '교환완료'],
+  cross:     ['맞교환요청', '맞교환완료'],
+  reconfirm: ['주문재확인'],
+};
+function _allClaimStatuses() {
+  const out = [];
+  Object.values(PA_CLAIM_STATUS).forEach(arr => arr.forEach(s => out.push(s)));
+  return out;
+}
+
+// ── PA 클레임 관리 ──────────────────────────────
+let _paClaims = []; // 수집된 클레임 주문 캐시
+
+function _initClaimSubTab() {
+  // 처음 들어왔을 때 기본 날짜 (최근 7일) 세팅
+  const startEl = document.getElementById('pa-claim-start');
+  const endEl = document.getElementById('pa-claim-end');
+  if (startEl && !startEl.value) {
+    const today = new Date();
+    const start = new Date(today); start.setDate(today.getDate() - 6);
+    const fmt = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    startEl.value = fmt(start);
+    endEl.value = fmt(today);
+  }
+}
+
+function setPaClaimDateRange(mode) {
+  const startEl = document.getElementById('pa-claim-start');
+  const endEl = document.getElementById('pa-claim-end');
+  if (!startEl || !endEl) return;
+  const fmt = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  const today = new Date();
+  if (mode === 'today') { const v = fmt(today); startEl.value = v; endEl.value = v; }
+  else if (mode === 'yesterday') { const v = fmt(new Date(today.getTime() - 86400000)); startEl.value = v; endEl.value = v; }
+  else if (mode === '7days') { startEl.value = fmt(new Date(today.getTime() - 6*86400000)); endEl.value = fmt(today); }
+  else if (mode === '30days') { startEl.value = fmt(new Date(today.getTime() - 29*86400000)); endEl.value = fmt(today); }
+  else if (mode === 'thismonth') { startEl.value = fmt(new Date(today.getFullYear(), today.getMonth(), 1)); endEl.value = fmt(today); }
+}
+
+async function fetchPlayautoClaims() {
+  const btn = document.getElementById('pa-claim-fetch-btn');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="animate-pulse">클레임 수집 중...</span>'; }
+  const msg = document.getElementById('pa-claim-status-msg');
+  const _msg = (text, tone) => {
+    if (!msg) return;
+    msg.textContent = text;
+    msg.className = 'text-sm font-semibold px-1 ' + (tone === 'error' ? 'text-brand-pink' : tone === 'ok' ? 'text-brand-green' : tone === 'warn' ? 'text-brand-orange' : 'text-brand-gray');
+    msg.classList.remove('hidden');
+  };
+  try {
+    if (!_loadPaKey() || !_loadPaAuth()) throw new Error('플레이오토 API 설정이 필요합니다. "플레이오토연동" 탭에서 먼저 등록하세요.');
+
+    const startDate = document.getElementById('pa-claim-start').value || '';
+    const endDate = document.getElementById('pa-claim-end').value || '';
+    const statusGroup = document.getElementById('pa-claim-status').value || 'all';
+    const dateType = document.getElementById('pa-claim-date-type').value || 'wdate';
+
+    // 상태 후보 결정
+    let statusList;
+    if (statusGroup === 'all') statusList = _allClaimStatuses();
+    else statusList = PA_CLAIM_STATUS[statusGroup] || _allClaimStatuses();
+
+    _msg(`클레임 ${statusList.length}개 상태 수집 중... (${statusList.join(', ')})`, 'info');
+
+    // PA API: 30일 widening (claim_time 등 비-wdate 필터는 클라이언트에서)
+    const widenStart = (dateType !== 'wdate' && startDate) ? _paAddDays(startDate, -30) : startDate;
+    const baseBody = {
+      start: 0, length: 1000,
+      date_type: 'wdate',
+      masking_yn: false, bundle_yn: false,
+      orderby: 'wdate desc',
+    };
+    if (widenStart) baseBody.sdate = widenStart + ' 00:00:00';
+    if (endDate) baseBody.edate = endDate + ' 23:59:59';
+    baseBody.status = statusList;
+
+    const data = await _paFetch('/orders', { method: 'POST', body: JSON.stringify(baseBody) });
+    let orders = _paUnwrap(data);
+
+    // 비-wdate 필터: claim_time 같은 필드로 클라이언트 필터링
+    if (dateType !== 'wdate' && (startDate || endDate)) {
+      const fields = _PA_DATE_FIELDS[dateType] || [dateType, 'claim_time', 'claim_date'];
+      orders = orders.filter(o => {
+        const v = _paPickDate(o, fields);
+        if (!v) return false;
+        const d = String(v).slice(0, 10);
+        if (startDate && d < startDate) return false;
+        if (endDate && d > endDate) return false;
+        return true;
+      });
+    }
+
+    _paClaims = orders;
+    _renderPaClaims();
+    _msg(`${orders.length}건 수집 완료`, 'ok');
+  } catch (err) {
+    console.error('[PA 클레임]', err);
+    _msg('수집 실패: ' + (err.message || err), 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+  }
+}
+
+function _renderPaClaims() {
+  const cnt = document.getElementById('pa-claim-count');
+  if (cnt) cnt.textContent = `${_paClaims.length}건`;
+
+  const fmtN = n => Number(n || 0).toLocaleString('ko-KR');
+  const _claimStatus = o => String(o.order_status || o.claim_status || o.status || '').trim();
+  const _claimReason = o => String(o.claim_reason || o.cancel_reason || o.return_reason || o.exchange_reason || o.memo || '').trim();
+  const _itemName = o => String(o.shop_sale_name || o.sale_name || o.product_name || o.name || '').trim();
+  const _orderNo = o => String(o.shop_ord_no || o.bundle_no || o.ord_no || o.order_no || '').trim();
+  const _qty = o => Number(o.sale_cnt || o.qty || o.order_qty || 0);
+  const _price = o => Number(o.sale_price || o.price || o.shop_price || 0);
+  const _shop = o => String(o.shop_name || o.shop_id || o.shop || '').trim();
+  const _date = o => String(o.wdate || o.order_date || '').slice(0, 10);
+  const _recv = o => String(o.to_name || o.receiver || o.order_name || '').trim();
+
+  // 상태별 KPI
+  const byStatus = {};
+  _paClaims.forEach(o => {
+    const s = _claimStatus(o) || '미분류';
+    byStatus[s] = (byStatus[s] || 0) + 1;
+  });
+  const kpiEl = document.getElementById('pa-claim-kpi');
+  if (kpiEl) {
+    if (!_paClaims.length) {
+      kpiEl.innerHTML = '<div class="col-span-full text-center text-brand-gray text-sm py-3">수집된 클레임 없음</div>';
+    } else {
+      kpiEl.innerHTML = Object.entries(byStatus).sort((a,b) => b[1] - a[1]).map(([s, n]) =>
+        `<div class="bg-white rounded-xl p-3 border border-brand-border"><div class="text-xs font-bold text-brand-gray">${escHtml(s)}</div><div class="text-lg font-black mt-0.5 text-brand-pink">${n}</div></div>`
+      ).join('');
+    }
+  }
+
+  const tbody = document.getElementById('pa-claim-tbody');
+  if (!tbody) return;
+  if (!_paClaims.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="px-6 py-12 text-center text-brand-gray text-sm">수집된 클레임 주문이 없습니다.</td></tr>';
+    return;
+  }
+  // 상태 색상
+  const _statusBadge = s => {
+    const isCancel = /취소/.test(s);
+    const isReturn = /반품/.test(s);
+    const isExchange = /교환|맞교환/.test(s);
+    const cls = isCancel ? 'bg-brand-pink-light text-brand-pink' :
+                isReturn ? 'bg-brand-orange-light text-brand-orange' :
+                isExchange ? 'bg-brand-blue-light text-brand-blue' :
+                'bg-brand-bg text-brand-gray';
+    return `<span class="px-2 py-0.5 rounded-full text-[11px] font-bold ${cls}">${escHtml(s || '-')}</span>`;
+  };
+  tbody.innerHTML = _paClaims.map(o => `<tr class="border-t border-brand-border hover:bg-brand-bg/40">
+    <td class="px-4 py-3 whitespace-nowrap">${_statusBadge(_claimStatus(o))}</td>
+    <td class="px-4 py-3 text-xs whitespace-nowrap">${escHtml(_shop(o))}</td>
+    <td class="px-4 py-3 text-xs whitespace-nowrap">${escHtml(_date(o))}</td>
+    <td class="px-4 py-3 text-xs font-mono text-brand-gray whitespace-nowrap">${escHtml(_orderNo(o))}</td>
+    <td class="px-4 py-3 text-xs">${escHtml(_itemName(o))}</td>
+    <td class="px-4 py-3 text-xs text-right whitespace-nowrap">${fmtN(_qty(o))}</td>
+    <td class="px-4 py-3 text-xs text-right whitespace-nowrap">${fmtN(_price(o))}</td>
+    <td class="px-4 py-3 text-xs whitespace-nowrap">${escHtml(_recv(o))}</td>
+    <td class="px-4 py-3 text-xs text-brand-gray truncate max-w-[300px]" title="${escHtml(_claimReason(o))}">${escHtml(_claimReason(o) || '-')}</td>
+  </tr>`).join('');
+}
+
+function exportPaClaims() {
+  if (!_paClaims.length) { showAppAlert('데이터 없음', '먼저 클레임 주문을 수집해 주세요.', 'warn'); return; }
+  const fmtD = o => String(o.wdate || o.order_date || '').slice(0, 10);
+  const data = [
+    ['상태','쇼핑몰','주문일','주문번호','상품명','수량','판매가','수령자','사유','쇼핑몰상품코드','클레임발생일'],
+    ..._paClaims.map(o => [
+      String(o.order_status || o.claim_status || o.status || ''),
+      String(o.shop_name || o.shop_id || ''),
+      fmtD(o),
+      String(o.shop_ord_no || o.bundle_no || o.ord_no || ''),
+      String(o.shop_sale_name || o.sale_name || o.product_name || ''),
+      Number(o.sale_cnt || o.qty || 0),
+      Number(o.sale_price || o.price || 0),
+      String(o.to_name || o.receiver || ''),
+      String(o.claim_reason || o.cancel_reason || o.return_reason || o.exchange_reason || o.memo || ''),
+      String(o.shop_sale_no || o.sale_no || ''),
+      String(o.claim_time || o.claim_date || ''),
+    ]),
+  ];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{wch:14},{wch:14},{wch:12},{wch:18},{wch:42},{wch:6},{wch:10},{wch:12},{wch:35},{wch:18},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, ws, 'PA 클레임');
+  XLSX.writeFile(wb, `GPLAN_PA클레임_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+function convertPaClaimsToReturns() {
+  if (!_paClaims.length) { showAppAlert('데이터 없음', '먼저 클레임 주문을 수집해 주세요.', 'warn'); return; }
+  // 반품/교환만 변환 — 취소는 별도 처리 권장
+  const returnable = _paClaims.filter(o => {
+    const s = String(o.order_status || o.claim_status || o.status || '');
+    return /반품|교환|맞교환/.test(s);
+  });
+  if (!returnable.length) {
+    showAppAlert('변환 대상 없음', '취소 상태는 반품 데이터로 변환되지 않습니다. 반품/교환/맞교환 주문이 있을 때만 변환됩니다.', 'warn');
+    return;
+  }
+  showAppConfirm(
+    '반품 데이터로 저장',
+    `${returnable.length}건의 클레임을 반품 데이터로 저장합니다.\n\n자동 재고 복원도 함께 적용됩니다 (상품명 매칭 후 stock += qty).\n\n진행하시겠습니까?`,
+    async () => {
+      const stamp = new Date().toISOString();
+      const newRows = returnable.map((o, i) => ({
+        recvName: String(o.to_name || o.receiver || ''),
+        phoneEtc: String(o.to_htel2 || o.to_htel || ''),
+        vendor:   '지플랜',
+        phone:    String(o.to_htel || o.to_tel || ''),
+        zip:      String(o.to_zipcd || ''),
+        addr:     String(o.to_addr1 || '') + (o.to_addr2 ? ' ' + o.to_addr2 : ''),
+        qty:      Number(o.sale_cnt || o.qty || 0),
+        itemName: String(o.shop_sale_name || o.sale_name || o.product_name || ''),
+        shipType: '',
+        payType:  '',
+        orderNo:  String(o.shop_ord_no || o.bundle_no || o.ord_no || ''),
+        shipMemo: '',
+        outDate:  String(o.wdate || o.order_date || '').slice(0, 10),
+        action:   String(o.order_status || o.claim_status || o.status || '').trim(),
+        detail:   String(o.claim_reason || o.cancel_reason || o.return_reason || o.exchange_reason || o.memo || ''),
+        _uploadedAt: stamp,
+        _key: `${stamp}_pa_${i}_${Math.random().toString(36).slice(2, 6)}`,
+        _fromPaClaim: true,
+      }));
+      const all = _loadReturns();
+      all.push(...newRows);
+      _saveReturns(all);
+      if (typeof _refreshReturnKpi === 'function') _refreshReturnKpi();
+      // 자동 재고 복원
+      try {
+        const { updated, missing } = await _restoreStockFromReturns(newRows);
+        const missMsg = missing.length ? `\n\n⚠ 매칭 실패 ${missing.length}건 — 상품명 표기 차이일 수 있어요.` : '';
+        const restoreMsg = updated > 0 ? `\n📦 재고 복원: ${updated}개 SKU 자동 +수량 적용됨` : '';
+        showAppAlert('변환 완료', `${newRows.length}건이 반품 데이터로 저장되었습니다.${restoreMsg}${missMsg}`, 'success');
+      } catch (e) {
+        showAppAlert('변환 완료', `${newRows.length}건이 반품 데이터로 저장되었습니다.`, 'success');
+      }
+    },
+    { type: 'info', confirmText: '저장' }
+  );
+}
 
 async function fetchPlayautoOrders() {
   const btn = document.getElementById('pa-order-fetch-btn');
