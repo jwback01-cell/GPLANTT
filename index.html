@@ -22549,22 +22549,23 @@ async function exportPaClaims() {
         };
       }
     }
-    // 2) 헤더 C(2), L(11) — 노랑으로 덮어쓰기
-    [{ r: 0, c: 2 }, { r: 0, c: 11 }].forEach(({ r, c }) => {
-      const addr = XLSX.utils.encode_cell({ r, c });
+    // 2) 헤더 C(업체명) — 노랑으로 덮어쓰기 (L 배송메세지는 회색 그대로 유지)
+    {
+      const addr = XLSX.utils.encode_cell({ r: 0, c: 2 });
       ws[addr].s = {
         border: thinBorder,
         alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
         font: { bold: true },
         fill: { patternType: 'solid', fgColor: { rgb: YELLOW } },
       };
-    });
-    // 3) 데이터 C 컬럼 (지플랜) 모두 노랑
+    }
+    // 3) 데이터 C 컬럼 (지플랜) 모두 노랑 + 굵게
     for (let r = 1; r < totalRows; r++) {
       const addr = XLSX.utils.encode_cell({ r, c: 2 });
       ws[addr].s = {
         border: thinBorder,
         alignment: { horizontal: 'center', vertical: 'center' },
+        font: { bold: true },
         fill: { patternType: 'solid', fgColor: { rgb: YELLOW } },
       };
     }
