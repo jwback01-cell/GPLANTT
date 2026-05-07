@@ -23120,13 +23120,13 @@ function _reconcileCompare(ledgerRows) {
     const d = String(r.date || '').slice(0, 10);
     return d >= minDate && d <= maxDate;
   });
-  // 매칭 키: 날짜 + 수령자 + 품명(정규화)
-  const _key = (date, recv, name) => `${date}__${_normRecv(recv)}__${_normName(name)}`;
+  // 매칭 키: 날짜 + 규격(=수령자) — 품명은 매칭에 사용하지 않음
+  const _key = (date, recv) => `${date}__${_normRecv(recv)}`;
 
-  // GPLAN 측 인덱스: 키 → row 배열 (중복 가능)
+  // GPLAN 측 인덱스: 키 → row 배열 (같은 날짜·수령자에 복수 건일 수 있음)
   const byKey = new Map();
   targets.forEach(r => {
-    const k = _key(r.date, r.receiver, r.itemName);
+    const k = _key(r.date, r.receiver);
     if (!byKey.has(k)) byKey.set(k, []);
     byKey.get(k).push(r);
   });
@@ -23136,9 +23136,15 @@ function _reconcileCompare(ledgerRows) {
   const onlyLedger = [];   // 거래원장만 (= GPLAN 누락)
   const usedGplan = new Set(); // _idx
   ledgerRows.forEach(L => {
-    const k = _key(L.date, L.recv, L.name);
+    const k = _key(L.date, L.recv);
     const candidates = (byKey.get(k) || []).filter(g => !usedGplan.has(g._idx));
     if (!candidates.length) { onlyLedger.push(L); return; }
+    // 같은 날짜·수령자에 여러 건일 때 단가가 가장 가까운 후보 우선 선택
+    candidates.sort((a, b) => {
+      const da = Math.abs((Number(a.price) || 0) - (L.unit || 0));
+      const db = Math.abs((Number(b.price) || 0) - (L.unit || 0));
+      return da - db;
+    });
     const G = candidates[0];
     usedGplan.add(G._idx);
     // 값 비교 — 수량 / 단가 / 원가(GPLAN cost 필드)
@@ -23153,11 +23159,9 @@ function _reconcileCompare(ledgerRows) {
     else matchedSame.push({ ledger: L, gplan: G });
   });
   // GPLAN 에 있지만 거래원장에 없는 (= GPLAN 추가)
-  const onlyGplan = targets.filter(r => !usedGplan.has(r._idx)).filter(r => {
-    // 거래원장에 같은 키가 아예 없으면 onlyGplan
-    const k = _key(r.date, r.receiver, r.itemName);
-    return !ledgerRows.some(L => _key(L.date, L.recv, L.name) === k);
-  });
+  // 같은 키(날짜+수령자) 자체가 거래원장에 없으면 onlyGplan
+  const ledgerKeySet = new Set(ledgerRows.map(L => _key(L.date, L.recv)));
+  const onlyGplan = targets.filter(r => !usedGplan.has(r._idx) && !ledgerKeySet.has(_key(r.date, r.receiver)));
 
   return {
     matched, matchedSame, onlyLedger, onlyGplan,
