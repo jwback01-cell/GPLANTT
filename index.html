@@ -3397,15 +3397,17 @@ tailwind.config = {
             <div class="px-6 py-4 border-b border-brand-border flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <div class="font-bold text-[15px]">수집된 클레임 주문 <span id="pa-claim-count" class="text-brand-gray font-medium">0건</span></div>
-                <div class="text-xs text-brand-gray mt-1">상태별로 분류된 클레임 주문 목록 — 반품 데이터로 자동 변환 가능</div>
+                <div class="text-xs text-brand-gray mt-1">상태별 분류 + 공급가/원가/택배비용 합계 · 표 안에서 값 직접 수정 가능</div>
               </div>
               <div class="flex items-center gap-2">
+                <button onclick="enrichPaClaimsWithDetail()" class="px-4 py-2 rounded-full bg-white border border-brand-border text-sm font-bold text-brand-blue hover:bg-brand-bg" title="각 주문 상세를 1건씩 조회해 사유/공급가/원가/택배비용을 채웁니다">🔍 상세 가져오기</button>
                 <button onclick="exportPaClaims()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg">📥 엑셀 내보내기</button>
                 <button id="pa-claim-to-returns" onclick="convertPaClaimsToReturns()" class="px-4 py-2 rounded-full bg-brand-pink-light text-brand-pink text-sm font-bold border border-brand-pink hover:bg-brand-pink hover:text-white transition-colors">📦 반품 데이터로 저장</button>
               </div>
             </div>
-            <!-- 상태별 KPI -->
+            <!-- 상태별 KPI + 합계 KPI -->
             <div id="pa-claim-kpi" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 p-4 bg-brand-bg/30"></div>
+            <div id="pa-claim-totals" class="grid grid-cols-2 md:grid-cols-4 gap-3 px-4 pb-4 bg-brand-bg/30"></div>
             <div class="overflow-x-auto">
               <table class="w-full text-sm">
                 <thead>
@@ -3415,10 +3417,13 @@ tailwind.config = {
                     <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">주문일</th>
                     <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">주문번호</th>
                     <th class="text-left px-4 py-3 font-bold text-xs">상품명</th>
-                    <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap">수량</th>
-                    <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap">판매가</th>
+                    <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap">수량 ✏️</th>
+                    <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap">판매가 ✏️</th>
+                    <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap text-brand-blue">공급가 ✏️</th>
+                    <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap text-brand-orange">원가 ✏️</th>
+                    <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap text-brand-pink">택배비용 ✏️</th>
                     <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">수령자</th>
-                    <th class="text-left px-4 py-3 font-bold text-xs">사유</th>
+                    <th class="text-left px-4 py-3 font-bold text-xs">사유 ✏️</th>
                   </tr>
                 </thead>
                 <tbody id="pa-claim-tbody"></tbody>
@@ -21636,17 +21641,74 @@ async function fetchPlayautoClaims() {
   }
 }
 
+// 클레임 주문에서 값 추출 헬퍼들 (사용자가 수정한 값이 있으면 그것 우선)
+function _claimVal(o, key, fallbackKeys) {
+  if (o._edits && o._edits[key] !== undefined) return o._edits[key];
+  for (const k of fallbackKeys) {
+    const v = o[k];
+    if (v !== undefined && v !== null && v !== '') return v;
+  }
+  return '';
+}
+function _claimGet(o, kind) {
+  switch (kind) {
+    case 'qty':    return Number(_claimVal(o, 'qty', ['sale_cnt','qty','order_qty']) || 0);
+    case 'price':  return Number(_claimVal(o, 'price', ['sale_price','price','shop_price']) || 0);
+    case 'supply': return Number(_claimVal(o, 'supply', ['shop_supply_price','supply_price','supply']) || 0);
+    case 'cost':   return Number(_claimVal(o, 'cost', ['cost_price','shop_cost_price','cost']) || 0);
+    case 'shipCost': return Number(_claimVal(o, 'shipCost', ['ship_cost','shop_ship_cost','shipping_cost']) || 0);
+    case 'reason': return String(_claimVal(o, 'reason', ['claim_reason','cancel_reason','return_reason','exchange_reason','claim_msg','memo','memo_msg','ord_status_msg']) || '');
+    case 'itemName': return String(_claimVal(o, 'itemName', ['shop_sale_name','sale_name','product_name','name']) || '');
+  }
+  return '';
+}
+
+// 셀 편집 후 호출 — _paClaims 의 해당 항목에 사용자 입력값 저장
+function _editPaClaim(idx, field, raw) {
+  const o = _paClaims[idx];
+  if (!o) return;
+  if (!o._edits) o._edits = {};
+  if (field === 'reason' || field === 'itemName') {
+    o._edits[field] = String(raw || '').trim();
+  } else {
+    const n = Number(String(raw || '').replace(/[,\s원]/g, ''));
+    o._edits[field] = isNaN(n) ? 0 : n;
+  }
+  // KPI/합계 다시 그리기 (행 자체는 이미 사용자 입력 반영됨)
+  _renderPaClaimsKpiOnly();
+}
+function _renderPaClaimsKpiOnly() {
+  const fmtN = n => Number(n || 0).toLocaleString('ko-KR');
+  let totalSupply = 0, totalCost = 0, totalShipCost = 0, totalQty = 0, totalPrice = 0;
+  _paClaims.forEach(o => {
+    totalQty += _claimGet(o, 'qty');
+    totalPrice += _claimGet(o, 'price') * _claimGet(o, 'qty');
+    totalSupply += _claimGet(o, 'supply');
+    totalCost   += _claimGet(o, 'cost');
+    totalShipCost += _claimGet(o, 'shipCost');
+  });
+  const totEl = document.getElementById('pa-claim-totals');
+  if (totEl) {
+    if (!_paClaims.length) { totEl.innerHTML = ''; return; }
+    totEl.innerHTML = [
+      { label: '총 수량', value: fmtN(totalQty) + '개', color: '' },
+      { label: '총 공급가', value: fmtN(totalSupply) + '원', color: 'text-brand-blue' },
+      { label: '총 원가', value: fmtN(totalCost) + '원', color: 'text-brand-orange' },
+      { label: '총 택배비용', value: fmtN(totalShipCost) + '원', color: 'text-brand-pink' },
+    ].map(k => `<div class="bg-white rounded-xl px-4 py-3 border border-brand-border">
+      <div class="text-xs font-bold text-brand-gray">${k.label}</div>
+      <div class="text-base font-black mt-0.5 ${k.color}">${k.value}</div>
+    </div>`).join('');
+  }
+}
+
 function _renderPaClaims() {
   const cnt = document.getElementById('pa-claim-count');
   if (cnt) cnt.textContent = `${_paClaims.length}건`;
 
   const fmtN = n => Number(n || 0).toLocaleString('ko-KR');
   const _claimStatus = o => String(o.order_status || o.claim_status || o.status || '').trim();
-  const _claimReason = o => String(o.claim_reason || o.cancel_reason || o.return_reason || o.exchange_reason || o.memo || '').trim();
-  const _itemName = o => String(o.shop_sale_name || o.sale_name || o.product_name || o.name || '').trim();
   const _orderNo = o => String(o.shop_ord_no || o.bundle_no || o.ord_no || o.order_no || '').trim();
-  const _qty = o => Number(o.sale_cnt || o.qty || o.order_qty || 0);
-  const _price = o => Number(o.sale_price || o.price || o.shop_price || 0);
   const _shop = o => String(o.shop_name || o.shop_id || o.shop || '').trim();
   const _date = o => String(o.wdate || o.order_date || '').slice(0, 10);
   const _recv = o => String(o.to_name || o.receiver || o.order_name || '').trim();
@@ -21668,10 +21730,13 @@ function _renderPaClaims() {
     }
   }
 
+  // 합계 KPI
+  _renderPaClaimsKpiOnly();
+
   const tbody = document.getElementById('pa-claim-tbody');
   if (!tbody) return;
   if (!_paClaims.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="px-6 py-12 text-center text-brand-gray text-sm">수집된 클레임 주문이 없습니다.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="px-6 py-12 text-center text-brand-gray text-sm">수집된 클레임 주문이 없습니다.</td></tr>';
     return;
   }
   // 상태 색상
@@ -21685,41 +21750,101 @@ function _renderPaClaims() {
                 'bg-brand-bg text-brand-gray';
     return `<span class="px-2 py-0.5 rounded-full text-[11px] font-bold ${cls}">${escHtml(s || '-')}</span>`;
   };
-  tbody.innerHTML = _paClaims.map(o => `<tr class="border-t border-brand-border hover:bg-brand-bg/40">
-    <td class="px-4 py-3 whitespace-nowrap">${_statusBadge(_claimStatus(o))}</td>
-    <td class="px-4 py-3 text-xs whitespace-nowrap">${escHtml(_shop(o))}</td>
-    <td class="px-4 py-3 text-xs whitespace-nowrap">${escHtml(_date(o))}</td>
-    <td class="px-4 py-3 text-xs font-mono text-brand-gray whitespace-nowrap">${escHtml(_orderNo(o))}</td>
-    <td class="px-4 py-3 text-xs">${escHtml(_itemName(o))}</td>
-    <td class="px-4 py-3 text-xs text-right whitespace-nowrap">${fmtN(_qty(o))}</td>
-    <td class="px-4 py-3 text-xs text-right whitespace-nowrap">${fmtN(_price(o))}</td>
-    <td class="px-4 py-3 text-xs whitespace-nowrap">${escHtml(_recv(o))}</td>
-    <td class="px-4 py-3 text-xs text-brand-gray truncate max-w-[300px]" title="${escHtml(_claimReason(o))}">${escHtml(_claimReason(o) || '-')}</td>
-  </tr>`).join('');
+  // 편집 가능 셀 만들기 helper
+  const _editCell = (idx, field, value, opts) => {
+    opts = opts || {};
+    const cls = opts.cls || '';
+    const align = opts.align || 'text-right';
+    const display = opts.format ? opts.format(value) : (typeof value === 'number' ? fmtN(value) : escHtml(value));
+    return `<td class="px-4 py-3 text-xs ${align} whitespace-nowrap ${cls} cursor-text hover:bg-brand-blue-light/30" contenteditable="true" data-claim-idx="${idx}" data-claim-field="${field}" onblur="_editPaClaim(${idx}, '${field}', this.textContent)">${display}</td>`;
+  };
+  tbody.innerHTML = _paClaims.map((o, idx) => {
+    const reason = _claimGet(o, 'reason');
+    const itemName = _claimGet(o, 'itemName');
+    return `<tr class="border-t border-brand-border hover:bg-brand-bg/40">
+      <td class="px-4 py-3 whitespace-nowrap">${_statusBadge(_claimStatus(o))}</td>
+      <td class="px-4 py-3 text-xs whitespace-nowrap">${escHtml(_shop(o))}</td>
+      <td class="px-4 py-3 text-xs whitespace-nowrap">${escHtml(_date(o))}</td>
+      <td class="px-4 py-3 text-xs font-mono text-brand-gray whitespace-nowrap">${escHtml(_orderNo(o))}</td>
+      <td class="px-4 py-3 text-xs">${escHtml(itemName)}</td>
+      ${_editCell(idx, 'qty', _claimGet(o, 'qty'))}
+      ${_editCell(idx, 'price', _claimGet(o, 'price'))}
+      ${_editCell(idx, 'supply', _claimGet(o, 'supply'), { cls: 'text-brand-blue font-semibold' })}
+      ${_editCell(idx, 'cost', _claimGet(o, 'cost'), { cls: 'text-brand-orange font-semibold' })}
+      ${_editCell(idx, 'shipCost', _claimGet(o, 'shipCost'), { cls: 'text-brand-pink font-semibold' })}
+      <td class="px-4 py-3 text-xs whitespace-nowrap">${escHtml(_recv(o))}</td>
+      ${_editCell(idx, 'reason', reason, { align: 'text-left', cls: 'text-brand-gray min-w-[200px] max-w-[400px]', format: v => escHtml(v || '-') })}
+    </tr>`;
+  }).join('');
+}
+
+// 각 클레임의 상세 정보를 /order/uniq 또는 주문 리스트 재조회로 가져와 사유/공급가/원가/택배비용 보충
+async function enrichPaClaimsWithDetail() {
+  if (!_paClaims.length) { showAppAlert('데이터 없음', '먼저 클레임 주문을 수집해 주세요.', 'warn'); return; }
+  const msg = document.getElementById('pa-claim-status-msg');
+  const _msg = (text, tone) => {
+    if (!msg) return;
+    msg.textContent = text;
+    msg.className = 'text-sm font-semibold px-1 ' + (tone === 'error' ? 'text-brand-pink' : tone === 'ok' ? 'text-brand-green' : tone === 'warn' ? 'text-brand-orange' : 'text-brand-gray');
+    msg.classList.remove('hidden');
+  };
+  let updated = 0, failed = 0;
+  for (let i = 0; i < _paClaims.length; i++) {
+    const o = _paClaims[i];
+    const uniq = String(o.uniq || o._uniq || '').trim();
+    if (!uniq) { failed++; continue; }
+    _msg(`상세 조회 중... (${i+1}/${_paClaims.length})`, 'info');
+    try {
+      const detail = await _paFetch('/order/' + encodeURIComponent(uniq), { method: 'GET' });
+      const d = (detail && (detail.data || detail.result || detail)) || {};
+      // detail 에서 사유/공급가/원가/택배비용 후보 추출
+      const reason = String(d.claim_reason || d.cancel_reason || d.return_reason || d.exchange_reason || d.claim_msg || d.memo || '').trim();
+      const supply = Number(d.shop_supply_price || d.supply_price || 0);
+      const cost   = Number(d.cost_price || d.shop_cost_price || 0);
+      const shipCost = Number(d.ship_cost || d.shop_ship_cost || 0);
+      // _edits 에 채움 (사용자 직접 입력값이 있으면 덮지 않음 — undefined 인 경우만)
+      if (!o._edits) o._edits = {};
+      if (reason && o._edits.reason === undefined) o._edits.reason = reason;
+      if (supply && o._edits.supply === undefined) o._edits.supply = supply;
+      if (cost   && o._edits.cost   === undefined) o._edits.cost   = cost;
+      if (shipCost && o._edits.shipCost === undefined) o._edits.shipCost = shipCost;
+      updated++;
+      // 부드러운 진행을 위해 매 5건마다 렌더 갱신
+      if (i % 5 === 0) _renderPaClaims();
+    } catch (e) {
+      console.warn('[PA 클레임 상세] 실패:', uniq, e);
+      failed++;
+    }
+  }
+  _renderPaClaims();
+  _msg(`상세 보충 완료 — 성공 ${updated}건${failed ? ` / 실패 ${failed}건` : ''}`, failed ? 'warn' : 'ok');
 }
 
 function exportPaClaims() {
   if (!_paClaims.length) { showAppAlert('데이터 없음', '먼저 클레임 주문을 수집해 주세요.', 'warn'); return; }
   const fmtD = o => String(o.wdate || o.order_date || '').slice(0, 10);
   const data = [
-    ['상태','쇼핑몰','주문일','주문번호','상품명','수량','판매가','수령자','사유','쇼핑몰상품코드','클레임발생일'],
+    ['상태','쇼핑몰','주문일','주문번호','상품명','수량','판매가','공급가','원가','택배비용','수령자','사유','쇼핑몰상품코드','클레임발생일'],
     ..._paClaims.map(o => [
       String(o.order_status || o.claim_status || o.status || ''),
       String(o.shop_name || o.shop_id || ''),
       fmtD(o),
       String(o.shop_ord_no || o.bundle_no || o.ord_no || ''),
-      String(o.shop_sale_name || o.sale_name || o.product_name || ''),
-      Number(o.sale_cnt || o.qty || 0),
-      Number(o.sale_price || o.price || 0),
+      _claimGet(o, 'itemName'),
+      _claimGet(o, 'qty'),
+      _claimGet(o, 'price'),
+      _claimGet(o, 'supply'),
+      _claimGet(o, 'cost'),
+      _claimGet(o, 'shipCost'),
       String(o.to_name || o.receiver || ''),
-      String(o.claim_reason || o.cancel_reason || o.return_reason || o.exchange_reason || o.memo || ''),
+      _claimGet(o, 'reason'),
       String(o.shop_sale_no || o.sale_no || ''),
       String(o.claim_time || o.claim_date || ''),
     ]),
   ];
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{wch:14},{wch:14},{wch:12},{wch:18},{wch:42},{wch:6},{wch:10},{wch:12},{wch:35},{wch:18},{wch:18}];
+  ws['!cols'] = [{wch:14},{wch:14},{wch:12},{wch:18},{wch:42},{wch:6},{wch:10},{wch:11},{wch:11},{wch:11},{wch:12},{wch:35},{wch:18},{wch:18}];
   XLSX.utils.book_append_sheet(wb, ws, 'PA 클레임');
   XLSX.writeFile(wb, `GPLAN_PA클레임_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
@@ -21747,15 +21872,20 @@ function convertPaClaimsToReturns() {
         phone:    String(o.to_htel || o.to_tel || ''),
         zip:      String(o.to_zipcd || ''),
         addr:     String(o.to_addr1 || '') + (o.to_addr2 ? ' ' + o.to_addr2 : ''),
-        qty:      Number(o.sale_cnt || o.qty || 0),
-        itemName: String(o.shop_sale_name || o.sale_name || o.product_name || ''),
+        qty:      _claimGet(o, 'qty'),
+        itemName: _claimGet(o, 'itemName'),
         shipType: '',
         payType:  '',
         orderNo:  String(o.shop_ord_no || o.bundle_no || o.ord_no || ''),
         shipMemo: '',
         outDate:  String(o.wdate || o.order_date || '').slice(0, 10),
         action:   String(o.order_status || o.claim_status || o.status || '').trim(),
-        detail:   String(o.claim_reason || o.cancel_reason || o.return_reason || o.exchange_reason || o.memo || ''),
+        detail:   _claimGet(o, 'reason'),
+        // 사용자 편집/상세 가져오기로 보충된 금액들도 함께 보관
+        _supply:  _claimGet(o, 'supply'),
+        _cost:    _claimGet(o, 'cost'),
+        _shipCost: _claimGet(o, 'shipCost'),
+        _price:   _claimGet(o, 'price'),
         _uploadedAt: stamp,
         _key: `${stamp}_pa_${i}_${Math.random().toString(36).slice(2, 6)}`,
         _fromPaClaim: true,
