@@ -21632,6 +21632,8 @@ async function fetchPlayautoClaims() {
       });
     }
 
+    // 매칭 캐시 초기화 (다음 렌더 시 다시 찾도록)
+    orders.forEach(o => { delete o._uploadMatch; delete o._edits; });
     _paClaims = orders;
     _renderPaClaims();
     _msg(`${orders.length}건 수집 완료`, 'ok');
@@ -21652,6 +21654,39 @@ function _paClaimStatusOf(o) {
   ).trim();
 }
 
+// 클레임 ↔ 업로드 데이터 매칭 — 가능하면 GPLAN 업로드 데이터의 값(단가/공급가/원가/택배비용) 을
+// 클레임 화면에서도 동일하게 표시. 매칭 우선순위: 주문번호 > 수령자+상품명+날짜
+function _findUploadMatchForClaim(o) {
+  if (!o) return null;
+  // 캐시
+  if (o._uploadMatch !== undefined) return o._uploadMatch;
+  let upload = [];
+  try { upload = (typeof _loadUploadData === 'function') ? _loadUploadData() : []; } catch (_) { upload = []; }
+  if (!upload.length) { o._uploadMatch = null; return null; }
+  const recv = String(o.to_name || o.receiver || '').trim();
+  const date = String(o.wdate || o.order_date || '').slice(0, 10);
+  const itemName = String(o.shop_sale_name || o.sale_name || o.product_name || o.name || '').trim();
+  const ordNo = String(o.shop_ord_no || o.bundle_no || o.ord_no || '').trim();
+  // 1) 주문번호 매칭 (있을 때만)
+  if (ordNo) {
+    const byOrdNo = upload.find(r => {
+      const cands = [r.siteCode, r.vendorCode, r.shipCode, r.orderNo, r.shop_ord_no, r._ordNo];
+      return cands.some(v => v && String(v).trim() === ordNo);
+    });
+    if (byOrdNo) { o._uploadMatch = byOrdNo; return byOrdNo; }
+  }
+  // 2) 수령자 + 상품명 + 날짜
+  const _norm = s => String(s || '').replace(/\s+/g, '').replace(/[\(\)\[\]\.,_\-\/·]/g, '').toLowerCase();
+  const candidate = upload.find(r => {
+    const sameRecv = !recv || String(r.receiver || '').trim() === recv;
+    const sameDate = !date || String(r.date || '').slice(0, 10) === date;
+    const sameItem = !itemName || _norm(r.itemName) === _norm(itemName);
+    return sameRecv && sameItem && sameDate;
+  });
+  o._uploadMatch = candidate || null;
+  return candidate || null;
+}
+
 // 클레임 주문에서 값 추출 헬퍼들 (사용자가 수정한 값이 있으면 그것 우선)
 function _claimVal(o, key, fallbackKeys) {
   if (o._edits && o._edits[key] !== undefined) return o._edits[key];
@@ -21662,12 +21697,26 @@ function _claimVal(o, key, fallbackKeys) {
   return '';
 }
 function _claimGet(o, kind) {
+  // 사용자 편집값이 있으면 항상 우선
+  if (o._edits && o._edits[kind] !== undefined) return o._edits[kind];
+
+  // 업로드 데이터에 같은 주문이 있으면 그 값을 우선 사용 (단가/공급가/원가/택배비용/수량)
+  const upMatch = (kind === 'qty' || kind === 'price' || kind === 'supply' || kind === 'cost' || kind === 'shipCost')
+    ? _findUploadMatchForClaim(o) : null;
+  if (upMatch) {
+    if (kind === 'qty'      && Number(upMatch.qty)      > 0) return Number(upMatch.qty);
+    if (kind === 'price'    && Number(upMatch.price)    > 0) return Number(upMatch.price);
+    if (kind === 'supply'   && Number(upMatch.supply ?? upMatch.cost) > 0) return Number(upMatch.supply ?? upMatch.cost);
+    if (kind === 'cost'     && Number(upMatch.cost)     > 0) return Number(upMatch.cost);
+    if (kind === 'shipCost' && Number(upMatch.shipCost) > 0) return Number(upMatch.shipCost);
+  }
+
   switch (kind) {
-    case 'qty':    return Number(_claimVal(o, 'qty', ['sale_cnt','qty','order_qty']) || 0);
-    case 'price':  return Number(_claimVal(o, 'price', ['sale_price','price','shop_price']) || 0);
-    case 'supply': return Number(_claimVal(o, 'supply', ['shop_supply_price','supply_price','supply']) || 0);
-    case 'cost':   return Number(_claimVal(o, 'cost', ['cost_price','shop_cost_price','cost']) || 0);
-    case 'shipCost': return Number(_claimVal(o, 'shipCost', ['ship_cost','shop_ship_cost','shipping_cost']) || 0);
+    case 'qty':    return Number(o.sale_cnt || o.qty || o.order_qty || 0);
+    case 'price':  return Number(o.sale_price || o.price || o.shop_price || 0);
+    case 'supply': return Number(o.shop_supply_price || o.supply_price || o.supply || 0);
+    case 'cost':   return Number(o.cost_price || o.shop_cost_price || o.cost || 0);
+    case 'shipCost': return Number(o.ship_cost || o.shop_ship_cost || o.shipping_cost || 0);
     case 'reason': return String(_claimVal(o, 'reason', ['claim_reason','cancel_reason','return_reason','exchange_reason','claim_msg','memo','memo_msg','ord_status_msg']) || '');
     case 'itemName': return String(_claimVal(o, 'itemName', ['shop_sale_name','sale_name','product_name','name']) || '');
   }
