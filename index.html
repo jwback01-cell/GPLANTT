@@ -3371,8 +3371,8 @@ tailwind.config = {
               <div>
                 <div class="text-xs font-bold text-brand-gray mb-1">조회 기준</div>
                 <select id="pa-claim-date-type" class="w-full bg-brand-bg border border-brand-border rounded-xl px-3 py-2 text-sm outline-none focus:border-brand-black">
+                  <option value="claim_time" selected>클레임 발생일</option>
                   <option value="wdate">주문수집일(wdate)</option>
-                  <option value="claim_time">클레임 발생일</option>
                 </select>
               </div>
             </div>
@@ -3417,7 +3417,8 @@ tailwind.config = {
                     <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">상태</th>
                     <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">쇼핑몰</th>
                     <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">주문일</th>
-                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">주문번호</th>
+                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">SKU</th>
+                    <th class="text-left px-4 py-3 font-bold text-xs">SKU상품명</th>
                     <th class="text-left px-4 py-3 font-bold text-xs">상품명</th>
                     <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap">수량 ✏️</th>
                     <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap">판매가 ✏️</th>
@@ -21553,12 +21554,25 @@ function _allClaimStatuses() {
 let _paClaims = []; // 수집된 클레임 주문 캐시
 
 function _initClaimSubTab() {
-  // 처음 들어왔을 때 기본 날짜 (최근 7일) 세팅
+  // 처음 들어왔을 때 기본 날짜 세팅
+  // - 평일/주말: 어제 ~ 오늘
+  // - 월요일: 지난주 금요일 ~ 오늘 (주말 동안의 클레임 모두 커버)
   const startEl = document.getElementById('pa-claim-start');
   const endEl = document.getElementById('pa-claim-end');
   if (startEl && !startEl.value) {
     const today = new Date();
-    const start = new Date(today); start.setDate(today.getDate() - 6);
+    const dow = today.getDay(); // 0=일, 1=월, 2=화, ..., 6=토
+    const start = new Date(today);
+    if (dow === 1) {
+      // 월요일 → 지난주 금요일 (오늘 - 3일)
+      start.setDate(today.getDate() - 3);
+    } else if (dow === 0) {
+      // 일요일 → 토요일 (오늘 - 1일)
+      start.setDate(today.getDate() - 1);
+    } else {
+      // 화~토 → 어제
+      start.setDate(today.getDate() - 1);
+    }
     const fmt = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
     startEl.value = fmt(start);
     endEl.value = fmt(today);
@@ -21696,11 +21710,30 @@ function _claimVal(o, key, fallbackKeys) {
   }
   return '';
 }
+// SKU 코드로 상품관리에서 택배비용 등 정보 조회
+function _findProductBySku(skuCode) {
+  if (!skuCode) return null;
+  const s = String(skuCode).trim().toLowerCase();
+  if (!s) return null;
+  const products = (typeof _allProducts !== 'undefined' && Array.isArray(_allProducts)) ? _allProducts : [];
+  return products.find(p => String(p.sku || '').trim().toLowerCase() === s) || null;
+}
+
 function _claimGet(o, kind) {
   // 사용자 편집값이 있으면 항상 우선
   if (o._edits && o._edits[kind] !== undefined) return o._edits[kind];
 
-  // 업로드 데이터에 같은 주문이 있으면 그 값을 우선 사용 (단가/공급가/원가/택배비용/수량)
+  // SKU/SKU상품명 — 사용자 편집 외엔 PA 응답에서 직접 추출
+  if (kind === 'sku') return String(o.sku_cd || o.sku || o.shop_sku_cd || '').trim();
+  if (kind === 'skuName') {
+    const v = String(o.prod_name || o.sku_name || o.set_pack_name || '').trim();
+    if (v) return v;
+    // SKU 매칭 시 상품관리 이름 폴백
+    const prod = _findProductBySku(_claimGet(o, 'sku'));
+    return prod ? String(prod.name || '') : '';
+  }
+
+  // 업로드 데이터 매칭 (단가/공급가/원가/택배비용/수량)
   const upMatch = (kind === 'qty' || kind === 'price' || kind === 'supply' || kind === 'cost' || kind === 'shipCost')
     ? _findUploadMatchForClaim(o) : null;
   if (upMatch) {
@@ -21709,6 +21742,21 @@ function _claimGet(o, kind) {
     if (kind === 'supply'   && Number(upMatch.supply ?? upMatch.cost) > 0) return Number(upMatch.supply ?? upMatch.cost);
     if (kind === 'cost'     && Number(upMatch.cost)     > 0) return Number(upMatch.cost);
     if (kind === 'shipCost' && Number(upMatch.shipCost) > 0) return Number(upMatch.shipCost);
+  }
+
+  // 택배비용 추가 폴백 — SKU 매칭으로 상품관리의 shipping_cost 가져오기
+  if (kind === 'shipCost') {
+    const prod = _findProductBySku(_claimGet(o, 'sku'));
+    if (prod && Number(prod.shipping_cost) > 0) return Number(prod.shipping_cost);
+  }
+  // 공급가/원가도 SKU 매칭으로 상품관리 값 폴백
+  if (kind === 'supply') {
+    const prod = _findProductBySku(_claimGet(o, 'sku'));
+    if (prod && Number(prod.supply_price) > 0) return Number(prod.supply_price);
+  }
+  if (kind === 'cost') {
+    const prod = _findProductBySku(_claimGet(o, 'sku'));
+    if (prod && Number(prod.cost) > 0) return Number(prod.cost);
   }
 
   switch (kind) {
@@ -21796,7 +21844,7 @@ function _renderPaClaims() {
   const tbody = document.getElementById('pa-claim-tbody');
   if (!tbody) return;
   if (!_paClaims.length) {
-    tbody.innerHTML = '<tr><td colspan="13" class="px-6 py-12 text-center text-brand-gray text-sm">수집된 클레임 주문이 없습니다.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="14" class="px-6 py-12 text-center text-brand-gray text-sm">수집된 클레임 주문이 없습니다.</td></tr>';
     return;
   }
   // 상태 색상
@@ -21821,12 +21869,15 @@ function _renderPaClaims() {
   tbody.innerHTML = _paClaims.map((o, idx) => {
     const reason = _claimGet(o, 'reason');
     const itemName = _claimGet(o, 'itemName');
+    const sku = _claimGet(o, 'sku');
+    const skuName = _claimGet(o, 'skuName');
     return `<tr class="border-t border-brand-border hover:bg-brand-bg/40">
       <td class="px-4 py-3 whitespace-nowrap"><input type="checkbox" class="pa-claim-cb" data-idx="${idx}" onchange="updatePaClaimSelCount()"></td>
       <td class="px-4 py-3 whitespace-nowrap">${_statusBadge(_claimStatus(o))}</td>
       <td class="px-4 py-3 text-xs whitespace-nowrap">${escHtml(_shop(o))}</td>
       <td class="px-4 py-3 text-xs whitespace-nowrap">${escHtml(_date(o))}</td>
-      <td class="px-4 py-3 text-xs font-mono text-brand-gray whitespace-nowrap">${escHtml(_orderNo(o))}</td>
+      <td class="px-4 py-3 text-xs font-mono text-brand-gray whitespace-nowrap">${escHtml(sku || '-')}</td>
+      <td class="px-4 py-3 text-xs">${escHtml(skuName || '-')}</td>
       <td class="px-4 py-3 text-xs">${escHtml(itemName)}</td>
       ${_editCell(idx, 'qty', _claimGet(o, 'qty'))}
       ${_editCell(idx, 'price', _claimGet(o, 'price'))}
@@ -21911,12 +21962,13 @@ function exportPaClaims() {
   if (!targetRows.length) { showAppAlert('선택 없음', '내보낼 행을 체크하거나 모두 해제해 주세요.', 'warn'); return; }
   const fmtD = o => String(o.wdate || o.order_date || '').slice(0, 10);
   const data = [
-    ['상태','쇼핑몰','주문일','주문번호','상품명','수량','판매가','공급가','원가','택배비용','수령자','사유','쇼핑몰상품코드','클레임발생일'],
+    ['상태','쇼핑몰','주문일','SKU','SKU상품명','상품명','수량','판매가','공급가','원가','택배비용','수령자','사유','주문번호','쇼핑몰상품코드','클레임발생일'],
     ...targetRows.map(o => [
       _paClaimStatusOf(o),
       String(o.shop_name || o.shop_id || ''),
       fmtD(o),
-      String(o.shop_ord_no || o.bundle_no || o.ord_no || ''),
+      _claimGet(o, 'sku'),
+      _claimGet(o, 'skuName'),
       _claimGet(o, 'itemName'),
       _claimGet(o, 'qty'),
       _claimGet(o, 'price'),
@@ -21925,13 +21977,14 @@ function exportPaClaims() {
       _claimGet(o, 'shipCost'),
       String(o.to_name || o.receiver || ''),
       _claimGet(o, 'reason'),
+      String(o.shop_ord_no || o.bundle_no || o.ord_no || ''),
       String(o.shop_sale_no || o.sale_no || ''),
       String(o.claim_time || o.claim_date || ''),
     ]),
   ];
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{wch:14},{wch:14},{wch:12},{wch:18},{wch:42},{wch:6},{wch:10},{wch:11},{wch:11},{wch:11},{wch:12},{wch:35},{wch:18},{wch:18}];
+  ws['!cols'] = [{wch:14},{wch:14},{wch:12},{wch:14},{wch:36},{wch:42},{wch:6},{wch:10},{wch:11},{wch:11},{wch:11},{wch:12},{wch:35},{wch:18},{wch:18},{wch:18}];
   const sheetName = selectedOnly ? `PA 클레임(선택 ${targetRows.length}건)` : 'PA 클레임';
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
   const stamp = new Date().toISOString().slice(0,10);
