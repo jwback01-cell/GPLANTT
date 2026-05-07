@@ -23023,7 +23023,8 @@ function _reconcileFileChosen(ev) {
         );
         return;
       }
-      _reconcileShowResult(rows, file.name);
+      // 결과 모달은 표시하지 않고 바로 엑셀 다운로드
+      _reconcileDownloadDirect(rows, file.name);
     } catch (err) {
       console.error('[거래원장 대조] 파싱 실패:', err);
       showAppAlert('파일 읽기 실패', err.message || String(err), 'error');
@@ -23344,6 +23345,26 @@ function _renderReconcileSameHtml(matchedSame) {
   </div>`;
 }
 
+// 모달 없이 거래원장 파일을 받아서 바로 엑셀 다운로드 — 결과 모달 우회
+function _reconcileDownloadDirect(ledgerRows, fileName) {
+  const result = _reconcileCompare(ledgerRows);
+  _reconcileExportExcelFromResult(result, fileName);
+  const totalDiff = result.matched.length + result.onlyLedger.length + result.onlyGplan.length;
+  const rangeLabel = (result.minDate && result.maxDate)
+    ? (result.minDate === result.maxDate ? result.minDate : `${result.minDate} ~ ${result.maxDate}`)
+    : '범위 없음';
+  showAppAlert(
+    '엑셀 다운로드 완료',
+    `📥 거래원장 대조 엑셀 다운로드 완료\n\n` +
+    `파일: ${fileName}\n` +
+    `기간: ${rangeLabel}\n` +
+    `거래원장 ${result.ledgerCount}건 / 같은 기간 GPLAN ${result.gplanCount}건\n\n` +
+    `일치 ${result.matchedSame.length}건 · 차이 ${totalDiff}건\n` +
+    `(값 불일치 ${result.matched.length} · 누락 ${result.onlyLedger.length} · 추가 ${result.onlyGplan.length})`,
+    totalDiff === 0 ? 'success' : 'info'
+  );
+}
+
 // 단일 시트 — 거래원장 행 순서 그대로 보존 + 옆에 GPLAN 매칭값 + 차이
 // (거래원장에 없고 GPLAN 에만 있는 행은 맨 아래 별도 구역으로)
 function _reconcileExportExcel() {
@@ -23352,8 +23373,12 @@ function _reconcileExportExcel() {
     showAppAlert('데이터 없음', '먼저 거래원장을 업로드해 대조 결과를 표시해 주세요.', 'warn');
     return;
   }
-  const { matched, matchedSame, onlyLedger, onlyGplan, ledgerCount, gplanCount, minDate, maxDate, gplanShipByDate } = m._reconcileResult;
-  const srcFile = m._reconcileFileName || '';
+  _reconcileExportExcelFromResult(m._reconcileResult, m._reconcileFileName || '');
+}
+
+// 결과 객체 + 파일명을 받아 엑셀 생성/다운로드 — 모달/직접 호출 양쪽에서 재사용
+function _reconcileExportExcelFromResult(resultObj, srcFile) {
+  const { matched, matchedSame, onlyLedger, onlyGplan, ledgerCount, gplanCount, minDate, maxDate, gplanShipByDate } = resultObj;
   const _shipByDate = gplanShipByDate || {};
   const _isTaekbae = (L) => /택배/.test(String(L.name || '').trim());
   const rangeLabel = (minDate && maxDate)
