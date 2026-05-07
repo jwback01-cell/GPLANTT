@@ -10323,6 +10323,7 @@ function openStockMovementModal(productId) {
     const deltaStr = m.delta > 0 ? '+' + fmtN(m.delta) : fmtN(m.delta);
     const deltaCls = m.delta > 0 ? 'color:#16A34A;font-weight:bold;' : (m.delta < 0 ? 'color:#DC2626;font-weight:bold;' : 'color:#6B7280;');
     return `<tr style="border-top:1px solid #f1f1f4;">
+      <td style="padding:8px 10px;text-align:center;width:32px;"><input type="checkbox" class="stock-move-cb" data-move-id="${escH(m.id)}" onchange="_updateStockMoveSelCount()"></td>
       <td style="padding:8px 10px;font-size:12px;color:#666;white-space:nowrap;">${escH(dt)}</td>
       <td style="padding:8px 10px;"><span style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:bold;background:${c.bg};color:${c.fg};">${escH(m.type)}</span></td>
       <td style="padding:8px 10px;font-size:13px;text-align:right;${deltaCls}">${deltaStr}</td>
@@ -10336,6 +10337,8 @@ function openStockMovementModal(productId) {
   if (prev) prev.remove();
   const m = document.createElement('div');
   m.id = 'stock-move-modal';
+  m.dataset.productId = String(product.id);
+  m.dataset.productSku = product.sku || '';
   m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
   m.onclick = (e) => { if (e.target === m) m.remove(); };
   m.innerHTML = `
@@ -10362,6 +10365,12 @@ function openStockMovementModal(productId) {
           <div style="font-size:18px;font-weight:bold;color:#1A1A1A;margin-top:2px;">${fmtN(moves.length)}건</div>
         </div>
       </div>
+      ${moves.length === 0 ? '' : `
+      <div style="padding:10px 22px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;gap:8px;background:#FAFAFA;">
+        <div style="font-size:11px;color:#666;">⚠ 이력 삭제는 기록만 지웁니다 — 실제 재고는 변경되지 않습니다.</div>
+        <button onclick="_deleteSelectedStockMoves()" style="padding:6px 14px;border-radius:14px;border:1px solid #FECACA;background:white;color:#DC2626;cursor:pointer;font-size:12px;font-weight:bold;">선택 삭제 <span id="stock-move-sel-count" style="color:#888;font-weight:normal;">(0)</span></button>
+      </div>
+      `}
       <div style="overflow:auto;flex:1;">
         ${moves.length === 0 ? `
           <div style="padding:40px 20px;text-align:center;color:#888;font-size:13px;">아직 기록된 수불 이력이 없습니다.<br>입고·매출 차감·반품 복원이 발생하면 자동으로 누적됩니다.</div>
@@ -10369,6 +10378,7 @@ function openStockMovementModal(productId) {
           <table style="width:100%;border-collapse:collapse;">
             <thead style="background:#FAFAFA;position:sticky;top:0;">
               <tr>
+                <th style="text-align:center;padding:10px;width:32px;"><input type="checkbox" id="stock-move-all" onchange="_toggleAllStockMoves(this)"></th>
                 <th style="text-align:left;padding:10px;font-size:11px;font-weight:bold;color:#666;">일시</th>
                 <th style="text-align:left;padding:10px;font-size:11px;font-weight:bold;color:#666;">유형</th>
                 <th style="text-align:right;padding:10px;font-size:11px;font-weight:bold;color:#666;">변동</th>
@@ -10382,6 +10392,42 @@ function openStockMovementModal(productId) {
       </div>
     </div>`;
   document.body.appendChild(m);
+}
+
+// 모달 — 전체 선택 토글
+function _toggleAllStockMoves(cb) {
+  document.querySelectorAll('#stock-move-modal .stock-move-cb').forEach(el => { el.checked = cb.checked; });
+  _updateStockMoveSelCount();
+}
+// 모달 — 선택 카운트 갱신
+function _updateStockMoveSelCount() {
+  const all = document.querySelectorAll('#stock-move-modal .stock-move-cb');
+  const checked = [...all].filter(cb => cb.checked).length;
+  const lab = document.getElementById('stock-move-sel-count');
+  if (lab) lab.textContent = `(${checked})`;
+  const allCb = document.getElementById('stock-move-all');
+  if (allCb) allCb.checked = all.length > 0 && checked === all.length;
+}
+// 모달 — 선택 삭제
+function _deleteSelectedStockMoves() {
+  const checked = [...document.querySelectorAll('#stock-move-modal .stock-move-cb:checked')];
+  if (!checked.length) { showAppAlert('선택 없음', '삭제할 이력을 먼저 선택하세요.', 'warn'); return; }
+  const ids = new Set(checked.map(cb => cb.dataset.moveId));
+  showAppConfirm(
+    '수불 이력 삭제',
+    `선택한 ${ids.size}건의 이력을 삭제할까요?\n\n⚠ 이력만 지워지며 실제 재고는 변경되지 않습니다.`,
+    () => {
+      const all = (typeof _loadStockMoves === 'function') ? _loadStockMoves() : [];
+      const next = all.filter(m => !ids.has(m.id));
+      if (typeof _saveStockMoves === 'function') _saveStockMoves(next);
+      // 모달 다시 열기
+      const modal = document.getElementById('stock-move-modal');
+      const productId = modal ? Number(modal.dataset.productId) : null;
+      if (modal) modal.remove();
+      if (productId) openStockMovementModal(productId);
+    },
+    { type: 'warning', confirmText: '삭제' }
+  );
 }
 
 function openStockLinkModal(productId) {
