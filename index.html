@@ -3428,6 +3428,7 @@ tailwind.config = {
                     <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap text-brand-pink">택배비용 ✏️</th>
                     <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">수령자</th>
                     <th class="text-left px-4 py-3 font-bold text-xs">사유 ✏️</th>
+                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">처리사항</th>
                   </tr>
                 </thead>
                 <tbody id="pa-claim-tbody"></tbody>
@@ -22138,7 +22139,7 @@ function _editPaClaim(idx, field, raw) {
   const o = _paClaims[idx];
   if (!o) return;
   if (!o._edits) o._edits = {};
-  if (field === 'reason' || field === 'itemName') {
+  if (field === 'reason' || field === 'itemName' || field === 'action') {
     o._edits[field] = String(raw || '').trim();
   } else {
     const n = Number(String(raw || '').replace(/[,\s원]/g, ''));
@@ -22206,7 +22207,7 @@ function _renderPaClaims() {
   const tbody = document.getElementById('pa-claim-tbody');
   if (!tbody) return;
   if (!_paClaims.length) {
-    tbody.innerHTML = '<tr><td colspan="14" class="px-6 py-12 text-center text-brand-gray text-sm">수집된 클레임 주문이 없습니다.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="15" class="px-6 py-12 text-center text-brand-gray text-sm">수집된 클레임 주문이 없습니다.</td></tr>';
     return;
   }
   // 상태 색상
@@ -22228,11 +22229,21 @@ function _renderPaClaims() {
     const display = opts.format ? opts.format(value) : (typeof value === 'number' ? fmtN(value) : escHtml(value));
     return `<td class="px-4 py-3 text-xs ${align} whitespace-nowrap ${cls} cursor-text hover:bg-brand-blue-light/30" contenteditable="true" data-claim-idx="${idx}" data-claim-field="${field}" onblur="_editPaClaim(${idx}, '${field}', this.textContent)">${display}</td>`;
   };
+  // 처리사항 옵션 — 엑셀 N 컬럼에 들어갈 값 (사용자가 셀별로 직접 선택)
+  const _PA_CLAIM_ACTIONS = ['단순 변심 반품', '단순 변심 교환', '불량 반품', '불량 교환', '오배송 반품', '오배송 교환'];
+  const _claimActionOf = o => {
+    if (o._edits && o._edits.action !== undefined) return o._edits.action;
+    return ''; // 사용자가 명시적으로 선택할 때까지 빈값
+  };
   tbody.innerHTML = _paClaims.map((o, idx) => {
     const reason = _claimGet(o, 'reason');
     const itemName = _claimGet(o, 'itemName');
     const sku = _claimGet(o, 'sku');
     const skuName = _claimGet(o, 'skuName');
+    const curAction = _claimActionOf(o);
+    const optsHtml = ['<option value="">선택…</option>']
+      .concat(_PA_CLAIM_ACTIONS.map(a => `<option value="${escHtml(a)}" ${a === curAction ? 'selected' : ''}>${escHtml(a)}</option>`))
+      .join('');
     return `<tr class="border-t border-brand-border hover:bg-brand-bg/40">
       <td class="px-4 py-3 whitespace-nowrap"><input type="checkbox" class="pa-claim-cb" data-idx="${idx}" onchange="updatePaClaimSelCount()"></td>
       <td class="px-4 py-3 whitespace-nowrap">${_statusBadge(_claimStatus(o))}</td>
@@ -22248,6 +22259,10 @@ function _renderPaClaims() {
       ${_editCell(idx, 'shipCost', _claimGet(o, 'shipCost'), { cls: 'text-brand-pink font-semibold' })}
       <td class="px-4 py-3 text-xs whitespace-nowrap">${escHtml(_recv(o))}</td>
       ${_editCell(idx, 'reason', reason, { align: 'text-left', cls: 'text-brand-gray min-w-[200px] max-w-[400px]', format: v => escHtml(v || '-') })}
+      <td class="px-4 py-3 whitespace-nowrap">
+        <select class="text-xs px-2 py-1 rounded-full border border-brand-border bg-white outline-none focus:border-brand-black cursor-pointer"
+                onchange="_editPaClaim(${idx}, 'action', this.value)">${optsHtml}</select>
+      </td>
     </tr>`;
   }).join('');
   updatePaClaimSelCount();
@@ -22376,10 +22391,29 @@ async function enrichPaClaimsWithDetail() {
   }
 }
 
-function exportPaClaims() {
+// xlsx-js-style 동적 로드 (셀 색상 적용용 — 한 번만 로드)
+let _xlsxStyleLoading = null;
+function _ensureXlsxStyle() {
+  if (window.XLSX && window.XLSX._jsStyleLoaded) return Promise.resolve();
+  if (_xlsxStyleLoading) return _xlsxStyleLoading;
+  _xlsxStyleLoading = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';
+    s.onload = () => { try { window.XLSX._jsStyleLoaded = true; } catch(_) {} resolve(); };
+    s.onerror = () => reject(new Error('xlsx-js-style 로드 실패'));
+    document.head.appendChild(s);
+  });
+  return _xlsxStyleLoading;
+}
+
+async function exportPaClaims() {
   if (!_paClaims.length) { showAppAlert('데이터 없음', '먼저 클레임 주문을 수집해 주세요.', 'warn'); return; }
   const { rows: targetRows, selectedOnly } = _getPaClaimTargets();
   if (!targetRows.length) { showAppAlert('선택 없음', '내보낼 행을 체크하거나 모두 해제해 주세요.', 'warn'); return; }
+
+  // 셀 색상 라이브러리 로드 (실패해도 색상 없이 export 는 진행)
+  try { await _ensureXlsxStyle(); } catch (e) { console.warn('[PA 클레임 export]', e); }
+
   // 출고일 → MM/DD 형태
   const fmtMD = (s) => {
     const m = String(s || '').match(/(\d{4})[-./](\d{1,2})[-./](\d{1,2})/);
@@ -22392,8 +22426,10 @@ function exportPaClaims() {
     const a2 = String(o.to_addr2 || '').trim();
     return a2 ? (a1 + ' ' + a2) : a1;
   };
-  // 처리사항 — "사유 처리유형" 형태 (예: "단순변심 교환")
+  // 처리사항 — 사용자가 드롭다운에서 선택한 값 우선 (_edits.action), 없으면 자동 추정
   const actionOf = o => {
+    if (o._edits && o._edits.action) return o._edits.action;
+    // 폴백: 사유 + 처리유형
     const reason = String(_claimGet(o, 'reason') || '').trim();
     const status = _paClaimStatusOf(o);
     const type = /취소/.test(status) ? '취소' : /반품/.test(status) ? '반품' : /교환|맞교환/.test(status) ? '교환' : '';
@@ -22445,6 +22481,29 @@ function exportPaClaims() {
     {wch:10},{wch:14},{wch:12},{wch:14},{wch:8},{wch:42},
     {wch:6},{wch:42},{wch:8},{wch:10},{wch:16},{wch:24},{wch:8},{wch:14},{wch:36}
   ];
+
+  // 셀 스타일 적용 — 양식 사진과 동일하게:
+  //   헤더 C(업체명), L(배송메세지) 컬럼: 노란 배경
+  //   데이터 C(지플랜) 컬럼: 노란 배경
+  if (window.XLSX && window.XLSX._jsStyleLoaded) {
+    const yellowFill = { fill: { fgColor: { rgb: 'FFFF00' } }, font: { bold: true } };
+    const yellowDataFill = { fill: { fgColor: { rgb: 'FFFF00' } } };
+    const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: 'F2F2F2' } }, alignment: { horizontal: 'center', vertical: 'center' } };
+    const totalRows = data.length;
+    // 모든 헤더 셀 — 가운데 정렬 + 회색 배경
+    for (let c = 0; c < 15; c++) {
+      const addr = XLSX.utils.encode_cell({ r: 0, c });
+      if (ws[addr]) ws[addr].s = headerStyle;
+    }
+    // 헤더 C(2), L(11) 노란
+    ['C1','L1'].forEach(a => { if (ws[a]) ws[a].s = yellowFill; });
+    // 데이터 C 컬럼 (지플랜) 모두 노란
+    for (let r = 1; r < totalRows; r++) {
+      const addr = XLSX.utils.encode_cell({ r, c: 2 });
+      if (ws[addr]) ws[addr].s = yellowDataFill;
+    }
+  }
+
   const sheetName = selectedOnly ? `PA 클레임(선택 ${targetRows.length}건)` : 'PA 클레임';
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
   const stamp = new Date().toISOString().slice(0,10);
