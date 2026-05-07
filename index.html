@@ -21788,6 +21788,21 @@ function _claimGet(o, kind) {
     const prod = _findProductBySku(_claimGet(o, 'sku'));
     if (prod && Number(prod.cost) > 0) return Number(prod.cost);
   }
+  // 판매가 폴백 — 동일 SKU 의 가장 최근 업로드 단가(VAT포함) (취소요청처럼 업로드 매칭 실패 시)
+  if (kind === 'price') {
+    const sku = String(_claimGet(o, 'sku') || '').trim().toLowerCase();
+    if (sku) {
+      let upload = [];
+      try { upload = (typeof _loadUploadData === 'function') ? _loadUploadData() : []; } catch (_) {}
+      const skuRows = upload
+        .filter(r => {
+          const c = String(r.skuCode || r.itemCode || r.sku || '').trim().toLowerCase();
+          return c === sku && Number(r.price) > 0;
+        })
+        .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+      if (skuRows.length) return Number(skuRows[0].price);
+    }
+  }
 
   switch (kind) {
     case 'qty':    return Number(o.sale_cnt || o.qty || o.order_qty || 0);
@@ -22006,10 +22021,17 @@ async function enrichPaClaimsWithDetail() {
         'claim_reason','cancel_reason','return_reason','exchange_reason','memo','claim_msg',
         'ord_status','order_status','claim_status','claim_time'
       ];
+      // 숫자 필드는 0 이어도 "값 없음" 으로 보고 d[k] 가 양수면 덮어씀
+      // (PA /orders 응답에 sale_price/cost_price 가 0 으로 와있는 경우 detail 값으로 보충)
+      const numericKeys = new Set([
+        'sale_price','shop_supply_price','cost_price','ship_cost',
+        'sale_cnt','opt_sale_cnt','pack_unit'
+      ]);
       skuCandidates.forEach(k => {
-        if (d[k] !== undefined && d[k] !== null && d[k] !== '' && (o[k] === undefined || o[k] === '' || o[k] === null)) {
-          o[k] = d[k];
-        }
+        if (d[k] === undefined || d[k] === null || d[k] === '') return;
+        const isEmpty = (o[k] === undefined || o[k] === '' || o[k] === null) ||
+                        (numericKeys.has(k) && Number(o[k]) === 0 && Number(d[k]) > 0);
+        if (isEmpty) o[k] = d[k];
       });
       // 중첩 배열도 보존 (_claimGet 의 nested 폴백용)
       if (prodList.length && !Array.isArray(o.prod_list)) o.prod_list = prodList;
