@@ -23163,11 +23163,21 @@ function _reconcileCompare(ledgerRows) {
   const ledgerKeySet = new Set(ledgerRows.map(L => _key(L.date, L.recv)));
   const onlyGplan = targets.filter(r => !usedGplan.has(r._idx) && !ledgerKeySet.has(_key(r.date, r.receiver)));
 
+  // GPLAN 택배비(ship) 일자별 합계 — 거래원장 택배 행과 비교용
+  // 서울리빙/그외/의류 의 같은 기간 행에서 ship 필드 합산
+  const gplanShipByDate = {};
+  targets.forEach(r => {
+    const d = String(r.date || '').slice(0, 10);
+    if (!d) return;
+    gplanShipByDate[d] = (gplanShipByDate[d] || 0) + (Number(r.ship) || 0);
+  });
+
   return {
     matched, matchedSame, onlyLedger, onlyGplan,
     ledgerCount: ledgerRows.length,
     gplanCount: targets.length,
     minDate, maxDate,
+    gplanShipByDate,
   };
 }
 
@@ -23342,8 +23352,10 @@ function _reconcileExportExcel() {
     showAppAlert('데이터 없음', '먼저 거래원장을 업로드해 대조 결과를 표시해 주세요.', 'warn');
     return;
   }
-  const { matched, matchedSame, onlyLedger, onlyGplan, ledgerCount, gplanCount, minDate, maxDate } = m._reconcileResult;
+  const { matched, matchedSame, onlyLedger, onlyGplan, ledgerCount, gplanCount, minDate, maxDate, gplanShipByDate } = m._reconcileResult;
   const srcFile = m._reconcileFileName || '';
+  const _shipByDate = gplanShipByDate || {};
+  const _isTaekbae = (L) => /택배/.test(String(L.name || '').trim());
   const rangeLabel = (minDate && maxDate)
     ? (minDate === maxDate ? minDate : `${minDate} ~ ${maxDate}`)
     : '';
@@ -23397,7 +23409,12 @@ function _reconcileExportExcel() {
     let lastBalance = '';
     let unmatchedInGroup = 0;
 
-    group.forEach(({ L, G }) => {
+    // 택배 / 비-택배 분리 — 택배는 날짜당 1행으로 합쳐서 표시
+    const regularItems = group.filter(({ L }) => !_isTaekbae(L));
+    const taekbaeItems = group.filter(({ L }) =>  _isTaekbae(L));
+
+    // 1) 일반 행들 먼저 출력 (원본 순서 유지)
+    regularItems.forEach(({ L, G }) => {
       const left = [
         L.date || '',
         L.type || '매출',
@@ -23426,7 +23443,45 @@ function _reconcileExportExcel() {
       if (L.balance) lastBalance = Number(L.balance) || 0;
     });
 
-    // 날짜별 소계 행
+    // 2) 택배 행 합산 — 1줄로 만들고 GPLAN 택배비 합계와 비교
+    if (taekbaeItems.length > 0) {
+      const tQty = taekbaeItems.reduce((s, { L }) => s + (Number(L.qty) || 0), 0);
+      const tSale = taekbaeItems.reduce((s, { L }) => s + (Number(L.sale) || 0), 0);
+      const firstUnit = Number(taekbaeItems[0].L.unit) || 0;
+      const tUnit = firstUnit || (tQty ? Math.round(tSale / tQty) : 0);
+      // 택배 행의 잔액 — 그 날 마지막 택배 행의 잔액 (원본 행 순서 따라)
+      const lastTaekbae = taekbaeItems[taekbaeItems.length - 1];
+      if (lastTaekbae && lastTaekbae.L.balance) lastBalance = Number(lastTaekbae.L.balance) || lastBalance;
+
+      // GPLAN 택배비(ship) 같은 날짜 서울리빙 계열 합계
+      const gShipSum = Number(_shipByDate[date]) || 0;
+      const tDiff = tSale - gShipSum;
+      const taekbaeName = taekbaeItems.length > 1 ? `택배 (${taekbaeItems.length}건 합산)` : '택배';
+
+      rows.push([
+        date,                               // 거래일자
+        '매출',                             // 구분
+        taekbaeName,                        // 품명
+        '',                                 // 규격 (택배는 수령자 없음)
+        tQty,                               // 수량 합
+        tUnit,                              // 단가 (보통 동일)
+        tSale,                              // 매출/지급 합
+        '',                                 // 매입/수금
+        lastBalance || '',                  // 잔액 (그 날 마지막 잔액)
+        'GPLAN 택배비(ship) 합계',          // 품명(GPLAN) 칸에 라벨
+        '',                                 // 수령자(GPLAN)
+        gShipSum,                           // 원가(GPLAN) 칸 → GPLAN 택배비 합계
+        tDiff,                              // 차이 = 거래원장 택배 매출 − GPLAN 택배비
+      ]);
+
+      sumQty += tQty;
+      sumSale += tSale;
+      sumGCost += gShipSum;
+      sumDiff += tDiff;
+    }
+
+    // 3) 날짜별 소계 행
+    const totalCount = regularItems.length + (taekbaeItems.length > 0 ? 1 : 0);
     const diffCell = (unmatchedInGroup > 0)
       ? `${sumDiff.toLocaleString('ko-KR')} (값없음 ${unmatchedInGroup}건 제외)`
       : sumDiff;
@@ -23434,7 +23489,7 @@ function _reconcileExportExcel() {
       '',                                 // 거래일자
       '소 계',                            // 구분
       '',                                 // 품명
-      `(${group.length}건)`,              // 규격 자리에 건수 표시
+      `(${totalCount}건)`,                // 규격 자리에 건수 표시 (택배 합산 후)
       sumQty,                             // 수량 합
       '',                                 // 단가
       sumSale,                            // 매출/지급 합
@@ -23442,7 +23497,7 @@ function _reconcileExportExcel() {
       lastBalance,                        // 잔액 (마지막 행 값)
       '',                                 // 품명(GPLAN)
       '',                                 // 수령자(GPLAN)
-      sumGCost,                           // 원가(GPLAN) 합
+      sumGCost,                           // 원가(GPLAN) 합 (일반 cost + 택배 ship)
       diffCell,                           // 차이 합
     ]);
   });
