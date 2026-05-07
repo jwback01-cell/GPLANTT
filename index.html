@@ -21641,6 +21641,15 @@ async function fetchPlayautoClaims() {
   }
 }
 
+// 클레임 주문 상태 추출 — PA API 의 다양한 필드명 후보 시도
+function _paClaimStatusOf(o) {
+  if (!o) return '';
+  return String(
+    o.ord_status || o.order_status || o.claim_status || o.claim_state ||
+    o.status || o.ord_status_msg || o.ord_status_kr || ''
+  ).trim();
+}
+
 // 클레임 주문에서 값 추출 헬퍼들 (사용자가 수정한 값이 있으면 그것 우선)
 function _claimVal(o, key, fallbackKeys) {
   if (o._edits && o._edits[key] !== undefined) return o._edits[key];
@@ -21707,7 +21716,7 @@ function _renderPaClaims() {
   if (cnt) cnt.textContent = `${_paClaims.length}건`;
 
   const fmtN = n => Number(n || 0).toLocaleString('ko-KR');
-  const _claimStatus = o => String(o.order_status || o.claim_status || o.status || '').trim();
+  const _claimStatus = o => _paClaimStatusOf(o);
   const _orderNo = o => String(o.shop_ord_no || o.bundle_no || o.ord_no || o.order_no || '').trim();
   const _shop = o => String(o.shop_name || o.shop_id || o.shop || '').trim();
   const _date = o => String(o.wdate || o.order_date || '').slice(0, 10);
@@ -21826,7 +21835,7 @@ function exportPaClaims() {
   const data = [
     ['상태','쇼핑몰','주문일','주문번호','상품명','수량','판매가','공급가','원가','택배비용','수령자','사유','쇼핑몰상품코드','클레임발생일'],
     ..._paClaims.map(o => [
-      String(o.order_status || o.claim_status || o.status || ''),
+      _paClaimStatusOf(o),
       String(o.shop_name || o.shop_id || ''),
       fmtD(o),
       String(o.shop_ord_no || o.bundle_no || o.ord_no || ''),
@@ -21853,7 +21862,7 @@ function convertPaClaimsToReturns() {
   if (!_paClaims.length) { showAppAlert('데이터 없음', '먼저 클레임 주문을 수집해 주세요.', 'warn'); return; }
   // 반품/교환만 변환 — 취소는 별도 처리 권장
   const returnable = _paClaims.filter(o => {
-    const s = String(o.order_status || o.claim_status || o.status || '');
+    const s = _paClaimStatusOf(o);
     return /반품|교환|맞교환/.test(s);
   });
   if (!returnable.length) {
@@ -21879,7 +21888,7 @@ function convertPaClaimsToReturns() {
         orderNo:  String(o.shop_ord_no || o.bundle_no || o.ord_no || ''),
         shipMemo: '',
         outDate:  String(o.wdate || o.order_date || '').slice(0, 10),
-        action:   String(o.order_status || o.claim_status || o.status || '').trim(),
+        action:   _paClaimStatusOf(o),
         detail:   _claimGet(o, 'reason'),
         // 사용자 편집/상세 가져오기로 보충된 금액들도 함께 보관
         _supply:  _claimGet(o, 'supply'),
