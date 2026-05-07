@@ -22500,7 +22500,7 @@ async function exportPaClaims() {
       String(o.to_zipcd || ''),
       addrOf(o),
       _claimGet(o, 'qty'),
-      _claimGet(o, 'itemName'),
+      _claimGet(o, 'skuName') || _claimGet(o, 'itemName'),  // SKU상품명 우선, 없으면 상품명 폴백
       '',                                  // 운임TYPE
       deliveryOf(o),                       // 지불조건 위치 — 사용자 양식상 택배사
       invoiceOf(o),                        // 출고번호 — 송장번호
