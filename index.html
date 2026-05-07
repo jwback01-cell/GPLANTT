@@ -23332,13 +23332,18 @@ function _reconcileExportExcel() {
   matched.forEach(M => matchByKey.set(_key(M.ledger.date, M.ledger.recv, M.ledger.name), M));
   matchedSame.forEach(M => matchByKey.set(_key(M.ledger.date, M.ledger.recv, M.ledger.name), M));
 
-  // ledger 원본 전체 (값 일치 + 값 불일치 + 누락) — 원본 순서 유지
-  // matched/matchedSame/onlyLedger 합쳐서 _origIdx 기준 정렬
+  // ledger 원본 전체 (값 일치 + 값 불일치 + 누락) — 거래일자 오름차순 정렬
+  // 같은 날짜 내에서는 원본 순서(_origIdx) 유지
   const allLedger = [
     ...matched.map(M => ({ L: M.ledger, G: M.gplan })),
     ...matchedSame.map(M => ({ L: M.ledger, G: M.gplan })),
     ...onlyLedger.map(L => ({ L, G: null })),
-  ].sort((a, b) => (a.L._origIdx || 0) - (b.L._origIdx || 0));
+  ].sort((a, b) => {
+    const dA = String(a.L.date || '');
+    const dB = String(b.L.date || '');
+    if (dA !== dB) return dA.localeCompare(dB);
+    return (a.L._origIdx || 0) - (b.L._origIdx || 0);
+  });
 
   // 컬럼 — 사진 예시 그대로
   // [업로드한 엑셀 9칸] + [웹사이트 업로드 데이터 4칸]
@@ -23382,13 +23387,16 @@ function _reconcileExportExcel() {
     }
   });
 
-  // GPLAN 에만 있는 행 — 별도 구역으로 맨 아래에
+  // GPLAN 에만 있는 행 — 별도 구역으로 맨 아래에 (날짜 오름차순 정렬)
   let extraSection = [];
   if (onlyGplan.length) {
+    const sortedOnlyGplan = onlyGplan.slice().sort((a, b) =>
+      String(a.date || '').localeCompare(String(b.date || ''))
+    );
     extraSection.push([]); // 빈 줄
-    extraSection.push([`▼ GPLAN 에만 있고 거래원장에 없는 행 (${onlyGplan.length}건)`]);
+    extraSection.push([`▼ GPLAN 에만 있고 거래원장에 없는 행 (${sortedOnlyGplan.length}건)`]);
     extraSection.push(header); // 같은 헤더 반복
-    onlyGplan.forEach(G => {
+    sortedOnlyGplan.forEach(G => {
       const gCost = Number(G.cost) || 0;
       extraSection.push([
         G.date || '', '매출', '', '', Number(G.qty) || 0, Number(G.price) || 0, '', '', '',
