@@ -23164,13 +23164,13 @@ function _reconcileCompare(ledgerRows) {
   const ledgerKeySet = new Set(ledgerRows.map(L => _key(L.date, L.recv)));
   const onlyGplan = targets.filter(r => !usedGplan.has(r._idx) && !ledgerKeySet.has(_key(r.date, r.receiver)));
 
-  // GPLAN 택배비(ship) 일자별 합계 — 거래원장 택배 행과 비교용
-  // 서울리빙/그외/의류 의 같은 기간 행에서 ship 필드 합산
+  // GPLAN 택배비용(shipCost) 일자별 합계 — 거래원장 택배 행과 비교용
+  // 서울리빙/그외/의류 의 같은 기간 행에서 shipCost 필드 합산
   const gplanShipByDate = {};
   targets.forEach(r => {
     const d = String(r.date || '').slice(0, 10);
     if (!d) return;
-    gplanShipByDate[d] = (gplanShipByDate[d] || 0) + (Number(r.ship) || 0);
+    gplanShipByDate[d] = (gplanShipByDate[d] || 0) + (Number(r.shipCost) || 0);
   });
 
   return {
@@ -23493,7 +23493,7 @@ function _reconcileExportExcelFromResult(resultObj, srcFile) {
         tSale,                              // 매출/지급 합
         '',                                 // 매입/수금
         lastBalance || '',                  // 잔액 (그 날 마지막 잔액)
-        'GPLAN 택배비(ship) 합계',          // 품명(GPLAN) 칸에 라벨
+        'GPLAN 택배비용(shipCost) 합계',     // 품명(GPLAN) 칸에 라벨
         '',                                 // 수령자(GPLAN)
         gShipSum,                           // 원가(GPLAN) 칸 → GPLAN 택배비 합계
         tDiff,                              // 차이 = 거래원장 택배 매출 − GPLAN 택배비
