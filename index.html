@@ -22954,7 +22954,9 @@ function _getVisibleUploadData() {
 const _RECONCILE_VENDORS = ['서울리빙', '서울리빙 그외', '서울리빙 의류'];
 function _normVendor(v) { return String(v || '').replace(/\s+/g, '').trim(); }
 function _normName(s) { return String(s || '').replace(/\s+/g, '').replace(/[\(\)\[\]\.,_\-\/·]/g, '').toLowerCase(); }
-function _normRecv(s) { return String(s || '').replace(/\s+/g, '').trim(); }
+// 수령자 정규화 — 매칭/표시 모두에서 숫자 제거 (예: "류용규1" → "류용규")
+function _normRecv(s) { return String(s || '').replace(/\s+/g, '').replace(/\d+/g, '').trim(); }
+function _displayRecv(s) { return String(s || '').replace(/\d+/g, '').trim(); }
 // "26-04-01" → "2026-04-01" / Excel serial / 다양한 포맷 처리
 function _reconcileNormDate(v) {
   if (v == null || v === '') return '';
@@ -23103,6 +23105,19 @@ function _reconcileParseSheet(data) {
     const purchase = purIdx >= 0 ? _num(row[purIdx]) : 0;
     const balance  = balIdx >= 0 ? _num(row[balIdx]) : 0;
     out.push({ date, type, name, recv, qty, unit, sale, purchase, balance, _origRow: i, _origIdx: out.length });
+  }
+  // 후처리: "//" 표시는 위 행의 수령자로 채우고, 이름에서 숫자 제거
+  let prevRecv = '';
+  for (const r of out) {
+    const raw = String(r.recv || '').trim();
+    // "//" 또는 비슷한 동일 표시는 직전 수령자로 상속
+    if (/^\/\/+$/.test(raw) || raw === '〃' || raw === '"' || raw === '′′') {
+      r.recv = prevRecv;
+    } else {
+      // 숫자 제거 (예: "류용규1" → "류용규") + 공백 정리
+      r.recv = raw.replace(/\d+/g, '').trim();
+      prevRecv = r.recv;
+    }
   }
   return out;
 }
@@ -23406,17 +23421,17 @@ function _reconcileExportExcelFromResult(resultObj, srcFile) {
     return (a.L._origIdx || 0) - (b.L._origIdx || 0);
   });
 
-  // 컬럼 — 사진 예시 그대로
-  // [업로드한 엑셀 9칸] + [웹사이트 업로드 데이터 4칸]
+  // 컬럼 — 매입/수금, 잔액 제거
+  // [업로드한 엑셀 7칸] + [웹사이트 업로드 데이터 4칸]
   const header = [
     // 거래원장 측
-    '거래일자', '구분', '품명', '규격', '수량', '단가', '매출/지급', '매입/수금', '잔액',
+    '거래일자', '구분', '품명', '규격', '수량', '단가', '매출/지급',
     // GPLAN 측
     '품명(GPLAN)', '수령자(GPLAN)', '원가(GPLAN)', '차이',
   ];
 
-  // 두 행짜리 그룹 헤더 (병합/색은 xlsx-js-style 없이는 어려워 단순 텍스트로)
-  const groupHeader = ['업로드한 엑셀', '', '', '', '', '', '', '', '', '웹사이트 업로드 데이터', '', '', ''];
+  // 두 행짜리 그룹 헤더
+  const groupHeader = ['업로드한 엑셀', '', '', '', '', '', '', '웹사이트 업로드 데이터', '', '', ''];
 
   const rows = [];
   // 날짜별 그룹화 후 각 그룹 끝에 소계 행 삽입
@@ -23430,8 +23445,7 @@ function _reconcileExportExcelFromResult(resultObj, srcFile) {
 
   sortedDates.forEach(date => {
     const group = byDate.get(date);
-    let sumQty = 0, sumSale = 0, sumPurchase = 0, sumGCost = 0, sumDiff = 0;
-    let lastBalance = '';
+    let sumQty = 0, sumSale = 0, sumGCost = 0, sumDiff = 0;
     let unmatchedInGroup = 0;
 
     // 택배 / 비-택배 분리 — 택배는 날짜당 1행으로 합쳐서 표시
@@ -23448,14 +23462,12 @@ function _reconcileExportExcelFromResult(resultObj, srcFile) {
         Number(L.qty) || 0,
         Number(L.unit) || 0,
         Number(L.sale) || 0,
-        Number(L.purchase) || '',
-        Number(L.balance) || '',
       ];
       if (G) {
         const gCost  = Number(G.cost) || 0;
         const lValue = Number(L.sale) || 0;
         const diff = lValue - gCost;
-        rows.push([...left, G.itemName || '', G.receiver || '', gCost, diff]);
+        rows.push([...left, G.itemName || '', _displayRecv(G.receiver), gCost, diff]);
         sumGCost += gCost;
         sumDiff += diff;
       } else {
@@ -23464,21 +23476,15 @@ function _reconcileExportExcelFromResult(resultObj, srcFile) {
       }
       sumQty += Number(L.qty) || 0;
       sumSale += Number(L.sale) || 0;
-      sumPurchase += Number(L.purchase) || 0;
-      if (L.balance) lastBalance = Number(L.balance) || 0;
     });
 
-    // 2) 택배 행 합산 — 1줄로 만들고 GPLAN 택배비 합계와 비교
+    // 2) 택배 행 합산 — 1줄로 만들고 GPLAN 택배비용 합계와 비교
     if (taekbaeItems.length > 0) {
       const tQty = taekbaeItems.reduce((s, { L }) => s + (Number(L.qty) || 0), 0);
       const tSale = taekbaeItems.reduce((s, { L }) => s + (Number(L.sale) || 0), 0);
       const firstUnit = Number(taekbaeItems[0].L.unit) || 0;
       const tUnit = firstUnit || (tQty ? Math.round(tSale / tQty) : 0);
-      // 택배 행의 잔액 — 그 날 마지막 택배 행의 잔액 (원본 행 순서 따라)
-      const lastTaekbae = taekbaeItems[taekbaeItems.length - 1];
-      if (lastTaekbae && lastTaekbae.L.balance) lastBalance = Number(lastTaekbae.L.balance) || lastBalance;
 
-      // GPLAN 택배비(ship) 같은 날짜 서울리빙 계열 합계
       const gShipSum = Number(_shipByDate[date]) || 0;
       const tDiff = tSale - gShipSum;
       const taekbaeName = taekbaeItems.length > 1 ? `택배 (${taekbaeItems.length}건 합산)` : '택배';
@@ -23487,16 +23493,14 @@ function _reconcileExportExcelFromResult(resultObj, srcFile) {
         date,                               // 거래일자
         '매출',                             // 구분
         taekbaeName,                        // 품명
-        '',                                 // 규격 (택배는 수령자 없음)
+        '',                                 // 규격
         tQty,                               // 수량 합
-        tUnit,                              // 단가 (보통 동일)
+        tUnit,                              // 단가
         tSale,                              // 매출/지급 합
-        '',                                 // 매입/수금
-        lastBalance || '',                  // 잔액 (그 날 마지막 잔액)
-        'GPLAN 택배비용(shipCost) 합계',     // 품명(GPLAN) 칸에 라벨
+        'GPLAN 택배비용(shipCost) 합계',     // 품명(GPLAN)
         '',                                 // 수령자(GPLAN)
-        gShipSum,                           // 원가(GPLAN) 칸 → GPLAN 택배비 합계
-        tDiff,                              // 차이 = 거래원장 택배 매출 − GPLAN 택배비
+        gShipSum,                           // 원가(GPLAN) → 택배비용 합계
+        tDiff,                              // 차이
       ]);
 
       sumQty += tQty;
@@ -23514,15 +23518,13 @@ function _reconcileExportExcelFromResult(resultObj, srcFile) {
       '',                                 // 거래일자
       '소 계',                            // 구분
       '',                                 // 품명
-      `(${totalCount}건)`,                // 규격 자리에 건수 표시 (택배 합산 후)
+      `(${totalCount}건)`,                // 규격 자리에 건수 표시
       sumQty,                             // 수량 합
       '',                                 // 단가
       sumSale,                            // 매출/지급 합
-      sumPurchase || '',                  // 매입/수금 합
-      lastBalance,                        // 잔액 (마지막 행 값)
       '',                                 // 품명(GPLAN)
       '',                                 // 수령자(GPLAN)
-      sumGCost,                           // 원가(GPLAN) 합 (일반 cost + 택배 ship)
+      sumGCost,                           // 원가(GPLAN) 합
       diffCell,                           // 차이 합
     ]);
   });
@@ -23539,9 +23541,9 @@ function _reconcileExportExcelFromResult(resultObj, srcFile) {
     sortedOnlyGplan.forEach(G => {
       const gCost = Number(G.cost) || 0;
       extraSection.push([
-        G.date || '', '매출', '', '', Number(G.qty) || 0, Number(G.price) || 0, '', '', '',
+        G.date || '', '매출', '', '', Number(G.qty) || 0, Number(G.price) || 0, '',
         G.itemName || '',
-        G.receiver || '',
+        _displayRecv(G.receiver),
         gCost,
         '거래원장에 없음',
       ]);
@@ -23562,7 +23564,7 @@ function _reconcileExportExcelFromResult(resultObj, srcFile) {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
 
-  // 컬럼 폭 — 사진 비율과 비슷하게
+  // 컬럼 폭 (총 11개)
   ws['!cols'] = [
     {wch:11},  // 거래일자
     {wch:6},   // 구분
@@ -23571,20 +23573,17 @@ function _reconcileExportExcelFromResult(resultObj, srcFile) {
     {wch:6},   // 수량
     {wch:10},  // 단가
     {wch:12},  // 매출/지급
-    {wch:11},  // 매입/수금
-    {wch:12},  // 잔액
     {wch:34},  // 품명(GPLAN)
     {wch:11},  // 수령자(GPLAN)
     {wch:12},  // 원가(GPLAN)
     {wch:12},  // 차이
   ];
 
-  // 그룹 헤더 셀 병합 — 1~9번째 컬럼 "업로드한 엑셀" / 10~13 "웹사이트 업로드 데이터"
-  // summaryBlock 4행 + groupHeader 는 5번째(index 4) 행에 위치
+  // 그룹 헤더 셀 병합 — 1~7번째 "업로드한 엑셀" / 8~11번째 "웹사이트 업로드 데이터"
   const groupRowIdx = summaryBlock.length; // 0-based row index of groupHeader
   ws['!merges'] = [
-    { s: { r: groupRowIdx, c: 0 }, e: { r: groupRowIdx, c: 8 } },
-    { s: { r: groupRowIdx, c: 9 }, e: { r: groupRowIdx, c: 12 } },
+    { s: { r: groupRowIdx, c: 0 }, e: { r: groupRowIdx, c: 6 } },
+    { s: { r: groupRowIdx, c: 7 }, e: { r: groupRowIdx, c: 10 } },
   ];
 
   // 헤더 영역 freeze: summary 4 + groupHeader 1 + columnHeader 1 = 6행 고정
