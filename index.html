@@ -22411,6 +22411,23 @@ async function exportPaClaims() {
   const { rows: targetRows, selectedOnly } = _getPaClaimTargets();
   if (!targetRows.length) { showAppAlert('선택 없음', '내보낼 행을 체크하거나 모두 해제해 주세요.', 'warn'); return; }
 
+  // 처리사항 미선택 행 검증 — 모든 대상 행이 드롭다운에서 처리사항을 선택해야 내보내기 가능
+  const missingAction = targetRows.filter(o => !(o._edits && o._edits.action));
+  if (missingAction.length) {
+    const samples = missingAction.slice(0, 5).map(o => {
+      const recv = String(o.to_name || o.receiver || '-');
+      const sku = _claimGet(o, 'sku') || '-';
+      return `· ${recv} / ${sku}`;
+    }).join('\n');
+    showAppAlert(
+      '처리사항 미선택',
+      `처리사항이 선택되지 않은 행이 ${missingAction.length}건 있습니다.\n표 우측의 "처리사항" 드롭다운에서 6가지 옵션 중 하나를 선택해 주세요.\n\n` +
+      `대표 행:\n${samples}${missingAction.length > 5 ? `\n…외 ${missingAction.length - 5}건` : ''}`,
+      'warn'
+    );
+    return;
+  }
+
   // 셀 색상 라이브러리 로드 (실패해도 색상 없이 export 는 진행)
   try { await _ensureXlsxStyle(); } catch (e) { console.warn('[PA 클레임 export]', e); }
 
