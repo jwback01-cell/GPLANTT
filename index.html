@@ -22380,31 +22380,71 @@ function exportPaClaims() {
   if (!_paClaims.length) { showAppAlert('데이터 없음', '먼저 클레임 주문을 수집해 주세요.', 'warn'); return; }
   const { rows: targetRows, selectedOnly } = _getPaClaimTargets();
   if (!targetRows.length) { showAppAlert('선택 없음', '내보낼 행을 체크하거나 모두 해제해 주세요.', 'warn'); return; }
-  const fmtD = o => String(o.wdate || o.order_date || '').slice(0, 10);
+  // 출고일 → MM/DD 형태
+  const fmtMD = (s) => {
+    const m = String(s || '').match(/(\d{4})[-./](\d{1,2})[-./](\d{1,2})/);
+    if (m) return String(m[2]).padStart(2,'0') + '/' + String(m[3]).padStart(2,'0');
+    return String(s || '');
+  };
+  // 받는분주소 합치기
+  const addrOf = o => {
+    const a1 = String(o.to_addr1 || '').trim();
+    const a2 = String(o.to_addr2 || '').trim();
+    return a2 ? (a1 + ' ' + a2) : a1;
+  };
+  // 처리사항 — "사유 처리유형" 형태 (예: "단순변심 교환")
+  const actionOf = o => {
+    const reason = String(_claimGet(o, 'reason') || '').trim();
+    const status = _paClaimStatusOf(o);
+    const type = /취소/.test(status) ? '취소' : /반품/.test(status) ? '반품' : /교환|맞교환/.test(status) ? '교환' : '';
+    if (reason && type) return reason + ' ' + type;
+    return reason || status;
+  };
+  // 출고번호(송장번호) 후보 — PA 응답에 따라 다양한 필드명 시도
+  const invoiceOf = o => String(
+    o.inv_no || o.invoice_no || o.invoice || o.tracking_no || o.tracking_num ||
+    o.delivery_no || o.send_no || o.send_invoice || ''
+  );
+  // 택배사 후보
+  const deliveryOf = o => String(
+    o.inv_company || o.invoice_company || o.delivery_corp || o.delivery_company ||
+    o.parcel_corp || o.parcel_company || o.send_company || ''
+  );
+  // 배송메모 후보
+  const shipMemoOf = o => String(
+    o.ship_msg || o.delivery_msg || o.delivery_memo || o.deli_memo ||
+    o.req_msg || o.order_memo || o.memo || ''
+  );
+  // 출고일 후보
+  const sendDateOf = o => fmtMD(o.send_date || o.ship_date || o.delivery_date || o.send_dt || '');
+
   const data = [
-    ['상태','쇼핑몰','주문일','SKU','SKU상품명','상품명','수량','판매가','공급가','원가','택배비용','수령자','사유','주문번호','쇼핑몰상품코드','클레임발생일'],
+    ['받는분성명','받는분기타연락처','업체명(필수기입)','받는분연락처','우편번호','받는분주소','수량','상품명','운임TYPE','지불조건','출고번호','배송메세지','출고일','처리사항','내용'],
     ...targetRows.map(o => [
-      _paClaimStatusOf(o),
-      String(o.shop_name || o.shop_id || ''),
-      fmtD(o),
-      _claimGet(o, 'sku'),
-      _claimGet(o, 'skuName'),
-      _claimGet(o, 'itemName'),
-      _claimGet(o, 'qty'),
-      _claimGet(o, 'price'),
-      _claimGet(o, 'supply'),
-      _claimGet(o, 'cost'),
-      _claimGet(o, 'shipCost'),
       String(o.to_name || o.receiver || ''),
-      _claimGet(o, 'reason'),
-      String(o.shop_ord_no || o.bundle_no || o.ord_no || ''),
-      String(o.shop_sale_no || o.sale_no || ''),
-      String(o.claim_time || o.claim_date || ''),
+      String(o.to_htel2 || o.to_htel || ''),
+      '지플랜',
+      String(o.to_htel || o.to_tel || ''),
+      String(o.to_zipcd || ''),
+      addrOf(o),
+      _claimGet(o, 'qty'),
+      _claimGet(o, 'itemName'),
+      '',                                  // 운임TYPE
+      deliveryOf(o),                       // 지불조건 위치 — 사용자 양식상 택배사
+      invoiceOf(o),                        // 출고번호 — 송장번호
+      shipMemoOf(o),                       // 배송메세지
+      sendDateOf(o),                       // 출고일 MM/DD
+      actionOf(o),                         // 처리사항 (예: "단순변심 교환")
+      _claimGet(o, 'reason'),              // 내용 — 클레임 사유 상세
     ]),
   ];
+
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{wch:14},{wch:14},{wch:12},{wch:14},{wch:36},{wch:42},{wch:6},{wch:10},{wch:11},{wch:11},{wch:11},{wch:12},{wch:35},{wch:18},{wch:18},{wch:18}];
+  ws['!cols'] = [
+    {wch:10},{wch:14},{wch:12},{wch:14},{wch:8},{wch:42},
+    {wch:6},{wch:42},{wch:8},{wch:10},{wch:16},{wch:24},{wch:8},{wch:14},{wch:36}
+  ];
   const sheetName = selectedOnly ? `PA 클레임(선택 ${targetRows.length}건)` : 'PA 클레임';
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
   const stamp = new Date().toISOString().slice(0,10);
