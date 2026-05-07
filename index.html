@@ -22451,8 +22451,25 @@ async function exportPaClaims() {
     o.ship_msg || o.delivery_msg || o.delivery_memo || o.deli_memo ||
     o.req_msg || o.order_memo || o.memo || ''
   );
-  // 출고일 후보
-  const sendDateOf = o => fmtMD(o.send_date || o.ship_date || o.delivery_date || o.send_dt || '');
+  // 출고완료일 후보 — PA 의 다양한 필드명을 폭넓게 시도, 그래도 없으면 주문일 폴백
+  const sendDateOf = o => {
+    const cand =
+      o.delivery_complete_date || o.delivery_done_date ||
+      o.shipping_complete_date || o.shipping_done_date ||
+      o.send_complete_date || o.ship_complete_date ||
+      o.send_date || o.ship_date || o.shipping_date || o.delivery_date ||
+      o.inv_send_date || o.inv_register_date || o.inv_date ||
+      o.complete_date || o.ord_complete_date ||
+      o.wdate || // 폴백: 주문일
+      '';
+    return fmtMD(cand);
+  };
+  // 디버그 — 첫 행에서 출고일/송장 관련 키만 console 에 노출 (필드명 진단용)
+  if (targetRows.length > 0 && typeof console !== 'undefined') {
+    const o0 = targetRows[0];
+    const dateKeys = Object.keys(o0).filter(k => /(date|wdate|rdate|inv|send|ship|deliver|complete)/i.test(k));
+    console.log('[PA 클레임 export] 첫 행의 날짜/송장 관련 키:', dateKeys.map(k => `${k}=${o0[k]}`));
+  }
 
   const data = [
     ['받는분성명','받는분기타연락처','업체명(필수기입)','받는분연락처','우편번호','받는분주소','수량','상품명','운임TYPE','지불조건','출고번호','배송메세지','출고일','처리사항','내용'],
