@@ -2769,8 +2769,10 @@ tailwind.config = {
           <span class="text-sm font-bold text-brand-gray">업로드 양식</span>
           <div class="flex gap-1 p-1 bg-brand-bg rounded-full border border-brand-border">
             <button id="upload-tpl-default" onclick="setUploadTemplate('default')" class="upload-tpl-btn px-4 py-1.5 rounded-full text-xs font-bold bg-brand-black text-white">기본</button>
+            <button id="upload-tpl-return"  onclick="setUploadTemplate('return')"  class="upload-tpl-btn px-4 py-1.5 rounded-full text-xs font-bold text-brand-gray hover:text-brand-black">반품</button>
             <button id="upload-tpl-jet"     onclick="setUploadTemplate('jet')"     class="upload-tpl-btn px-4 py-1.5 rounded-full text-xs font-bold text-brand-gray hover:text-brand-black">제트배송</button>
           </div>
+          <span id="upload-return-kpi" class="hidden ml-3 text-xs font-semibold text-brand-pink">📦 반품 데이터: <span id="return-count">0</span>건 · 최근 업로드 <span id="return-last">-</span></span>
         </div>
 
         <!-- Dropzone -->
@@ -23853,6 +23855,92 @@ function _processUploadAoa(aoa) {
     return null;
   };
 
+  if (_uploadTemplate === 'return') {
+    // 반품 양식 처리
+    const found = _findHeaderRow(['받는분성명','업체명','상품명','수량']);
+    if (!found) {
+      showAppAlert('헤더 행 미발견', '반품 양식의 헤더 행을 찾을 수 없습니다.\n받는분성명 / 업체명 / 상품명 / 수량 등의 컬럼이 있는지 확인해 주세요.', 'warn');
+      return;
+    }
+    const rHeader = found.row;
+    const rIdx = (keys) => {
+      for (const k of keys) {
+        const i = rHeader.findIndex(h => String(h || '').trim() === k);
+        if (i >= 0) return i;
+      }
+      // 부분 일치 폴백
+      for (const k of keys) {
+        const i = rHeader.findIndex(h => String(h || '').includes(k));
+        if (i >= 0) return i;
+      }
+      return -1;
+    };
+    const I = {
+      name:       rIdx(['받는분성명']),
+      phoneEtc:   rIdx(['받는분기타연락처']),
+      vendor:     rIdx(['업체명(필수기입)','업체명']),
+      phone:      rIdx(['받는분연락처']),
+      zip:        rIdx(['우편번호']),
+      addr:       rIdx(['받는분주소']),
+      qty:        rIdx(['수량']),
+      itemName:   rIdx(['상품명','품목명']),
+      shipType:   rIdx(['운임TYPE','운임type','운임 TYPE']),
+      payType:    rIdx(['지불조건']),
+      orderNo:    rIdx(['출고번호']),
+      shipMemo:   rIdx(['배송메세지','배송메시지']),
+      outDate:    rIdx(['출고일']),
+      action:     rIdx(['처리사항']),
+      detail:     rIdx(['내용']),
+    };
+
+    const stamp = new Date().toISOString();
+    const newRows = [];
+    for (let i = found.i + 1; i < aoa.length; i++) {
+      const row = aoa[i] || [];
+      const recvName = _str(row[I.name]);
+      const itemName = _str(row[I.itemName]);
+      const qty = _num(row[I.qty]);
+      // 모두 비어있으면 스킵
+      if (!recvName && !itemName && !qty) continue;
+      newRows.push({
+        recvName,
+        phoneEtc:  _str(row[I.phoneEtc]),
+        vendor:    _str(row[I.vendor]),
+        phone:     _str(row[I.phone]),
+        zip:       _str(row[I.zip]),
+        addr:      _str(row[I.addr]),
+        qty,
+        itemName,
+        shipType:  _str(row[I.shipType]),
+        payType:   _str(row[I.payType]),
+        orderNo:   _str(row[I.orderNo]),
+        shipMemo:  _str(row[I.shipMemo]),
+        outDate:   _str(row[I.outDate]),
+        action:    _str(row[I.action]),
+        detail:    _str(row[I.detail]),
+        _uploadedAt: stamp,
+        _key: `${stamp}_${i}_${Math.random().toString(36).slice(2, 6)}`,
+      });
+    }
+
+    if (!newRows.length) {
+      showAppAlert('데이터 없음', '반품 행을 찾지 못했습니다. 받는분성명/상품명/수량이 비어있지 않은 행이 있는지 확인해 주세요.', 'warn');
+      return;
+    }
+
+    const all = _loadReturns();
+    all.push(...newRows);
+    _saveReturns(all);
+    _refreshReturnKpi();
+
+    showAppAlert(
+      '반품 업로드 완료',
+      `📦 ${newRows.length}건의 반품 데이터가 저장되었습니다.\n누적 ${all.length}건.`,
+      'success'
+    );
+    return;
+  }
+
   if (_uploadTemplate === 'jet') {
     // 제트배송 (쿠팡 정산서) 처리
     const found = _findHeaderRow(['주문ID','등록상품명','판매가','판매수량']);
@@ -23977,8 +24065,8 @@ const UPLOAD_COLS = ['거래처명','사이트','날짜','사이트코드','거�
 const JET_COLS = ['정산유형','정산주기','세금계산서 발생일','매출인식일','주문ID','거래유형','카테고리 ID','카테고리명','과세유형','등록상품 ID','옵션ID','SKU ID','등록상품명','옵션명','판매가','판매수량','판매액','쿠팡지원할인','매출금액','즉시할인쿠폰','다운로드쿠폰','판매자할인쿠폰','정산대상액','판매수수료율','할인적용 판매수수료율','판매수수료','판매수수료VAT'];
 let _uploadTemplate = 'default';
 function setUploadTemplate(type) {
-  _uploadTemplate = (type === 'jet') ? 'jet' : 'default';
-  ['default','jet'].forEach(t => {
+  _uploadTemplate = (type === 'jet') ? 'jet' : (type === 'return') ? 'return' : 'default';
+  ['default','return','jet'].forEach(t => {
     const btn = document.getElementById('upload-tpl-' + t);
     if (!btn) return;
     btn.className = 'upload-tpl-btn px-4 py-1.5 rounded-full text-xs font-bold ' + (t === _uploadTemplate ? 'bg-brand-black text-white' : 'text-brand-gray hover:text-brand-black');
@@ -23988,11 +24076,43 @@ function setUploadTemplate(type) {
   if (extra) {
     if (_uploadTemplate === 'jet') {
       extra.classList.remove('hidden');
-      // 저장된 데이터 다시 그리기
       try { ['io','ship','storage','loss','order','fee'].forEach(t => _renderJetReport(t)); } catch(_) {}
     } else {
       extra.classList.add('hidden');
     }
+  }
+  // 반품 KPI 표시/갱신
+  const kpiEl = document.getElementById('upload-return-kpi');
+  if (kpiEl) {
+    if (_uploadTemplate === 'return') {
+      kpiEl.classList.remove('hidden');
+      _refreshReturnKpi();
+    } else {
+      kpiEl.classList.add('hidden');
+    }
+  }
+}
+
+// ── 반품 데이터 저장소 ──────────────────────────────
+const RETURN_DATA_KEY = 'gplan_returns_v1';
+function _loadReturns() {
+  try { return JSON.parse(localStorage.getItem(RETURN_DATA_KEY) || '[]') || []; }
+  catch (_) { return []; }
+}
+function _saveReturns(rows) {
+  localStorage.setItem(RETURN_DATA_KEY, JSON.stringify(rows));
+}
+function _refreshReturnKpi() {
+  const rows = _loadReturns();
+  const cntEl = document.getElementById('return-count');
+  const lastEl = document.getElementById('return-last');
+  if (cntEl) cntEl.textContent = rows.length.toLocaleString('ko-KR');
+  if (lastEl) {
+    const last = rows.reduce((m, r) => {
+      const t = String(r._uploadedAt || '');
+      return t > m ? t : m;
+    }, '');
+    lastEl.textContent = last ? last.slice(0, 16).replace('T',' ') : '-';
   }
 }
 
@@ -24868,6 +24988,11 @@ function downloadUploadTemplate() {
     sample = ['일반','2026-04','2026-04','2026-04-15','2026-04-15','O-0001','과세','C01','생활/주방','과세','P-001','OP-1','SKU-1','프리미엄 베개','화이트',29900,3,89700,0,89700,0,0,0,89700,'10.8','10.8',9688,969];
     sheetName = '제트배송';
     fileName  = '제트배송_양식.xlsx';
+  } else if (_uploadTemplate === 'return') {
+    cols = ['받는분성명','받는분기타연락처','업체명(필수기입)','받는분연락처','우편번호','받는분주소','수량','상품명','운임TYPE','지불조건','출고번호','배송메세지','출고일','처리사항','내용'];
+    sample = ['안주진','01092431062','지플랜','01092431062','03652','서울특별시 서대문구 연희로37길 25 (홍은동, 이안휴벌)이안휴벌102동403호( )',1,'퀸센스 샤이니 인덕션 주전자 5L','한진','462195514616','null','04/22','단순변심 교환','퀸센스 샤이니 인덕션 주전자 7L 로 교환'];
+    sheetName = '반품';
+    fileName  = '반품_양식.xlsx';
   } else {
     cols = ['거래처명','사이트','날짜','사이트코드','거래처코드','택배코드','품목코드','품목명','수량','단가(vat포함)','택배비','택배비용','원가','수령자명','이익'];
     sample = ['㈜지플랜','쿠팡','2026-04-15','CP-001','V-100','CJ-A','P-001','프리미엄 베개',3,29900,3000,2500,12000,'홍길동',50700];
