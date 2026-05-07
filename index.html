@@ -17643,8 +17643,6 @@ function renderPaMinus() {
       { key: 'cost',       label: '원가',       align: 'text-right', extra: '' },
       { key: 'shipCost',   label: '택배비용',   align: 'text-right', extra: '' },
       { key: 'margin',     label: '마진(공급가+택배비−원가−택배비용)', align: 'text-right', extra: '' },
-      { key: 'adCost',     label: '광고비',     align: 'text-right', extra: '' },
-      { key: 'marginAfterAd', label: '실마진(광고비차감)', align: 'text-right', extra: '' },
       { key: 'receiver',   label: '수령자',     align: '',           extra: 'pr-5' },
     ];
     thead.innerHTML = '<tr class="text-brand-gray text-xs">' + cols.map(c => {
@@ -17676,9 +17674,6 @@ function renderPaMinus() {
   };
   tbody.innerHTML = rows.length ? rows.map(r => {
     const rowCls = r.isMinus ? 'bg-brand-pink-light/30 border-b border-brand-border' : 'border-b border-brand-border hover:bg-brand-bg/40';
-    const adCostHtml = r.adCost == null
-      ? '<span class="text-brand-gray">-</span>'
-      : (Number(r.adCost) > 0 ? `<span class="text-brand-orange font-semibold">${fmt(r.adCost)}원</span>` : `<span class="text-brand-gray">0원</span>`);
     return `<tr class="${rowCls}">
       <td class="p-3 pl-5 text-xs">${_escapeHtml(r.shop)}</td>
       <td class="p-3 text-xs">${_escapeHtml(String(r.date).slice(0, 10))}</td>
@@ -17692,11 +17687,9 @@ function renderPaMinus() {
       <td class="p-3 text-right text-xs">${money(r.cost)}</td>
       <td class="p-3 text-right text-xs">${shipCostCell(r)}</td>
       <td class="p-3 text-right text-xs">${marginCell(r.margin)}</td>
-      <td class="p-3 text-right text-xs">${adCostHtml}</td>
-      <td class="p-3 text-right text-xs">${marginCell(r.marginAfterAd != null ? r.marginAfterAd : r.margin)}</td>
       <td class="p-3 pr-5 text-xs">${_escapeHtml(r.receiver)}</td>
     </tr>`;
-  }).join('') : '<tr><td colspan="14" class="p-8 text-center text-brand-gray text-sm">주문이 없습니다</td></tr>';
+  }).join('') : '<tr><td colspan="13" class="p-8 text-center text-brand-gray text-sm">주문이 없습니다</td></tr>';
 
   // 합계 행
   const tfoot = document.getElementById('pa-minus-tfoot');
@@ -17712,13 +17705,9 @@ function renderPaMinus() {
         if (r.cost != null) { a.cost += Number(r.cost) || 0; a.costN++; }
         a.shipCost += Number(r.shipCost) || 0;
         if (r.margin != null) { a.margin += Number(r.margin) || 0; a.marginN++; }
-        a.adCost += Number(r.adCost) || 0;
-        const realM = (r.marginAfterAd != null ? r.marginAfterAd : r.margin);
-        if (realM != null) { a.realMargin += Number(realM) || 0; a.realMarginN++; }
         return a;
-      }, { qty: 0, price: 0, supply: 0, shipFee: 0, cost: 0, costN: 0, shipCost: 0, margin: 0, marginN: 0, adCost: 0, realMargin: 0, realMarginN: 0 });
+      }, { qty: 0, price: 0, supply: 0, shipFee: 0, cost: 0, costN: 0, shipCost: 0, margin: 0, marginN: 0 });
       const marginCls = sum.margin < 0 ? 'text-brand-pink font-bold' : (sum.margin > 0 ? 'text-brand-green font-bold' : '');
-      const realMarginCls = sum.realMargin < 0 ? 'text-brand-pink font-bold' : (sum.realMargin > 0 ? 'text-brand-green font-bold' : '');
       tfoot.innerHTML = `<tr class="border-t-2 border-brand-border font-bold">
         <td class="p-3 pl-5 text-xs" colspan="5">합계 (${rows.length}건)</td>
         <td class="p-3 text-right text-xs">${fmt(sum.qty)}</td>
@@ -17728,8 +17717,6 @@ function renderPaMinus() {
         <td class="p-3 text-right text-xs">${sum.costN ? fmt(sum.cost) + '원' : '<span class="text-brand-gray font-normal">-</span>'}</td>
         <td class="p-3 text-right text-xs">${fmt(sum.shipCost)}원</td>
         <td class="p-3 text-right text-xs ${marginCls}">${sum.marginN ? fmt(sum.margin) + '원' : '<span class="text-brand-gray font-normal">-</span>'}</td>
-        <td class="p-3 text-right text-xs">${sum.adCost > 0 ? `<span class="text-brand-orange">${fmt(sum.adCost)}원</span>` : '<span class="text-brand-gray font-normal">-</span>'}</td>
-        <td class="p-3 text-right text-xs ${realMarginCls}">${sum.realMarginN ? fmt(sum.realMargin) + '원' : '<span class="text-brand-gray font-normal">-</span>'}</td>
         <td class="p-3 pr-5"></td>
       </tr>`;
     }
@@ -17749,19 +17736,16 @@ function exportPaMinus() {
     if (r.cost != null) a.cost += Number(r.cost) || 0;
     a.shipCost += Number(r.shipCost) || 0;
     if (r.margin != null) a.margin += Number(r.margin) || 0;
-    a.adCost += Number(r.adCost) || 0;
-    const realM = (r.marginAfterAd != null ? r.marginAfterAd : r.margin);
-    if (realM != null) a.realMargin += Number(realM) || 0;
     return a;
-  }, { qty: 0, price: 0, supply: 0, shipFee: 0, cost: 0, shipCost: 0, margin: 0, adCost: 0, realMargin: 0 });
+  }, { qty: 0, price: 0, supply: 0, shipFee: 0, cost: 0, shipCost: 0, margin: 0 });
   const data = [
-    ['쇼핑몰', '주문일', 'SKU코드', 'SKU상품명', '온라인 상품명', '수량', '판매가', '공급가', '택배비', '원가', '택배비용', '마진(공급가+택배비-원가-택배비용)', '광고비', '실마진(광고비차감)', '수령자', '마이너스'],
-    ...rows.map(r => [r.shop, String(r.date).slice(0, 10), r.skuCode || '', r.name, r.onlineName || '', r.qty, r.price, r.supply, r.shipFee || 0, r.cost == null ? '' : r.cost, r.shipCost || 0, r.margin == null ? '' : r.margin, r.adCost || 0, r.marginAfterAd != null ? r.marginAfterAd : (r.margin == null ? '' : r.margin), r.receiver, r.isMinus ? 'Y' : 'N']),
-    ['합계', '', '', `${rows.length}건`, '', sum.qty, sum.price, sum.supply, sum.shipFee, sum.cost, sum.shipCost, sum.margin, sum.adCost, sum.realMargin, '', ''],
+    ['쇼핑몰', '주문일', 'SKU코드', 'SKU상품명', '온라인 상품명', '수량', '판매가', '공급가', '택배비', '원가', '택배비용', '마진(공급가+택배비-원가-택배비용)', '수령자', '마이너스'],
+    ...rows.map(r => [r.shop, String(r.date).slice(0, 10), r.skuCode || '', r.name, r.onlineName || '', r.qty, r.price, r.supply, r.shipFee || 0, r.cost == null ? '' : r.cost, r.shipCost || 0, r.margin == null ? '' : r.margin, r.receiver, r.isMinus ? 'Y' : 'N']),
+    ['합계', '', '', `${rows.length}건`, '', sum.qty, sum.price, sum.supply, sum.shipFee, sum.cost, sum.shipCost, sum.margin, '', ''],
   ];
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{wch:10},{wch:12},{wch:14},{wch:40},{wch:40},{wch:6},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:22},{wch:10},{wch:18},{wch:10},{wch:8}];
+  ws['!cols'] = [{wch:10},{wch:12},{wch:14},{wch:40},{wch:40},{wch:6},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:22},{wch:10},{wch:8}];
   XLSX.utils.book_append_sheet(wb, ws, '마이너스확인');
   XLSX.writeFile(wb, `GPLAN_마이너스확인_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
