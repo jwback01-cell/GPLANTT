@@ -8,7 +8,11 @@ node_modules/
 
 # 백업/보관 폴더
 백업/
-clicknara-site/
+# 클릭나라 — 코드(index.html)만 추적, 매출 데이터/백업/실행 스크립트는 제외
+clicknara-site/데이터/
+clicknara-site/백업/
+clicknara-site/*.bak*
+clicknara-site/index.html.bak_*
 
 # 백업 파일
 *.bak
