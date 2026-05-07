@@ -21724,10 +21724,30 @@ function _claimGet(o, kind) {
   if (o._edits && o._edits[kind] !== undefined) return o._edits[kind];
 
   // SKU/SKU상품명 — 사용자 편집 외엔 PA 응답에서 직접 추출
-  if (kind === 'sku') return String(o.sku_cd || o.sku || o.shop_sku_cd || '').trim();
+  if (kind === 'sku') {
+    // 1) 최상위 필드 후보
+    const top = String(
+      o.sku_cd || o.sku || o.shop_sku_cd ||
+      o.set_cd || o.set_no || o.set_pack_cd || ''
+    ).trim();
+    if (top) return top;
+    // 2) prod_list[0].sku_cd 등 중첩 배열
+    const list = Array.isArray(o.prod_list) ? o.prod_list : (Array.isArray(o.products) ? o.products : []);
+    if (list.length) {
+      const first = list[0] || {};
+      return String(first.sku_cd || first.sku || first.set_cd || first.prod_no || '').trim();
+    }
+    return '';
+  }
   if (kind === 'skuName') {
-    const v = String(o.prod_name || o.sku_name || o.set_pack_name || '').trim();
+    const v = String(o.prod_name || o.sku_name || o.set_pack_name || o.set_name || '').trim();
     if (v) return v;
+    // prod_list 안의 첫 항목의 prod_name
+    const list = Array.isArray(o.prod_list) ? o.prod_list : (Array.isArray(o.products) ? o.products : []);
+    if (list.length) {
+      const fname = String((list[0] && (list[0].prod_name || list[0].sku_name)) || '').trim();
+      if (fname) return fname;
+    }
     // SKU 매칭 시 상품관리 이름 폴백
     const prod = _findProductBySku(_claimGet(o, 'sku'));
     return prod ? String(prod.name || '') : '';
@@ -21944,6 +21964,14 @@ async function enrichPaClaimsWithDetail() {
       if (supply && o._edits.supply === undefined) o._edits.supply = supply;
       if (cost   && o._edits.cost   === undefined) o._edits.cost   = cost;
       if (shipCost && o._edits.shipCost === undefined) o._edits.shipCost = shipCost;
+
+      // SKU 관련 필드 — list API 에서 누락된 경우 detail 에서 보충해 _paClaims 객체에 머지
+      const skuCandidates = ['sku_cd','sku','shop_sku_cd','set_cd','set_no','set_pack_cd','prod_name','sku_name','set_pack_name','set_name','prod_list','products','pack_unit','set_pack_unit'];
+      skuCandidates.forEach(k => {
+        if (d[k] !== undefined && d[k] !== null && d[k] !== '' && (o[k] === undefined || o[k] === '' || o[k] === null)) {
+          o[k] = d[k];
+        }
+      });
       updated++;
       // 부드러운 진행을 위해 매 5건마다 렌더 갱신
       if (i % 5 === 0) _renderPaClaims();
