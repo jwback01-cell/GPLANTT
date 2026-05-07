@@ -3399,7 +3399,8 @@ tailwind.config = {
                 <div class="font-bold text-[15px]">수집된 클레임 주문 <span id="pa-claim-count" class="text-brand-gray font-medium">0건</span></div>
                 <div class="text-xs text-brand-gray mt-1">상태별 분류 + 공급가/원가/택배비용 합계 · 표 안에서 값 직접 수정 가능</div>
               </div>
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span id="pa-claim-sel-count" class="text-xs font-bold text-brand-gray hidden">선택 <span id="pa-claim-sel-num">0</span>건</span>
                 <button onclick="enrichPaClaimsWithDetail()" class="px-4 py-2 rounded-full bg-white border border-brand-border text-sm font-bold text-brand-blue hover:bg-brand-bg" title="각 주문 상세를 1건씩 조회해 사유/공급가/원가/택배비용을 채웁니다">🔍 상세 가져오기</button>
                 <button onclick="exportPaClaims()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg">📥 엑셀 내보내기</button>
                 <button id="pa-claim-to-returns" onclick="convertPaClaimsToReturns()" class="px-4 py-2 rounded-full bg-brand-pink-light text-brand-pink text-sm font-bold border border-brand-pink hover:bg-brand-pink hover:text-white transition-colors">📦 반품 데이터로 저장</button>
@@ -3412,6 +3413,7 @@ tailwind.config = {
               <table class="w-full text-sm">
                 <thead>
                   <tr class="bg-brand-bg text-brand-gray">
+                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap"><input id="pa-claim-select-all" type="checkbox" onchange="toggleAllPaClaims(this)"></th>
                     <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">상태</th>
                     <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">쇼핑몰</th>
                     <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">주문일</th>
@@ -21745,7 +21747,7 @@ function _renderPaClaims() {
   const tbody = document.getElementById('pa-claim-tbody');
   if (!tbody) return;
   if (!_paClaims.length) {
-    tbody.innerHTML = '<tr><td colspan="12" class="px-6 py-12 text-center text-brand-gray text-sm">수집된 클레임 주문이 없습니다.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13" class="px-6 py-12 text-center text-brand-gray text-sm">수집된 클레임 주문이 없습니다.</td></tr>';
     return;
   }
   // 상태 색상
@@ -21771,6 +21773,7 @@ function _renderPaClaims() {
     const reason = _claimGet(o, 'reason');
     const itemName = _claimGet(o, 'itemName');
     return `<tr class="border-t border-brand-border hover:bg-brand-bg/40">
+      <td class="px-4 py-3 whitespace-nowrap"><input type="checkbox" class="pa-claim-cb" data-idx="${idx}" onchange="updatePaClaimSelCount()"></td>
       <td class="px-4 py-3 whitespace-nowrap">${_statusBadge(_claimStatus(o))}</td>
       <td class="px-4 py-3 text-xs whitespace-nowrap">${escHtml(_shop(o))}</td>
       <td class="px-4 py-3 text-xs whitespace-nowrap">${escHtml(_date(o))}</td>
@@ -21785,6 +21788,30 @@ function _renderPaClaims() {
       ${_editCell(idx, 'reason', reason, { align: 'text-left', cls: 'text-brand-gray min-w-[200px] max-w-[400px]', format: v => escHtml(v || '-') })}
     </tr>`;
   }).join('');
+  updatePaClaimSelCount();
+}
+
+// 선택 관련 헬퍼들
+function toggleAllPaClaims(cb) {
+  document.querySelectorAll('#pa-claim-tbody .pa-claim-cb').forEach(c => c.checked = cb.checked);
+  updatePaClaimSelCount();
+}
+function updatePaClaimSelCount() {
+  const cbs = document.querySelectorAll('#pa-claim-tbody .pa-claim-cb');
+  const sel = [...cbs].filter(c => c.checked).length;
+  const numEl = document.getElementById('pa-claim-sel-num');
+  const wrapEl = document.getElementById('pa-claim-sel-count');
+  if (numEl) numEl.textContent = sel;
+  if (wrapEl) wrapEl.classList.toggle('hidden', sel === 0);
+  const all = document.getElementById('pa-claim-select-all');
+  if (all) all.checked = cbs.length > 0 && sel === cbs.length;
+}
+// 현재 처리 대상 — 체크된 행이 있으면 그것만, 없으면 전체
+function _getPaClaimTargets() {
+  const checked = [...document.querySelectorAll('#pa-claim-tbody .pa-claim-cb:checked')];
+  if (checked.length === 0) return { rows: _paClaims, selectedOnly: false };
+  const idxs = checked.map(c => parseInt(c.getAttribute('data-idx'), 10)).filter(n => !isNaN(n));
+  return { rows: idxs.map(i => _paClaims[i]).filter(Boolean), selectedOnly: true };
 }
 
 // 각 클레임의 상세 정보를 /order/uniq 또는 주문 리스트 재조회로 가져와 사유/공급가/원가/택배비용 보충
@@ -21831,10 +21858,12 @@ async function enrichPaClaimsWithDetail() {
 
 function exportPaClaims() {
   if (!_paClaims.length) { showAppAlert('데이터 없음', '먼저 클레임 주문을 수집해 주세요.', 'warn'); return; }
+  const { rows: targetRows, selectedOnly } = _getPaClaimTargets();
+  if (!targetRows.length) { showAppAlert('선택 없음', '내보낼 행을 체크하거나 모두 해제해 주세요.', 'warn'); return; }
   const fmtD = o => String(o.wdate || o.order_date || '').slice(0, 10);
   const data = [
     ['상태','쇼핑몰','주문일','주문번호','상품명','수량','판매가','공급가','원가','택배비용','수령자','사유','쇼핑몰상품코드','클레임발생일'],
-    ..._paClaims.map(o => [
+    ...targetRows.map(o => [
       _paClaimStatusOf(o),
       String(o.shop_name || o.shop_id || ''),
       fmtD(o),
@@ -21854,24 +21883,35 @@ function exportPaClaims() {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws['!cols'] = [{wch:14},{wch:14},{wch:12},{wch:18},{wch:42},{wch:6},{wch:10},{wch:11},{wch:11},{wch:11},{wch:12},{wch:35},{wch:18},{wch:18}];
-  XLSX.utils.book_append_sheet(wb, ws, 'PA 클레임');
-  XLSX.writeFile(wb, `GPLAN_PA클레임_${new Date().toISOString().slice(0,10)}.xlsx`);
+  const sheetName = selectedOnly ? `PA 클레임(선택 ${targetRows.length}건)` : 'PA 클레임';
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  const stamp = new Date().toISOString().slice(0,10);
+  const fileSuffix = selectedOnly ? `_선택${targetRows.length}건` : '';
+  XLSX.writeFile(wb, `GPLAN_PA클레임${fileSuffix}_${stamp}.xlsx`);
 }
 
 function convertPaClaimsToReturns() {
   if (!_paClaims.length) { showAppAlert('데이터 없음', '먼저 클레임 주문을 수집해 주세요.', 'warn'); return; }
-  // 반품/교환만 변환 — 취소는 별도 처리 권장
-  const returnable = _paClaims.filter(o => {
+  const { rows: targetRows, selectedOnly } = _getPaClaimTargets();
+  if (!targetRows.length) { showAppAlert('선택 없음', '저장할 행을 체크하거나 모두 해제해 주세요.', 'warn'); return; }
+  // 반품/교환만 변환 — 취소는 제외
+  const returnable = targetRows.filter(o => {
     const s = _paClaimStatusOf(o);
     return /반품|교환|맞교환/.test(s);
   });
   if (!returnable.length) {
-    showAppAlert('변환 대상 없음', '취소 상태는 반품 데이터로 변환되지 않습니다. 반품/교환/맞교환 주문이 있을 때만 변환됩니다.', 'warn');
+    showAppAlert(
+      '변환 대상 없음',
+      `${selectedOnly ? '선택된 ' : ''}취소 상태는 반품 데이터로 변환되지 않습니다.\n반품/교환/맞교환 주문을 선택해 주세요.`,
+      'warn'
+    );
     return;
   }
+  const skippedCancel = targetRows.length - returnable.length;
+  const skipMsg = skippedCancel > 0 ? `\n\n⚠ 취소 상태 ${skippedCancel}건은 제외됩니다.` : '';
   showAppConfirm(
     '반품 데이터로 저장',
-    `${returnable.length}건의 클레임을 반품 데이터로 저장합니다.\n\n자동 재고 복원도 함께 적용됩니다 (상품명 매칭 후 stock += qty).\n\n진행하시겠습니까?`,
+    `${selectedOnly ? `선택 ${targetRows.length}건 중 ` : ''}${returnable.length}건의 클레임을 반품 데이터로 저장합니다.${skipMsg}\n\n자동 재고 복원도 함께 적용됩니다 (상품명 매칭 후 stock += qty).\n\n진행하시겠습니까?`,
     async () => {
       const stamp = new Date().toISOString();
       const newRows = returnable.map((o, i) => ({
