@@ -23255,11 +23255,99 @@ function _reconcileShowResult(ledgerRows, fileName) {
         ${sec('🟡 추가 (GPLAN 에는 있지만 거래원장에 없음)', '#D97706', onlyGplan.length, onlyGplanHtml)}
         ${sec('🟠 값 불일치 (양쪽에 있지만 수량/단가/공급가 다름)', '#EA580C', matched.length, matchHtml)}
       </div>
-      <div style="padding:14px 22px;border-top:1px solid #eee;display:flex;gap:8px;justify-content:flex-end;">
-        <button onclick="document.getElementById('reconcile-modal').remove()" style="padding:9px 22px;border-radius:20px;border:1px solid #ddd;background:white;cursor:pointer;font-size:13px;font-weight:bold;">닫기</button>
+      <div style="padding:14px 22px;border-top:1px solid #eee;display:flex;gap:8px;justify-content:space-between;align-items:center;">
+        <span style="font-size:11px;color:#888;">파일 다운로드: 누락 / 추가 / 값 불일치 3개 시트로 구성</span>
+        <div style="display:flex;gap:8px;">
+          <button onclick="document.getElementById('reconcile-modal').remove()" style="padding:9px 22px;border-radius:20px;border:1px solid #ddd;background:white;cursor:pointer;font-size:13px;font-weight:bold;">닫기</button>
+          <button onclick="_reconcileExportExcel()" style="padding:9px 26px;border-radius:20px;border:none;background:#000;color:white;cursor:pointer;font-size:13px;font-weight:bold;">📥 엑셀 다운로드</button>
+        </div>
       </div>
     </div>`;
   document.body.appendChild(m);
+  // 엑셀 내보내기용 결과 캐시
+  m._reconcileResult = result;
+  m._reconcileFileName = fileName;
+}
+
+function _reconcileExportExcel() {
+  const m = document.getElementById('reconcile-modal');
+  if (!m || !m._reconcileResult) {
+    showAppAlert('데이터 없음', '먼저 거래원장을 업로드해 대조 결과를 표시해 주세요.', 'warn');
+    return;
+  }
+  const { matched, onlyLedger, onlyGplan, ledgerCount, gplanCount } = m._reconcileResult;
+  const srcFile = m._reconcileFileName || '';
+
+  const wb = XLSX.utils.book_new();
+
+  // ── 요약 시트 ──
+  const summaryRows = [
+    ['서울리빙 거래원장 대조 결과'],
+    [],
+    ['업로드한 파일', srcFile],
+    ['거래원장 행수', ledgerCount],
+    ['GPLAN 서울리빙 계열 행수', gplanCount],
+    [],
+    ['카테고리', '건수', '설명'],
+    ['🔴 누락', onlyLedger.length, '거래원장에는 있지만 GPLAN 에 없음'],
+    ['🟡 추가', onlyGplan.length, 'GPLAN 에는 있지만 거래원장에 없음'],
+    ['🟠 값 불일치', matched.length, '양쪽에 있지만 수량/단가/공급가 다름'],
+    [],
+    ['총 차이', onlyLedger.length + onlyGplan.length + matched.length, ''],
+  ];
+  const wsSum = XLSX.utils.aoa_to_sheet(summaryRows);
+  wsSum['!cols'] = [{wch:24},{wch:14},{wch:50}];
+  XLSX.utils.book_append_sheet(wb, wsSum, '요약');
+
+  // ── 누락 시트 (거래원장에만 있음) ──
+  const missingHeader = ['날짜', '수령자', '품명', '수량', '단가', '매출/공급가'];
+  const missingRows = onlyLedger.map(L => [L.date, L.recv || '', L.name || '', L.qty || 0, L.unit || 0, L.sale || 0]);
+  const wsMiss = XLSX.utils.aoa_to_sheet([missingHeader, ...missingRows]);
+  wsMiss['!cols'] = [{wch:12},{wch:12},{wch:42},{wch:8},{wch:12},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, wsMiss, '누락(거래원장에만)');
+
+  // ── 추가 시트 (GPLAN 에만 있음) ──
+  const extraHeader = ['날짜', '수령자', '품명', '수량', '단가(VAT포함)', '공급가', '거래처'];
+  const extraRows = onlyGplan.map(G => [
+    G.date || '',
+    G.receiver || '',
+    G.itemName || '',
+    Number(G.qty) || 0,
+    Number(G.price) || 0,
+    Number(G.supply ?? G.cost) || 0,
+    G.vendor || '',
+  ]);
+  const wsExt = XLSX.utils.aoa_to_sheet([extraHeader, ...extraRows]);
+  wsExt['!cols'] = [{wch:12},{wch:12},{wch:42},{wch:8},{wch:14},{wch:12},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, wsExt, '추가(GPLAN에만)');
+
+  // ── 값 불일치 시트 ── (양쪽 값 나란히)
+  const diffHeader = ['날짜', '수령자', '품명', '수량(거래원장)', '수량(GPLAN)', '단가(거래원장)', '단가(GPLAN)', '매출(거래원장)', '공급가(GPLAN)', '차이 필드'];
+  const diffRows = matched.map(M => {
+    const L = M.ledger, G = M.gplan;
+    const fields = M.diffs.map(d => d.field).join(', ');
+    return [
+      L.date,
+      L.recv || '',
+      L.name || '',
+      Number(L.qty) || 0,
+      Number(G.qty) || 0,
+      Number(L.unit) || 0,
+      Number(G.price) || 0,
+      Number(L.sale) || 0,
+      Number(G.supply ?? G.cost) || 0,
+      fields,
+    ];
+  });
+  const wsDiff = XLSX.utils.aoa_to_sheet([diffHeader, ...diffRows]);
+  wsDiff['!cols'] = [{wch:12},{wch:12},{wch:42},{wch:13},{wch:13},{wch:13},{wch:13},{wch:14},{wch:14},{wch:30}];
+  XLSX.utils.book_append_sheet(wb, wsDiff, '값 불일치');
+
+  // 파일명: GPLAN_거래원장대조_YYYY-MM-DD.xlsx
+  const today = new Date();
+  const stamp = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const outName = `GPLAN_거래원장대조_${stamp}.xlsx`;
+  XLSX.writeFile(wb, outName);
 }
 
 function exportUploadData() {
