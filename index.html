@@ -1576,12 +1576,13 @@ tailwind.config = {
           </div>
         </div>
         <!-- 헤더 -->
-        <div class="grid border-b border-brand-border bg-white px-4 md:px-6 py-3 select-none" style="grid-template-columns: 36px 1fr 100px 100px 80px 40px;">
+        <div class="grid border-b border-brand-border bg-white px-4 md:px-6 py-3 select-none" style="grid-template-columns: 36px 1fr 100px 100px 80px 40px 40px;">
           <div></div>
           <div class="text-xs font-bold text-brand-gray uppercase tracking-wider cursor-pointer hover:text-brand-black transition-colors flex items-center gap-1" onclick="sortProducts('name')">상품 정보<span id="sort-icon-name" class="text-[10px]"></span></div>
           <div class="text-xs font-bold text-brand-gray uppercase tracking-wider text-right cursor-pointer hover:text-brand-black transition-colors flex items-center justify-end gap-1" onclick="sortProducts('stock')">현재 재고<span id="sort-icon-stock" class="text-[10px]"></span></div>
           <div class="text-xs font-bold text-brand-gray uppercase tracking-wider text-right cursor-pointer hover:text-brand-black transition-colors flex items-center justify-end gap-1" onclick="sortProducts('safety')">안전 재고<span id="sort-icon-safety" class="text-[10px]"></span></div>
           <div class="text-xs font-bold text-brand-gray uppercase tracking-wider text-center cursor-pointer hover:text-brand-black transition-colors flex items-center justify-center gap-1" onclick="sortProducts('status')">상태<span id="sort-icon-status" class="text-[10px]"></span></div>
+          <div class="text-xs font-bold text-brand-gray uppercase tracking-wider text-center" title="재고 수불">수불</div>
           <div></div>
         </div>
         <!-- 상품 행 -->
@@ -5002,6 +5003,7 @@ const GPLAN_SYNC_KEYS = [
   'gplan_ecount_ship_cost_map_v1',  // 이카운트 배송비 매핑
   'gplan_ad_costs_v1',              // 광고비 업로드 데이터 (스마트스토어 A/B/C, 쿠팡 등)
   'gplan_returns_v1',               // 반품 데이터
+  'gplan_stock_movements_v1',       // 재고 수불 이력 (입출고 로그)
   'kw_extra_products',              // 키워드 추가 상품
   'kw_naver_api',                   // 네이버 API 키
   'kw_rank_history',                // 키워드 순위 이력
@@ -9681,15 +9683,22 @@ function syncDashboardRevenue() {
   const prev    = data.length >= 2 ? data[data.length - 2] : null;
 
   const fmt = n => n.toLocaleString('ko-KR');
-  const rate = prev && prev.sales > 0
-    ? (((current.sales - prev.sales) / prev.sales) * 100).toFixed(1)
+  // 반품 손실 차감 후 매출 (월별)
+  const _retCurMonth = parseInt(current.label) || 0;
+  const _retCurLoss = (typeof _returnAmountByMonth === 'function' && _retCurMonth > 0) ? _returnAmountByMonth(_retCurMonth) : 0;
+  const _retPrevMonth = prev ? (parseInt(prev.label) || 0) : 0;
+  const _retPrevLoss = (typeof _returnAmountByMonth === 'function' && _retPrevMonth > 0) ? _returnAmountByMonth(_retPrevMonth) : 0;
+  const adjCurSalesM  = current.sales - _retCurLoss;
+  const adjPrevSalesM = prev ? (prev.sales - _retPrevLoss) : 0;
+  const rate = prev && adjPrevSalesM > 0
+    ? (((adjCurSalesM - adjPrevSalesM) / adjPrevSalesM) * 100).toFixed(1)
     : 0;
   const isUp = rate >= 0;
 
   // 대시보드 카드
   const dashRevEl   = document.getElementById('dashboard-month-revenue');
   const dashRateEl  = document.getElementById('dashboard-month-revenue-rate');
-  if (dashRevEl) dashRevEl.textContent = fmt(current.sales);
+  if (dashRevEl) dashRevEl.textContent = fmt(adjCurSalesM);
   if (dashRateEl) {
     const arrow = isUp
       ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m18 15-6-6-6 6"/></svg>'
@@ -9697,11 +9706,11 @@ function syncDashboardRevenue() {
     dashRateEl.innerHTML = arrow + Math.abs(rate) + '%';
   }
 
-  // 매출장부 매출 카드
+  // 매출장부 매출 카드 (반품 차감 적용)
   const ledgerRevEl   = document.getElementById('ledger-month-revenue');
   const ledgerRateEl  = document.getElementById('ledger-month-rate');
   const ledgerLabelEl = document.getElementById('ledger-month-label');
-  if (ledgerRevEl)   ledgerRevEl.textContent   = fmt(current.sales);
+  if (ledgerRevEl)   ledgerRevEl.textContent   = fmt(adjCurSalesM);
   if (ledgerRateEl)  ledgerRateEl.textContent  = '전월 대비 ' + (isUp ? '+' : '') + rate + '%';
   if (ledgerLabelEl) ledgerLabelEl.textContent = '2026년 ' + current.label;
 
@@ -9710,12 +9719,18 @@ function syncDashboardRevenue() {
   const _profitOfMonth = m => (m && m.uploadProfit != null)
     ? Number(m.uploadProfit)
     : (m ? (m.sales - m.purchase - m.fee - m.delivery) : 0);
-  const curProfit  = _profitOfMonth(current);
-  const profitRate = current.sales > 0 ? Math.round((curProfit / current.sales) * 100) : 0;
+  // 반품 손실액 차감 — 해당 월의 qty × 단가(VAT포함) 합
+  const _curMonthNum = parseInt(current.label) || 0;
+  const _curReturnLoss = (typeof _returnAmountByMonth === 'function' && _curMonthNum > 0) ? _returnAmountByMonth(_curMonthNum) : 0;
+  const curProfit  = _profitOfMonth(current) - _curReturnLoss;
+  const adjCurSales = current.sales - _curReturnLoss;
+  const profitRate = adjCurSales > 0 ? Math.round((curProfit / adjCurSales) * 100) : 0;
 
   let prevProfit = 0, profitChange = 0;
   if (prev) {
-    prevProfit = _profitOfMonth(prev);
+    const _prevMonthNum = parseInt(prev.label) || 0;
+    const _prevReturnLoss = (typeof _returnAmountByMonth === 'function' && _prevMonthNum > 0) ? _returnAmountByMonth(_prevMonthNum) : 0;
+    prevProfit = _profitOfMonth(prev) - _prevReturnLoss;
     profitChange = prevProfit > 0 ? (((curProfit - prevProfit) / prevProfit) * 100).toFixed(1) : 0;
   }
   const profitUp = profitChange >= 0;
@@ -10270,6 +10285,105 @@ function showLinkedGroupInfo(productId) {
 }
 
 // 연동 추가 모달 열기 — 트리거 상품을 미리 체크해놓고, 함께 묶을 다른 상품을 선택
+// ── 재고 수불 모달 ─────────────────────────────────────
+// 한 상품의 모든 재고 변동(입고/PA출고/반품복원/편집/일괄/안전재고) 이력 표시
+function openStockMovementModal(productId) {
+  const product = (typeof _allProducts !== 'undefined' && Array.isArray(_allProducts))
+    ? _allProducts.find(p => p.id === productId) : null;
+  if (!product) { showAppAlert('상품 없음', '상품을 찾을 수 없습니다.', 'error'); return; }
+
+  const moves = (typeof _getStockMovesForProduct === 'function')
+    ? _getStockMovesForProduct(product.id, product.sku) : [];
+
+  const fmtN = n => Number(n || 0).toLocaleString('ko-KR');
+  const escH = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]);
+
+  // 합계 (전체 기간)
+  let totalIn = 0, totalOut = 0;
+  moves.forEach(m => {
+    const d = Number(m.delta) || 0;
+    if (d > 0) totalIn += d;
+    else totalOut += Math.abs(d);
+  });
+
+  // 유형별 색상
+  const typeColor = {
+    '입고':         { bg:'#E0F2FE', fg:'#075985' },
+    'PA출고':       { bg:'#FFE4E6', fg:'#9F1239' },
+    '반품복원':      { bg:'#FEF3C7', fg:'#92400E' },
+    '편집수정':      { bg:'#F3F4F6', fg:'#374151' },
+    '일괄수정':      { bg:'#EDE9FE', fg:'#5B21B6' },
+    '안전재고자동':  { bg:'#DCFCE7', fg:'#166534' },
+    '기타':          { bg:'#F3F4F6', fg:'#6B7280' },
+  };
+
+  const rows = moves.map(m => {
+    const dt = String(m.ts || '').slice(0, 16).replace('T', ' ');
+    const c = typeColor[m.type] || typeColor['기타'];
+    const deltaStr = m.delta > 0 ? '+' + fmtN(m.delta) : fmtN(m.delta);
+    const deltaCls = m.delta > 0 ? 'color:#16A34A;font-weight:bold;' : (m.delta < 0 ? 'color:#DC2626;font-weight:bold;' : 'color:#6B7280;');
+    return `<tr style="border-top:1px solid #f1f1f4;">
+      <td style="padding:8px 10px;font-size:12px;color:#666;white-space:nowrap;">${escH(dt)}</td>
+      <td style="padding:8px 10px;"><span style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:bold;background:${c.bg};color:${c.fg};">${escH(m.type)}</span></td>
+      <td style="padding:8px 10px;font-size:13px;text-align:right;${deltaCls}">${deltaStr}</td>
+      <td style="padding:8px 10px;font-size:12px;color:#444;text-align:right;white-space:nowrap;">${fmtN(m.prevStock)} → <b>${fmtN(m.newStock)}</b></td>
+      <td style="padding:8px 10px;font-size:11px;color:#888;">${escH(m.note || '')}</td>
+    </tr>`;
+  }).join('');
+
+  // 모달
+  const prev = document.getElementById('stock-move-modal');
+  if (prev) prev.remove();
+  const m = document.createElement('div');
+  m.id = 'stock-move-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML = `
+    <div style="background:white;border-radius:16px;max-width:920px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="padding:16px 22px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
+        <div>
+          <div style="font-weight:bold;font-size:16px;">🔍 재고 수불 이력</div>
+          <div style="color:#444;font-size:13px;margin-top:4px;font-weight:600;">${escH(product.name)}</div>
+          <div style="color:#888;font-size:11px;margin-top:2px;">SKU: ${escH(product.sku || '-')} · 현재 재고 <b style="color:#1A1A1A;">${fmtN(product.stock)}</b></div>
+        </div>
+        <button onclick="document.getElementById('stock-move-modal').remove()" style="padding:6px 12px;border-radius:14px;border:1px solid #ddd;background:white;cursor:pointer;font-size:12px;font-weight:bold;">닫기</button>
+      </div>
+      <div style="padding:14px 22px;border-bottom:1px solid #eee;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+        <div style="background:#F0FDF4;border-radius:10px;padding:10px 12px;">
+          <div style="font-size:10px;font-weight:bold;color:#166534;letter-spacing:.5px;">총 입고/복원</div>
+          <div style="font-size:18px;font-weight:bold;color:#166534;margin-top:2px;">+${fmtN(totalIn)}</div>
+        </div>
+        <div style="background:#FEF2F2;border-radius:10px;padding:10px 12px;">
+          <div style="font-size:10px;font-weight:bold;color:#9F1239;letter-spacing:.5px;">총 출고/차감</div>
+          <div style="font-size:18px;font-weight:bold;color:#9F1239;margin-top:2px;">-${fmtN(totalOut)}</div>
+        </div>
+        <div style="background:#F8FAFC;border-radius:10px;padding:10px 12px;">
+          <div style="font-size:10px;font-weight:bold;color:#475569;letter-spacing:.5px;">전체 기록</div>
+          <div style="font-size:18px;font-weight:bold;color:#1A1A1A;margin-top:2px;">${fmtN(moves.length)}건</div>
+        </div>
+      </div>
+      <div style="overflow:auto;flex:1;">
+        ${moves.length === 0 ? `
+          <div style="padding:40px 20px;text-align:center;color:#888;font-size:13px;">아직 기록된 수불 이력이 없습니다.<br>입고·매출 차감·반품 복원이 발생하면 자동으로 누적됩니다.</div>
+        ` : `
+          <table style="width:100%;border-collapse:collapse;">
+            <thead style="background:#FAFAFA;position:sticky;top:0;">
+              <tr>
+                <th style="text-align:left;padding:10px;font-size:11px;font-weight:bold;color:#666;">일시</th>
+                <th style="text-align:left;padding:10px;font-size:11px;font-weight:bold;color:#666;">유형</th>
+                <th style="text-align:right;padding:10px;font-size:11px;font-weight:bold;color:#666;">변동</th>
+                <th style="text-align:right;padding:10px;font-size:11px;font-weight:bold;color:#666;">재고 변화</th>
+                <th style="text-align:left;padding:10px;font-size:11px;font-weight:bold;color:#666;">메모</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        `}
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+}
+
 function openStockLinkModal(productId) {
   _openProductMenuId = null;
   // 닫혀있던 메뉴 정리
@@ -10765,7 +10879,7 @@ function renderProductsPage() {
     var linkMenuHtml = linkN >= 2
       ? '<button onclick="unlinkStockGroup(' + p.id + ')" class="w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-brand-bg transition-colors flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 0 1 4 8"/><line x1="2" y1="2" x2="22" y2="22"/></svg>연동 해제</button>'
       : '<button onclick="openStockLinkModal(' + p.id + ')" class="w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-brand-bg transition-colors flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>재고 연동</button>';
-    return '<div class="grid items-center px-4 md:px-6 py-4 md:py-5 border-b border-[#F9F9FB] hover:bg-brand-bg transition-colors" data-db-id="' + p.id + '" style="grid-template-columns: 36px 1fr 100px 100px 80px 40px;">' +
+    return '<div class="grid items-center px-4 md:px-6 py-4 md:py-5 border-b border-[#F9F9FB] hover:bg-brand-bg transition-colors" data-db-id="' + p.id + '" style="grid-template-columns: 36px 1fr 100px 100px 80px 40px 40px;">' +
       '<div class="flex items-center"><input type="checkbox" class="product-row-cb w-4 h-4 rounded border-brand-border" data-product-id="' + p.id + '" onchange="updateProductSelectLabel()"></div>' +
       '<div class="flex items-center gap-3 md:gap-4 cursor-pointer rounded-xl -mx-1 px-1 py-1 hover:bg-brand-bg transition-colors" onclick="openEditProduct(' + p.id + ')" title="클릭하여 수정">' +
         '<div class="w-12 md:w-14 h-12 md:h-14 rounded-xl ' + bg + ' ' + fg + ' flex items-center justify-center font-bold shrink-0">' + escHtml(initials) + '</div>' +
@@ -10775,6 +10889,11 @@ function renderProductsPage() {
       '<div class="text-right"><input type="number" value="' + p.stock + '" class="' + stockClass + '"></div>' +
       '<div class="text-right"><input type="number" value="' + p.safety_stock + '" class="input-stock" style="border-style:dashed"></div>' +
       '<div class="text-center">' + statusHtml + '</div>' +
+      '<div class="text-center">' +
+        '<button onclick="event.stopPropagation();openStockMovementModal(' + p.id + ')" class="text-brand-gray hover:text-brand-blue p-1 md:p-2" title="재고 수불 이력 보기">' +
+          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>' +
+        '</button>' +
+      '</div>' +
       '<div class="text-right relative">' +
         '<button onclick="toggleProductMenu(' + p.id + ', event)" class="text-brand-gray hover:text-brand-black p-1 md:p-2">' +
           '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>' +
@@ -10975,6 +11094,26 @@ async function submitBulkEditProducts() {
   if (Object.keys(linkedFields).length) {
     for (const id of ids) {
       try { await _syncLinkedFields(id, linkedFields); } catch (_) {}
+    }
+  }
+
+  // 수불 이력 — payload 에 stock 이 있으면 변경된 상품마다 기록
+  if ('stock' in payload && typeof _logStockMove === 'function') {
+    const newStock = Number(payload.stock) || 0;
+    const productsCache = (typeof _allProducts !== 'undefined' && Array.isArray(_allProducts)) ? _allProducts : [];
+    for (const id of ids) {
+      const prev = productsCache.find(p => p.id === id);
+      if (!prev) continue;
+      const prevStock = Number(prev.stock || 0);
+      if (prevStock === newStock) continue;
+      try {
+        _logStockMove({
+          productId: prev.id, sku: prev.sku, productName: prev.name,
+          type: '일괄수정', delta: newStock - prevStock,
+          prevStock, newStock,
+          note: '일괄 수정으로 재고 변경'
+        });
+      } catch (_) {}
     }
   }
 
@@ -12582,6 +12721,11 @@ async function submitAddProduct() {
   };
 
   const isEditing = !!_editingProductId;
+  // 편집 모드면 이전 재고 기억 (이력 기록용)
+  const _prevStockBeforeEdit = isEditing ? (() => {
+    const prev = (products || []).find(p => p.id === _editingProductId);
+    return prev ? Number(prev.stock || 0) : 0;
+  })() : 0;
   try {
     const fullBase = { name, sku, category: cat, stock, safety_stock: safety, cost, supply_price: supply, shipping_fee: shipFee, shipping_cost: shipCost };
     const full = isEditing ? fullBase : { user_id: session.user.id, ...fullBase };
@@ -12590,6 +12734,17 @@ async function submitAddProduct() {
     // 재고 연동: 수정인 경우 같은 그룹 멤버에게 재고/안전재고/원가/공급가 동기화
     if (isEditing) {
       try { await _syncLinkedFields(_editingProductId, { stock, safety_stock: safety, cost, supply_price: supply }); } catch (_) {}
+      // 수불 이력 — 편집으로 재고가 변경된 경우만
+      if (stock !== _prevStockBeforeEdit) {
+        try {
+          if (typeof _logStockMove === 'function') _logStockMove({
+            productId: _editingProductId, sku, productName: name,
+            type: '편집수정', delta: stock - _prevStockBeforeEdit,
+            prevStock: _prevStockBeforeEdit, newStock: stock,
+            note: '상품 편집 모달에서 재고 직접 수정'
+          });
+        } catch (_) {}
+      }
     }
   } catch (e) {
     showErr('예외 발생: ' + (e.message || e));
@@ -12910,6 +13065,15 @@ async function submitReceiving() {
 
   // 재고 연동: 같은 그룹의 다른 상품도 동일하게 업데이트
   try { await _syncLinkedFields(product.id, { stock: newStock, cost: unit }); } catch (_) {}
+
+  // 수불 이력 — 입고
+  try {
+    if (typeof _logStockMove === 'function') _logStockMove({
+      productId: product.id, sku: product.sku, productName: product.name,
+      type: '입고', delta: qty, prevStock, newStock,
+      note: `입고일자 ${date}, 단가 ${unit.toLocaleString('ko-KR')}원${memo ? ' / ' + memo : ''}`
+    });
+  } catch (_) {}
 
   // 이력 기록
   const hist = _loadReceivingHistory();
@@ -14546,6 +14710,96 @@ window._adDebug = function () {
   console.log(' localStorage 직접:', (localStorage.getItem('gplan_ad_costs_v1') || '').slice(0, 200) + '...');
   return { count: raw.length, totalSum, byMonth: months, sample };
 };
+// ── 재고 수불 이력 (입출고 로그) ─────────────────────────────────────
+// localStorage: gplan_stock_movements_v1. 클라우드 동기화 대상.
+// 행: { id, ts, productId, sku, productName, type, delta, prevStock, newStock, note }
+const STOCK_MOVE_KEY = 'gplan_stock_movements_v1';
+function _loadStockMoves() {
+  try { return JSON.parse(localStorage.getItem(STOCK_MOVE_KEY) || '[]') || []; }
+  catch (_) { return []; }
+}
+function _saveStockMoves(arr) {
+  // 최근 20000건만 유지 (오래된 것부터 잘라냄)
+  if (Array.isArray(arr) && arr.length > 20000) arr = arr.slice(-20000);
+  try { localStorage.setItem(STOCK_MOVE_KEY, JSON.stringify(arr || [])); } catch (_) {}
+}
+// 단일 이동 기록 추가. type: '입고' | 'PA출고' | '반품복원' | '편집수정' | '안전재고자동' | '일괄수정' | '기타'
+function _logStockMove({ productId, sku, productName, type, delta, prevStock, newStock, note }) {
+  if (!productId && !sku) return;
+  const arr = _loadStockMoves();
+  arr.push({
+    id: Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+    ts: new Date().toISOString(),
+    productId: productId || null,
+    sku: sku || '',
+    productName: productName || '',
+    type: type || '기타',
+    delta: Number(delta) || 0,
+    prevStock: Number(prevStock) || 0,
+    newStock: Number(newStock) || 0,
+    note: String(note || ''),
+  });
+  _saveStockMoves(arr);
+}
+// 특정 상품의 수불 이력 조회 (최신순)
+function _getStockMovesForProduct(productId, sku) {
+  const arr = _loadStockMoves();
+  const filtered = arr.filter(m => {
+    if (productId && m.productId === productId) return true;
+    if (sku && m.sku && String(m.sku).toLowerCase() === String(sku).toLowerCase()) return true;
+    return false;
+  });
+  return filtered.sort((a, b) => String(b.ts || '').localeCompare(String(a.ts || '')));
+}
+
+// ── 반품 손실액 헬퍼 ─────────────────────────────────────
+// 반품 손실액 = qty × 단가(VAT포함). 단가는 1) 같은 날·같은 상품명의 업로드 단가
+// 2) 같은 상품명의 가장 최근 단가 3) SKU 매칭으로 상품관리의 lprice 순으로 폴백.
+function _returnUnitPriceFor(r) {
+  try {
+    const _norm = s => String(s || '').replace(/\s+/g,'').replace(/[\(\)\[\]\.,_\-\/·]/g,'').toLowerCase();
+    const itemKey = _norm(r.itemName);
+    const outDate = (typeof _normReturnOutDate === 'function') ? _normReturnOutDate(r.outDate) : String(r.outDate || '').slice(0, 10);
+    let upload = [];
+    try { upload = (typeof _loadUploadData === 'function') ? _loadUploadData() : []; } catch(_) {}
+    if (itemKey) {
+      // 1) 같은 출고일 + 같은 상품명
+      if (outDate) {
+        const same = upload.find(u => String(u.date || '').slice(0,10) === outDate && _norm(u.itemName) === itemKey && Number(u.price) > 0);
+        if (same) return Number(same.price);
+      }
+      // 2) 같은 상품명 가장 최근 단가
+      const byName = upload
+        .filter(u => _norm(u.itemName) === itemKey && Number(u.price) > 0)
+        .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+      if (byName.length) return Number(byName[0].price);
+    }
+    return 0;
+  } catch (_) { return 0; }
+}
+function _returnAmountInRange(start, end) {
+  try {
+    const all = (typeof _loadReturns === 'function') ? _loadReturns() : [];
+    let total = 0;
+    all.forEach(r => {
+      const d = (typeof _normReturnOutDate === 'function') ? _normReturnOutDate(r.outDate) : String(r.outDate || '').slice(0, 10);
+      if (!d) return;
+      if (start && d < start) return;
+      if (end && d > end) return;
+      const qty = Number(r.qty) || 0;
+      const unit = _returnUnitPriceFor(r);
+      total += qty * unit;
+    });
+    return total;
+  } catch (_) { return 0; }
+}
+function _returnAmountByMonth(monthNum) {
+  const yr = new Date().getFullYear();
+  const lastDay = new Date(yr, monthNum, 0).getDate();
+  const start = `${yr}-${String(monthNum).padStart(2,'0')}-01`;
+  const end   = `${yr}-${String(monthNum).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+  return _returnAmountInRange(start, end);
+}
 // 채널명(매출장부 사이트명) → 광고비 site 매칭. PA shop_name 매핑 헬퍼 재사용
 function _adCostForChannel(channelName, start, end) {
   const target = (typeof _adSiteFromShopName === 'function') ? _adSiteFromShopName(channelName) : null;
@@ -14697,31 +14951,37 @@ function renderDailyTab() {
     return a;
   }, { sales: 0, cost: 0, shipCost: 0, profit: 0, profitDays: 0, count: 0, adCost: 0 });
   const dayCount = days.length || 1;
-  const avgSales = Math.round(kpiSum.sales / dayCount);
-  const realProfit = kpiSum.profit - kpiSum.adCost;
-  const profitRate = kpiSum.sales > 0 && kpiSum.profitDays ? ((kpiSum.profit / kpiSum.sales) * 100).toFixed(1) : '-';
+
+  // 반품 손실액 — 같은 기간 (출고일 기준) qty × 단가(VAT포함) 합
+  const _allReturns = (typeof _loadReturns === 'function') ? _loadReturns() : [];
+  let returnCount = 0, returnLoss = 0;
+  _allReturns.forEach(r => {
+    const d = (typeof _normReturnOutDate === 'function') ? _normReturnOutDate(r.outDate) : String(r.outDate || '').slice(0, 10);
+    if (!d) return;
+    if (startDate && d < startDate) return;
+    if (endDate   && d > endDate)   return;
+    returnCount++;
+    const qty = Number(r.qty) || 0;
+    const unit = (typeof _returnUnitPriceFor === 'function') ? _returnUnitPriceFor(r) : 0;
+    returnLoss += qty * unit;
+  });
+
+  // 반품액을 매출/순이익에서 직접 차감
+  const adjSales = kpiSum.sales - returnLoss;
+  const adjProfit = kpiSum.profit - returnLoss;
+  const avgSales = Math.round(adjSales / dayCount);
+  const realProfit = adjProfit - kpiSum.adCost;
+  const profitRate = adjSales > 0 && kpiSum.profitDays ? ((adjProfit / adjSales) * 100).toFixed(1) : '-';
 
   const kpi = document.getElementById('daily-kpi');
   if (kpi) {
-    // 반품 KPI — 같은 기간 (출고일 기준) 합계
-    const _allReturns = (typeof _loadReturns === 'function') ? _loadReturns() : [];
-    let returnCount = 0, returnQty = 0;
-    _allReturns.forEach(r => {
-      const d = (typeof _normReturnOutDate === 'function') ? _normReturnOutDate(r.outDate) : String(r.outDate || '').slice(0, 10);
-      if (!d) return;
-      if (startDate && d < startDate) return;
-      if (endDate   && d > endDate)   return;
-      returnCount++;
-      returnQty += Number(r.qty) || 0;
-    });
-
     kpi.innerHTML = [
-      { label: `누적 매출 (${days.length}일)`, value: fmtN(kpiSum.sales) + '원', accent: '' },
-      { label: '누적 순이익', value: fmtN(kpiSum.profit) + '원', accent: kpiSum.profit >= 0 ? 'text-brand-green' : 'text-brand-pink' },
+      { label: `누적 매출 (${days.length}일)`, value: fmtN(adjSales) + '원', accent: '' },
+      { label: '누적 순이익 (반품 차감)', value: fmtN(adjProfit) + '원', accent: adjProfit >= 0 ? 'text-brand-green' : 'text-brand-pink' },
       { label: '누적 광고비', value: fmtN(kpiSum.adCost) + '원', accent: 'text-brand-pink' },
       { label: '실순이익 (순이익-광고비)', value: fmtN(realProfit) + '원', accent: realProfit >= 0 ? 'text-brand-green' : 'text-brand-pink' },
       { label: '반품 건수', value: fmtN(returnCount) + '건', accent: returnCount > 0 ? 'text-brand-pink' : 'text-brand-gray' },
-      { label: '반품 수량', value: fmtN(returnQty) + '개', accent: returnQty > 0 ? 'text-brand-pink' : 'text-brand-gray' },
+      { label: '반품 차감액', value: fmtN(returnLoss) + '원', accent: returnLoss > 0 ? 'text-brand-pink' : 'text-brand-gray' },
       { label: '일평균 매출', value: fmtN(avgSales) + '원', accent: 'text-brand-blue' },
       { label: '평균 수익률', value: (profitRate === '-' ? '-' : profitRate + '%'), accent: 'text-brand-orange' },
     ].map(k => `
@@ -14970,19 +15230,11 @@ function renderPeriodChart() {
   const totalAd       = data.reduce((s, d) => s + (d.adCost || 0), 0);
   // 순이익: 업로드 데이터의 profit 합계가 있으면 그 값, 없으면 기존 계산 (매출-원가-수수료-배송비) 폴백
   const _profitOf = d => (d.uploadProfit != null ? Number(d.uploadProfit) : (d.sales - d.purchase - d.fee - d.delivery));
-  const totalProfit   = data.reduce((s, d) => s + _profitOf(d), 0);
-  const totalReal     = totalProfit - totalAd;
-  const avgSales      = Math.round(totalSales / data.length);
-  const profitRate    = totalSales > 0 ? Math.round((totalProfit / totalSales) * 100) : 0;
+  const rawProfit     = data.reduce((s, d) => s + _profitOf(d), 0);
 
-  // 범위 라벨
-  const rangeEl = document.getElementById('period-range-label');
-  if (rangeEl) rangeEl.textContent = `2026년 ${data[0].label} ~ ${data[data.length-1].label} 누적`;
-
-  // 반품 KPI — 같은 기간 (출고일 기준) 합계
+  // 반품 손실/건수 — 기간 = data 의 첫/마지막 월 라벨 범위
   const _allReturnsP = (typeof _loadReturns === 'function') ? _loadReturns() : [];
-  let returnCountP = 0, returnQtyP = 0;
-  // period 의 기간 = data 의 첫/마지막 월 라벨 → 해당 월 범위 산정
+  let returnCountP = 0, returnLossP = 0;
   const yr = new Date().getFullYear();
   const monthLabels = data.map(d => parseInt(d.label) || 0).filter(n => n > 0);
   const periodMinMonth = monthLabels.length ? Math.min(...monthLabels) : 0;
@@ -14996,18 +15248,31 @@ function renderPeriodChart() {
       if (!d) return;
       if (d < pStart || d > pEnd) return;
       returnCountP++;
-      returnQtyP += Number(r.qty) || 0;
+      const qty = Number(r.qty) || 0;
+      const unit = (typeof _returnUnitPriceFor === 'function') ? _returnUnitPriceFor(r) : 0;
+      returnLossP += qty * unit;
     });
   }
 
+  // 매출/순이익에서 반품 손실 차감
+  const adjSalesP  = totalSales - returnLossP;
+  const totalProfit = rawProfit - returnLossP;
+  const totalReal     = totalProfit - totalAd;
+  const avgSales      = Math.round(adjSalesP / data.length);
+  const profitRate    = adjSalesP > 0 ? Math.round((totalProfit / adjSalesP) * 100) : 0;
+
+  // 범위 라벨
+  const rangeEl = document.getElementById('period-range-label');
+  if (rangeEl) rangeEl.textContent = `2026년 ${data[0].label} ~ ${data[data.length-1].label} 누적`;
+
   // KPI 카드
   document.getElementById('period-kpi').innerHTML = [
-    { label:'누적 매출', value: fmtM(totalSales), color:'' },
-    { label:'누적 순이익', value: fmtM(totalProfit), color:'text-brand-green' },
+    { label:'누적 매출', value: fmtM(adjSalesP), color:'' },
+    { label:'누적 순이익 (반품 차감)', value: fmtM(totalProfit), color:'text-brand-green' },
     { label:'누적 광고비', value: fmtM(totalAd), color:'text-brand-pink' },
     { label:'실순이익 (순이익-광고비)', value: fmtM(totalReal), color: totalReal >= 0 ? 'text-brand-green' : 'text-brand-pink' },
     { label:'반품 건수', value: returnCountP.toLocaleString('ko-KR') + '건', color: returnCountP > 0 ? 'text-brand-pink' : 'text-brand-gray' },
-    { label:'반품 수량', value: returnQtyP.toLocaleString('ko-KR') + '개', color: returnQtyP > 0 ? 'text-brand-pink' : 'text-brand-gray' },
+    { label:'반품 차감액', value: fmtM(returnLossP), color: returnLossP > 0 ? 'text-brand-pink' : 'text-brand-gray' },
     { label:'기간 평균 매출', value: fmtM(avgSales), color:'' },
     { label:'평균 수익률', value: profitRate + '%', color:'text-brand-blue' },
   ].map(k => `
@@ -23187,12 +23452,27 @@ async function _applyStockFromUploadRows(rows, direction, opts) {
     const newStock = Math.max(0, oldStock + g.totalDelta);
     for (const m of g.members) {
       try {
+        const memberPrev = Number(m.stock || 0);
         const { error } = await _supabase.from('products').update({ stock: newStock }).eq('id', m.id);
         if (error) { console.error('[재고연동] DB 업데이트 실패:', m.sku, error); continue; }
         updated++;
         const tag = (g.members.length > 1) ? ` (🔗 그룹 ${g.members.length}개 동기화)` : '';
-        console.log(`[재고연동] ${m.sku}: ${Number(m.stock || 0)} → ${newStock} (${g.totalDelta > 0 ? '+' : ''}${g.totalDelta})${tag}`);
-        updates.push({ id: m.id, sku: m.sku, oldStock: Number(m.stock || 0), newStock, delta: newStock - Number(m.stock || 0) });
+        console.log(`[재고연동] ${m.sku}: ${memberPrev} → ${newStock} (${g.totalDelta > 0 ? '+' : ''}${g.totalDelta})${tag}`);
+        updates.push({ id: m.id, sku: m.sku, oldStock: memberPrev, newStock, delta: newStock - memberPrev });
+        // 수불 이력 — PA 출고 (direction -1) 또는 PA 출고 취소 (direction +1)
+        try {
+          if (typeof _logStockMove === 'function' && (newStock - memberPrev) !== 0) {
+            const moveType = direction < 0 ? 'PA출고' : '편집수정';
+            _logStockMove({
+              productId: m.id, sku: m.sku, productName: m.name,
+              type: moveType, delta: newStock - memberPrev,
+              prevStock: memberPrev, newStock,
+              note: direction < 0
+                ? `매출 업로드 자동 차감${g.members.length > 1 ? ` (그룹 ${g.members.length}개 동기화)` : ''}`
+                : `업로드 삭제 — 재고 복구${g.members.length > 1 ? ` (그룹 ${g.members.length}개)` : ''}`,
+            });
+          }
+        } catch (_) {}
       } catch (e) {
         console.error('[재고연동] DB 업데이트 예외:', m.sku, e);
       }
@@ -25241,10 +25521,19 @@ async function _restoreStockFromReturns(returnRows) {
   for (const [k, qty] of byItem) {
     const prod = byName.get(k);
     if (!prod) { missing.push({ name: k, qty }); continue; }
-    const newStock = (Number(prod.stock) || 0) + qty;
+    const prevStock = Number(prod.stock) || 0;
+    const newStock = prevStock + qty;
     try {
       await _supabase.from('products').update({ stock: newStock }).eq('id', prod.id);
       updated++;
+      // 수불 이력 — 반품 복원
+      try {
+        if (typeof _logStockMove === 'function') _logStockMove({
+          productId: prod.id, sku: prod.sku, productName: prod.name,
+          type: '반품복원', delta: qty, prevStock, newStock,
+          note: `반품 데이터 ${qty}건 복원`
+        });
+      } catch (_) {}
       // 재고 연동 그룹 동기화도 적용
       try { if (typeof _syncLinkedFields === 'function') await _syncLinkedFields(prod.id, { stock: newStock }); } catch(_) {}
     } catch (e) { console.warn('[반품 재고복원] 실패:', prod.sku, e); }
