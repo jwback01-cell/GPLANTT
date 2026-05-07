@@ -13791,10 +13791,10 @@ function renderTodoList() {
       const repeatHtml = item.repeatLabel ? `<span class="flex items-center gap-1 text-xs font-semibold text-brand-gray bg-brand-bg px-2 py-0.5 rounded-full"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>${escHtml(item.repeatLabel)}</span>` : '';
       return `
         <div class="todo-row flex items-center justify-between p-4 md:p-5 border border-brand-border rounded-[24px] hover:bg-brand-bg transition-all group" data-id="${item.id}" data-accent="${item.accent}">
-          <div class="flex items-center gap-4 md:gap-5 min-w-0">
+          <div class="flex items-center gap-4 md:gap-5 min-w-0 flex-1">
             <input type="checkbox" class="todo-row-cb w-4 h-4 rounded shrink-0" data-todo-id="${item.id}" onchange="updateTodoSelectLabel()">
             <div class="w-6 md:w-7 h-6 md:h-7 rounded-full border-2 ${ac.border} flex items-center justify-center cursor-pointer bg-white ${ac.cHov} transition-colors shrink-0" onclick="todoComplete(${item.id},event)"></div>
-            <div class="min-w-0">
+            <div class="min-w-0 flex-1 cursor-pointer" onclick="todoEdit(${item.id})" title="클릭하여 수정">
               <div class="font-bold text-[1rem] md:text-[1.1rem] mb-1 ${ac.tHov} transition-colors">${escHtml(item.title)}</div>
               <div class="flex items-center gap-2 md:gap-3 flex-wrap">${teamHtml}${dueHtml}${repeatHtml}</div>
             </div>
