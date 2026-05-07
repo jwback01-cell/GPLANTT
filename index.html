@@ -22483,24 +22483,51 @@ async function exportPaClaims() {
   ];
 
   // 셀 스타일 적용 — 양식 사진과 동일하게:
-  //   헤더 C(업체명), L(배송메세지) 컬럼: 노란 배경
-  //   데이터 C(지플랜) 컬럼: 노란 배경
+  //   모든 셀에 검은 얇은 테두리
+  //   헤더 C(업체명), L(배송메세지): 연노란 배경 + 굵게
+  //   데이터 C(지플랜) 컬럼: 연노란 배경
   if (window.XLSX && window.XLSX._jsStyleLoaded) {
-    const yellowFill = { fill: { fgColor: { rgb: 'FFFF00' } }, font: { bold: true } };
-    const yellowDataFill = { fill: { fgColor: { rgb: 'FFFF00' } } };
-    const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: 'F2F2F2' } }, alignment: { horizontal: 'center', vertical: 'center' } };
+    const thinBorder = {
+      top:    { style: 'thin', color: { rgb: '000000' } },
+      bottom: { style: 'thin', color: { rgb: '000000' } },
+      left:   { style: 'thin', color: { rgb: '000000' } },
+      right:  { style: 'thin', color: { rgb: '000000' } },
+    };
+    const yellowRgb = 'FFFF99'; // 연노란
     const totalRows = data.length;
-    // 모든 헤더 셀 — 가운데 정렬 + 회색 배경
-    for (let c = 0; c < 15; c++) {
-      const addr = XLSX.utils.encode_cell({ r: 0, c });
-      if (ws[addr]) ws[addr].s = headerStyle;
+    // 1) 모든 셀: 테두리 + 헤더는 굵게/가운데
+    for (let r = 0; r < totalRows; r++) {
+      for (let c = 0; c < 15; c++) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        if (!ws[addr]) ws[addr] = { v: '', t: 's' };
+        const isHeader = (r === 0);
+        ws[addr].s = {
+          border: thinBorder,
+          alignment: isHeader
+            ? { horizontal: 'center', vertical: 'center', wrapText: true }
+            : { vertical: 'center', wrapText: true },
+          font: isHeader ? { bold: true } : undefined,
+        };
+      }
     }
-    // 헤더 C(2), L(11) 노란
-    ['C1','L1'].forEach(a => { if (ws[a]) ws[a].s = yellowFill; });
-    // 데이터 C 컬럼 (지플랜) 모두 노란
+    // 2) 노란 강조: 헤더 C(2), L(11)
+    [{ r: 0, c: 2 }, { r: 0, c: 11 }].forEach(({ r, c }) => {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      ws[addr].s = {
+        border: thinBorder,
+        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+        font: { bold: true },
+        fill: { patternType: 'solid', fgColor: { rgb: yellowRgb } },
+      };
+    });
+    // 3) 데이터 C 컬럼 (지플랜) 모두 노란
     for (let r = 1; r < totalRows; r++) {
       const addr = XLSX.utils.encode_cell({ r, c: 2 });
-      if (ws[addr]) ws[addr].s = yellowDataFill;
+      ws[addr].s = {
+        border: thinBorder,
+        alignment: { horizontal: 'center', vertical: 'center' },
+        fill: { patternType: 'solid', fgColor: { rgb: yellowRgb } },
+      };
     }
   }
 
