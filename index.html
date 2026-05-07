@@ -21916,6 +21916,12 @@ async function fetchPlayautoClaims() {
     _paClaims = orders;
     _renderPaClaims();
     _msg(`${orders.length}건 수집 완료`, 'ok');
+
+    // 자동 상세 보충 — 수집된 주문이 있으면 곧바로 상세 조회까지 진행
+    if (orders.length > 0 && typeof enrichPaClaimsWithDetail === 'function') {
+      // 버튼은 enrichPaClaimsWithDetail 가 끝날 때까지 잠금 유지
+      try { await enrichPaClaimsWithDetail(); } catch (_) {}
+    }
   } catch (err) {
     console.error('[PA 클레임]', err);
     _msg('수집 실패: ' + (err.message || err), 'error');
