@@ -22750,6 +22750,60 @@ function convertPaClaimsToReturns() {
       all.push(...newRows);
       _saveReturns(all);
       if (typeof _refreshReturnKpi === 'function') _refreshReturnKpi();
+
+      // ── 업로드 데이터에도 같은 행 추가 (매출장부 표/검색용) ───────────────
+      // 매출장부 KPI 가 _loadReturns 로 자동 차감하므로 양수로 추가해도 합산 결과는 상쇄됨
+      let uploadAdded = 0;
+      try {
+        const _claimDate = o => {
+          // 출고완료일(invoice_time) 우선, 없으면 주문일(wdate)
+          const cand = o.invoice_time || o.invoice_send_time || o.wdate || o.order_date || '';
+          return String(cand).slice(0, 10);
+        };
+        const uploadRows = returnable.map((o, i) => {
+          const status = _paClaimStatusOf(o);
+          const isReturn = /반품/.test(status);
+          const isExchange = /교환|맞교환/.test(status);
+          const tag = isReturn ? '반품' : (isExchange ? '교환' : '클레임');
+          return {
+            date:        _claimDate(o),
+            orderNo:     String(o.shop_ord_no || o.bundle_no || o.ord_no || ''),
+            shop:        String(o.shop_name || o.shop_id || o.shop || ''),
+            status:      status || tag,
+            shipCode:    '',
+            shipName:    '',
+            vendorCode:  '',
+            vendorName:  '',
+            depotCode:   '',
+            depotName:   '',
+            itemCode:    _claimGet(o, 'sku') || '',
+            skuCode:     _claimGet(o, 'sku') || '',
+            itemName:    _claimGet(o, 'skuName') || _claimGet(o, 'itemName') || '',
+            qty:         _claimGet(o, 'qty'),
+            price:       _claimGet(o, 'price'),
+            supply:      _claimGet(o, 'supply'),
+            ship:        0,
+            shipFee:     0,
+            shipCost:    _claimGet(o, 'shipCost'),
+            cost:        _claimGet(o, 'cost'),
+            receiver:    String(o.to_name || o.receiver || ''),
+            address:     [o.to_state, o.to_city, o.to_addr1, o.to_addr2, o.addr1, o.addr2].filter(Boolean).join(' '),
+            profit:      null,
+            template:    'pa-claim',                          // 출처 구분용
+            _fromPaClaim: true,
+            _claimType:   tag,                                // '반품' | '교환' | '클레임'
+            savedAt:      stamp,
+            _uploadedAt:  stamp,
+          };
+        });
+        const existing = _loadUploadData();
+        existing.push(...uploadRows);
+        _saveUploadData(existing);
+        uploadAdded = uploadRows.length;
+      } catch (e) {
+        console.warn('[클레임 → 업로드 데이터] 저장 실패:', e);
+      }
+
       // 자동 재고 복원
       try {
         const { updated, missing } = await _restoreStockFromReturns(newRows);
@@ -22758,7 +22812,8 @@ function convertPaClaimsToReturns() {
           ? `\n\n⚠ 매칭 실패 ${missing.length}건 — 상품관리에 SKU 등록 후 다시 시도하세요.\n${missDetail}${missing.length > 5 ? `\n…외 ${missing.length - 5}건` : ''}`
           : '';
         const restoreMsg = updated > 0 ? `\n📦 재고 복원: ${updated}개 상품 자동 +수량 적용됨` : '';
-        showAppAlert('변환 완료', `${newRows.length}건이 반품 데이터로 저장되었습니다.${restoreMsg}${missMsg}`, 'success');
+        const uploadMsg = uploadAdded > 0 ? `\n📒 업로드 데이터: ${uploadAdded}건 추가 (매출장부에서 조회 가능)` : '';
+        showAppAlert('변환 완료', `${newRows.length}건이 반품 데이터로 저장되었습니다.${restoreMsg}${uploadMsg}${missMsg}`, 'success');
       } catch (e) {
         showAppAlert('변환 완료', `${newRows.length}건이 반품 데이터로 저장되었습니다.`, 'success');
       }
