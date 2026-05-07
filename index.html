@@ -23382,33 +23382,69 @@ function _reconcileExportExcel() {
   const groupHeader = ['업로드한 엑셀', '', '', '', '', '', '', '', '', '웹사이트 업로드 데이터', '', '', ''];
 
   const rows = [];
-  allLedger.forEach(({ L, G }) => {
-    const left = [
-      L.date || '',
-      L.type || '매출',
-      L.name || '',
-      L.recv || '',
-      Number(L.qty) || 0,
-      Number(L.unit) || 0,
-      Number(L.sale) || 0,
-      Number(L.purchase) || '',
-      Number(L.balance) || '',
-    ];
-    if (G) {
-      const gCost  = Number(G.cost) || 0;
-      const lValue = Number(L.sale) || 0;
-      const diff = lValue - gCost;
-      const right = [
-        G.itemName || '',
-        G.receiver || '',
-        gCost,
-        diff, // 0 이면 일치, 양수/음수면 차이
+  // 날짜별 그룹화 후 각 그룹 끝에 소계 행 삽입
+  const byDate = new Map();
+  allLedger.forEach(item => {
+    const d = item.L.date || '';
+    if (!byDate.has(d)) byDate.set(d, []);
+    byDate.get(d).push(item);
+  });
+  const sortedDates = [...byDate.keys()].sort();
+
+  sortedDates.forEach(date => {
+    const group = byDate.get(date);
+    let sumQty = 0, sumSale = 0, sumPurchase = 0, sumGCost = 0, sumDiff = 0;
+    let lastBalance = '';
+    let unmatchedInGroup = 0;
+
+    group.forEach(({ L, G }) => {
+      const left = [
+        L.date || '',
+        L.type || '매출',
+        L.name || '',
+        L.recv || '',
+        Number(L.qty) || 0,
+        Number(L.unit) || 0,
+        Number(L.sale) || 0,
+        Number(L.purchase) || '',
+        Number(L.balance) || '',
       ];
-      rows.push([...left, ...right]);
-    } else {
-      // GPLAN 매칭 없음 → 우측 빈칸 + 차이 = "값 없음"
-      rows.push([...left, '', '', '', '값 없음']);
-    }
+      if (G) {
+        const gCost  = Number(G.cost) || 0;
+        const lValue = Number(L.sale) || 0;
+        const diff = lValue - gCost;
+        rows.push([...left, G.itemName || '', G.receiver || '', gCost, diff]);
+        sumGCost += gCost;
+        sumDiff += diff;
+      } else {
+        rows.push([...left, '', '', '', '값 없음']);
+        unmatchedInGroup++;
+      }
+      sumQty += Number(L.qty) || 0;
+      sumSale += Number(L.sale) || 0;
+      sumPurchase += Number(L.purchase) || 0;
+      if (L.balance) lastBalance = Number(L.balance) || 0;
+    });
+
+    // 날짜별 소계 행
+    const diffCell = (unmatchedInGroup > 0)
+      ? `${sumDiff.toLocaleString('ko-KR')} (값없음 ${unmatchedInGroup}건 제외)`
+      : sumDiff;
+    rows.push([
+      '',                                 // 거래일자
+      '소 계',                            // 구분
+      '',                                 // 품명
+      `(${group.length}건)`,              // 규격 자리에 건수 표시
+      sumQty,                             // 수량 합
+      '',                                 // 단가
+      sumSale,                            // 매출/지급 합
+      sumPurchase || '',                  // 매입/수금 합
+      lastBalance,                        // 잔액 (마지막 행 값)
+      '',                                 // 품명(GPLAN)
+      '',                                 // 수령자(GPLAN)
+      sumGCost,                           // 원가(GPLAN) 합
+      diffCell,                           // 차이 합
+    ]);
   });
 
   // GPLAN 에만 있는 행 — 별도 구역으로 맨 아래에 (날짜 오름차순 정렬)
