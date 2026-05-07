@@ -22451,16 +22451,18 @@ async function exportPaClaims() {
     o.ship_msg || o.delivery_msg || o.delivery_memo || o.deli_memo ||
     o.req_msg || o.order_memo || o.memo || ''
   );
-  // 출고완료일 후보 — PA 의 다양한 필드명을 폭넓게 시도, 그래도 없으면 주문일 폴백
+  // 출고완료일 — PA Open API 기준 'invoice_time' 이 송장 등록 시각 = 화면의 출고완료일
+  // (사용자 PA 주문상세 캡쳐로 확인됨: invoice_time = 2026-05-04 00:10:20)
   const sendDateOf = o => {
     const cand =
+      o.invoice_time ||           // 1순위: PA 출고완료일 (송장 등록 시각)
+      o.invoice_send_time ||      // 2순위: 송장 전송 시각
       o.delivery_complete_date || o.delivery_done_date ||
       o.shipping_complete_date || o.shipping_done_date ||
       o.send_complete_date || o.ship_complete_date ||
       o.send_date || o.ship_date || o.shipping_date || o.delivery_date ||
       o.inv_send_date || o.inv_register_date || o.inv_date ||
       o.complete_date || o.ord_complete_date ||
-      o.wdate || // 폴백: 주문일
       '';
     return fmtMD(cand);
   };
