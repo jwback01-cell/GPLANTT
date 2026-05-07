@@ -23042,6 +23042,8 @@ function _reconcileParseSheet(data) {
   const QTY_KEYS  = ['수량', 'qty'];
   const UNIT_KEYS = ['단가', 'price'];
   const SALE_KEYS = ['매출/지급', '매출', '매출지급', '판매', '공급가', 'amount'];
+  const PURCHASE_KEYS = ['매입/수금', '매입수금', '매입', '수금'];
+  const BAL_KEYS  = ['잔액', '잔금', 'balance'];
 
   const matchHeader = (cell, keys) => {
     const c = String(cell || '').replace(/\s+/g,'').toLowerCase().trim();
@@ -23071,6 +23073,8 @@ function _reconcileParseSheet(data) {
   const qtyIdx  = findIdx(QTY_KEYS);
   const unitIdx = findIdx(UNIT_KEYS);
   const saleIdx = findIdx(SALE_KEYS);
+  const purIdx  = findIdx(PURCHASE_KEYS);
+  const balIdx  = findIdx(BAL_KEYS);
   if (dateIdx < 0 || nameIdx < 0) return [];
 
   const _num = v => {
@@ -23095,7 +23099,9 @@ function _reconcileParseSheet(data) {
     const qty  = qtyIdx  >= 0 ? _num(row[qtyIdx])  : 0;
     const unit = unitIdx >= 0 ? _num(row[unitIdx]) : 0;
     const sale = saleIdx >= 0 ? _num(row[saleIdx]) : (qty * unit);
-    out.push({ date, type, name, recv, qty, unit, sale, _origRow: i });
+    const purchase = purIdx >= 0 ? _num(row[purIdx]) : 0;
+    const balance  = balIdx >= 0 ? _num(row[balIdx]) : 0;
+    out.push({ date, type, name, recv, qty, unit, sale, purchase, balance, _origRow: i, _origIdx: out.length });
   }
   return out;
 }
@@ -23307,7 +23313,8 @@ function _renderReconcileSameHtml(matchedSame) {
   </div>`;
 }
 
-// 단일 시트 통합 엑셀 다운로드 — 분류/날짜/수령자/품명 + 거래원장값/GPLAN값 나란히 + 차이필드
+// 단일 시트 — 거래원장 행 순서 그대로 보존 + 옆에 GPLAN 매칭값 + 차이
+// (거래원장에 없고 GPLAN 에만 있는 행은 맨 아래 별도 구역으로)
 function _reconcileExportExcel() {
   const m = document.getElementById('reconcile-modal');
   if (!m || !m._reconcileResult) {
@@ -23317,94 +23324,123 @@ function _reconcileExportExcel() {
   const { matched, matchedSame, onlyLedger, onlyGplan, ledgerCount, gplanCount } = m._reconcileResult;
   const srcFile = m._reconcileFileName || '';
 
-  // 단일 시트 통합 컬럼 — 양쪽 값을 나란히 비교 가능
+  // 거래원장 행 → GPLAN 매칭 룩업 (date+recv+name)
+  const _normName = s => String(s || '').replace(/\s+/g, '').replace(/[\(\)\[\]\.,_\-\/·]/g, '').toLowerCase();
+  const _normRecv = s => String(s || '').replace(/\s+/g, '').trim();
+  const _key = (date, recv, name) => `${date}__${_normRecv(recv)}__${_normName(name)}`;
+  const matchByKey = new Map();
+  matched.forEach(M => matchByKey.set(_key(M.ledger.date, M.ledger.recv, M.ledger.name), M));
+  matchedSame.forEach(M => matchByKey.set(_key(M.ledger.date, M.ledger.recv, M.ledger.name), M));
+
+  // ledger 원본 전체 (값 일치 + 값 불일치 + 누락) — 원본 순서 유지
+  // matched/matchedSame/onlyLedger 합쳐서 _origIdx 기준 정렬
+  const allLedger = [
+    ...matched.map(M => ({ L: M.ledger, G: M.gplan })),
+    ...matchedSame.map(M => ({ L: M.ledger, G: M.gplan })),
+    ...onlyLedger.map(L => ({ L, G: null })),
+  ].sort((a, b) => (a.L._origIdx || 0) - (b.L._origIdx || 0));
+
+  // 컬럼 — 사진 예시 그대로
+  // [업로드한 엑셀 9칸] + [웹사이트 업로드 데이터 4칸]
   const header = [
-    '분류',
-    '날짜',
-    '수령자',
-    '품명',
-    '수량(거래원장)', '수량(GPLAN)',
-    '단가(거래원장)', '단가(GPLAN)',
-    '매출(거래원장)', '공급가(GPLAN)',
-    '차이 필드',
-    '거래처(GPLAN)',
+    // 거래원장 측
+    '거래일자', '구분', '품명', '규격', '수량', '단가', '매출/지급', '매입/수금', '잔액',
+    // GPLAN 측
+    '품명(GPLAN)', '수령자(GPLAN)', '원가(GPLAN)', '차이',
   ];
+
+  // 두 행짜리 그룹 헤더 (병합/색은 xlsx-js-style 없이는 어려워 단순 텍스트로)
+  const groupHeader = ['업로드한 엑셀', '', '', '', '', '', '', '', '', '웹사이트 업로드 데이터', '', '', ''];
+
   const rows = [];
-
-  // ① 값 불일치 (가장 중요 — 먼저)
-  matched.forEach(M => {
-    const L = M.ledger, G = M.gplan;
-    rows.push([
-      '🟠 값 불일치',
-      L.date, L.recv || '', L.name || '',
-      Number(L.qty) || 0,    Number(G.qty) || 0,
-      Number(L.unit) || 0,   Number(G.price) || 0,
-      Number(L.sale) || 0,   Number(G.supply ?? G.cost) || 0,
-      M.diffs.map(d => d.field).join(', '),
-      G.vendor || '',
-    ]);
+  allLedger.forEach(({ L, G }) => {
+    const left = [
+      L.date || '',
+      L.type || '매출',
+      L.name || '',
+      L.recv || '',
+      Number(L.qty) || 0,
+      Number(L.unit) || 0,
+      Number(L.sale) || 0,
+      Number(L.purchase) || '',
+      Number(L.balance) || '',
+    ];
+    if (G) {
+      const gValue = Number(G.supply ?? G.cost ?? G.price) || 0;
+      const lValue = Number(L.sale) || 0;
+      const diff = lValue - gValue;
+      const right = [
+        G.itemName || '',
+        G.receiver || '',
+        gValue,
+        diff, // 0 이면 일치, 양수/음수면 차이
+      ];
+      rows.push([...left, ...right]);
+    } else {
+      // GPLAN 매칭 없음 → 우측 빈칸 + 차이 = "값 없음"
+      rows.push([...left, '', '', '', '값 없음']);
+    }
   });
 
-  // ② 누락 (거래원장에만 있음 — GPLAN 컬럼은 빈칸)
-  onlyLedger.forEach(L => {
-    rows.push([
-      '🔴 누락',
-      L.date, L.recv || '', L.name || '',
-      Number(L.qty) || 0, '',
-      Number(L.unit) || 0, '',
-      Number(L.sale) || 0, '',
-      'GPLAN 에 없음',
-      '',
-    ]);
-  });
+  // GPLAN 에만 있는 행 — 별도 구역으로 맨 아래에
+  let extraSection = [];
+  if (onlyGplan.length) {
+    extraSection.push([]); // 빈 줄
+    extraSection.push([`▼ GPLAN 에만 있고 거래원장에 없는 행 (${onlyGplan.length}건)`]);
+    extraSection.push(header); // 같은 헤더 반복
+    onlyGplan.forEach(G => {
+      const gValue = Number(G.supply ?? G.cost ?? G.price) || 0;
+      extraSection.push([
+        G.date || '', '매출', '', '', Number(G.qty) || 0, Number(G.price) || 0, '', '', '',
+        G.itemName || '',
+        G.receiver || '',
+        gValue,
+        '거래원장에 없음',
+      ]);
+    });
+  }
 
-  // ③ 추가 (GPLAN 에만 있음 — 거래원장 컬럼은 빈칸)
-  onlyGplan.forEach(G => {
-    rows.push([
-      '🟡 추가',
-      G.date || '', G.receiver || '', G.itemName || '',
-      '', Number(G.qty) || 0,
-      '', Number(G.price) || 0,
-      '', Number(G.supply ?? G.cost) || 0,
-      '거래원장에 없음',
-      G.vendor || '',
-    ]);
-  });
-
-  // ④ 일치 (양쪽 값 같음)
-  matchedSame.forEach(M => {
-    const L = M.ledger, G = M.gplan;
-    rows.push([
-      '🟢 일치',
-      L.date, L.recv || '', L.name || '',
-      Number(L.qty) || 0,    Number(G.qty) || 0,
-      Number(L.unit) || 0,   Number(G.price) || 0,
-      Number(L.sale) || 0,   Number(G.supply ?? G.cost) || 0,
-      '',
-      G.vendor || '',
-    ]);
-  });
-
-  // 상단 요약 행 (구분선 포함)
+  // 상단 요약 + 그룹헤더 + 컬럼헤더 + 본문 + (별도 구역)
   const totalDiff = matched.length + onlyLedger.length + onlyGplan.length;
   const summaryBlock = [
     [`서울리빙 거래원장 대조 결과 — ${srcFile}`],
     [`거래원장 ${ledgerCount}건 / GPLAN(서울리빙 계열) ${gplanCount}건 / 일치 ${matchedSame.length}건 · 차이 ${totalDiff}건 (값 불일치 ${matched.length} · 누락 ${onlyLedger.length} · 추가 ${onlyGplan.length})`],
+    [`차이 컬럼: 거래원장 매출 − GPLAN 원가. 0 이면 일치, 다르면 차액 표시. "값 없음" 은 GPLAN 에 매칭 행이 없음.`],
     [], // 빈 줄
   ];
 
-  const data = [...summaryBlock, header, ...rows];
+  const data = [...summaryBlock, groupHeader, header, ...rows, ...extraSection];
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
+
+  // 컬럼 폭 — 사진 비율과 비슷하게
   ws['!cols'] = [
-    {wch:14}, {wch:12}, {wch:12}, {wch:42},
-    {wch:13}, {wch:13},
-    {wch:13}, {wch:13},
-    {wch:14}, {wch:14},
-    {wch:18}, {wch:14},
+    {wch:11},  // 거래일자
+    {wch:6},   // 구분
+    {wch:34},  // 품명
+    {wch:11},  // 규격
+    {wch:6},   // 수량
+    {wch:10},  // 단가
+    {wch:12},  // 매출/지급
+    {wch:11},  // 매입/수금
+    {wch:12},  // 잔액
+    {wch:34},  // 품명(GPLAN)
+    {wch:11},  // 수령자(GPLAN)
+    {wch:12},  // 원가(GPLAN)
+    {wch:12},  // 차이
   ];
-  // 헤더 행 영역에 freeze: 상단 요약 3 + 헤더 1 = 4행 고정
-  ws['!freeze'] = { xSplit: 0, ySplit: 4 };
+
+  // 그룹 헤더 셀 병합 — 1~9번째 컬럼 "업로드한 엑셀" / 10~13 "웹사이트 업로드 데이터"
+  // summaryBlock 4행 + groupHeader 는 5번째(index 4) 행에 위치
+  const groupRowIdx = summaryBlock.length; // 0-based row index of groupHeader
+  ws['!merges'] = [
+    { s: { r: groupRowIdx, c: 0 }, e: { r: groupRowIdx, c: 8 } },
+    { s: { r: groupRowIdx, c: 9 }, e: { r: groupRowIdx, c: 12 } },
+  ];
+
+  // 헤더 영역 freeze: summary 4 + groupHeader 1 + columnHeader 1 = 6행 고정
+  ws['!freeze'] = { xSplit: 0, ySplit: summaryBlock.length + 2 };
+
   XLSX.utils.book_append_sheet(wb, ws, '거래원장 대조');
 
   // 파일명: GPLAN_거래원장대조_YYYY-MM-DD.xlsx
