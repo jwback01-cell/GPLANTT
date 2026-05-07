@@ -3410,25 +3410,41 @@ tailwind.config = {
             <!-- 상태별 KPI + 합계 KPI -->
             <div id="pa-claim-kpi" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 p-4 bg-brand-bg/30"></div>
             <div id="pa-claim-totals" class="grid grid-cols-2 md:grid-cols-4 gap-3 px-4 pb-4 bg-brand-bg/30"></div>
+            <!-- 검색 + 상태 필터 -->
+            <div class="flex items-center gap-3 px-6 py-3 border-t border-brand-border bg-white flex-wrap">
+              <div class="relative flex-1 min-w-[200px] max-w-[400px]">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-brand-gray" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <input id="pa-claim-search" type="text" placeholder="SKU·상품명·수령자·주문번호·사유 검색" oninput="_renderPaClaims()"
+                       class="w-full pl-9 pr-3 py-1.5 rounded-full border border-brand-border bg-brand-bg text-xs font-medium outline-none focus:border-brand-black">
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-brand-gray">상태:</span>
+                <select id="pa-claim-filter-status" onchange="_renderPaClaims()"
+                        class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold outline-none focus:border-brand-black cursor-pointer">
+                  <option value="">전체</option>
+                </select>
+              </div>
+              <span id="pa-claim-filter-info" class="text-xs text-brand-gray ml-auto"></span>
+            </div>
             <div class="overflow-x-auto">
               <table class="w-full text-sm">
                 <thead>
-                  <tr class="bg-brand-bg text-brand-gray">
+                  <tr class="bg-brand-bg text-brand-gray select-none">
                     <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap"><input id="pa-claim-select-all" type="checkbox" onchange="toggleAllPaClaims(this)"></th>
-                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">상태</th>
-                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">쇼핑몰</th>
-                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">주문일</th>
-                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">SKU</th>
-                    <th class="text-left px-4 py-3 font-bold text-xs">SKU상품명</th>
-                    <th class="text-left px-4 py-3 font-bold text-xs">상품명</th>
-                    <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap">수량 ✏️</th>
-                    <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap">판매가 ✏️</th>
-                    <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap text-brand-blue">공급가 ✏️</th>
-                    <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap text-brand-orange">원가 ✏️</th>
-                    <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap text-brand-pink">택배비용 ✏️</th>
-                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">수령자</th>
-                    <th class="text-left px-4 py-3 font-bold text-xs">사유 ✏️</th>
-                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap">처리사항</th>
+                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap cursor-pointer hover:text-brand-black" onclick="_sortPaClaims('status')">상태<span class="pa-sort-ind ml-1 text-[10px]" data-sort="status"></span></th>
+                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap cursor-pointer hover:text-brand-black" onclick="_sortPaClaims('shop')">쇼핑몰<span class="pa-sort-ind ml-1 text-[10px]" data-sort="shop"></span></th>
+                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap cursor-pointer hover:text-brand-black" onclick="_sortPaClaims('date')">주문일<span class="pa-sort-ind ml-1 text-[10px]" data-sort="date"></span></th>
+                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap cursor-pointer hover:text-brand-black" onclick="_sortPaClaims('sku')">SKU<span class="pa-sort-ind ml-1 text-[10px]" data-sort="sku"></span></th>
+                    <th class="text-left px-4 py-3 font-bold text-xs cursor-pointer hover:text-brand-black" onclick="_sortPaClaims('skuName')">SKU상품명<span class="pa-sort-ind ml-1 text-[10px]" data-sort="skuName"></span></th>
+                    <th class="text-left px-4 py-3 font-bold text-xs cursor-pointer hover:text-brand-black" onclick="_sortPaClaims('itemName')">상품명<span class="pa-sort-ind ml-1 text-[10px]" data-sort="itemName"></span></th>
+                    <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap cursor-pointer hover:text-brand-black" onclick="_sortPaClaims('qty')">수량 ✏️<span class="pa-sort-ind ml-1 text-[10px]" data-sort="qty"></span></th>
+                    <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap cursor-pointer hover:text-brand-black" onclick="_sortPaClaims('price')">판매가 ✏️<span class="pa-sort-ind ml-1 text-[10px]" data-sort="price"></span></th>
+                    <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap text-brand-blue cursor-pointer hover:opacity-80" onclick="_sortPaClaims('supply')">공급가 ✏️<span class="pa-sort-ind ml-1 text-[10px]" data-sort="supply"></span></th>
+                    <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap text-brand-orange cursor-pointer hover:opacity-80" onclick="_sortPaClaims('cost')">원가 ✏️<span class="pa-sort-ind ml-1 text-[10px]" data-sort="cost"></span></th>
+                    <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap text-brand-pink cursor-pointer hover:opacity-80" onclick="_sortPaClaims('shipCost')">택배비용 ✏️<span class="pa-sort-ind ml-1 text-[10px]" data-sort="shipCost"></span></th>
+                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap cursor-pointer hover:text-brand-black" onclick="_sortPaClaims('recv')">수령자<span class="pa-sort-ind ml-1 text-[10px]" data-sort="recv"></span></th>
+                    <th class="text-left px-4 py-3 font-bold text-xs cursor-pointer hover:text-brand-black" onclick="_sortPaClaims('reason')">사유 ✏️<span class="pa-sort-ind ml-1 text-[10px]" data-sort="reason"></span></th>
+                    <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap cursor-pointer hover:text-brand-black" onclick="_sortPaClaims('action')">처리사항<span class="pa-sort-ind ml-1 text-[10px]" data-sort="action"></span></th>
                   </tr>
                 </thead>
                 <tbody id="pa-claim-tbody"></tbody>
@@ -22173,6 +22189,38 @@ function _renderPaClaimsKpiOnly() {
   }
 }
 
+// 검색·필터·정렬 상태
+let _paClaimSort = { field: '', dir: 'asc' };
+function _sortPaClaims(field) {
+  if (_paClaimSort.field === field) {
+    if (_paClaimSort.dir === 'asc') _paClaimSort.dir = 'desc';
+    else { _paClaimSort.field = ''; _paClaimSort.dir = 'asc'; } // 3번째 클릭 = 해제
+  } else {
+    _paClaimSort.field = field;
+    _paClaimSort.dir = 'asc';
+  }
+  _renderPaClaims();
+}
+function _paGetSortValue(o, field) {
+  switch (field) {
+    case 'status':   return _paClaimStatusOf(o);
+    case 'shop':     return String(o.shop_name || o.shop_id || '');
+    case 'date':     return String(o.wdate || o.order_date || '').slice(0, 10);
+    case 'sku':      return _claimGet(o, 'sku') || '';
+    case 'skuName':  return _claimGet(o, 'skuName') || '';
+    case 'itemName': return _claimGet(o, 'itemName') || '';
+    case 'qty':      return Number(_claimGet(o, 'qty')) || 0;
+    case 'price':    return Number(_claimGet(o, 'price')) || 0;
+    case 'supply':   return Number(_claimGet(o, 'supply')) || 0;
+    case 'cost':     return Number(_claimGet(o, 'cost')) || 0;
+    case 'shipCost': return Number(_claimGet(o, 'shipCost')) || 0;
+    case 'recv':     return String(o.to_name || o.receiver || '');
+    case 'reason':   return _claimGet(o, 'reason') || '';
+    case 'action':   return (o._edits && o._edits.action) || '';
+  }
+  return '';
+}
+
 function _renderPaClaims() {
   const cnt = document.getElementById('pa-claim-count');
   if (cnt) cnt.textContent = `${_paClaims.length}건`;
@@ -22201,6 +22249,16 @@ function _renderPaClaims() {
     }
   }
 
+  // 상태 필터 드롭다운 옵션 갱신 (현재 데이터에 등장하는 상태만)
+  const filterStatusEl = document.getElementById('pa-claim-filter-status');
+  if (filterStatusEl) {
+    const cur = filterStatusEl.value;
+    const statuses = [...new Set(_paClaims.map(o => _claimStatus(o) || '미분류'))].sort();
+    const opts = ['<option value="">전체</option>']
+      .concat(statuses.map(s => `<option value="${escHtml(s)}" ${s === cur ? 'selected' : ''}>${escHtml(s)} (${byStatus[s] || 0})</option>`));
+    filterStatusEl.innerHTML = opts.join('');
+  }
+
   // 합계 KPI
   _renderPaClaimsKpiOnly();
 
@@ -22208,6 +22266,58 @@ function _renderPaClaims() {
   if (!tbody) return;
   if (!_paClaims.length) {
     tbody.innerHTML = '<tr><td colspan="15" class="px-6 py-12 text-center text-brand-gray text-sm">수집된 클레임 주문이 없습니다.</td></tr>';
+    const infoElEmpty = document.getElementById('pa-claim-filter-info');
+    if (infoElEmpty) infoElEmpty.textContent = '';
+    // 정렬 화살표 초기화
+    document.querySelectorAll('.pa-sort-ind').forEach(el => { el.textContent = ''; });
+    return;
+  }
+
+  // 검색·상태 필터 적용 (원본 인덱스 보존: _editPaClaim 호출용)
+  const searchTerm = String(document.getElementById('pa-claim-search')?.value || '').trim().toLowerCase();
+  const filterStatus = String(filterStatusEl?.value || '').trim();
+  let visible = _paClaims.map((o, origIdx) => ({ o, origIdx }));
+  if (filterStatus) {
+    visible = visible.filter(({ o }) => (_claimStatus(o) || '미분류') === filterStatus);
+  }
+  if (searchTerm) {
+    visible = visible.filter(({ o }) => {
+      const fields = [
+        _claimGet(o, 'sku'), _claimGet(o, 'skuName'), _claimGet(o, 'itemName'),
+        _shop(o), _recv(o), _claimGet(o, 'reason'), _orderNo(o), _claimStatus(o)
+      ].filter(Boolean).join(' ').toLowerCase();
+      return fields.includes(searchTerm);
+    });
+  }
+  // 정렬
+  if (_paClaimSort && _paClaimSort.field) {
+    const f = _paClaimSort.field;
+    const dir = _paClaimSort.dir === 'desc' ? -1 : 1;
+    visible.sort((a, b) => {
+      const va = _paGetSortValue(a.o, f);
+      const vb = _paGetSortValue(b.o, f);
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+      return String(va).localeCompare(String(vb), 'ko') * dir;
+    });
+  }
+  // 정렬 화살표 표시
+  document.querySelectorAll('.pa-sort-ind').forEach(el => {
+    if (_paClaimSort.field && el.dataset.sort === _paClaimSort.field) {
+      el.textContent = _paClaimSort.dir === 'desc' ? '▼' : '▲';
+    } else {
+      el.textContent = '';
+    }
+  });
+  // 필터 정보 표시
+  const infoEl = document.getElementById('pa-claim-filter-info');
+  if (infoEl) {
+    if (visible.length === _paClaims.length) infoEl.textContent = '';
+    else infoEl.textContent = `${visible.length} / ${_paClaims.length}건 표시`;
+  }
+  // 결과 없음
+  if (!visible.length) {
+    tbody.innerHTML = '<tr><td colspan="15" class="px-6 py-12 text-center text-brand-gray text-sm">조건에 맞는 클레임이 없습니다. 검색어/필터를 변경해 보세요.</td></tr>';
+    updatePaClaimSelCount();
     return;
   }
   // 상태 색상
@@ -22235,7 +22345,8 @@ function _renderPaClaims() {
     if (o._edits && o._edits.action !== undefined) return o._edits.action;
     return ''; // 사용자가 명시적으로 선택할 때까지 빈값
   };
-  tbody.innerHTML = _paClaims.map((o, idx) => {
+  tbody.innerHTML = visible.map(({ o, origIdx }) => {
+    const idx = origIdx; // 편집 콜백은 항상 원본 _paClaims 인덱스로 동작
     const reason = _claimGet(o, 'reason');
     const itemName = _claimGet(o, 'itemName');
     const sku = _claimGet(o, 'sku');
@@ -22286,7 +22397,13 @@ function updatePaClaimSelCount() {
 // 현재 처리 대상 — 체크된 행이 있으면 그것만, 없으면 전체
 function _getPaClaimTargets() {
   const checked = [...document.querySelectorAll('#pa-claim-tbody .pa-claim-cb:checked')];
-  if (checked.length === 0) return { rows: _paClaims, selectedOnly: false };
+  if (checked.length === 0) {
+    // 선택 없으면 현재 화면에 보이는(=필터/검색 적용된) 행 전체
+    const visibleIdxs = [...document.querySelectorAll('#pa-claim-tbody .pa-claim-cb')]
+      .map(c => parseInt(c.getAttribute('data-idx'), 10))
+      .filter(n => !isNaN(n));
+    return { rows: visibleIdxs.map(i => _paClaims[i]).filter(Boolean), selectedOnly: false };
+  }
   const idxs = checked.map(c => parseInt(c.getAttribute('data-idx'), 10)).filter(n => !isNaN(n));
   return { rows: idxs.map(i => _paClaims[i]).filter(Boolean), selectedOnly: true };
 }
