@@ -3854,6 +3854,8 @@ tailwind.config = {
               </button>
               <button onclick="filterUploadDataByJet()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-black hover:bg-brand-bg" title="검색창에 '제트배송' 키워드 적용">📦 제트배송만 보기</button>
               <button onclick="syncJetReportsToUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-blue hover:bg-brand-bg" title="저장된 제트배송 리포트(입출고비/배송비/보관비/재고손실/주문/수수료) 데이터를 업로드 데이터로 가져오기">⟳ 제트배송 동기화</button>
+              <button onclick="openSeoulLivingReconcile()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-blue hover:bg-brand-bg" title="서울리빙 거래원장 엑셀과 비교해 누락/추가/값 불일치 행 찾기">🔍 거래원장 대조</button>
+              <input type="file" id="reconcile-file-input" accept=".xlsx,.xls,.csv" class="hidden" onchange="_reconcileFileChosen(event)">
               <button onclick="exportUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg">엑셀 내보내기</button>
               <button id="upload-data-delete-btn" onclick="deleteSelectedUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-pink hover:bg-brand-bg">선택 삭제 <span id="upload-data-sel-count" class="ml-1 text-xs text-brand-gray">(0)</span></button>
             </div>
@@ -22944,6 +22946,302 @@ function _getVisibleUploadData() {
     return true;
   });
   return _applyUploadDataSort(all);
+}
+
+// ── 서울리빙 거래원장 대조 ──────────────────────────
+// 거래원장 엑셀(거래일자/구분/품명/규격(수령자)/수량/단가/매출_지급/매입_수금/잔액)을
+// 업로드 데이터(거래처명: 서울리빙/그외/의류) 와 매칭해서 차이만 표시
+const _RECONCILE_VENDORS = ['서울리빙', '서울리빙 그외', '서울리빙 의류'];
+function _normVendor(v) { return String(v || '').replace(/\s+/g, '').trim(); }
+function _normName(s) { return String(s || '').replace(/\s+/g, '').replace(/[\(\)\[\]\.,_\-\/·]/g, '').toLowerCase(); }
+function _normRecv(s) { return String(s || '').replace(/\s+/g, '').trim(); }
+// "26-04-01" → "2026-04-01" / Excel serial / 다양한 포맷 처리
+function _reconcileNormDate(v) {
+  if (v == null || v === '') return '';
+  if (v instanceof Date) {
+    const y = v.getFullYear(), m = v.getMonth()+1, d = v.getDate();
+    return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
+  if (typeof v === 'number') {
+    try {
+      if (typeof XLSX !== 'undefined' && XLSX.SSF && XLSX.SSF.parse_date_code) {
+        const o = XLSX.SSF.parse_date_code(v);
+        if (o && o.y) return `${o.y}-${String(o.m).padStart(2,'0')}-${String(o.d).padStart(2,'0')}`;
+      }
+    } catch (_) {}
+  }
+  const s = String(v).trim();
+  // YY-MM-DD (2자리 연도) → 20YY-MM-DD
+  let m = s.match(/^(\d{2})[.\-\/](\d{1,2})[.\-\/](\d{1,2})$/);
+  if (m) return `20${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+  // YYYY-MM-DD
+  m = s.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+  if (m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+  return '';
+}
+
+function openSeoulLivingReconcile() {
+  const data = _loadUploadData();
+  const eligible = data.filter(r => _RECONCILE_VENDORS.some(v => _normVendor(v) === _normVendor(r.vendor)));
+  if (!eligible.length) {
+    showAppAlert(
+      '비교 대상 없음',
+      '업로드 데이터 중 거래처명이 "서울리빙 / 서울리빙 그외 / 서울리빙 의류" 인 행이 없습니다.\n먼저 해당 데이터를 업로드해 주세요.',
+      'warn'
+    );
+    return;
+  }
+  const fi = document.getElementById('reconcile-file-input');
+  if (fi) { fi.value = ''; fi.click(); }
+}
+
+function _reconcileFileChosen(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      const rows = [];
+      for (const sheetName of wb.SheetNames) {
+        const ws = wb.Sheets[sheetName];
+        const arr = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+        rows.push(..._reconcileParseSheet(arr));
+      }
+      if (!rows.length) {
+        showAppAlert('인식 실패', '거래원장 형식의 행을 찾지 못했습니다.\n\n파일에 거래일자/품명/수량/단가 컬럼이 있는지 확인해 주세요.', 'error');
+        return;
+      }
+      _reconcileShowResult(rows, file.name);
+    } catch (err) {
+      console.error('[거래원장 대조] 파싱 실패:', err);
+      showAppAlert('파일 읽기 실패', err.message || String(err), 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// 거래원장 시트 파싱 — 헤더 자동 인식 (거래일자/구분/품명/규격/수량/단가/매출/지급)
+function _reconcileParseSheet(data) {
+  if (!Array.isArray(data) || data.length < 2) return [];
+  const DATE_KEYS = ['거래일자', '거래일', '일자', '날짜', 'date'];
+  const TYPE_KEYS = ['구분', '거래구분', 'type'];
+  const NAME_KEYS = ['품명', '품목명', '상품명', '품목', 'name'];
+  const SPEC_KEYS = ['규격', '수령자', '받는사람', '받는분', 'receiver'];
+  const QTY_KEYS  = ['수량', 'qty'];
+  const UNIT_KEYS = ['단가', 'price'];
+  const SALE_KEYS = ['매출/지급', '매출', '매출지급', '판매', '공급가', 'amount'];
+
+  const matchHeader = (cell, keys) => {
+    const c = String(cell || '').replace(/\s+/g,'').toLowerCase().trim();
+    if (!c) return false;
+    return keys.some(k => c === String(k).replace(/\s+/g,'').toLowerCase() || c.includes(String(k).replace(/\s+/g,'').toLowerCase()));
+  };
+  let headerIdx = -1, header = null;
+  for (let i = 0; i < Math.min(data.length, 12); i++) {
+    const row = (data[i] || []).map(v => String(v || '').trim());
+    if (row.some(c => matchHeader(c, DATE_KEYS)) && row.some(c => matchHeader(c, NAME_KEYS)) && row.some(c => matchHeader(c, QTY_KEYS))) {
+      headerIdx = i; header = row; break;
+    }
+  }
+  if (headerIdx < 0) return [];
+  const findIdx = (keys) => { for (let i = 0; i < header.length; i++) { if (matchHeader(header[i], keys)) return i; } return -1; };
+  const dateIdx = findIdx(DATE_KEYS);
+  const typeIdx = findIdx(TYPE_KEYS);
+  const nameIdx = findIdx(NAME_KEYS);
+  const specIdx = findIdx(SPEC_KEYS);
+  const qtyIdx  = findIdx(QTY_KEYS);
+  const unitIdx = findIdx(UNIT_KEYS);
+  const saleIdx = findIdx(SALE_KEYS);
+  if (dateIdx < 0 || nameIdx < 0) return [];
+
+  const _num = v => {
+    if (v == null || v === '') return 0;
+    const n = Number(String(v).replace(/[,\s원]/g,''));
+    return isNaN(n) ? 0 : n;
+  };
+  const _isSkip = (v) => /^(소\s*계|합\s*계|기간전|이월잔액|기간소계|<.*>)/.test(String(v || '').trim());
+
+  const out = [];
+  for (let i = headerIdx + 1; i < data.length; i++) {
+    const row = data[i] || [];
+    const dateRaw = row[dateIdx];
+    if (_isSkip(dateRaw) || _isSkip(row[1])) continue;
+    const date = _reconcileNormDate(dateRaw);
+    if (!date) continue;
+    const type = typeIdx >= 0 ? String(row[typeIdx] || '').trim() : '';
+    if (type && !/매출/.test(type)) continue; // 매입/수금 행 스킵
+    const name = String(row[nameIdx] || '').trim();
+    if (!name) continue;
+    const recv = specIdx >= 0 ? String(row[specIdx] || '').trim() : '';
+    const qty  = qtyIdx  >= 0 ? _num(row[qtyIdx])  : 0;
+    const unit = unitIdx >= 0 ? _num(row[unitIdx]) : 0;
+    const sale = saleIdx >= 0 ? _num(row[saleIdx]) : (qty * unit);
+    out.push({ date, type, name, recv, qty, unit, sale, _origRow: i });
+  }
+  return out;
+}
+
+// 매칭 + 차이 분석
+function _reconcileCompare(ledgerRows) {
+  const data = _loadUploadData().map((r, i) => ({ ...r, _idx: i }));
+  // 서울리빙 계열만 필터
+  const targets = data.filter(r => _RECONCILE_VENDORS.some(v => _normVendor(v) === _normVendor(r.vendor)));
+  // 매칭 키: 날짜 + 수령자 + 품명(정규화)
+  const _key = (date, recv, name) => `${date}__${_normRecv(recv)}__${_normName(name)}`;
+
+  // GPLAN 측 인덱스: 키 → row 배열 (중복 가능)
+  const byKey = new Map();
+  targets.forEach(r => {
+    const k = _key(r.date, r.receiver, r.itemName);
+    if (!byKey.has(k)) byKey.set(k, []);
+    byKey.get(k).push(r);
+  });
+
+  const matched = [];     // { ledger, gplan, diffs[] }
+  const onlyLedger = [];  // 거래원장만 (= GPLAN 누락)
+  const usedGplan = new Set(); // _idx
+  ledgerRows.forEach(L => {
+    const k = _key(L.date, L.recv, L.name);
+    const candidates = (byKey.get(k) || []).filter(g => !usedGplan.has(g._idx));
+    if (!candidates.length) { onlyLedger.push(L); return; }
+    const G = candidates[0];
+    usedGplan.add(G._idx);
+    // 값 비교 — 수량/단가/공급가
+    const gQty   = Number(G.qty) || 0;
+    const gPrice = Number(G.price) || 0;
+    const gSupply= Number(G.supply ?? G.cost) || 0;
+    const diffs = [];
+    if (gQty !== L.qty)        diffs.push({ field: '수량', ledger: L.qty, gplan: gQty });
+    if (L.unit && gPrice !== L.unit) diffs.push({ field: '단가', ledger: L.unit, gplan: gPrice });
+    if (L.sale && gSupply !== L.sale) diffs.push({ field: '공급가/매출', ledger: L.sale, gplan: gSupply });
+    if (diffs.length) matched.push({ ledger: L, gplan: G, diffs });
+  });
+  // GPLAN 에 있지만 거래원장에 없는 (= GPLAN 추가)
+  const onlyGplan = targets.filter(r => !usedGplan.has(r._idx)).filter(r => {
+    // 거래원장에 같은 키가 아예 없으면 onlyGplan
+    const k = _key(r.date, r.receiver, r.itemName);
+    return !ledgerRows.some(L => _key(L.date, L.recv, L.name) === k);
+  });
+
+  return { matched, onlyLedger, onlyGplan, ledgerCount: ledgerRows.length, gplanCount: targets.length };
+}
+
+function _reconcileShowResult(ledgerRows, fileName) {
+  const result = _reconcileCompare(ledgerRows);
+  const { matched, onlyLedger, onlyGplan, ledgerCount, gplanCount } = result;
+  const totalDiff = matched.length + onlyLedger.length + onlyGplan.length;
+  const fmt = n => Number(n || 0).toLocaleString('ko-KR');
+
+  const prev = document.getElementById('reconcile-modal');
+  if (prev) prev.remove();
+  const m = document.createElement('div');
+  m.id = 'reconcile-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+
+  const sec = (title, badgeColor, count, content) => `
+    <div style="margin-bottom:18px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:0 4px;">
+        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${badgeColor};"></span>
+        <span style="font-weight:bold;font-size:14px;">${title}</span>
+        <span style="color:${badgeColor};font-weight:bold;font-size:13px;">${count}건</span>
+      </div>
+      ${content || '<div style="padding:8px 12px;color:#888;font-size:12px;">없음</div>'}
+    </div>`;
+
+  const onlyLedgerRows = onlyLedger.map(L => `
+    <tr style="border-bottom:1px solid #eee;">
+      <td style="padding:6px 10px;font-size:12px;">${_escapeHtml(L.date)}</td>
+      <td style="padding:6px 10px;font-size:12px;">${_escapeHtml(L.recv || '-')}</td>
+      <td style="padding:6px 10px;font-size:12px;">${_escapeHtml(L.name)}</td>
+      <td style="padding:6px 10px;font-size:12px;text-align:right;">${fmt(L.qty)}</td>
+      <td style="padding:6px 10px;font-size:12px;text-align:right;">${fmt(L.unit)}</td>
+      <td style="padding:6px 10px;font-size:12px;text-align:right;">${fmt(L.sale)}</td>
+    </tr>`).join('');
+  const onlyLedgerHtml = onlyLedger.length ? `
+    <div style="overflow:auto;max-height:240px;border:1px solid #eee;border-radius:8px;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead style="position:sticky;top:0;background:#FEF2F2;"><tr>
+          <th style="padding:6px 10px;text-align:left;font-size:11px;color:#991B1B;">날짜</th>
+          <th style="padding:6px 10px;text-align:left;font-size:11px;color:#991B1B;">수령자</th>
+          <th style="padding:6px 10px;text-align:left;font-size:11px;color:#991B1B;">품명</th>
+          <th style="padding:6px 10px;text-align:right;font-size:11px;color:#991B1B;">수량</th>
+          <th style="padding:6px 10px;text-align:right;font-size:11px;color:#991B1B;">단가</th>
+          <th style="padding:6px 10px;text-align:right;font-size:11px;color:#991B1B;">매출</th>
+        </tr></thead>
+        <tbody>${onlyLedgerRows}</tbody>
+      </table>
+    </div>` : '';
+
+  const onlyGplanRows = onlyGplan.map(G => `
+    <tr style="border-bottom:1px solid #eee;">
+      <td style="padding:6px 10px;font-size:12px;">${_escapeHtml(G.date)}</td>
+      <td style="padding:6px 10px;font-size:12px;">${_escapeHtml(G.receiver || '-')}</td>
+      <td style="padding:6px 10px;font-size:12px;">${_escapeHtml(G.itemName || '')}</td>
+      <td style="padding:6px 10px;font-size:12px;text-align:right;">${fmt(G.qty)}</td>
+      <td style="padding:6px 10px;font-size:12px;text-align:right;">${fmt(G.price)}</td>
+      <td style="padding:6px 10px;font-size:12px;text-align:right;">${fmt(G.supply ?? G.cost)}</td>
+    </tr>`).join('');
+  const onlyGplanHtml = onlyGplan.length ? `
+    <div style="overflow:auto;max-height:240px;border:1px solid #eee;border-radius:8px;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead style="position:sticky;top:0;background:#FFFBEB;"><tr>
+          <th style="padding:6px 10px;text-align:left;font-size:11px;color:#92400E;">날짜</th>
+          <th style="padding:6px 10px;text-align:left;font-size:11px;color:#92400E;">수령자</th>
+          <th style="padding:6px 10px;text-align:left;font-size:11px;color:#92400E;">품명</th>
+          <th style="padding:6px 10px;text-align:right;font-size:11px;color:#92400E;">수량</th>
+          <th style="padding:6px 10px;text-align:right;font-size:11px;color:#92400E;">단가</th>
+          <th style="padding:6px 10px;text-align:right;font-size:11px;color:#92400E;">공급가</th>
+        </tr></thead>
+        <tbody>${onlyGplanRows}</tbody>
+      </table>
+    </div>` : '';
+
+  const matchRows = matched.map(M => {
+    const L = M.ledger, G = M.gplan;
+    const diffStr = M.diffs.map(d => `${d.field}: 거래원장 ${fmt(d.ledger)} ↔ GPLAN ${fmt(d.gplan)}`).join('<br>');
+    return `<tr style="border-bottom:1px solid #eee;">
+      <td style="padding:6px 10px;font-size:12px;">${_escapeHtml(L.date)}</td>
+      <td style="padding:6px 10px;font-size:12px;">${_escapeHtml(L.recv || '-')}</td>
+      <td style="padding:6px 10px;font-size:12px;">${_escapeHtml(L.name)}</td>
+      <td style="padding:6px 10px;font-size:11px;color:#C2410C;">${diffStr}</td>
+    </tr>`;
+  }).join('');
+  const matchHtml = matched.length ? `
+    <div style="overflow:auto;max-height:280px;border:1px solid #eee;border-radius:8px;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead style="position:sticky;top:0;background:#FFEDD5;"><tr>
+          <th style="padding:6px 10px;text-align:left;font-size:11px;color:#9A3412;">날짜</th>
+          <th style="padding:6px 10px;text-align:left;font-size:11px;color:#9A3412;">수령자</th>
+          <th style="padding:6px 10px;text-align:left;font-size:11px;color:#9A3412;">품명</th>
+          <th style="padding:6px 10px;text-align:left;font-size:11px;color:#9A3412;">차이</th>
+        </tr></thead>
+        <tbody>${matchRows}</tbody>
+      </table>
+    </div>` : '';
+
+  m.innerHTML = `
+    <div style="background:white;border-radius:16px;max-width:1100px;width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="padding:18px 22px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-weight:bold;font-size:16px;">🔍 서울리빙 거래원장 대조 결과</div>
+          <div style="color:#888;font-size:12px;margin-top:4px;">파일: ${_escapeHtml(fileName)} · 거래원장 ${ledgerCount}건 / GPLAN(서울리빙 계열) ${gplanCount}건</div>
+        </div>
+        <button onclick="document.getElementById('reconcile-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:8px 22px;background:${totalDiff === 0 ? '#DCFCE7' : '#FEF3C7'};border-bottom:1px solid #eee;font-size:13px;font-weight:bold;color:${totalDiff === 0 ? '#166534' : '#92400E'};">
+        ${totalDiff === 0 ? '✅ 차이 없음 — 모든 행이 일치합니다.' : `⚠ 총 ${totalDiff}건의 차이가 있습니다.`}
+      </div>
+      <div style="padding:18px 22px;overflow:auto;flex:1;">
+        ${sec('🔴 누락 (거래원장에는 있지만 GPLAN 에 없음)', '#DC2626', onlyLedger.length, onlyLedgerHtml)}
+        ${sec('🟡 추가 (GPLAN 에는 있지만 거래원장에 없음)', '#D97706', onlyGplan.length, onlyGplanHtml)}
+        ${sec('🟠 값 불일치 (양쪽에 있지만 수량/단가/공급가 다름)', '#EA580C', matched.length, matchHtml)}
+      </div>
+      <div style="padding:14px 22px;border-top:1px solid #eee;display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="document.getElementById('reconcile-modal').remove()" style="padding:9px 22px;border-radius:20px;border:1px solid #ddd;background:white;cursor:pointer;font-size:13px;font-weight:bold;">닫기</button>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
 }
 
 function exportUploadData() {
