@@ -23109,8 +23109,17 @@ function _reconcileParseSheet(data) {
 // 매칭 + 차이 분석
 function _reconcileCompare(ledgerRows) {
   const data = _loadUploadData().map((r, i) => ({ ...r, _idx: i }));
-  // 서울리빙 계열만 필터
-  const targets = data.filter(r => _RECONCILE_VENDORS.some(v => _normVendor(v) === _normVendor(r.vendor)));
+  // 거래원장의 거래일자 범위 추출 (업로드한 엑셀 기준)
+  const ledgerDates = ledgerRows.map(L => String(L.date || '')).filter(Boolean).sort();
+  const minDate = ledgerDates[0] || '';
+  const maxDate = ledgerDates[ledgerDates.length - 1] || '';
+  // 서울리빙 계열 + 거래원장 날짜 범위 안에 있는 GPLAN 행만 비교 대상
+  const targets = data.filter(r => {
+    if (!_RECONCILE_VENDORS.some(v => _normVendor(v) === _normVendor(r.vendor))) return false;
+    if (!minDate) return true;
+    const d = String(r.date || '').slice(0, 10);
+    return d >= minDate && d <= maxDate;
+  });
   // 매칭 키: 날짜 + 수령자 + 품명(정규화)
   const _key = (date, recv, name) => `${date}__${_normRecv(recv)}__${_normName(name)}`;
 
@@ -23150,13 +23159,21 @@ function _reconcileCompare(ledgerRows) {
     return !ledgerRows.some(L => _key(L.date, L.recv, L.name) === k);
   });
 
-  return { matched, matchedSame, onlyLedger, onlyGplan, ledgerCount: ledgerRows.length, gplanCount: targets.length };
+  return {
+    matched, matchedSame, onlyLedger, onlyGplan,
+    ledgerCount: ledgerRows.length,
+    gplanCount: targets.length,
+    minDate, maxDate,
+  };
 }
 
 function _reconcileShowResult(ledgerRows, fileName) {
   const result = _reconcileCompare(ledgerRows);
-  const { matched, matchedSame, onlyLedger, onlyGplan, ledgerCount, gplanCount } = result;
+  const { matched, matchedSame, onlyLedger, onlyGplan, ledgerCount, gplanCount, minDate, maxDate } = result;
   const totalDiff = matched.length + onlyLedger.length + onlyGplan.length;
+  const rangeLabel = (minDate && maxDate)
+    ? (minDate === maxDate ? minDate : `${minDate} ~ ${maxDate}`)
+    : '범위 없음';
   const fmt = n => Number(n || 0).toLocaleString('ko-KR');
 
   const prev = document.getElementById('reconcile-modal');
@@ -23251,7 +23268,7 @@ function _reconcileShowResult(ledgerRows, fileName) {
       <div style="padding:18px 22px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between;">
         <div>
           <div style="font-weight:bold;font-size:16px;">🔍 서울리빙 거래원장 대조 결과</div>
-          <div style="color:#888;font-size:12px;margin-top:4px;">파일: ${_escapeHtml(fileName)} · 거래원장 ${ledgerCount}건 / GPLAN(서울리빙 계열) ${gplanCount}건</div>
+          <div style="color:#888;font-size:12px;margin-top:4px;">파일: ${_escapeHtml(fileName)} · 기간 <b>${_escapeHtml(rangeLabel)}</b> · 거래원장 ${ledgerCount}건 / 같은 기간 GPLAN(서울리빙 계열) ${gplanCount}건</div>
         </div>
         <button onclick="document.getElementById('reconcile-modal').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer;">✕</button>
       </div>
@@ -23321,8 +23338,11 @@ function _reconcileExportExcel() {
     showAppAlert('데이터 없음', '먼저 거래원장을 업로드해 대조 결과를 표시해 주세요.', 'warn');
     return;
   }
-  const { matched, matchedSame, onlyLedger, onlyGplan, ledgerCount, gplanCount } = m._reconcileResult;
+  const { matched, matchedSame, onlyLedger, onlyGplan, ledgerCount, gplanCount, minDate, maxDate } = m._reconcileResult;
   const srcFile = m._reconcileFileName || '';
+  const rangeLabel = (minDate && maxDate)
+    ? (minDate === maxDate ? minDate : `${minDate} ~ ${maxDate}`)
+    : '';
 
   // 거래원장 행 → GPLAN 매칭 룩업 (date+recv+name)
   const _normName = s => String(s || '').replace(/\s+/g, '').replace(/[\(\)\[\]\.,_\-\/·]/g, '').toLowerCase();
@@ -23412,7 +23432,8 @@ function _reconcileExportExcel() {
   const totalDiff = matched.length + onlyLedger.length + onlyGplan.length;
   const summaryBlock = [
     [`서울리빙 거래원장 대조 결과 — ${srcFile}`],
-    [`거래원장 ${ledgerCount}건 / GPLAN(서울리빙 계열) ${gplanCount}건 / 일치 ${matchedSame.length}건 · 차이 ${totalDiff}건 (값 불일치 ${matched.length} · 누락 ${onlyLedger.length} · 추가 ${onlyGplan.length})`],
+    [`기간: ${rangeLabel || '범위 없음'} (업로드한 엑셀의 거래일자 범위 기준)`],
+    [`거래원장 ${ledgerCount}건 / 같은 기간 GPLAN(서울리빙 계열) ${gplanCount}건 / 일치 ${matchedSame.length}건 · 차이 ${totalDiff}건 (값 불일치 ${matched.length} · 누락 ${onlyLedger.length} · 추가 ${onlyGplan.length})`],
     [`차이 컬럼: 거래원장 매출/지급 − GPLAN 원가(cost). 0 이면 일치, 다르면 차액 표시. "값 없음" 은 GPLAN 에 매칭 행이 없음.`],
     [], // 빈 줄
   ];
