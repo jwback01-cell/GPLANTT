@@ -18122,6 +18122,13 @@ async function downloadSeoulLiving(mode, actionType) {
         return;
       }
       _msg(`📧 메일 발송 완료 — ${SEOULLIVING_TO_EMAIL} 로 ${fileName} 전송 (${rows.length}행, gplan23@naver.com 발신)`, 'text-brand-green');
+      // 메일 발송 성공 → 자동으로 PA 신규주문 → 출고관리 이동
+      try {
+        await _moveSeoulLivingToShipManagement(orders, targetDepot, _msg);
+      } catch (e2) {
+        console.error('[PA 출고관리 이동] 예외:', e2);
+        gplanAlert('PA 출고관리 이동 중 오류\n\n' + (e2.message || e2), { type: 'error', title: 'PA 이동 실패' });
+      }
     } catch (err) {
       console.error('[메일발송] 실패:', err);
       gplanAlert('메일 발송 중 네트워크 오류\n\n' + (err.message || err) + '\n\nVercel 환경변수(NAVER_SMTP_USER/PASS)가 설정되었는지 확인해주세요.', { type: 'error', title: '메일 발송 실패' });
@@ -18138,6 +18145,108 @@ async function downloadSeoulLiving(mode, actionType) {
 // 서울리빙 메일 발송 — downloadSeoulLiving의 'email' 모드 래퍼
 async function sendSeoulLivingEmail(mode) {
   return downloadSeoulLiving(mode, 'email');
+}
+
+// ── PA 신규주문 → 출고관리 이동 (메일 발송 직후 자동 호출) ──────────
+// 메일 발송된 배송처(서울리빙/그외/의류) 의 신규주문 행들을 PA "출고관리" 상태로 일괄 이동
+// 엔드포인트: POST /orders/addWork — 작업 추가 = PA 에서 출고관리(출고대기) 상태로 자동 전환
+// 부분 실패 시 어느 bundle_no 가 실패했는지 알림
+async function _moveSeoulLivingToShipManagement(orders, targetDepotLabel, _msg) {
+  if (!Array.isArray(orders) || !orders.length) return;
+  // bundle_no 추출 (setInvoice 와 동일한 키 후보 순서 사용)
+  const targets = orders.map(o => {
+    const bundleNo = o.bundle_no || o.pa_bundle_no || o.ori_bundle_no || o.shop_ord_no || o.ord_no || o.order_no || '';
+    const ordName  = String(o.shop_ord_no || o.bundle_no || o.ord_no || '').slice(0, 30);
+    const recv     = String(o.to_name || o.receiver || o.order_name || '').slice(0, 12);
+    return { bundle_no: String(bundleNo).trim(), label: `${ordName}${recv ? ' / ' + recv : ''}` };
+  }).filter(t => t.bundle_no);
+
+  if (!targets.length) {
+    _msg && _msg('📦 PA 이동 건너뜀 — bundle_no 가 없는 주문', 'text-brand-orange');
+    return;
+  }
+
+  _msg && _msg(`📦 PA "${targetDepotLabel}" 신규주문 ${targets.length}건 → 출고관리로 이동 중...`, 'text-brand-blue');
+
+  // 페이로드 — PA 표준 형식: { orders: [{bundle_no}] }
+  const body = { orders: targets.map(t => ({ bundle_no: t.bundle_no })) };
+
+  // 시도할 엔드포인트 후보 (다양한 PA 환경 대응)
+  const endpoints = [
+    { method: 'POST', path: '/orders/addWork' },
+    { method: 'POST', path: '/order/addWork' },
+    { method: 'PUT',  path: '/orders/addWork' },
+  ];
+
+  let res = null;
+  let succeeded = null;
+  let lastErr = null;
+  const _isNotFound = (err) => /\bpage could not be found\b|\bnot found\b|\bcannot (post|put)\b|\b404\b/i.test(String(err && err.message || err));
+
+  for (const spec of endpoints) {
+    try {
+      res = await _paFetch(spec.path, { method: spec.method, body: JSON.stringify(body) });
+      if (_isPaErrorResponse(res)) {
+        const m = res.message || (res.response && res.response.message) || res.error || '';
+        if (_isNotFound({ message: m })) { lastErr = new Error(m); continue; }
+        succeeded = spec; break;
+      }
+      succeeded = spec;
+      break;
+    } catch (err) {
+      lastErr = err;
+      if (_isNotFound(err)) continue;
+      break;
+    }
+  }
+
+  if (!succeeded) {
+    const errMsg = (lastErr && lastErr.message) || '엔드포인트를 찾을 수 없습니다';
+    gplanAlert(
+      `PA 출고관리 이동 실패 (${targets.length}건)\n\n원인: ${errMsg}\n\n메일은 정상 발송되었으나 PA 상태 변경에 실패했습니다.\nPA 화면에서 "신규주문" 탭을 열어 직접 [발주서 출력] 또는 [출고지시] 처리해 주세요.`,
+      { type: 'error', title: 'PA 이동 실패' }
+    );
+    _msg && _msg(`📦 PA 이동 실패 — ${errMsg}`, 'text-brand-pink');
+    return;
+  }
+
+  // 응답 파싱 — { result: [{bundle_no, addWorkResult, addWorkMessage, ...}] } 형식 가정
+  const list = (res && (res.result || res.update_list || res.work_result)) || [];
+  const success = [];
+  const failures = [];
+  if (Array.isArray(list) && list.length) {
+    list.forEach(r => {
+      const bn = String(r.bundle_no || '');
+      const okThis = r.addWorkResult === '성공' || r.result === true || r.addWorkResult === true || r.success === true;
+      if (okThis) success.push(bn);
+      else failures.push({ bundle_no: bn, message: r.addWorkMessage || r.message || r.addWorkResult || '실패' });
+    });
+  } else {
+    // 응답이 빈 경우 — 호출 자체가 200 이면 전체 성공으로 간주
+    if (res && !_isPaErrorResponse(res)) {
+      targets.forEach(t => success.push(t.bundle_no));
+    } else {
+      targets.forEach(t => failures.push({ bundle_no: t.bundle_no, message: 'PA 응답 파싱 불가' }));
+    }
+  }
+
+  // 결과 알림
+  if (failures.length === 0) {
+    _msg && _msg(`📦 PA "${targetDepotLabel}" → 출고관리 이동 완료 (${success.length}건)`, 'text-brand-green');
+  } else {
+    // 실패 목록을 라벨(주문번호/수령자) 매핑으로 보여주기
+    const labelByBundle = new Map(targets.map(t => [t.bundle_no, t.label]));
+    const failLines = failures.slice(0, 30).map(f => {
+      const lbl = labelByBundle.get(f.bundle_no) || f.bundle_no;
+      return `• ${lbl} — ${f.message}`;
+    }).join('\n');
+    const more = failures.length > 30 ? `\n… 외 ${failures.length - 30}건` : '';
+    gplanAlert(
+      `PA 출고관리 이동 — 일부 실패\n\n성공 ${success.length}건 / 실패 ${failures.length}건\n\n실패 목록:\n${failLines}${more}\n\n실패한 주문은 PA 화면에서 직접 처리해 주세요.`,
+      { type: 'warn', title: 'PA 이동 부분 실패' }
+    );
+    _msg && _msg(`📦 PA 이동 — 성공 ${success.length} / 실패 ${failures.length}`, failures.length === targets.length ? 'text-brand-pink' : 'text-brand-orange');
+  }
 }
 
 // ── 외부업체 주문 업로드 ─────────────────────────
