@@ -3427,7 +3427,7 @@ tailwind.config = {
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                     📧 메일 발송
                   </button>
-                  <button onclick="sendSeoulLivingTestEmail('all')" class="bg-white border border-brand-border text-brand-gray px-5 py-2.5 rounded-full font-bold text-xs hover:bg-brand-bg flex items-center gap-1.5" title="jwback01@nate.com 으로 테스트 메일 전송 (PA 출고관리 이동 안 함)">
+                  <button onclick="sendSeoulLivingTestEmail('all')" class="bg-white border border-brand-border text-brand-gray px-5 py-2.5 rounded-full font-bold text-xs hover:bg-brand-bg flex items-center gap-1.5" title="jwback01@nate.com 으로 테스트 메일 전송 (PA 출고관리 자동 이동 포함)">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                     🧪 테스트 메일 발송
                   </button>
@@ -3449,7 +3449,7 @@ tailwind.config = {
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                     📧 메일 발송
                   </button>
-                  <button onclick="sendSeoulLivingTestEmail('etc')" class="bg-white border border-brand-border text-brand-gray px-5 py-2.5 rounded-full font-bold text-xs hover:bg-brand-bg flex items-center gap-1.5" title="jwback01@nate.com 으로 테스트 메일 전송 (PA 출고관리 이동 안 함)">
+                  <button onclick="sendSeoulLivingTestEmail('etc')" class="bg-white border border-brand-border text-brand-gray px-5 py-2.5 rounded-full font-bold text-xs hover:bg-brand-bg flex items-center gap-1.5" title="jwback01@nate.com 으로 테스트 메일 전송 (PA 출고관리 자동 이동 포함)">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                     🧪 테스트 메일 발송
                   </button>
@@ -3471,7 +3471,7 @@ tailwind.config = {
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                     📧 메일 발송
                   </button>
-                  <button onclick="sendSeoulLivingTestEmail('cloth')" class="bg-white border border-brand-border text-brand-gray px-5 py-2.5 rounded-full font-bold text-xs hover:bg-brand-bg flex items-center gap-1.5" title="jwback01@nate.com 으로 테스트 메일 전송 (PA 출고관리 이동 안 함)">
+                  <button onclick="sendSeoulLivingTestEmail('cloth')" class="bg-white border border-brand-border text-brand-gray px-5 py-2.5 rounded-full font-bold text-xs hover:bg-brand-bg flex items-center gap-1.5" title="jwback01@nate.com 으로 테스트 메일 전송 (PA 출고관리 자동 이동 포함)">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                     🧪 테스트 메일 발송
                   </button>
@@ -17887,7 +17887,7 @@ function _loadXlsxStyled() {
 // 서울리빙 엑셀 다운로드 / 메일 발송
 // mode: 'all' (서울리빙) | 'etc' (서울리빙 그외) | 'cloth' (서울리빙 의류)
 // actionType: 'download' (기본) | 'email' (실제 메일 발송) | 'test-email' (테스트 메일 — jwback01@nate.com)
-// 테스트 메일은 PA 신규주문 → 출고관리 자동 이동을 수행하지 않음
+// email/test-email 모두 PA 신규주문 → 출고관리 자동 이동 수행 (수신 주소만 다름)
 async function downloadSeoulLiving(mode, actionType) {
   actionType = actionType || 'download';
   const isTestMail = actionType === 'test-email';
@@ -18142,14 +18142,12 @@ async function downloadSeoulLiving(mode, actionType) {
         return;
       }
       _msg(`${labelTag} 완료 — ${toEmail} 로 ${fileName} 전송 (${rows.length}행, gplan23@naver.com 발신)`, 'text-brand-green');
-      // 실제 메일 발송 성공 시에만 PA 신규주문 → 출고관리 자동 이동 (테스트는 스킵)
-      if (!isTestMail) {
-        try {
-          await _moveSeoulLivingToShipManagement(orders, targetDepot, _msg);
-        } catch (e2) {
-          console.error('[PA 출고관리 이동] 예외:', e2);
-          gplanAlert('PA 출고관리 이동 중 오류\n\n' + (e2.message || e2), { type: 'error', title: 'PA 이동 실패' });
-        }
+      // 메일 발송 성공 → 자동으로 PA 신규주문 → 출고관리 이동 (실제/테스트 모두)
+      try {
+        await _moveSeoulLivingToShipManagement(orders, targetDepot, _msg);
+      } catch (e2) {
+        console.error('[PA 출고관리 이동] 예외:', e2);
+        gplanAlert('PA 출고관리 이동 중 오류\n\n' + (e2.message || e2), { type: 'error', title: 'PA 이동 실패' });
       }
     } catch (err) {
       console.error('[메일발송] 실패:', err);
@@ -18170,7 +18168,7 @@ async function sendSeoulLivingEmail(mode) {
 }
 
 // 서울리빙 테스트 메일 발송 — downloadSeoulLiving 의 'test-email' 모드 래퍼
-// 수신: jwback01@nate.com / PA 출고관리 자동 이동 안 함
+// 수신: jwback01@nate.com / PA 신규주문 → 출고관리 자동 이동도 함께 진행
 async function sendSeoulLivingTestEmail(mode) {
   return downloadSeoulLiving(mode, 'test-email');
 }
