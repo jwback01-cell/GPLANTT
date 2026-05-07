@@ -23003,13 +23003,24 @@ function _reconcileFileChosen(ev) {
     try {
       const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
       const rows = [];
+      const diag = []; // 시트별 진단
       for (const sheetName of wb.SheetNames) {
         const ws = wb.Sheets[sheetName];
         const arr = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
-        rows.push(..._reconcileParseSheet(arr));
+        const parsed = _reconcileParseSheet(arr);
+        diag.push({ sheet: sheetName, totalRows: arr.length, parsed: parsed.length, first8: arr.slice(0, 8).map(r => (r || []).slice(0, 12)) });
+        rows.push(...parsed);
       }
+      console.log('[거래원장 대조] 진단:', diag);
       if (!rows.length) {
-        showAppAlert('인식 실패', '거래원장 형식의 행을 찾지 못했습니다.\n\n파일에 거래일자/품명/수량/단가 컬럼이 있는지 확인해 주세요.', 'error');
+        const sheetSummary = diag.map(d => `• ${d.sheet}: 총 ${d.totalRows}행, 인식 0건`).join('\n');
+        showAppAlert(
+          '인식 실패',
+          `거래원장 형식의 행을 찾지 못했습니다.\n\n${sheetSummary}\n\n` +
+          `📋 F12 콘솔에서 [거래원장 대조] 진단 로그를 보내주시면 헤더 형태를 분석해 자동 인식 패턴을 추가하겠습니다.\n\n` +
+          `필요한 컬럼: 거래일자 / 품명 / 수량 / 단가 / 매출(또는 공급가)`,
+          'error'
+        );
         return;
       }
       _reconcileShowResult(rows, file.name);
@@ -23037,10 +23048,17 @@ function _reconcileParseSheet(data) {
     if (!c) return false;
     return keys.some(k => c === String(k).replace(/\s+/g,'').toLowerCase() || c.includes(String(k).replace(/\s+/g,'').toLowerCase()));
   };
+  // 헤더 검색 범위를 30행으로 확대 — 회사정보/타이틀 행이 상단에 많은 거래원장 양식 대응
+  // 또한 QTY 가 없어도 DATE+NAME 만으로 헤더 인식 (단가/수량은 매출 컬럼만 있는 경우 추정)
   let headerIdx = -1, header = null;
-  for (let i = 0; i < Math.min(data.length, 12); i++) {
+  for (let i = 0; i < Math.min(data.length, 30); i++) {
     const row = (data[i] || []).map(v => String(v || '').trim());
-    if (row.some(c => matchHeader(c, DATE_KEYS)) && row.some(c => matchHeader(c, NAME_KEYS)) && row.some(c => matchHeader(c, QTY_KEYS))) {
+    const hasDate = row.some(c => matchHeader(c, DATE_KEYS));
+    const hasName = row.some(c => matchHeader(c, NAME_KEYS));
+    const hasQty  = row.some(c => matchHeader(c, QTY_KEYS));
+    const hasSale = row.some(c => matchHeader(c, SALE_KEYS));
+    // 거래일자 + 품명 필수, 수량/매출/단가 중 1개라도 있으면 헤더로 판정
+    if (hasDate && hasName && (hasQty || hasSale)) {
       headerIdx = i; header = row; break;
     }
   }
