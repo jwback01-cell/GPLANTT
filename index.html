@@ -16922,11 +16922,13 @@ const CPS_STORAGE_COLS = [
 function _cpsParseSheet(ws, expectedCols) {
   const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
   if (!aoa.length) return [];
-  // 헤더 행 자동 탐지 — 주문ID + 배송ID 가 있는 행
+  // 헤더 행 자동 탐지 — 입출고비/배송비는 주문ID+배송ID, 보관비는 등록상품ID+SKUID
   let headerIdx = -1;
   for (let i = 0; i < Math.min(aoa.length, 30); i++) {
     const r = (aoa[i] || []).map(c => String(c || '').replace(/\s+/g,''));
-    if (r.includes('주문ID') && r.includes('배송ID')) { headerIdx = i; break; }
+    const hasOrderShip = r.includes('주문ID') && r.includes('배송ID');     // 입출고비/배송비
+    const hasProdSku   = r.includes('등록상품ID') && r.includes('SKUID');   // 보관비 (또는 공통)
+    if (hasOrderShip || hasProdSku) { headerIdx = i; break; }
   }
   if (headerIdx < 0) return [];
 
@@ -16995,8 +16997,11 @@ function _cpsParseSheet(ws, expectedCols) {
     if (allEmpty) continue;
     const o = {};
     headerCanon.forEach((h, ci) => { if (h) o[h] = row[ci] != null ? row[ci] : ''; });
-    // 합계 행 같은 것 거르기 (주문ID 가 비어있으면 스킵)
-    if (!String(o['주문ID'] || '').trim()) continue;
+    // 합계 행 거르기 — 주문ID(입출고비/배송비) 또는 등록상품 ID/SKU ID(보관비) 가 모두 비면 스킵
+    const orderId = String(o['주문ID'] || '').trim();
+    const prodId  = String(o['등록상품 ID'] || '').trim();
+    const skuId   = String(o['SKU ID'] || '').trim();
+    if (!orderId && !prodId && !skuId) continue;
     rows.push(o);
   }
   return rows;
@@ -17021,23 +17026,30 @@ async function cpsHandleFiles(fileList) {
       const ioRows      = ioSheetName      ? _cpsParseSheet(wb.Sheets[ioSheetName],      CPS_IO_COLS)      : [];
       const shipRows    = shipSheetName    ? _cpsParseSheet(wb.Sheets[shipSheetName],    CPS_SHIP_COLS)    : [];
       const storageRows = storageSheetName ? _cpsParseSheet(wb.Sheets[storageSheetName], CPS_STORAGE_COLS) : [];
-      // 키워드로 못 찾고 시트가 1개뿐이면 그 시트가 어떤 양식인지 헤더로 추정
-      if (!ioRows.length && !shipRows.length && !storageRows.length && wb.SheetNames.length >= 1) {
+      // 시트 이름으로 못 찾으면 헤더 내용/파일명으로 추정
+      if (!ioRows.length && !shipRows.length && !storageRows.length) {
+        const fname = String(file.name || '').toUpperCase();
         const guess = wb.SheetNames.map(n => {
           const aoa = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '', raw: false });
           const flat = aoa.slice(0, 30).map(r => (r||[]).join(' ')).join(' ');
           return { name: n, flat };
         });
         for (const g of guess) {
-          if (/보관기간|보관재고수량|개당 상품부피/.test(g.flat) && !storageRows.length) {
+          // 보관비 단서 — 시트 내용 또는 파일명 STORAGE_FEE
+          const isStorage = /보관기간|보관재고수량|개당 상품부피|진열일/.test(g.flat) || /STORAGE/.test(fname);
+          // 배송비 단서
+          const isShip = /총 판매가|구매 수량 총 사이즈|추가비용|최종비용/.test(g.flat) && !isStorage;
+          // 입출고비 단서
+          const isIo = /단품 판매가|단품 기준 구매 수량|옵션 유형/.test(g.flat) && !isStorage && !isShip;
+          if (isStorage && !storageRows.length) {
             const r = _cpsParseSheet(wb.Sheets[g.name], CPS_STORAGE_COLS);
-            if (r.length) { storageRows.push(...r); }
-          } else if (/총 판매가|구매 수량 총 사이즈|추가비용/.test(g.flat) && !shipRows.length) {
+            if (r.length) storageRows.push(...r);
+          } else if (isShip && !shipRows.length) {
             const r = _cpsParseSheet(wb.Sheets[g.name], CPS_SHIP_COLS);
-            if (r.length) { shipRows.push(...r); }
-          } else if (/단품 판매가|단품 기준 구매 수량|옵션 유형/.test(g.flat) && !ioRows.length) {
+            if (r.length) shipRows.push(...r);
+          } else if (isIo && !ioRows.length) {
             const r = _cpsParseSheet(wb.Sheets[g.name], CPS_IO_COLS);
-            if (r.length) { ioRows.push(...r); }
+            if (r.length) ioRows.push(...r);
           }
         }
       }
