@@ -15344,18 +15344,21 @@ function renderDailyTab() {
       </div>`).join('');
   }
 
+  // 주문건수 0인 날은 표/차트에서 제외 (광고비는 이미 다음 매출일로 이월됨)
+  const visibleDays = days.filter(d => (d.count || 0) > 0);
+
   // 바 차트 — 매출(회색)과 순이익(파랑)을 같은 칼럼 안에 겹쳐 표시
   const barsEl = document.getElementById('daily-bars');
   const labelsEl = document.getElementById('daily-labels');
   if (barsEl && labelsEl) {
-    if (!days.length) {
+    if (!visibleDays.length) {
       barsEl.innerHTML = '<div class="text-brand-gray text-sm m-auto">선택한 기간에 데이터 없음</div>';
       labelsEl.innerHTML = '';
     } else {
-      const maxV = Math.max(1, ...days.map(d => Math.max(d.sales, Math.abs(d.profit || 0))));
+      const maxV = Math.max(1, ...visibleDays.map(d => Math.max(d.sales, Math.abs(d.profit || 0))));
       // 라벨 "12/31" (4글자) 가 깔끔히 들어가도록 28px. 바와 라벨 모두 동일 폭으로 정렬
       const minBarWidth = 28;
-      barsEl.innerHTML = days.map(d => {
+      barsEl.innerHTML = visibleDays.map(d => {
         const salesH = Math.round((d.sales / maxV) * 100);
         const profitH = Math.round((Math.max(0, d.profit) / maxV) * 100);
         return `
@@ -15364,7 +15367,7 @@ function renderDailyTab() {
             <div class="absolute bottom-0 rounded-t" style="background:#2196F3;width:60%;left:20%;height:${profitH}%;opacity:0.85;" title="${d.date} 순이익 ${fmtN(d.profit)}원"></div>
           </div>`;
       }).join('');
-      labelsEl.innerHTML = days.map(d => {
+      labelsEl.innerHTML = visibleDays.map(d => {
         const dt = new Date(d.date + 'T00:00:00');
         const md = `${dt.getMonth()+1}/${dt.getDate()}`;
         // 바와 동일 폭, 가운데 정렬, 줄바꿈 방지
@@ -15373,15 +15376,15 @@ function renderDailyTab() {
     }
   }
 
-  // 테이블
+  // 테이블 — 주문건수 0인 날은 행 자체를 표시하지 않음
   const tbody = document.getElementById('daily-tbody');
   const tfoot = document.getElementById('daily-tfoot');
   if (tbody) {
-    if (!days.length) {
+    if (!visibleDays.length) {
       tbody.innerHTML = '<tr><td colspan="11" class="px-6 py-8 text-center text-brand-gray">선택한 기간에 데이터 없음</td></tr>';
       if (tfoot) tfoot.innerHTML = '';
     } else {
-      tbody.innerHTML = days.map((d, i) => {
+      tbody.innerHTML = visibleDays.map((d, i) => {
         const dt = new Date(d.date + 'T00:00:00');
         const dow = DOW_NAMES[dt.getDay()];
         const dowCls = dt.getDay() === 0 ? 'text-brand-pink' : dt.getDay() === 6 ? 'text-brand-blue' : '';
@@ -15389,8 +15392,8 @@ function renderDailyTab() {
         const realDay = (d.profit || 0) - (d.adCost || 0);
         const realCls = (d._hasProfit || d.adCost) ? (realDay >= 0 ? 'text-brand-green' : 'text-brand-pink') : 'text-brand-gray';
         const rate = d.sales > 0 && d._hasProfit ? ((d.profit / d.sales) * 100).toFixed(1) + '%' : '-';
-        // 전일 대비 매출 차이
-        const prev = i > 0 ? days[i-1] : null;
+        // 전일 대비 매출 차이 — visibleDays(매출 있는 날)들끼리 비교
+        const prev = i > 0 ? visibleDays[i-1] : null;
         let diffHtml = '<span class="text-brand-gray">-</span>';
         if (prev && prev.sales > 0) {
           const diff = d.sales - prev.sales;
@@ -15415,7 +15418,7 @@ function renderDailyTab() {
       }).join('');
       if (tfoot) {
         tfoot.innerHTML = `<tr class="border-t-2 border-brand-black">
-          <td class="px-6 py-3" colspan="2">합계 (${days.length}일)</td>
+          <td class="px-6 py-3" colspan="2">합계 (${visibleDays.length}일)</td>
           <td class="px-4 py-3 text-right">${fmtN(kpiSum.count)}건</td>
           <td class="px-4 py-3 text-right">${fmtN(kpiSum.sales)}</td>
           <td class="px-4 py-3 text-right">${fmtN(kpiSum.cost)}</td>
