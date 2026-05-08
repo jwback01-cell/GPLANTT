@@ -16330,81 +16330,141 @@ function renderEventsCalendar() {
 
   const events = _loadEvents();
 
-  // 카테고리 필터 옵션 갱신
+  // 사이트 필터 옵션 갱신
   const catSel = document.getElementById('events-category-filter');
-  const allCats = [...new Set(events.map(e => e.category).filter(Boolean))].sort();
+  const allCats = [...new Set(events.map(e => e.site || e.category).filter(Boolean))].sort();
   if (catSel) {
     const cur = catSel.value;
-    catSel.innerHTML = '<option value="">전체 카테고리</option>'
+    catSel.innerHTML = '<option value="">전체 사이트</option>'
       + allCats.map(c => `<option value="${escHtml(c)}" ${c === cur ? 'selected' : ''}>${escHtml(c)}</option>`).join('');
   }
-  const datalist = document.getElementById('event-category-suggestions');
-  if (datalist) datalist.innerHTML = allCats.map(c => `<option value="${escHtml(c)}"></option>`).join('');
   const filterCat = catSel ? catSel.value : '';
 
-  // 해당 월 그리드 생성 — 첫째주 시작 일요일부터 마지막주 토요일까지
+  // 한 달 셀 만들기 — 일요일 시작 ~ 토요일 끝
   const firstDow = new Date(_eventsYear, _eventsMonth, 1).getDay();
   const lastDate = new Date(_eventsYear, _eventsMonth + 1, 0).getDate();
   const cells = [];
-  // 이전 달의 빈 셀 (첫째주 채우기)
   for (let i = 0; i < firstDow; i++) {
     const d = new Date(_eventsYear, _eventsMonth, 1 - (firstDow - i));
-    cells.push({ date: d, isOther: true });
+    cells.push({ date: d, key: _evDateKey(d), dow: d.getDay(), isOther: true });
   }
   for (let day = 1; day <= lastDate; day++) {
-    cells.push({ date: new Date(_eventsYear, _eventsMonth, day), isOther: false });
+    const d = new Date(_eventsYear, _eventsMonth, day);
+    cells.push({ date: d, key: _evDateKey(d), dow: d.getDay(), isOther: false });
   }
-  // 마지막주 채우기 (총 셀 7의 배수)
   while (cells.length % 7 !== 0) {
     const last = cells[cells.length - 1].date;
     const d = new Date(last);
     d.setDate(d.getDate() + 1);
-    cells.push({ date: d, isOther: true });
+    cells.push({ date: d, key: _evDateKey(d), dow: d.getDay(), isOther: true });
   }
 
-  // 일자별 행사 매핑 (시작일~종료일 모든 날에 표시)
-  const evByDay = new Map(); // 'YYYY-MM-DD' -> [event...]
-  events.forEach(ev => {
-    if (filterCat && ev.category !== filterCat) return;
-    const start = ev.dateStart || ev.dateEnd;
-    const end   = ev.dateEnd   || ev.dateStart;
-    if (!start) return;
-    const sd = new Date(start + 'T00:00:00');
-    const ed = new Date((end || start) + 'T00:00:00');
-    for (let d = new Date(sd); d <= ed; d.setDate(d.getDate() + 1)) {
-      const k = _evDateKey(d);
-      if (!evByDay.has(k)) evByDay.set(k, []);
-      evByDay.get(k).push(ev);
-    }
+  // 주 단위 분할 (7개씩)
+  const weeks = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+
+  // 필터된 events
+  const visibleEvents = events.filter(ev => {
+    if (!filterCat) return true;
+    return (ev.site || ev.category) === filterCat;
   });
 
+  // 각 주마다 행사 막대 lane 패킹 (캘린더 탭의 buildWeekBars 와 동일)
+  function buildWeekBars(week) {
+    const weekStart = week[0].key;
+    const weekEnd   = week[week.length - 1].key;
+    const tasks = [];
+    visibleEvents.forEach(ev => {
+      const evStart = ev.dateStart || ev.dateEnd;
+      const evEnd   = ev.dateEnd   || ev.dateStart;
+      if (!evStart) return;
+      if (evEnd < weekStart || evStart > weekEnd) return;
+      const barStart = evStart < weekStart ? weekStart : evStart;
+      const barEnd   = evEnd   > weekEnd   ? weekEnd   : evEnd;
+      let startCol = -1, endCol = -1;
+      week.forEach((c, i) => {
+        if (c.key === barStart) startCol = i;
+        if (c.key === barEnd)   endCol   = i;
+      });
+      if (startCol < 0 || endCol < 0) return;
+      tasks.push({
+        ev, startCol, endCol,
+        showTitle: (evStart === barStart) || (startCol === 0),
+      });
+    });
+    // 정렬: 긴 행사 → 시작일 빠른 순
+    tasks.sort((a, b) => a.startCol - b.startCol || (b.endCol - b.startCol) - (a.endCol - a.startCol));
+    const lanes = [];
+    tasks.forEach(task => {
+      let placed = false;
+      for (let li = 0; li < lanes.length; li++) {
+        const conflict = lanes[li].some(r => !(task.endCol < r.startCol || task.startCol > r.endCol));
+        if (!conflict) {
+          lanes[li].push({ startCol: task.startCol, endCol: task.endCol });
+          task.lane = li;
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        task.lane = lanes.length;
+        lanes.push([{ startCol: task.startCol, endCol: task.endCol }]);
+      }
+    });
+    return { bars: tasks, laneCount: lanes.length };
+  }
+
   const today = _evDateKey(new Date());
-  grid.innerHTML = cells.map(cell => {
-    const k = _evDateKey(cell.date);
-    const dow = cell.date.getDay();
-    const isToday = k === today;
-    const dayEvents = evByDay.get(k) || [];
-    const dayNumColor = cell.isOther ? '#D1D5DB' : (dow === 0 ? '#E91E63' : (dow === 6 ? '#2196F3' : '#1A1A1A'));
-    const cellBg = cell.isOther ? '#FAFAFA' : '#FFFFFF';
-    const cellBorder = isToday ? '2px solid #1A1A1A' : '1px solid #F3F4F6';
-    const cards = dayEvents.slice(0, 4).map(ev => {
-      const c = _evCategoryColor(ev.category);
-      return `<div onclick="event.stopPropagation();openEditEventModal('${escHtml(ev.id)}')"
-                   class="cursor-pointer rounded-md px-1.5 py-1 mb-0.5 text-[10px] font-bold leading-tight truncate hover:opacity-80"
-                   style="background:${c.bg};color:${c.fg};"
-                   title="${escHtml(ev.title)}${ev.category ? ' · ' + escHtml(ev.category) : ''}">${escHtml(ev.title)}</div>`;
-    }).join('');
-    const moreCount = dayEvents.length > 4 ? `<div class="text-[10px] text-brand-gray font-bold pl-1">+${dayEvents.length - 4}건</div>` : '';
-    return `<div onclick="openAddEventModal('${k}')"
-                 class="cursor-pointer rounded-lg p-1.5 hover:bg-brand-bg/60 transition-colors flex flex-col gap-0.5"
-                 style="background:${cellBg};border:${cellBorder};min-height:110px;">
-      <div class="flex items-center justify-between mb-1">
-        <span class="text-xs font-bold" style="color:${dayNumColor};">${cell.date.getDate()}</span>
-        ${isToday ? '<span class="text-[9px] font-black text-white bg-brand-black rounded-full px-1.5 py-0.5">TODAY</span>' : ''}
-      </div>
-      ${cards}${moreCount}
-    </div>`;
-  }).join('');
+  const weekData = weeks.map(w => buildWeekBars(w));
+  const maxLanes = weekData.reduce((m, w) => Math.max(m, w.laneCount), 0);
+
+  // grid 초기화 — 주 단위로 그리기
+  grid.innerHTML = '';
+  grid.style.display = 'flex';
+  grid.style.flexDirection = 'column';
+  grid.style.gap = '4px';
+
+  weeks.forEach((week, wIdx) => {
+    const { bars } = weekData[wIdx];
+    const weekDiv = document.createElement('div');
+    weekDiv.className = 'ev-week';
+    weekDiv.style.cssText = `display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:28px repeat(${maxLanes},26px) 1fr;gap:4px;min-height:130px;`;
+
+    // 각 일자 셀 (전체 행 차지)
+    week.forEach((cell, idx) => {
+      const isToday = cell.key === today;
+      const dayNumColor = cell.isOther ? '#D1D5DB' : (cell.dow === 0 ? '#E91E63' : (cell.dow === 6 ? '#2196F3' : '#1A1A1A'));
+      const cellBg = cell.isOther ? '#FAFAFA' : '#FFFFFF';
+      const cellBorder = isToday ? '2px solid #1A1A1A' : '1px solid #F3F4F6';
+      const cellOpacity = cell.isOther ? '0.5' : '1';
+      const dayCell = document.createElement('div');
+      dayCell.style.cssText = `grid-column:${idx+1};grid-row:1/-1;background:${cellBg};border:${cellBorder};border-radius:10px;padding:8px;cursor:pointer;opacity:${cellOpacity};transition:background .12s;`;
+      dayCell.onmouseenter = () => { if (!cell.isOther) dayCell.style.background = '#FAFAFA'; };
+      dayCell.onmouseleave = () => { dayCell.style.background = cellBg; };
+      dayCell.onclick = () => openAddEventModal(cell.key);
+      dayCell.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:13px;font-weight:700;color:${dayNumColor};">${cell.date.getDate()}</span>
+        ${isToday ? '<span style="font-size:9px;font-weight:900;color:#fff;background:#1A1A1A;border-radius:999px;padding:2px 6px;">TODAY</span>' : ''}
+      </div>`;
+      weekDiv.appendChild(dayCell);
+    });
+
+    // 행사 막대 (여러 셀 가로지름)
+    bars.forEach(t => {
+      const c = _evCategoryColor(t.ev.site || t.ev.category);
+      const bar = document.createElement('div');
+      const colStart = t.startCol + 1;
+      const colEnd   = t.endCol + 2; // exclusive
+      const row      = t.lane + 2;
+      bar.style.cssText = `grid-column:${colStart}/${colEnd};grid-row:${row};background:${c.bg};color:${c.fg};border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;line-height:1;display:flex;align-items:center;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0 6px;z-index:2;position:relative;box-sizing:border-box;`;
+      bar.title = t.ev.title || '';
+      bar.onclick = (e) => { e.stopPropagation(); openEditEventModal(t.ev.id); };
+      bar.textContent = t.showTitle ? (t.ev.title || '') : '';
+      weekDiv.appendChild(bar);
+    });
+
+    grid.appendChild(weekDiv);
+  });
 }
 
 // 날짜를 MM.DD 로 포매팅
