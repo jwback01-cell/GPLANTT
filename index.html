@@ -765,6 +765,7 @@ tailwind.config = {
       <div class="flex gap-1 px-1">
         <button class="todo-tab-btn active" id="todo-tab-list" onclick="switchTodoTab('list')">목록</button>
         <button class="todo-tab-btn" id="todo-tab-calendar" onclick="switchTodoTab('calendar')">캘린더</button>
+        <button class="todo-tab-btn" id="todo-tab-events" onclick="switchTodoTab('events')">행사 내역</button>
       </div>
 
       <!-- List panel -->
@@ -874,6 +875,101 @@ tailwind.config = {
 
       <!-- Calendar day detail panel -->
       <div id="cal-detail-panel" class="hidden bg-white rounded-4xl panel p-6 md:p-8 shrink-0 relative"></div>
+
+      <!-- Events panel (행사 내역) -->
+      <div id="todo-events-panel" class="hidden bg-white rounded-4xl panel p-6 md:p-8 shrink-0">
+        <div class="flex items-center justify-between mb-5 flex-wrap gap-3">
+          <div class="flex items-center gap-3">
+            <button onclick="prevEventsMonth()" class="w-9 h-9 rounded-full bg-brand-bg hover:bg-brand-border flex items-center justify-center" title="이전 달">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <h2 id="events-month-label" class="text-[1.4rem] md:text-[1.6rem] font-bold tracking-tight">2026년 5월</h2>
+            <button onclick="nextEventsMonth()" class="w-9 h-9 rounded-full bg-brand-bg hover:bg-brand-border flex items-center justify-center" title="다음 달">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <button onclick="todayEventsMonth()" class="px-3 py-1.5 rounded-full bg-brand-bg border border-brand-border text-xs font-bold hover:bg-white">오늘</button>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <select id="events-category-filter" onchange="renderEventsCalendar()" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold outline-none focus:border-brand-black cursor-pointer">
+              <option value="">전체 카테고리</option>
+            </select>
+            <button onclick="openAddEventModal()" class="bg-brand-black text-white px-4 py-2 rounded-full text-sm font-bold hover:-translate-y-0.5 transition-transform shadow-md flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+              행사 추가
+            </button>
+          </div>
+        </div>
+        <!-- 요일 헤더 -->
+        <div class="grid grid-cols-7 gap-1 mb-2">
+          <div class="text-center text-xs font-bold text-brand-pink py-2">일</div>
+          <div class="text-center text-xs font-bold text-brand-gray py-2">월</div>
+          <div class="text-center text-xs font-bold text-brand-gray py-2">화</div>
+          <div class="text-center text-xs font-bold text-brand-gray py-2">수</div>
+          <div class="text-center text-xs font-bold text-brand-gray py-2">목</div>
+          <div class="text-center text-xs font-bold text-brand-gray py-2">금</div>
+          <div class="text-center text-xs font-bold text-brand-blue py-2">토</div>
+        </div>
+        <!-- 캘린더 그리드 -->
+        <div id="events-calendar-grid" class="grid grid-cols-7 gap-1"></div>
+        <!-- 안내 -->
+        <div class="mt-4 text-xs text-brand-gray text-center">행사 카드를 클릭하면 상세 정보를 보거나 편집할 수 있어요. 빈 셀을 클릭하면 해당 날짜로 새 행사를 추가합니다.</div>
+      </div>
+
+      <!-- 행사 추가/편집 모달 -->
+      <div id="event-modal-backdrop" class="todo-modal-backdrop hidden" onclick="if(event.target===event.currentTarget)closeEventModal()">
+        <div class="todo-modal" style="max-width:640px;">
+          <div class="px-6 md:px-8 pt-7 pb-3 flex items-center justify-between">
+            <h2 id="event-modal-title" class="text-[1.4rem] font-bold tracking-tight">행사 추가</h2>
+            <button onclick="closeEventModal()" class="text-brand-gray hover:text-brand-black"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+          <div class="px-6 md:px-8 pb-6 flex flex-col gap-4 overflow-y-auto" style="max-height:70vh;">
+            <div>
+              <label class="block text-xs font-bold text-brand-gray mb-1.5">행사 제목 <span class="text-brand-pink">*</span></label>
+              <input id="event-title" type="text" placeholder="예: 롯데온 04.06-04.19" class="drawer-input w-full">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-brand-gray mb-1.5">시작일 <span class="text-brand-pink">*</span></label>
+                <input id="event-date-start" type="date" class="drawer-input w-full">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-brand-gray mb-1.5">종료일</label>
+                <input id="event-date-end" type="date" class="drawer-input w-full">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-brand-gray mb-1.5">카테고리</label>
+              <input id="event-category" type="text" placeholder="예: 모니터, 노트북, 가전" list="event-category-suggestions" class="drawer-input w-full">
+              <datalist id="event-category-suggestions"></datalist>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-brand-gray mb-1.5">판매 수량</label>
+                <input id="event-qty" type="number" placeholder="0" class="drawer-input w-full">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-brand-gray mb-1.5">판매 매출 (원)</label>
+                <input id="event-revenue" type="number" placeholder="0" class="drawer-input w-full">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-brand-gray mb-1.5">행사 URL</label>
+              <input id="event-url" type="url" placeholder="https://" class="drawer-input w-full">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-brand-gray mb-1.5">행사 제품 / 메모</label>
+              <textarea id="event-products" rows="6" placeholder="제품 코드를 한 줄에 하나씩 적거나 자유롭게 메모하세요&#10;예:&#10;G242L850 E14&#10;MAG 274F" class="drawer-input w-full" style="resize:vertical;"></textarea>
+            </div>
+          </div>
+          <div class="px-6 md:px-8 py-4 border-t border-brand-border flex items-center justify-between gap-2">
+            <button id="event-delete-btn" onclick="deleteCurrentEvent()" class="px-5 py-2.5 rounded-full text-sm font-bold text-brand-pink hover:bg-brand-pink-light hidden">삭제</button>
+            <div class="flex gap-2 ml-auto">
+              <button onclick="closeEventModal()" class="px-5 py-2.5 rounded-full bg-white border border-brand-border text-sm font-bold hover:bg-brand-bg">취소</button>
+              <button onclick="submitEventModal()" class="px-5 py-2.5 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333]">저장</button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Completed list -->
       <div id="todo-completed-section" class="hidden bg-white rounded-4xl panel px-5 py-4 md:px-6 md:py-5 flex flex-col gap-3">
@@ -5086,6 +5182,7 @@ const GPLAN_SYNC_KEYS = [
   'gplan_ad_costs_v1',              // 광고비 업로드 데이터 (스마트스토어 A/B/C, 쿠팡 등)
   'gplan_returns_v1',               // 반품 데이터
   'gplan_stock_movements_v1',       // 재고 수불 이력 (입출고 로그)
+  'gplan_events_v1',                // 행사 내역 (할 일 페이지의 행사 캘린더)
   'kw_extra_products',              // 키워드 추가 상품
   'kw_naver_api',                   // 네이버 API 키
   'kw_rank_history',                // 키워드 순위 이력
@@ -16112,19 +16209,248 @@ let _calSelectedKey = null;
 
 function switchTodoTab(tab) {
   const isList = tab === 'list';
+  const isCal = tab === 'calendar';
+  const isEvents = tab === 'events';
   document.getElementById('todo-tab-list').classList.toggle('active', isList);
-  document.getElementById('todo-tab-calendar').classList.toggle('active', !isList);
+  document.getElementById('todo-tab-calendar').classList.toggle('active', isCal);
+  const evTabBtn = document.getElementById('todo-tab-events');
+  if (evTabBtn) evTabBtn.classList.toggle('active', isEvents);
   document.getElementById('todo-list-panel').classList.toggle('hidden', !isList);
-  document.getElementById('todo-calendar-panel').classList.toggle('hidden', isList);
+  document.getElementById('todo-calendar-panel').classList.toggle('hidden', !isCal);
+  const evPanel = document.getElementById('todo-events-panel');
+  if (evPanel) evPanel.classList.toggle('hidden', !isEvents);
   const _tn = new Date();
   const _tk = _tn.getFullYear() + '-' + String(_tn.getMonth()+1).padStart(2,'0') + '-' + String(_tn.getDate()).padStart(2,'0');
   document.getElementById('todo-completed-section').classList.toggle('hidden', !isList || todos.filter(t => t.completed && t.completedAt && t.completedAt.startsWith(_tk)).length === 0);
   const detPanel = document.getElementById('cal-detail-panel');
-  if (isList) {
+  if (!isCal) {
     detPanel.classList.add('hidden');
     _calSelectedKey = null;
   }
-  if (!isList) renderCalendar();
+  if (isCal) renderCalendar();
+  if (isEvents) renderEventsCalendar();
+}
+
+// ── 행사 내역 (Events) ──────────────────────────────────────
+const EVENTS_KEY = 'gplan_events_v1';
+let _eventsMonth = new Date().getMonth();
+let _eventsYear  = new Date().getFullYear();
+let _editingEventId = null;
+function _loadEvents() {
+  try { return JSON.parse(localStorage.getItem(EVENTS_KEY) || '[]') || []; }
+  catch (_) { return []; }
+}
+function _saveEvents(arr) {
+  try { localStorage.setItem(EVENTS_KEY, JSON.stringify(arr || [])); } catch(_) {}
+}
+function _evDateKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function _evNewId() { return 'ev_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function _evCategoryColor(cat) {
+  // 카테고리별 일관된 색상 — 해시 기반 분배
+  const palette = [
+    { bg: '#FCE7F3', fg: '#9D174D' }, // pink
+    { bg: '#DBEAFE', fg: '#1E40AF' }, // blue
+    { bg: '#D1FAE5', fg: '#065F46' }, // green
+    { bg: '#FED7AA', fg: '#9A3412' }, // orange
+    { bg: '#E9D5FF', fg: '#6B21A8' }, // purple
+    { bg: '#FEF3C7', fg: '#92400E' }, // yellow
+    { bg: '#CFFAFE', fg: '#155E75' }, // cyan
+  ];
+  if (!cat) return { bg: '#F3F4F6', fg: '#374151' };
+  let h = 0;
+  for (let i = 0; i < cat.length; i++) h = (h * 31 + cat.charCodeAt(i)) >>> 0;
+  return palette[h % palette.length];
+}
+
+function prevEventsMonth() {
+  _eventsMonth--;
+  if (_eventsMonth < 0) { _eventsMonth = 11; _eventsYear--; }
+  renderEventsCalendar();
+}
+function nextEventsMonth() {
+  _eventsMonth++;
+  if (_eventsMonth > 11) { _eventsMonth = 0; _eventsYear++; }
+  renderEventsCalendar();
+}
+function todayEventsMonth() {
+  const t = new Date();
+  _eventsMonth = t.getMonth();
+  _eventsYear  = t.getFullYear();
+  renderEventsCalendar();
+}
+
+function renderEventsCalendar() {
+  const monthLabel = document.getElementById('events-month-label');
+  if (monthLabel) monthLabel.textContent = `${_eventsYear}년 ${_eventsMonth + 1}월`;
+  const grid = document.getElementById('events-calendar-grid');
+  if (!grid) return;
+
+  const events = _loadEvents();
+
+  // 카테고리 필터 옵션 갱신
+  const catSel = document.getElementById('events-category-filter');
+  const allCats = [...new Set(events.map(e => e.category).filter(Boolean))].sort();
+  if (catSel) {
+    const cur = catSel.value;
+    catSel.innerHTML = '<option value="">전체 카테고리</option>'
+      + allCats.map(c => `<option value="${escHtml(c)}" ${c === cur ? 'selected' : ''}>${escHtml(c)}</option>`).join('');
+  }
+  const datalist = document.getElementById('event-category-suggestions');
+  if (datalist) datalist.innerHTML = allCats.map(c => `<option value="${escHtml(c)}"></option>`).join('');
+  const filterCat = catSel ? catSel.value : '';
+
+  // 해당 월 그리드 생성 — 첫째주 시작 일요일부터 마지막주 토요일까지
+  const firstDow = new Date(_eventsYear, _eventsMonth, 1).getDay();
+  const lastDate = new Date(_eventsYear, _eventsMonth + 1, 0).getDate();
+  const cells = [];
+  // 이전 달의 빈 셀 (첫째주 채우기)
+  for (let i = 0; i < firstDow; i++) {
+    const d = new Date(_eventsYear, _eventsMonth, 1 - (firstDow - i));
+    cells.push({ date: d, isOther: true });
+  }
+  for (let day = 1; day <= lastDate; day++) {
+    cells.push({ date: new Date(_eventsYear, _eventsMonth, day), isOther: false });
+  }
+  // 마지막주 채우기 (총 셀 7의 배수)
+  while (cells.length % 7 !== 0) {
+    const last = cells[cells.length - 1].date;
+    const d = new Date(last);
+    d.setDate(d.getDate() + 1);
+    cells.push({ date: d, isOther: true });
+  }
+
+  // 일자별 행사 매핑 (시작일~종료일 모든 날에 표시)
+  const evByDay = new Map(); // 'YYYY-MM-DD' -> [event...]
+  events.forEach(ev => {
+    if (filterCat && ev.category !== filterCat) return;
+    const start = ev.dateStart || ev.dateEnd;
+    const end   = ev.dateEnd   || ev.dateStart;
+    if (!start) return;
+    const sd = new Date(start + 'T00:00:00');
+    const ed = new Date((end || start) + 'T00:00:00');
+    for (let d = new Date(sd); d <= ed; d.setDate(d.getDate() + 1)) {
+      const k = _evDateKey(d);
+      if (!evByDay.has(k)) evByDay.set(k, []);
+      evByDay.get(k).push(ev);
+    }
+  });
+
+  const today = _evDateKey(new Date());
+  grid.innerHTML = cells.map(cell => {
+    const k = _evDateKey(cell.date);
+    const dow = cell.date.getDay();
+    const isToday = k === today;
+    const dayEvents = evByDay.get(k) || [];
+    const dayNumColor = cell.isOther ? '#D1D5DB' : (dow === 0 ? '#E91E63' : (dow === 6 ? '#2196F3' : '#1A1A1A'));
+    const cellBg = cell.isOther ? '#FAFAFA' : '#FFFFFF';
+    const cellBorder = isToday ? '2px solid #1A1A1A' : '1px solid #F3F4F6';
+    const cards = dayEvents.slice(0, 4).map(ev => {
+      const c = _evCategoryColor(ev.category);
+      return `<div onclick="event.stopPropagation();openEditEventModal('${escHtml(ev.id)}')"
+                   class="cursor-pointer rounded-md px-1.5 py-1 mb-0.5 text-[10px] font-bold leading-tight truncate hover:opacity-80"
+                   style="background:${c.bg};color:${c.fg};"
+                   title="${escHtml(ev.title)}${ev.category ? ' · ' + escHtml(ev.category) : ''}">${escHtml(ev.title)}</div>`;
+    }).join('');
+    const moreCount = dayEvents.length > 4 ? `<div class="text-[10px] text-brand-gray font-bold pl-1">+${dayEvents.length - 4}건</div>` : '';
+    return `<div onclick="openAddEventModal('${k}')"
+                 class="cursor-pointer rounded-lg p-1.5 hover:bg-brand-bg/60 transition-colors flex flex-col gap-0.5"
+                 style="background:${cellBg};border:${cellBorder};min-height:110px;">
+      <div class="flex items-center justify-between mb-1">
+        <span class="text-xs font-bold" style="color:${dayNumColor};">${cell.date.getDate()}</span>
+        ${isToday ? '<span class="text-[9px] font-black text-white bg-brand-black rounded-full px-1.5 py-0.5">TODAY</span>' : ''}
+      </div>
+      ${cards}${moreCount}
+    </div>`;
+  }).join('');
+}
+
+function openAddEventModal(dateKey) {
+  _editingEventId = null;
+  document.getElementById('event-modal-title').textContent = '행사 추가';
+  document.getElementById('event-delete-btn').classList.add('hidden');
+  // 폼 초기화
+  document.getElementById('event-title').value = '';
+  document.getElementById('event-date-start').value = dateKey || '';
+  document.getElementById('event-date-end').value = '';
+  document.getElementById('event-category').value = '';
+  document.getElementById('event-qty').value = '';
+  document.getElementById('event-revenue').value = '';
+  document.getElementById('event-url').value = '';
+  document.getElementById('event-products').value = '';
+  // 모달 열기
+  const bd = document.getElementById('event-modal-backdrop');
+  bd.classList.remove('hidden');
+  bd.classList.add('open');
+  setTimeout(() => document.getElementById('event-title')?.focus(), 80);
+}
+function openEditEventModal(id) {
+  const ev = _loadEvents().find(e => e.id === id);
+  if (!ev) return;
+  _editingEventId = id;
+  document.getElementById('event-modal-title').textContent = '행사 편집';
+  document.getElementById('event-delete-btn').classList.remove('hidden');
+  document.getElementById('event-title').value = ev.title || '';
+  document.getElementById('event-date-start').value = ev.dateStart || '';
+  document.getElementById('event-date-end').value = ev.dateEnd || '';
+  document.getElementById('event-category').value = ev.category || '';
+  document.getElementById('event-qty').value = ev.qty || '';
+  document.getElementById('event-revenue').value = ev.revenue || '';
+  document.getElementById('event-url').value = ev.url || '';
+  document.getElementById('event-products').value = ev.products || '';
+  const bd = document.getElementById('event-modal-backdrop');
+  bd.classList.remove('hidden');
+  bd.classList.add('open');
+  setTimeout(() => document.getElementById('event-title')?.focus(), 80);
+}
+function closeEventModal() {
+  const bd = document.getElementById('event-modal-backdrop');
+  bd.classList.add('hidden');
+  bd.classList.remove('open');
+  _editingEventId = null;
+}
+function submitEventModal() {
+  const title = document.getElementById('event-title').value.trim();
+  const dateStart = document.getElementById('event-date-start').value;
+  const dateEnd = document.getElementById('event-date-end').value;
+  if (!title) { alert('행사 제목을 입력해 주세요.'); document.getElementById('event-title').focus(); return; }
+  if (!dateStart) { alert('시작일을 선택해 주세요.'); document.getElementById('event-date-start').focus(); return; }
+  if (dateEnd && dateEnd < dateStart) { alert('종료일은 시작일보다 빠를 수 없어요.'); return; }
+  const events = _loadEvents();
+  const data = {
+    title,
+    dateStart,
+    dateEnd: dateEnd || dateStart,
+    category: document.getElementById('event-category').value.trim(),
+    qty: Number(document.getElementById('event-qty').value) || 0,
+    revenue: Number(document.getElementById('event-revenue').value) || 0,
+    url: document.getElementById('event-url').value.trim(),
+    products: document.getElementById('event-products').value,
+  };
+  if (_editingEventId) {
+    const idx = events.findIndex(e => e.id === _editingEventId);
+    if (idx >= 0) {
+      events[idx] = { ...events[idx], ...data, updatedAt: new Date().toISOString() };
+    }
+  } else {
+    events.push({
+      id: _evNewId(),
+      ...data,
+      createdAt: new Date().toISOString(),
+    });
+  }
+  _saveEvents(events);
+  closeEventModal();
+  renderEventsCalendar();
+}
+function deleteCurrentEvent() {
+  if (!_editingEventId) return;
+  if (!confirm('이 행사를 삭제할까요?')) return;
+  const events = _loadEvents().filter(e => e.id !== _editingEventId);
+  _saveEvents(events);
+  closeEventModal();
+  renderEventsCalendar();
 }
 
 function prevMonth() {
