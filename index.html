@@ -15277,6 +15277,24 @@ function renderDailyTab() {
   });
   days.sort((a, b) => a.date.localeCompare(b.date));
 
+  // 매출 없는 날의 광고비를 다음 매출 있는 날로 이월
+  // (예: 토/일 매출 0 → 광고비 carry → 월요일에 합산)
+  let _adCarry = 0;
+  days.forEach(d => {
+    const noSales = (d.count === 0 && (d.sales || 0) === 0);
+    if (noSales) {
+      _adCarry += (d.adCost || 0);
+      d.adCost = 0;
+    } else {
+      d.adCost = (d.adCost || 0) + _adCarry;
+      _adCarry = 0;
+    }
+  });
+  // 끝까지 매출 없는 날만 이어지면 마지막 행에 남김 (광고비 누락 방지)
+  if (_adCarry > 0 && days.length) {
+    days[days.length - 1].adCost = (days[days.length - 1].adCost || 0) + _adCarry;
+  }
+
   // KPI 집계
   const kpiSum = days.reduce((a, d) => {
     a.sales += d.sales; a.cost += d.cost; a.shipCost += d.shipCost;
