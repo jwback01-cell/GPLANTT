@@ -913,6 +913,10 @@ tailwind.config = {
             <select id="events-category-filter" onchange="renderEventsCalendar()" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold outline-none focus:border-brand-black cursor-pointer">
               <option value="">전체 사이트</option>
             </select>
+            <button onclick="exportEventsAsText()" class="bg-white border border-brand-border text-brand-black px-4 py-2 rounded-full text-sm font-bold hover:bg-brand-bg flex items-center gap-1.5" title="현재 달의 행사 목록을 메모장(.txt)으로 내보내기">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              내보내기
+            </button>
             <button onclick="openAddEventModal()" class="bg-brand-black text-white px-4 py-2 rounded-full text-sm font-bold hover:-translate-y-0.5 transition-transform shadow-md flex items-center gap-1.5">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
               행사 추가
@@ -16749,6 +16753,54 @@ function deleteCurrentEvent() {
   _saveEvents(events);
   closeEventModal();
   renderEventsCalendar();
+}
+
+// 현재 표시 중인 달의 행사들을 .txt 파일로 내보내기
+// 형식:  {title}\n{products}\n\n{title}\n{products}\n\n...
+function exportEventsAsText() {
+  const events = _loadEvents();
+  // 현재 달과 겹치는 행사만 (시작일 ≤ 월말 AND 종료일 ≥ 월초)
+  const monthStart = `${_eventsYear}-${String(_eventsMonth + 1).padStart(2,'0')}-01`;
+  const lastDay = new Date(_eventsYear, _eventsMonth + 1, 0).getDate();
+  const monthEnd = `${_eventsYear}-${String(_eventsMonth + 1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+  const catSel = document.getElementById('events-category-filter');
+  const filterCat = catSel ? catSel.value : '';
+
+  const visible = events.filter(ev => {
+    const start = ev.dateStart || ev.dateEnd;
+    const end   = ev.dateEnd   || ev.dateStart;
+    if (!start) return false;
+    if (end < monthStart || start > monthEnd) return false;
+    if (filterCat && (ev.site || ev.category) !== filterCat) return false;
+    return true;
+  });
+
+  if (!visible.length) {
+    alert('현재 달에 내보낼 행사가 없습니다.');
+    return;
+  }
+
+  // 시작일 오름차순 정렬
+  visible.sort((a, b) => String(a.dateStart || '').localeCompare(String(b.dateStart || '')));
+
+  // 각 행사 = 제목 + 빈 줄 + 행사 제품 메모, 행사 사이는 빈 줄
+  const text = visible.map(ev => {
+    const title = ev.title || '';
+    const products = (ev.products || '').trim();
+    return products ? `${title}\n${products}` : title;
+  }).join('\n\n');
+
+  // .txt 파일로 다운로드 — UTF-8 BOM 포함 (메모장이 한글 잘 읽도록)
+  const BOM = '﻿';
+  const blob = new Blob([BOM + text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = `${_eventsYear}-${String(_eventsMonth + 1).padStart(2,'0')}`;
+  a.href = url;
+  a.download = `행사내역_${stamp}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
 }
 
 function prevMonth() {
