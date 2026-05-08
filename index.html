@@ -15803,16 +15803,24 @@ function applyDetailRange(tab) {
   // 피커 닫기
   toggleRangePicker(tab);
 
-  // 해당 기간 데이터로 렌더링
-  if (tab === 'product')       renderProductTab(0, idxs);
-  else if (tab === 'supplier') renderSupplierTab(0, idxs);
-  else if (tab === 'channel')  renderChannelTab(0, idxs);
-  else if (tab === 'analysis') renderAnalysisTab(0, idxs);
+  // 해당 기간 데이터로 렌더링 — idxs 대신 정확한 날짜 범위 전달
+  const dateRange = { start: startVal, end: endVal };
+  if (tab === 'product')       renderProductTab(0, dateRange);
+  else if (tab === 'supplier') renderSupplierTab(0, dateRange);
+  else if (tab === 'channel')  renderChannelTab(0, dateRange);
+  else if (tab === 'analysis') renderAnalysisTab(0, dateRange);
 }
 
-// 장부 입력 데이터를 월(m)로 필터 (0=전체, 1=1월, ...)
-function _filterEntriesByMonth(m) {
+// 장부 입력 데이터를 월(m) 또는 날짜 범위로 필터
+// range = { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD' } 가 있으면 정확한 범위로 필터 (월 무시)
+function _filterEntriesByMonth(m, range) {
   if (!_ledgerEntries || !_ledgerEntries.length) return null;
+  if (range && range.start && range.end) {
+    return _ledgerEntries.filter(r => {
+      const d = String(r['날짜'] || '').slice(0, 10);
+      return d >= range.start && d <= range.end;
+    });
+  }
   if (m === 0) return _ledgerEntries;
   return _ledgerEntries.filter(r => {
     const d = r['날짜'] || '';
@@ -15821,8 +15829,8 @@ function _filterEntriesByMonth(m) {
   });
 }
 
-function _getProductRowsFromEntries(m) {
-  const entries = _filterEntriesByMonth(m);
+function _getProductRowsFromEntries(m, range) {
+  const entries = _filterEntriesByMonth(m, range);
   if (!entries || !entries.length) return null;
   const map = {};
   entries.forEach(r => {
@@ -15841,8 +15849,8 @@ function _getProductRowsFromEntries(m) {
   })).sort((a, b) => b.profit - a.profit);
 }
 
-function _getSupplierRowsFromEntries(m) {
-  const entries = _filterEntriesByMonth(m);
+function _getSupplierRowsFromEntries(m, range) {
+  const entries = _filterEntriesByMonth(m, range);
   if (!entries || !entries.length) return null;
   const map = {};
   entries.forEach(r => {
@@ -15856,8 +15864,8 @@ function _getSupplierRowsFromEntries(m) {
   return Object.values(map).sort((a, b) => b.amount - a.amount);
 }
 
-function _getChannelRowsFromEntries(m) {
-  const entries = _filterEntriesByMonth(m);
+function _getChannelRowsFromEntries(m, range) {
+  const entries = _filterEntriesByMonth(m, range);
   if (!entries || !entries.length) return null;
   const map = {};
   entries.forEach(r => {
@@ -15876,16 +15884,19 @@ function _getChannelRowsFromEntries(m) {
   })).sort((a, b) => b.sales - a.sales);
 }
 
-function renderProductTab(m, idxs) {
-  const entryRows = _getProductRowsFromEntries(m);
+function renderProductTab(m, rangeOrIdxs) {
+  // 두 번째 인자가 {start,end} 객체면 직접 선택 모드, 배열이면 구버전 idxs (사용 안 함)
+  const range = (rangeOrIdxs && typeof rangeOrIdxs === 'object' && !Array.isArray(rangeOrIdxs))
+    ? rangeOrIdxs : null;
+  const entryRows = _getProductRowsFromEntries(m, range);
   const rows = entryRows || [];
   const totalSales = rows.reduce((s,r) => s + r.sales, 0);
   const totalProfit = rows.reduce((s,r) => s + r.profit, 0);
   const avgMargin = totalSales > 0 ? +(totalProfit / totalSales * 100).toFixed(1) : 0;
   const best = rows[0];
 
-  // 광고비 합계 (선택 기간 전체)
-  const _range = (typeof _monthRangeFromIdx === 'function') ? _monthRangeFromIdx(m) : null;
+  // 광고비 합계 (선택 기간) — range 우선, 없으면 월 인덱스로
+  const _range = range || ((typeof _monthRangeFromIdx === 'function') ? _monthRangeFromIdx(m) : null);
   const totalAd = (_range && typeof _adCostSumInRange === 'function') ? _adCostSumInRange(_range.start, _range.end) : 0;
 
   document.getElementById('product-kpi').innerHTML = [
@@ -16015,15 +16026,16 @@ function filterProductTable() {
   }
 }
 
-function renderSupplierTab(m, idxs) {
-  const entryRows = _getSupplierRowsFromEntries(m);
+function renderSupplierTab(m, rangeOrIdxs) {
+  const range = (rangeOrIdxs && typeof rangeOrIdxs === 'object' && !Array.isArray(rangeOrIdxs)) ? rangeOrIdxs : null;
+  const entryRows = _getSupplierRowsFromEntries(m, range);
   // 실제 입력 데이터가 없으면 빈 배열 (하드코딩 샘플로 폴백하지 않음)
   const rows = entryRows || [];
   const totalAmount = rows.reduce((s,r) => s + r.amount, 0);
   const top = rows[0];
 
   // 광고비 — 매입처와 직접 매핑은 어려워서 기간 합계만 표시
-  const _range = (typeof _monthRangeFromIdx === 'function') ? _monthRangeFromIdx(m) : null;
+  const _range = range || ((typeof _monthRangeFromIdx === 'function') ? _monthRangeFromIdx(m) : null);
   const totalAd = (_range && typeof _adCostSumInRange === 'function') ? _adCostSumInRange(_range.start, _range.end) : 0;
 
   document.getElementById('supplier-kpi').innerHTML = [
@@ -16070,12 +16082,13 @@ function renderSupplierTab(m, idxs) {
   }
 }
 
-function renderChannelTab(m, idxs) {
-  const entryRows = _getChannelRowsFromEntries(m);
+function renderChannelTab(m, rangeOrIdxs) {
+  const range = (rangeOrIdxs && typeof rangeOrIdxs === 'object' && !Array.isArray(rangeOrIdxs)) ? rangeOrIdxs : null;
+  const entryRows = _getChannelRowsFromEntries(m, range);
   // 실제 입력 데이터가 없으면 빈 배열 (하드코딩 샘플로 폴백하지 않음)
   const rows = entryRows || [];
-  // 채널별 광고비 attach — 월(0=전체) 또는 idxs(직접선택 기간) 기준
-  const _range = (typeof _monthRangeFromIdx === 'function') ? _monthRangeFromIdx(m) : null;
+  // 채널별 광고비 attach — 월(0=전체) 또는 직접 선택 기간 기준
+  const _range = range || ((typeof _monthRangeFromIdx === 'function') ? _monthRangeFromIdx(m) : null);
   rows.forEach(r => {
     r.adCost = (typeof _adCostForChannel === 'function' && _range)
       ? _adCostForChannel(r.name, _range.start, _range.end) : 0;
@@ -16150,14 +16163,15 @@ function renderChannelTab(m, idxs) {
   }
 }
 
-function renderAnalysisTab(m, idxs) {
+function renderAnalysisTab(m, rangeOrIdxs) {
+  const range = (rangeOrIdxs && typeof rangeOrIdxs === 'object' && !Array.isArray(rangeOrIdxs)) ? rangeOrIdxs : null;
   // 실제 입력 데이터가 없으면 빈 배열 (하드코딩 샘플로 폴백하지 않음)
-  const pRows = _getProductRowsFromEntries(m) || [];
-  const cRows = _getChannelRowsFromEntries(m) || [];
+  const pRows = _getProductRowsFromEntries(m, range) || [];
+  const cRows = _getChannelRowsFromEntries(m, range) || [];
   const totalSales  = cRows.reduce((s,r) => s + r.sales, 0);
   const totalProfit = pRows.reduce((s,r) => s + r.profit, 0);
-  // 광고비 — 월별/전체 모두 _monthRangeFromIdx 로 계산
-  const _range = (typeof _monthRangeFromIdx === 'function') ? _monthRangeFromIdx(m) : null;
+  // 광고비 — 직접 선택 우선, 없으면 월 인덱스 기준
+  const _range = range || ((typeof _monthRangeFromIdx === 'function') ? _monthRangeFromIdx(m) : null);
   const totalAd = (_range && typeof _adCostSumInRange === 'function')
     ? _adCostSumInRange(_range.start, _range.end) : 0;
   const totalReal = totalProfit - totalAd;
