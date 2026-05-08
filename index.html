@@ -16926,25 +16926,77 @@ const CPS_SHIP_COLS = [
   '발생비용(A)','할인가(B)','할인적용가(A-B)','추가비용','최종비용'
 ];
 
-// 시트에서 헤더 행을 찾고 행 객체로 변환
+// 시트에서 헤더 행을 찾고 행 객체로 변환 (헤더가 두 행에 걸친 케이스 처리)
 function _cpsParseSheet(ws, expectedCols) {
   const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
   if (!aoa.length) return [];
-  // 헤더 행 자동 탐지 — 첫 30행 안에서 expectedCols 의 핵심 키워드(주문ID/배송ID 등)가 보이는 행
+  // 헤더 행 자동 탐지 — 주문ID + 배송ID 가 있는 행
   let headerIdx = -1;
   for (let i = 0; i < Math.min(aoa.length, 30); i++) {
     const r = (aoa[i] || []).map(c => String(c || '').replace(/\s+/g,''));
     if (r.includes('주문ID') && r.includes('배송ID')) { headerIdx = i; break; }
   }
   if (headerIdx < 0) return [];
-  const header = aoa[headerIdx].map(c => String(c || '').trim());
+
+  const row1 = (aoa[headerIdx]   || []).map(c => String(c || '').trim());
+  const row2 = (aoa[headerIdx+1] || []).map(c => String(c || '').trim());
+
+  // 두 번째 행이 sub-header 인지 판정 — 1차/2차/발생비용(A)/할인가(B)/할인적용가(A-B) 같은 토큰이 보이면
+  const SUB_TOKENS = ['1차','2차','발생비용(A)','할인가(B)','할인적용가(A-B)','발생비용','할인가','할인적용가','발생비용 (A)','할인가 (B)','할인적용가 (A-B)'];
+  const _norm = s => String(s || '').replace(/\s+/g,'');
+  const row2Norm = row2.map(_norm);
+  const subTokensNorm = SUB_TOKENS.map(_norm);
+  const isSubHeader = row2Norm.some(c => subTokensNorm.includes(c));
+
+  let header, dataStart;
+  if (isSubHeader) {
+    // 행 1 의 개별 헤더가 비어있고 행 2 에 값이 있으면 행 2 사용
+    // 그룹 헤더(카테고리/쿠팡물류... 등) + sub(1차/2차/발생비용...) → sub 우선
+    header = row1.map((h, i) => {
+      const sub = row2[i] || '';
+      if (!h && sub) return sub;
+      if (sub && /(카테고리|쿠팡|풀필먼트|입출고비|배송비|서비스)/.test(h)) {
+        // 그룹 헤더 위에 있으면 sub 가 진짜 헤더
+        return sub;
+      }
+      return h;
+    });
+    dataStart = headerIdx + 2;
+  } else {
+    header = row1;
+    dataStart = headerIdx + 1;
+  }
+
+  // 헤더 별칭 정규화 — 공백/괄호 차이가 있어도 표준 컬럼명으로 매핑
+  const ALIAS = {
+    '발생비용': '발생비용(A)',
+    '발생비용(a)': '발생비용(A)',
+    '발생비용a': '발생비용(A)',
+    '할인가': '할인가(B)',
+    '할인가(b)': '할인가(B)',
+    '할인가b': '할인가(B)',
+    '할인적용가': '할인적용가(A-B)',
+    '할인적용가(a-b)': '할인적용가(A-B)',
+    '할인적용가ab': '할인적용가(A-B)',
+    '1차': '카테고리(1차)',
+    '2차': '카테고리(2차)',
+    '카테고리1차': '카테고리(1차)',
+    '카테고리2차': '카테고리(2차)',
+    '카테고리(1차)': '카테고리(1차)',
+    '카테고리(2차)': '카테고리(2차)',
+  };
+  const headerCanon = header.map(h => {
+    const n = String(h || '').replace(/\s+/g,'').toLowerCase();
+    return ALIAS[n] || h;
+  });
+
   const rows = [];
-  for (let i = headerIdx + 1; i < aoa.length; i++) {
+  for (let i = dataStart; i < aoa.length; i++) {
     const row = aoa[i] || [];
     const allEmpty = row.every(c => String(c || '').trim() === '');
     if (allEmpty) continue;
     const o = {};
-    header.forEach((h, ci) => { if (h) o[h] = row[ci] != null ? row[ci] : ''; });
+    headerCanon.forEach((h, ci) => { if (h) o[h] = row[ci] != null ? row[ci] : ''; });
     // 합계 행 같은 것 거르기 (주문ID 가 비어있으면 스킵)
     if (!String(o['주문ID'] || '').trim()) continue;
     rows.push(o);
