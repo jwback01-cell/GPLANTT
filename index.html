@@ -304,46 +304,64 @@ tailwind.config = {
   .todo-tab-btn:not(.active):hover { background: #F2F2F7; color: #1A1A1A; }
 
   /* ── Calendar ── */
-  .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+  .cal-header-left { display: flex; align-items: center; gap: 12px; }
   .cal-nav-btn {
     width: 36px; height: 36px; border-radius: 50%;
-    border: 1.5px solid #F2F2F7; background: white;
+    border: none; background: #F9F9FB;
     cursor: pointer; display: flex; align-items: center; justify-content: center;
     transition: all .2s; color: #1A1A1A;
   }
-  .cal-nav-btn:hover { background: #1A1A1A; color: white; border-color: #1A1A1A; }
-  .cal-dow-row { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); border-bottom: 1px solid #E5E7EB; }
-  .cal-dow { text-align: center; font-size: 11px; font-weight: 600; color: #5F6368; padding: 8px 0; letter-spacing: 0.02em; }
-  .cal-weeks { display: flex; flex-direction: column; border-left: 1px solid #E5E7EB; border-top: 1px solid #E5E7EB; }
-  .cal-week  { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); }
+  .cal-nav-btn:hover { background: #E5E7EB; }
+  .cal-today-btn {
+    padding: 6px 12px; border-radius: 999px;
+    background: #F9F9FB; border: 1px solid #E5E7EB;
+    font-size: 12px; font-weight: 700; cursor: pointer;
+  }
+  .cal-today-btn:hover { background: #fff; }
+  .cal-dow-row {
+    display: grid; grid-template-columns: repeat(7, minmax(0,1fr));
+    margin-bottom: 8px;
+  }
+  .cal-dow { text-align: center; font-size: 12px; font-weight: 700; color: #5F6368; padding: 8px 0; letter-spacing: 0.02em; }
+  .cal-dow.dow-sun { color: #E91E63; }
+  .cal-dow.dow-sat { color: #2196F3; }
+  .cal-weeks { display: flex; flex-direction: column; gap: 4px; }
+  .cal-week  { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 4px; }
   .cal-day {
     grid-row: 1 / -1;
-    padding: 4px 6px 6px;
-    border-right: 1px solid #E5E7EB;
-    border-bottom: 1px solid #E5E7EB;
+    padding: 8px 8px 8px;
+    border-radius: 10px;
+    border: 1px solid #F3F4F6;
     transition: background .12s;
     position: relative; z-index: 0;
     background: #fff;
+    min-height: 110px;
+    display: flex; flex-direction: column;
   }
   .cal-day:not(.cal-day--empty) { cursor: pointer; }
-  .cal-day:not(.cal-day--empty):hover { background: #F8F9FA; }
-  .cal-day--empty { background: #FAFBFC; pointer-events: none; }
+  .cal-day:not(.cal-day--empty):hover { background: #FAFAFA; }
+  .cal-day--empty { background: #FAFAFA; pointer-events: none; opacity: 0.5; }
+  .cal-day--today { border: 2px solid #1A1A1A; padding: 7px 7px 7px; }
   .cal-day--selected { background: #F1F3F4 !important; box-shadow: inset 0 0 0 2px #1A73E8; }
+  .cal-day-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; min-height: 18px; }
   .cal-day-num {
-    font-size: 12px; font-weight: 500; color: #3C4043; line-height: 1;
-    display: inline-flex; align-items: center; justify-content: center;
-    min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px;
-    margin-bottom: 2px;
+    font-size: 13px; font-weight: 700; color: #1A1A1A; line-height: 1;
+    display: inline-flex; align-items: center; padding: 0 2px;
   }
-  .cal-day--today .cal-day-num {
-    background: #1A73E8; color: #fff; font-weight: 600;
+  .cal-day-num.dow-sun { color: #E91E63; }
+  .cal-day-num.dow-sat { color: #2196F3; }
+  .cal-day-num.is-other { color: #D1D5DB; }
+  .cal-day-today-badge {
+    font-size: 9px; font-weight: 900; color: #fff; background: #1A1A1A;
+    border-radius: 999px; padding: 2px 6px; line-height: 1;
   }
   .cal-bar {
-    height: 20px; padding: 2px 8px; border-radius: 4px;
-    font-size: 11px; font-weight: 500;
+    height: 22px; padding: 3px 8px; border-radius: 6px;
+    font-size: 11px; font-weight: 700;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     position: relative; z-index: 2; align-self: center;
-    margin: 1px 2px; pointer-events: auto; cursor: grab;
+    margin: 1px 0; pointer-events: auto; cursor: grab;
     display: flex; align-items: center; line-height: 1;
     user-select: none;
   }
@@ -16460,6 +16478,14 @@ function prevMonth() {
   document.getElementById('cal-detail-panel').classList.add('hidden');
   renderCalendar();
 }
+function todayCalendar() {
+  const t = new Date();
+  calMonth = t.getMonth();
+  calYear  = t.getFullYear();
+  _calSelectedKey = null;
+  document.getElementById('cal-detail-panel').classList.add('hidden');
+  renderCalendar();
+}
 
 function nextMonth() {
   calMonth++;
@@ -16573,19 +16599,22 @@ function renderCalendar() {
   }
 
   let html = `<div class="cal-header">
-    <button class="cal-nav-btn" onclick="prevMonth()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-    </button>
-    <div class="font-bold text-[1.05rem]">${calYear}년 ${MONTHS[calMonth]}</div>
-    <button class="cal-nav-btn" onclick="nextMonth()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-    </button>
+    <div class="cal-header-left">
+      <button class="cal-nav-btn" onclick="prevMonth()" title="이전 달">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <h2 class="text-[1.4rem] md:text-[1.6rem] font-bold tracking-tight">${calYear}년 ${MONTHS[calMonth]}</h2>
+      <button class="cal-nav-btn" onclick="nextMonth()" title="다음 달">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <button class="cal-today-btn" onclick="todayCalendar()">오늘</button>
+    </div>
   </div>
   <div class="cal-dow-row">`;
 
   DAYS.forEach((d, i) => {
-    const color = i === 0 ? 'color:#E91E63' : (i === 6 ? 'color:#2196F3' : '');
-    html += `<div class="cal-dow" style="${color}">${d}</div>`;
+    const dowCls = i === 0 ? 'dow-sun' : (i === 6 ? 'dow-sat' : '');
+    html += `<div class="cal-dow ${dowCls}">${d}</div>`;
   });
   html += `</div><div class="cal-weeks">`;
 
@@ -16595,8 +16624,9 @@ function renderCalendar() {
 
   weeks.forEach((week, wIdx) => {
     const { bars } = weekData[wIdx];
-    const rows = `26px repeat(${Math.max(maxLanes,0)}, 22px) 1fr`;
-    html += `<div class="cal-week" style="grid-template-rows:${rows}; min-height:180px;">`;
+    // 헤더(28px) + lane * 24px + 여유 1fr
+    const rows = `28px repeat(${Math.max(maxLanes,0)}, 24px) 1fr`;
+    html += `<div class="cal-week" style="grid-template-rows:${rows}; min-height:130px;">`;
 
     // 날짜 셀
     week.forEach((cell, idx) => {
@@ -16609,9 +16639,14 @@ function renderCalendar() {
       let cls = 'cal-day';
       if (isToday) cls += ' cal-day--today';
       if (isSel)   cls += ' cal-day--selected';
-      const numColor = isToday ? '' : (cell.dow === 0 ? 'color:#D93025' : (cell.dow === 6 ? 'color:#1A73E8' : ''));
-      const dayLabel = (cell.day === 1) ? `${calMonth+1}월 1일` : cell.day;
-      html += `<div class="${cls}" style="grid-column:${idx+1};" onclick="selectCalDay('${cell.key}')" ondragover="calDayDragOver(event,this)" ondragleave="calDayDragLeave(this)" ondrop="calDayDrop(event,'${cell.key}',this)"><div class="cal-day-num" style="${numColor}">${dayLabel}</div></div>`;
+      const numCls = cell.dow === 0 ? 'dow-sun' : (cell.dow === 6 ? 'dow-sat' : '');
+      const todayBadge = isToday ? '<span class="cal-day-today-badge">TODAY</span>' : '';
+      html += `<div class="${cls}" style="grid-column:${idx+1};" onclick="selectCalDay('${cell.key}')" ondragover="calDayDragOver(event,this)" ondragleave="calDayDragLeave(this)" ondrop="calDayDrop(event,'${cell.key}',this)">
+        <div class="cal-day-header">
+          <span class="cal-day-num ${numCls}">${cell.day}</span>
+          ${todayBadge}
+        </div>
+      </div>`;
     });
 
     // 업무 바 (여러 셀에 걸쳐 표시)
