@@ -303,6 +303,22 @@ tailwind.config = {
   .todo-tab-btn.active { background: #1A1A1A; color: white; }
   .todo-tab-btn:not(.active):hover { background: #F2F2F7; color: #1A1A1A; }
 
+  /* ── DataOps tabs ── */
+  .dataops-tab-btn {
+    padding: 8px 18px; border-radius: 20px; font-size: 13px; font-weight: 700;
+    cursor: pointer; transition: all .2s; color: #8E8E93;
+    background: transparent; border: 1px solid #E5E7EB; font-family: inherit;
+  }
+  .dataops-tab-btn.active { background: #1A1A1A; color: white; border-color: #1A1A1A; }
+  .dataops-tab-btn:not(.active):hover { background: #F2F2F7; color: #1A1A1A; }
+  .cps-sheet-btn {
+    padding: 6px 16px; border-radius: 14px; font-size: 12px; font-weight: 700;
+    cursor: pointer; transition: all .2s; color: #8E8E93;
+    background: #F9FAFB; border: 1px solid #E5E7EB; font-family: inherit;
+  }
+  .cps-sheet-btn.active { background: #1A73E8; color: white; border-color: #1A73E8; }
+  .cps-sheet-btn:not(.active):hover { background: #F2F2F7; color: #1A1A1A; }
+
   /* ── Calendar ── */
   .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
   .cal-header-left { display: flex; align-items: center; gap: 12px; }
@@ -5138,13 +5154,76 @@ PBT키캡	1180
         <p class="text-brand-gray text-base md:text-[1.1rem]">엑셀·CSV 파일을 가공하고 변환하는 작업을 한 곳에서 관리하세요.</p>
       </section>
 
-      <section class="bg-white rounded-4xl panel p-8 md:p-12 flex flex-col items-center justify-center text-center gap-4" style="min-height:400px;">
-        <div class="w-20 h-20 rounded-3xl flex items-center justify-center bg-gradient-to-br from-brand-blue-light to-brand-green-light">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2196F3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>
+      <!-- 도구 선택 탭 -->
+      <div class="flex gap-2 px-1 flex-wrap">
+        <button class="dataops-tab-btn active" data-dt="coupang-settle" onclick="switchDataopsTab('coupang-settle')">📦 쿠팡 정산 합산</button>
+      </div>
+
+      <!-- 쿠팡 정산 합산 도구 -->
+      <section id="dt-coupang-settle" class="dataops-panel bg-white rounded-4xl panel p-6 md:p-8 flex flex-col gap-5">
+        <div>
+          <h2 class="text-xl font-bold tracking-tight mb-1">쿠팡 정산 엑셀 합산</h2>
+          <p class="text-sm text-brand-gray">쿠팡 다운로드 엑셀(시트: <b>입출고비</b>, <b>배송비</b>) 여러 개를 한꺼번에 합쳐서 보고 다운로드합니다.</p>
         </div>
-        <h2 class="text-2xl font-bold tracking-tight">데이터 가공 도구 준비 중</h2>
-        <p class="text-brand-gray max-w-md">엑셀 변환 · 거래원장 대조 · 양식 일괄 매핑 등 데이터 가공 기능이 이곳에 추가됩니다.</p>
-        <div class="text-xs text-brand-gray mt-2">필요한 기능을 알려주시면 메뉴에 추가해 드릴게요.</div>
+        <!-- 업로드 영역 -->
+        <div id="cps-drop" class="border-2 border-dashed border-brand-border rounded-3xl p-8 text-center cursor-pointer hover:bg-brand-bg/40 transition-colors" onclick="document.getElementById('cps-files').click()">
+          <input id="cps-files" type="file" accept=".xlsx,.xls" multiple class="hidden" onchange="cpsHandleFiles(this.files)">
+          <div class="flex flex-col items-center gap-2">
+            <div class="w-14 h-14 rounded-3xl bg-brand-blue-light flex items-center justify-center">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2196F3" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <div class="font-bold">엑셀 파일을 끌어다 놓거나 클릭해서 선택 (.xlsx / .xls)</div>
+            <div class="text-xs text-brand-gray">한 번에 여러 파일 선택 가능 — 각 파일의 입출고비/배송비 시트를 자동 인식합니다.</div>
+          </div>
+        </div>
+        <!-- 처리된 파일 목록 -->
+        <div id="cps-file-list" class="hidden">
+          <div class="font-bold text-sm mb-2 flex items-center justify-between">
+            <span>처리된 파일 <span id="cps-file-count" class="text-brand-blue">0</span>개</span>
+            <button onclick="cpsClearAll()" class="text-xs text-brand-pink font-bold hover:opacity-80">전체 삭제</button>
+          </div>
+          <div id="cps-file-items" class="flex flex-col gap-2"></div>
+        </div>
+        <!-- KPI -->
+        <div id="cps-kpi" class="hidden grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div class="bg-brand-bg rounded-2xl p-4">
+            <div class="text-xs font-bold text-brand-gray">입출고비 — 행 수</div>
+            <div class="text-xl font-black mt-1" id="cps-kpi-io-rows">0건</div>
+          </div>
+          <div class="bg-brand-bg rounded-2xl p-4">
+            <div class="text-xs font-bold text-brand-gray">입출고비 — 최종비용 합계</div>
+            <div class="text-xl font-black mt-1 text-brand-pink" id="cps-kpi-io-sum">0원</div>
+          </div>
+          <div class="bg-brand-bg rounded-2xl p-4">
+            <div class="text-xs font-bold text-brand-gray">배송비 — 행 수</div>
+            <div class="text-xl font-black mt-1" id="cps-kpi-ship-rows">0건</div>
+          </div>
+          <div class="bg-brand-bg rounded-2xl p-4">
+            <div class="text-xs font-bold text-brand-gray">배송비 — 최종비용 합계</div>
+            <div class="text-xl font-black mt-1 text-brand-pink" id="cps-kpi-ship-sum">0원</div>
+          </div>
+        </div>
+        <!-- 결과 시트 탭 -->
+        <div id="cps-result-wrap" class="hidden flex flex-col gap-3">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex gap-1">
+              <button class="cps-sheet-btn active" data-sheet="io" onclick="cpsSwitchSheet('io')">입출고비</button>
+              <button class="cps-sheet-btn" data-sheet="ship" onclick="cpsSwitchSheet('ship')">배송비</button>
+            </div>
+            <button onclick="cpsExportCombined()" class="bg-brand-black text-white px-4 py-2 rounded-full text-sm font-bold hover:-translate-y-0.5 transition-transform shadow-md flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              합쳐진 엑셀 다운로드
+            </button>
+          </div>
+          <div class="border border-brand-border rounded-2xl overflow-auto" style="max-height:60vh;">
+            <table id="cps-result-table" class="w-full text-xs">
+              <thead id="cps-result-thead" class="bg-brand-bg sticky top-0 z-10"></thead>
+              <tbody id="cps-result-tbody"></tbody>
+              <tfoot id="cps-result-tfoot" class="bg-brand-bg sticky bottom-0 font-bold"></tfoot>
+            </table>
+          </div>
+          <div id="cps-status-msg" class="text-xs text-brand-gray"></div>
+        </div>
       </section>
     </main>
   </div>
@@ -16800,6 +16879,275 @@ function exportEventsAsText() {
       </div>
     </div>`;
   document.body.appendChild(m);
+}
+
+// ── 데이터 가공 — 쿠팡 정산 합산 ─────────────────────────────────
+let _cpsFiles = []; // [{ name, ioRows, shipRows }]
+let _cpsActiveSheet = 'io';
+
+// 드래그앤드롭으로 엑셀 추가 가능
+document.addEventListener('DOMContentLoaded', () => {
+  const drop = document.getElementById('cps-drop');
+  if (!drop) return;
+  ['dragover','dragenter'].forEach(ev => drop.addEventListener(ev, (e) => {
+    e.preventDefault(); drop.style.background = '#EFF6FF'; drop.style.borderColor = '#1A73E8';
+  }));
+  ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, (e) => {
+    e.preventDefault(); drop.style.background = ''; drop.style.borderColor = '';
+  }));
+  drop.addEventListener('drop', (e) => {
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if (files && files.length) cpsHandleFiles(files);
+  });
+});
+
+function switchDataopsTab(tab) {
+  document.querySelectorAll('.dataops-tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.dt === tab);
+  });
+  document.querySelectorAll('.dataops-panel').forEach(p => p.classList.add('hidden'));
+  const target = document.getElementById('dt-' + tab);
+  if (target) target.classList.remove('hidden');
+}
+
+// 쿠팡 시트 컬럼 정의 — 사진 양식과 동일
+const CPS_IO_COLS = [
+  '정산유형','정산주기(종료일)','세금계산서 발행월','발생일(배송완료일)','매출인식일','거래유형',
+  '주문ID','배송ID','주문일','등록상품 ID','옵션ID','SKU ID','등록상품명','옵션명',
+  '단품 판매가','카테고리(1차)','카테고리(2차)','개별포장 상품 사이즈','물류센터',
+  '판매수량','단품 기준 구매 수량','옵션 유형',
+  '발생비용(A)','할인가(B)','할인적용가(A-B)','비고'
+];
+const CPS_SHIP_COLS = [
+  '정산유형','정산주기(종료일)','세금계산서 발행월','발생일(배송완료일)','매출인식일','거래유형',
+  '주문ID','배송ID','주문일','등록상품 ID','옵션ID','SKU ID','등록상품명','옵션명',
+  '총 판매가','카테고리(1차)','카테고리(2차)','개별포장 상품 사이즈','구매 수량 총 사이즈','물류센터',
+  '판매수량',
+  '발생비용(A)','할인가(B)','할인적용가(A-B)','추가비용','최종비용'
+];
+
+// 시트에서 헤더 행을 찾고 행 객체로 변환
+function _cpsParseSheet(ws, expectedCols) {
+  const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+  if (!aoa.length) return [];
+  // 헤더 행 자동 탐지 — 첫 30행 안에서 expectedCols 의 핵심 키워드(주문ID/배송ID 등)가 보이는 행
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(aoa.length, 30); i++) {
+    const r = (aoa[i] || []).map(c => String(c || '').replace(/\s+/g,''));
+    if (r.includes('주문ID') && r.includes('배송ID')) { headerIdx = i; break; }
+  }
+  if (headerIdx < 0) return [];
+  const header = aoa[headerIdx].map(c => String(c || '').trim());
+  const rows = [];
+  for (let i = headerIdx + 1; i < aoa.length; i++) {
+    const row = aoa[i] || [];
+    const allEmpty = row.every(c => String(c || '').trim() === '');
+    if (allEmpty) continue;
+    const o = {};
+    header.forEach((h, ci) => { if (h) o[h] = row[ci] != null ? row[ci] : ''; });
+    // 합계 행 같은 것 거르기 (주문ID 가 비어있으면 스킵)
+    if (!String(o['주문ID'] || '').trim()) continue;
+    rows.push(o);
+  }
+  return rows;
+}
+
+async function cpsHandleFiles(fileList) {
+  if (!fileList || !fileList.length) return;
+  const _msg = (txt, color) => {
+    const el = document.getElementById('cps-status-msg');
+    if (el) { el.textContent = txt; el.style.color = color || '#666'; }
+  };
+  _msg(`${fileList.length}개 파일 처리 중...`, '#1A73E8');
+
+  for (const file of fileList) {
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      // 시트 찾기 — 이름에 "입출고" / "배송" 포함된 시트 우선
+      const ioSheetName = wb.SheetNames.find(n => /입출고/.test(n)) || wb.SheetNames[0];
+      const shipSheetName = wb.SheetNames.find(n => /배송/.test(n)) || wb.SheetNames[1] || '';
+      const ioRows = ioSheetName ? _cpsParseSheet(wb.Sheets[ioSheetName], CPS_IO_COLS) : [];
+      const shipRows = shipSheetName ? _cpsParseSheet(wb.Sheets[shipSheetName], CPS_SHIP_COLS) : [];
+      _cpsFiles.push({
+        name: file.name,
+        ioRows, shipRows,
+        ioCount: ioRows.length, shipCount: shipRows.length,
+      });
+    } catch (e) {
+      console.warn('[쿠팡 정산] 파일 파싱 실패:', file.name, e);
+      alert(`"${file.name}" 처리 실패: ${e.message || e}`);
+    }
+  }
+
+  _cpsRender();
+  _msg(`처리 완료 — 총 ${_cpsFiles.length}개 파일 합산`, '#16A34A');
+  // input 초기화 (같은 파일 다시 선택 가능)
+  const inp = document.getElementById('cps-files');
+  if (inp) inp.value = '';
+}
+
+function cpsClearAll() {
+  if (!_cpsFiles.length) return;
+  if (!confirm('처리된 모든 파일을 초기화할까요?')) return;
+  _cpsFiles = [];
+  _cpsRender();
+}
+
+function cpsRemoveFile(idx) {
+  _cpsFiles.splice(idx, 1);
+  _cpsRender();
+}
+
+function cpsSwitchSheet(sheet) {
+  _cpsActiveSheet = sheet;
+  document.querySelectorAll('.cps-sheet-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.sheet === sheet);
+  });
+  _cpsRenderTable();
+}
+
+function _cpsAllRows(sheet) {
+  const out = [];
+  _cpsFiles.forEach(f => {
+    const rows = sheet === 'io' ? f.ioRows : f.shipRows;
+    rows.forEach(r => out.push({ ...r, _src: f.name }));
+  });
+  return out;
+}
+
+function _cpsToNum(v) {
+  if (v == null || v === '') return 0;
+  const n = Number(String(v).replace(/[,\s원]/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+
+function _cpsRender() {
+  const list = document.getElementById('cps-file-list');
+  const items = document.getElementById('cps-file-items');
+  const cnt = document.getElementById('cps-file-count');
+  const kpi = document.getElementById('cps-kpi');
+  const result = document.getElementById('cps-result-wrap');
+
+  if (!_cpsFiles.length) {
+    list?.classList.add('hidden');
+    kpi?.classList.add('hidden');
+    result?.classList.add('hidden');
+    return;
+  }
+  list?.classList.remove('hidden');
+  kpi?.classList.remove('hidden');
+  result?.classList.remove('hidden');
+
+  if (cnt) cnt.textContent = _cpsFiles.length;
+  if (items) {
+    items.innerHTML = _cpsFiles.map((f, idx) => `
+      <div class="flex items-center justify-between bg-brand-bg/40 rounded-xl px-4 py-2.5">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-8 h-8 rounded-lg bg-brand-blue-light flex items-center justify-center shrink-0">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2196F3" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <div class="min-w-0">
+            <div class="font-bold text-sm truncate">${escHtml(f.name)}</div>
+            <div class="text-xs text-brand-gray">입출고비 ${f.ioCount}건 · 배송비 ${f.shipCount}건</div>
+          </div>
+        </div>
+        <button onclick="cpsRemoveFile(${idx})" class="text-xs text-brand-pink font-bold hover:opacity-80 px-2 py-1">제거</button>
+      </div>
+    `).join('');
+  }
+
+  // KPI
+  const ioRows = _cpsAllRows('io');
+  const shipRows = _cpsAllRows('ship');
+  const ioSum = ioRows.reduce((s, r) => s + _cpsToNum(r['할인적용가(A-B)']), 0);
+  const shipSum = shipRows.reduce((s, r) => s + _cpsToNum(r['최종비용']), 0);
+  const fmt = n => Number(n || 0).toLocaleString('ko-KR');
+  document.getElementById('cps-kpi-io-rows').textContent = `${fmt(ioRows.length)}건`;
+  document.getElementById('cps-kpi-io-sum').textContent = `${fmt(ioSum)}원`;
+  document.getElementById('cps-kpi-ship-rows').textContent = `${fmt(shipRows.length)}건`;
+  document.getElementById('cps-kpi-ship-sum').textContent = `${fmt(shipSum)}원`;
+
+  _cpsRenderTable();
+}
+
+function _cpsRenderTable() {
+  const cols = _cpsActiveSheet === 'io' ? CPS_IO_COLS : CPS_SHIP_COLS;
+  const rows = _cpsAllRows(_cpsActiveSheet);
+  const thead = document.getElementById('cps-result-thead');
+  const tbody = document.getElementById('cps-result-tbody');
+  const tfoot = document.getElementById('cps-result-tfoot');
+  if (!thead || !tbody || !tfoot) return;
+
+  thead.innerHTML = '<tr class="text-brand-gray">'
+    + '<th class="px-2 py-2 text-left whitespace-nowrap font-bold text-[11px]">파일</th>'
+    + cols.map(c => `<th class="px-2 py-2 whitespace-nowrap font-bold text-[11px] ${/(비용|판매가|할인|수량|사이즈)/.test(c) ? 'text-right' : 'text-left'}">${escHtml(c)}</th>`).join('')
+    + '</tr>';
+
+  // 본문 — 너무 많으면 잘라서 표시 (최대 500행 미리보기)
+  const MAX_PREVIEW = 500;
+  const previewRows = rows.slice(0, MAX_PREVIEW);
+  tbody.innerHTML = previewRows.map(r => {
+    return '<tr class="border-t border-brand-border hover:bg-brand-bg/40">'
+      + `<td class="px-2 py-1.5 text-[11px] text-brand-gray whitespace-nowrap" title="${escHtml(r._src)}">${escHtml(String(r._src || '').slice(0, 18))}${(r._src||'').length > 18 ? '…' : ''}</td>`
+      + cols.map(c => {
+          const v = r[c] == null ? '' : r[c];
+          const isNum = /(비용|판매가|할인)/.test(c);
+          const align = /(비용|판매가|할인|수량|사이즈)/.test(c) ? 'text-right' : 'text-left';
+          const display = isNum ? Number(_cpsToNum(v)).toLocaleString('ko-KR') : String(v);
+          return `<td class="px-2 py-1.5 text-[11px] ${align} whitespace-nowrap">${escHtml(display)}</td>`;
+        }).join('')
+      + '</tr>';
+  }).join('');
+  if (rows.length > MAX_PREVIEW) {
+    tbody.innerHTML += `<tr><td colspan="${cols.length + 1}" class="px-3 py-3 text-center text-xs text-brand-gray bg-brand-bg/40">… 미리보기 ${MAX_PREVIEW}행만 표시 · 전체 ${rows.length.toLocaleString('ko-KR')}행은 다운로드 시 모두 포함됩니다</td></tr>`;
+  }
+
+  // 합계 — 숫자성 컬럼만
+  const sums = {};
+  cols.forEach(c => {
+    if (/(비용|판매가|할인|수량)/.test(c)) {
+      sums[c] = rows.reduce((s, r) => s + _cpsToNum(r[c]), 0);
+    }
+  });
+  tfoot.innerHTML = '<tr class="border-t-2 border-brand-black">'
+    + `<td class="px-2 py-2 text-[11px]">합계 (${rows.length.toLocaleString('ko-KR')}건)</td>`
+    + cols.map(c => {
+        const align = /(비용|판매가|할인|수량|사이즈)/.test(c) ? 'text-right' : 'text-left';
+        if (sums[c] !== undefined) {
+          return `<td class="px-2 py-2 text-[11px] ${align}">${sums[c].toLocaleString('ko-KR')}</td>`;
+        }
+        return `<td class="px-2 py-2"></td>`;
+      }).join('')
+    + '</tr>';
+}
+
+function cpsExportCombined() {
+  if (!_cpsFiles.length) { alert('처리된 파일이 없습니다.'); return; }
+  const ioRows = _cpsAllRows('io');
+  const shipRows = _cpsAllRows('ship');
+
+  // 입출고비 시트
+  const ioAoa = [['파일', ...CPS_IO_COLS],
+    ...ioRows.map(r => ['', ...CPS_IO_COLS.map(c => r[c] != null ? r[c] : '')].map((v, i) => i === 0 ? r._src : v))
+  ];
+  // 배송비 시트
+  const shipAoa = [['파일', ...CPS_SHIP_COLS],
+    ...shipRows.map(r => ['', ...CPS_SHIP_COLS.map(c => r[c] != null ? r[c] : '')].map((v, i) => i === 0 ? r._src : v))
+  ];
+
+  const wb = XLSX.utils.book_new();
+  if (ioRows.length) {
+    const ws = XLSX.utils.aoa_to_sheet(ioAoa);
+    XLSX.utils.book_append_sheet(wb, ws, '입출고비');
+  }
+  if (shipRows.length) {
+    const ws = XLSX.utils.aoa_to_sheet(shipAoa);
+    XLSX.utils.book_append_sheet(wb, ws, '배송비');
+  }
+  if (!wb.SheetNames.length) { alert('내보낼 데이터가 없습니다.'); return; }
+  const stamp = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `쿠팡정산_합산_${stamp}.xlsx`);
 }
 
 function _doEventsExport() {
