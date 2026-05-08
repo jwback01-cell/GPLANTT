@@ -5163,7 +5163,7 @@ PBT키캡	1180
       <section id="dt-coupang-settle" class="dataops-panel bg-white rounded-4xl panel p-6 md:p-8 flex flex-col gap-5">
         <div>
           <h2 class="text-xl font-bold tracking-tight mb-1">쿠팡 정산 엑셀 합산</h2>
-          <p class="text-sm text-brand-gray">쿠팡 다운로드 엑셀(시트: <b>입출고비</b>, <b>배송비</b>) 여러 개를 한꺼번에 합쳐서 보고 다운로드합니다.</p>
+          <p class="text-sm text-brand-gray">쿠팡 다운로드 엑셀(시트: <b>입출고비</b>·<b>배송비</b>·<b>보관비</b>) 여러 개를 한꺼번에 합쳐서 다운로드합니다. 시트는 자동 인식되며, 다운로드 엑셀의 금액은 SUM 함수가 동작하도록 숫자로 저장됩니다.</p>
         </div>
         <!-- 업로드 영역 -->
         <div id="cps-drop" class="border-2 border-dashed border-brand-border rounded-3xl p-8 text-center cursor-pointer hover:bg-brand-bg/40 transition-colors" onclick="document.getElementById('cps-files').click()">
@@ -5185,44 +5185,30 @@ PBT키캡	1180
           <div id="cps-file-items" class="flex flex-col gap-2"></div>
         </div>
         <!-- KPI -->
-        <div id="cps-kpi" class="hidden grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div id="cps-kpi" class="hidden grid grid-cols-2 md:grid-cols-3 gap-3">
           <div class="bg-brand-bg rounded-2xl p-4">
             <div class="text-xs font-bold text-brand-gray">입출고비 — 행 수</div>
             <div class="text-xl font-black mt-1" id="cps-kpi-io-rows">0건</div>
-          </div>
-          <div class="bg-brand-bg rounded-2xl p-4">
-            <div class="text-xs font-bold text-brand-gray">입출고비 — 최종비용 합계</div>
-            <div class="text-xl font-black mt-1 text-brand-pink" id="cps-kpi-io-sum">0원</div>
+            <div class="text-[11px] text-brand-pink font-bold mt-1" id="cps-kpi-io-sum">합계 0원</div>
           </div>
           <div class="bg-brand-bg rounded-2xl p-4">
             <div class="text-xs font-bold text-brand-gray">배송비 — 행 수</div>
             <div class="text-xl font-black mt-1" id="cps-kpi-ship-rows">0건</div>
+            <div class="text-[11px] text-brand-pink font-bold mt-1" id="cps-kpi-ship-sum">합계 0원</div>
           </div>
           <div class="bg-brand-bg rounded-2xl p-4">
-            <div class="text-xs font-bold text-brand-gray">배송비 — 최종비용 합계</div>
-            <div class="text-xl font-black mt-1 text-brand-pink" id="cps-kpi-ship-sum">0원</div>
+            <div class="text-xs font-bold text-brand-gray">보관비 — 행 수</div>
+            <div class="text-xl font-black mt-1" id="cps-kpi-storage-rows">0건</div>
+            <div class="text-[11px] text-brand-pink font-bold mt-1" id="cps-kpi-storage-sum">합계 0원</div>
           </div>
         </div>
-        <!-- 결과 시트 탭 -->
-        <div id="cps-result-wrap" class="hidden flex flex-col gap-3">
-          <div class="flex items-center justify-between flex-wrap gap-2">
-            <div class="flex gap-1">
-              <button class="cps-sheet-btn active" data-sheet="io" onclick="cpsSwitchSheet('io')">입출고비</button>
-              <button class="cps-sheet-btn" data-sheet="ship" onclick="cpsSwitchSheet('ship')">배송비</button>
-            </div>
-            <button onclick="cpsExportCombined()" class="bg-brand-black text-white px-4 py-2 rounded-full text-sm font-bold hover:-translate-y-0.5 transition-transform shadow-md flex items-center gap-1.5">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              합쳐진 엑셀 다운로드
-            </button>
-          </div>
-          <div class="border border-brand-border rounded-2xl overflow-auto" style="max-height:60vh;">
-            <table id="cps-result-table" class="w-full text-xs">
-              <thead id="cps-result-thead" class="bg-brand-bg sticky top-0 z-10"></thead>
-              <tbody id="cps-result-tbody"></tbody>
-              <tfoot id="cps-result-tfoot" class="bg-brand-bg sticky bottom-0 font-bold"></tfoot>
-            </table>
-          </div>
-          <div id="cps-status-msg" class="text-xs text-brand-gray"></div>
+        <!-- 다운로드 버튼만 -->
+        <div id="cps-result-wrap" class="hidden flex items-center justify-end gap-2">
+          <span id="cps-status-msg" class="text-xs text-brand-gray mr-auto"></span>
+          <button onclick="cpsExportCombined()" class="bg-brand-black text-white px-4 py-2 rounded-full text-sm font-bold hover:-translate-y-0.5 transition-transform shadow-md flex items-center gap-1.5">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            합쳐진 엑셀 다운로드
+          </button>
         </div>
       </section>
     </main>
@@ -16882,8 +16868,7 @@ function exportEventsAsText() {
 }
 
 // ── 데이터 가공 — 쿠팡 정산 합산 ─────────────────────────────────
-let _cpsFiles = []; // [{ name, ioRows, shipRows }]
-let _cpsActiveSheet = 'io';
+let _cpsFiles = []; // [{ name, ioRows, shipRows, storageRows }]
 
 // 드래그앤드롭으로 엑셀 추가 가능
 document.addEventListener('DOMContentLoaded', () => {
@@ -16924,6 +16909,13 @@ const CPS_SHIP_COLS = [
   '총 판매가','카테고리(1차)','카테고리(2차)','개별포장 상품 사이즈','구매 수량 총 사이즈','물류센터',
   '판매수량',
   '발생비용(A)','할인가(B)','할인적용가(A-B)','추가비용','최종비용'
+];
+// 보관비 시트 컬럼 — 양식 사진과 동일
+const CPS_STORAGE_COLS = [
+  '정산유형','정산주기(종료일)','세금계산서 발행월','발생일','매출인식일','진열일','보관기간',
+  '등록상품 ID','옵션ID','SKU ID','등록상품명','옵션명',
+  '보관재고수량','개당 상품부피(CBM)','로켓그로스 세이버',
+  '발생비용(A)','할인가(B)','할인적용가(A-B)','로켓그로스 세이버 혜택 금액(C)','최종비용(A-B-C)'
 ];
 
 // 시트에서 헤더 행을 찾고 행 객체로 변환 (헤더가 두 행에 걸친 케이스 처리)
@@ -16984,6 +16976,12 @@ function _cpsParseSheet(ws, expectedCols) {
     '카테고리2차': '카테고리(2차)',
     '카테고리(1차)': '카테고리(1차)',
     '카테고리(2차)': '카테고리(2차)',
+    // 보관비 전용
+    '로켓그로스세이버혜택금액(c)': '로켓그로스 세이버 혜택 금액(C)',
+    '로켓그로스세이버혜택금액c': '로켓그로스 세이버 혜택 금액(C)',
+    '최종비용(a-b-c)': '최종비용(A-B-C)',
+    '최종비용a-b-c': '최종비용(A-B-C)',
+    '최종비용abc': '최종비용(A-B-C)',
   };
   const headerCanon = header.map(h => {
     const n = String(h || '').replace(/\s+/g,'').toLowerCase();
@@ -17016,15 +17014,37 @@ async function cpsHandleFiles(fileList) {
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: 'array' });
-      // 시트 찾기 — 이름에 "입출고" / "배송" 포함된 시트 우선
-      const ioSheetName = wb.SheetNames.find(n => /입출고/.test(n)) || wb.SheetNames[0];
-      const shipSheetName = wb.SheetNames.find(n => /배송/.test(n)) || wb.SheetNames[1] || '';
-      const ioRows = ioSheetName ? _cpsParseSheet(wb.Sheets[ioSheetName], CPS_IO_COLS) : [];
-      const shipRows = shipSheetName ? _cpsParseSheet(wb.Sheets[shipSheetName], CPS_SHIP_COLS) : [];
+      // 시트 자동 인식 — 이름에 "입출고" / "배송" / "보관" 키워드
+      const ioSheetName      = wb.SheetNames.find(n => /입출고/.test(n));
+      const shipSheetName    = wb.SheetNames.find(n => /배송/.test(n));
+      const storageSheetName = wb.SheetNames.find(n => /보관/.test(n));
+      const ioRows      = ioSheetName      ? _cpsParseSheet(wb.Sheets[ioSheetName],      CPS_IO_COLS)      : [];
+      const shipRows    = shipSheetName    ? _cpsParseSheet(wb.Sheets[shipSheetName],    CPS_SHIP_COLS)    : [];
+      const storageRows = storageSheetName ? _cpsParseSheet(wb.Sheets[storageSheetName], CPS_STORAGE_COLS) : [];
+      // 키워드로 못 찾고 시트가 1개뿐이면 그 시트가 어떤 양식인지 헤더로 추정
+      if (!ioRows.length && !shipRows.length && !storageRows.length && wb.SheetNames.length >= 1) {
+        const guess = wb.SheetNames.map(n => {
+          const aoa = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '', raw: false });
+          const flat = aoa.slice(0, 30).map(r => (r||[]).join(' ')).join(' ');
+          return { name: n, flat };
+        });
+        for (const g of guess) {
+          if (/보관기간|보관재고수량|개당 상품부피/.test(g.flat) && !storageRows.length) {
+            const r = _cpsParseSheet(wb.Sheets[g.name], CPS_STORAGE_COLS);
+            if (r.length) { storageRows.push(...r); }
+          } else if (/총 판매가|구매 수량 총 사이즈|추가비용/.test(g.flat) && !shipRows.length) {
+            const r = _cpsParseSheet(wb.Sheets[g.name], CPS_SHIP_COLS);
+            if (r.length) { shipRows.push(...r); }
+          } else if (/단품 판매가|단품 기준 구매 수량|옵션 유형/.test(g.flat) && !ioRows.length) {
+            const r = _cpsParseSheet(wb.Sheets[g.name], CPS_IO_COLS);
+            if (r.length) { ioRows.push(...r); }
+          }
+        }
+      }
       _cpsFiles.push({
         name: file.name,
-        ioRows, shipRows,
-        ioCount: ioRows.length, shipCount: shipRows.length,
+        ioRows, shipRows, storageRows,
+        ioCount: ioRows.length, shipCount: shipRows.length, storageCount: storageRows.length,
       });
     } catch (e) {
       console.warn('[쿠팡 정산] 파일 파싱 실패:', file.name, e);
@@ -17051,19 +17071,15 @@ function cpsRemoveFile(idx) {
   _cpsRender();
 }
 
-function cpsSwitchSheet(sheet) {
-  _cpsActiveSheet = sheet;
-  document.querySelectorAll('.cps-sheet-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.sheet === sheet);
-  });
-  _cpsRenderTable();
-}
-
 function _cpsAllRows(sheet) {
   const out = [];
   _cpsFiles.forEach(f => {
-    const rows = sheet === 'io' ? f.ioRows : f.shipRows;
-    rows.forEach(r => out.push({ ...r, _src: f.name }));
+    let rows;
+    if (sheet === 'io') rows = f.ioRows;
+    else if (sheet === 'ship') rows = f.shipRows;
+    else if (sheet === 'storage') rows = f.storageRows;
+    else rows = [];
+    (rows || []).forEach(r => out.push({ ...r, _src: f.name }));
   });
   return out;
 }
@@ -17093,7 +17109,14 @@ function _cpsRender() {
 
   if (cnt) cnt.textContent = _cpsFiles.length;
   if (items) {
-    items.innerHTML = _cpsFiles.map((f, idx) => `
+    items.innerHTML = _cpsFiles.map((f, idx) => {
+      const tags = [];
+      if (f.ioCount) tags.push(`입출고비 ${f.ioCount}건`);
+      if (f.shipCount) tags.push(`배송비 ${f.shipCount}건`);
+      if (f.storageCount) tags.push(`보관비 ${f.storageCount}건`);
+      const tagText = tags.length ? tags.join(' · ') : '⚠ 인식된 시트 없음';
+      const warnCls = tags.length ? 'text-brand-gray' : 'text-brand-pink';
+      return `
       <div class="flex items-center justify-between bg-brand-bg/40 rounded-xl px-4 py-2.5">
         <div class="flex items-center gap-3 min-w-0">
           <div class="w-8 h-8 rounded-lg bg-brand-blue-light flex items-center justify-center shrink-0">
@@ -17101,88 +17124,41 @@ function _cpsRender() {
           </div>
           <div class="min-w-0">
             <div class="font-bold text-sm truncate">${escHtml(f.name)}</div>
-            <div class="text-xs text-brand-gray">입출고비 ${f.ioCount}건 · 배송비 ${f.shipCount}건</div>
+            <div class="text-xs ${warnCls}">${tagText}</div>
           </div>
         </div>
         <button onclick="cpsRemoveFile(${idx})" class="text-xs text-brand-pink font-bold hover:opacity-80 px-2 py-1">제거</button>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   }
 
-  // KPI
+  // KPI — 행수 + 할인적용가(A-B) 합계 (보관비는 최종비용(A-B-C) 합계)
   const ioRows = _cpsAllRows('io');
   const shipRows = _cpsAllRows('ship');
+  const storageRows = _cpsAllRows('storage');
   const ioSum = ioRows.reduce((s, r) => s + _cpsToNum(r['할인적용가(A-B)']), 0);
   const shipSum = shipRows.reduce((s, r) => s + _cpsToNum(r['최종비용']), 0);
+  const storageSum = storageRows.reduce((s, r) => s + _cpsToNum(r['최종비용(A-B-C)']), 0);
   const fmt = n => Number(n || 0).toLocaleString('ko-KR');
   document.getElementById('cps-kpi-io-rows').textContent = `${fmt(ioRows.length)}건`;
-  document.getElementById('cps-kpi-io-sum').textContent = `${fmt(ioSum)}원`;
+  document.getElementById('cps-kpi-io-sum').textContent = `합계 ${fmt(ioSum)}원`;
   document.getElementById('cps-kpi-ship-rows').textContent = `${fmt(shipRows.length)}건`;
-  document.getElementById('cps-kpi-ship-sum').textContent = `${fmt(shipSum)}원`;
-
-  _cpsRenderTable();
-}
-
-function _cpsRenderTable() {
-  const cols = _cpsActiveSheet === 'io' ? CPS_IO_COLS : CPS_SHIP_COLS;
-  const rows = _cpsAllRows(_cpsActiveSheet);
-  const thead = document.getElementById('cps-result-thead');
-  const tbody = document.getElementById('cps-result-tbody');
-  const tfoot = document.getElementById('cps-result-tfoot');
-  if (!thead || !tbody || !tfoot) return;
-
-  thead.innerHTML = '<tr class="text-brand-gray">'
-    + '<th class="px-2 py-2 text-left whitespace-nowrap font-bold text-[11px]">파일</th>'
-    + cols.map(c => `<th class="px-2 py-2 whitespace-nowrap font-bold text-[11px] ${/(비용|판매가|할인|수량|사이즈)/.test(c) ? 'text-right' : 'text-left'}">${escHtml(c)}</th>`).join('')
-    + '</tr>';
-
-  // 본문 — 너무 많으면 잘라서 표시 (최대 500행 미리보기)
-  const MAX_PREVIEW = 500;
-  const previewRows = rows.slice(0, MAX_PREVIEW);
-  tbody.innerHTML = previewRows.map(r => {
-    return '<tr class="border-t border-brand-border hover:bg-brand-bg/40">'
-      + `<td class="px-2 py-1.5 text-[11px] text-brand-gray whitespace-nowrap" title="${escHtml(r._src)}">${escHtml(String(r._src || '').slice(0, 18))}${(r._src||'').length > 18 ? '…' : ''}</td>`
-      + cols.map(c => {
-          const v = r[c] == null ? '' : r[c];
-          const isNum = /(비용|판매가|할인)/.test(c);
-          const align = /(비용|판매가|할인|수량|사이즈)/.test(c) ? 'text-right' : 'text-left';
-          const display = isNum ? Number(_cpsToNum(v)).toLocaleString('ko-KR') : String(v);
-          return `<td class="px-2 py-1.5 text-[11px] ${align} whitespace-nowrap">${escHtml(display)}</td>`;
-        }).join('')
-      + '</tr>';
-  }).join('');
-  if (rows.length > MAX_PREVIEW) {
-    tbody.innerHTML += `<tr><td colspan="${cols.length + 1}" class="px-3 py-3 text-center text-xs text-brand-gray bg-brand-bg/40">… 미리보기 ${MAX_PREVIEW}행만 표시 · 전체 ${rows.length.toLocaleString('ko-KR')}행은 다운로드 시 모두 포함됩니다</td></tr>`;
-  }
-
-  // 합계 — 숫자성 컬럼만
-  const sums = {};
-  cols.forEach(c => {
-    if (/(비용|판매가|할인|수량)/.test(c)) {
-      sums[c] = rows.reduce((s, r) => s + _cpsToNum(r[c]), 0);
-    }
-  });
-  tfoot.innerHTML = '<tr class="border-t-2 border-brand-black">'
-    + `<td class="px-2 py-2 text-[11px]">합계 (${rows.length.toLocaleString('ko-KR')}건)</td>`
-    + cols.map(c => {
-        const align = /(비용|판매가|할인|수량|사이즈)/.test(c) ? 'text-right' : 'text-left';
-        if (sums[c] !== undefined) {
-          return `<td class="px-2 py-2 text-[11px] ${align}">${sums[c].toLocaleString('ko-KR')}</td>`;
-        }
-        return `<td class="px-2 py-2"></td>`;
-      }).join('')
-    + '</tr>';
+  document.getElementById('cps-kpi-ship-sum').textContent = `합계 ${fmt(shipSum)}원`;
+  document.getElementById('cps-kpi-storage-rows').textContent = `${fmt(storageRows.length)}건`;
+  document.getElementById('cps-kpi-storage-sum').textContent = `합계 ${fmt(storageSum)}원`;
 }
 
 function cpsExportCombined() {
   if (!_cpsFiles.length) { alert('처리된 파일이 없습니다.'); return; }
   const ioRows = _cpsAllRows('io');
   const shipRows = _cpsAllRows('ship');
+  const storageRows = _cpsAllRows('storage');
 
   // 숫자로 저장할 컬럼들 (SUM 함수가 동작하도록)
   const NUM_COLS = new Set([
     '단품 판매가','총 판매가','판매수량','단품 기준 구매 수량','구매 수량 총 사이즈',
-    '발생비용(A)','할인가(B)','할인적용가(A-B)','추가비용','최종비용'
+    '발생비용(A)','할인가(B)','할인적용가(A-B)','추가비용','최종비용',
+    '보관기간','보관재고수량','개당 상품부피(CBM)','로켓그로스 세이버 혜택 금액(C)','최종비용(A-B-C)'
   ]);
   // 셀 값 변환 — 숫자 컬럼이면 Number, 빈 값은 빈 셀로 유지
   const _cellVal = (col, v) => {
@@ -17222,6 +17198,7 @@ function cpsExportCombined() {
   const wb = XLSX.utils.book_new();
   if (ioRows.length) XLSX.utils.book_append_sheet(wb, _buildSheet(CPS_IO_COLS, ioRows), '입출고비');
   if (shipRows.length) XLSX.utils.book_append_sheet(wb, _buildSheet(CPS_SHIP_COLS, shipRows), '배송비');
+  if (storageRows.length) XLSX.utils.book_append_sheet(wb, _buildSheet(CPS_STORAGE_COLS, storageRows), '보관비');
   if (!wb.SheetNames.length) { alert('내보낼 데이터가 없습니다.'); return; }
   const stamp = new Date().toISOString().slice(0, 10);
   XLSX.writeFile(wb, `쿠팡정산_합산_${stamp}.xlsx`);
