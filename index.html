@@ -911,7 +911,7 @@ tailwind.config = {
           </div>
           <div class="flex items-center gap-2 flex-wrap">
             <select id="events-category-filter" onchange="renderEventsCalendar()" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold outline-none focus:border-brand-black cursor-pointer">
-              <option value="">전체 카테고리</option>
+              <option value="">전체 사이트</option>
             </select>
             <button onclick="openAddEventModal()" class="bg-brand-black text-white px-4 py-2 rounded-full text-sm font-bold hover:-translate-y-0.5 transition-transform shadow-md flex items-center gap-1.5">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
@@ -944,8 +944,22 @@ tailwind.config = {
           </div>
           <div class="px-6 md:px-8 pb-6 flex flex-col gap-4 overflow-y-auto" style="max-height:70vh;">
             <div>
-              <label class="block text-xs font-bold text-brand-gray mb-1.5">행사 제목 <span class="text-brand-pink">*</span></label>
-              <input id="event-title" type="text" placeholder="예: 롯데온 04.06-04.19" class="drawer-input w-full">
+              <label class="block text-xs font-bold text-brand-gray mb-1.5">사이트 <span class="text-brand-pink">*</span></label>
+              <select id="event-site" class="drawer-input w-full">
+                <option value="이베이">이베이</option>
+                <option value="11번가">11번가</option>
+                <option value="롯데온">롯데온</option>
+                <option value="네이버">네이버</option>
+                <option value="쿠팡">쿠팡</option>
+                <option value="오늘의집">오늘의집</option>
+                <option value="알리">알리</option>
+                <option value="SSG">SSG</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-brand-gray mb-1.5">행사 이름 <span class="text-brand-pink">*</span></label>
+              <input id="event-name" type="text" placeholder="예: 빡세일, 단독딜, 십일절 (사이트와 날짜는 자동으로 붙어요)" class="drawer-input w-full">
+              <div class="text-[11px] text-brand-gray mt-1">저장되는 제목 미리보기: <span id="event-title-preview" class="font-bold text-brand-black">—</span></div>
             </div>
             <div class="grid grid-cols-2 gap-3">
               <div>
@@ -956,25 +970,6 @@ tailwind.config = {
                 <label class="block text-xs font-bold text-brand-gray mb-1.5">종료일</label>
                 <input id="event-date-end" type="date" class="drawer-input w-full">
               </div>
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-brand-gray mb-1.5">카테고리</label>
-              <input id="event-category" type="text" placeholder="예: 모니터, 노트북, 가전" list="event-category-suggestions" class="drawer-input w-full">
-              <datalist id="event-category-suggestions"></datalist>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs font-bold text-brand-gray mb-1.5">판매 수량</label>
-                <input id="event-qty" type="number" placeholder="0" class="drawer-input w-full">
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-brand-gray mb-1.5">판매 매출 (원)</label>
-                <input id="event-revenue" type="number" placeholder="0" class="drawer-input w-full">
-              </div>
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-brand-gray mb-1.5">행사 URL</label>
-              <input id="event-url" type="url" placeholder="https://" class="drawer-input w-full">
             </div>
             <div>
               <label class="block text-xs font-bold text-brand-gray mb-1.5">행사 제품 / 메모</label>
@@ -16386,24 +16381,45 @@ function renderEventsCalendar() {
   }).join('');
 }
 
+// 날짜를 MM.DD 로 포매팅
+function _evFmtMD(yyyymmdd) {
+  if (!yyyymmdd) return '';
+  const m = String(yyyymmdd).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[2]}.${m[3]}` : String(yyyymmdd);
+}
+// 사이트+이름+날짜로 표시 제목 합성 (예: "이베이 빡세일 05.08-05.14")
+function _evComposeTitle(site, name, dateStart, dateEnd) {
+  const dateRange = (dateStart && dateEnd && dateEnd !== dateStart)
+    ? `${_evFmtMD(dateStart)}-${_evFmtMD(dateEnd)}`
+    : _evFmtMD(dateStart);
+  return [site, name, dateRange].filter(Boolean).join(' ');
+}
+function _evUpdateTitlePreview() {
+  const site = document.getElementById('event-site')?.value || '';
+  const name = document.getElementById('event-name')?.value || '';
+  const ds = document.getElementById('event-date-start')?.value || '';
+  const de = document.getElementById('event-date-end')?.value || '';
+  const composed = _evComposeTitle(site, name, ds, de);
+  const prevEl = document.getElementById('event-title-preview');
+  if (prevEl) prevEl.textContent = composed || '—';
+}
+
 function openAddEventModal(dateKey) {
   _editingEventId = null;
   document.getElementById('event-modal-title').textContent = '행사 추가';
   document.getElementById('event-delete-btn').classList.add('hidden');
   // 폼 초기화
-  document.getElementById('event-title').value = '';
+  document.getElementById('event-site').value = '이베이';
+  document.getElementById('event-name').value = '';
   document.getElementById('event-date-start').value = dateKey || '';
   document.getElementById('event-date-end').value = '';
-  document.getElementById('event-category').value = '';
-  document.getElementById('event-qty').value = '';
-  document.getElementById('event-revenue').value = '';
-  document.getElementById('event-url').value = '';
   document.getElementById('event-products').value = '';
+  _evUpdateTitlePreview();
   // 모달 열기
   const bd = document.getElementById('event-modal-backdrop');
   bd.classList.remove('hidden');
   bd.classList.add('open');
-  setTimeout(() => document.getElementById('event-title')?.focus(), 80);
+  setTimeout(() => document.getElementById('event-name')?.focus(), 80);
 }
 function openEditEventModal(id) {
   const ev = _loadEvents().find(e => e.id === id);
@@ -16411,18 +16427,35 @@ function openEditEventModal(id) {
   _editingEventId = id;
   document.getElementById('event-modal-title').textContent = '행사 편집';
   document.getElementById('event-delete-btn').classList.remove('hidden');
-  document.getElementById('event-title').value = ev.title || '';
+  // 사이트/이름 — 신규 객체엔 ev.site/ev.name 으로 저장됨, 구버전이면 title 에서 추출
+  let site = ev.site || ev.category || '';
+  let name = ev.name || '';
+  if (!ev.site && ev.title) {
+    // 구버전 호환: title 에서 첫 토큰을 site 로 추정
+    const tokens = String(ev.title).split(' ');
+    if (tokens.length >= 1) {
+      const KNOWN_SITES = ['이베이','11번가','롯데온','네이버','쿠팡','오늘의집','알리','SSG'];
+      if (KNOWN_SITES.includes(tokens[0])) {
+        site = tokens[0];
+        // 마지막 토큰이 날짜(MM.DD-MM.DD 또는 MM.DD)면 제거
+        const last = tokens[tokens.length - 1];
+        const isDateLike = /^\d{2}\.\d{2}(-\d{2}\.\d{2})?$/.test(last);
+        name = tokens.slice(1, isDateLike ? -1 : tokens.length).join(' ');
+      } else {
+        name = ev.title;
+      }
+    }
+  }
+  document.getElementById('event-site').value = site || '이베이';
+  document.getElementById('event-name').value = name;
   document.getElementById('event-date-start').value = ev.dateStart || '';
   document.getElementById('event-date-end').value = ev.dateEnd || '';
-  document.getElementById('event-category').value = ev.category || '';
-  document.getElementById('event-qty').value = ev.qty || '';
-  document.getElementById('event-revenue').value = ev.revenue || '';
-  document.getElementById('event-url').value = ev.url || '';
   document.getElementById('event-products').value = ev.products || '';
+  _evUpdateTitlePreview();
   const bd = document.getElementById('event-modal-backdrop');
   bd.classList.remove('hidden');
   bd.classList.add('open');
-  setTimeout(() => document.getElementById('event-title')?.focus(), 80);
+  setTimeout(() => document.getElementById('event-name')?.focus(), 80);
 }
 function closeEventModal() {
   const bd = document.getElementById('event-modal-backdrop');
@@ -16431,21 +16464,24 @@ function closeEventModal() {
   _editingEventId = null;
 }
 function submitEventModal() {
-  const title = document.getElementById('event-title').value.trim();
+  const site = document.getElementById('event-site').value.trim();
+  const name = document.getElementById('event-name').value.trim();
   const dateStart = document.getElementById('event-date-start').value;
   const dateEnd = document.getElementById('event-date-end').value;
-  if (!title) { alert('행사 제목을 입력해 주세요.'); document.getElementById('event-title').focus(); return; }
+  if (!site) { alert('사이트를 선택해 주세요.'); return; }
+  if (!name) { alert('행사 이름을 입력해 주세요.'); document.getElementById('event-name').focus(); return; }
   if (!dateStart) { alert('시작일을 선택해 주세요.'); document.getElementById('event-date-start').focus(); return; }
   if (dateEnd && dateEnd < dateStart) { alert('종료일은 시작일보다 빠를 수 없어요.'); return; }
+  const finalEnd = dateEnd || dateStart;
+  const composedTitle = _evComposeTitle(site, name, dateStart, finalEnd);
   const events = _loadEvents();
   const data = {
-    title,
+    site,                    // 사이트 (이베이/11번가 등) — 필터·색상에도 사용
+    name,                    // 행사 이름만 (예: '빡세일')
+    title: composedTitle,    // 합성 제목 (예: '이베이 빡세일 05.08-05.14')
+    category: site,          // 색상 매핑용 — 사이트별로 일관 색상
     dateStart,
-    dateEnd: dateEnd || dateStart,
-    category: document.getElementById('event-category').value.trim(),
-    qty: Number(document.getElementById('event-qty').value) || 0,
-    revenue: Number(document.getElementById('event-revenue').value) || 0,
-    url: document.getElementById('event-url').value.trim(),
+    dateEnd: finalEnd,
     products: document.getElementById('event-products').value,
   };
   if (_editingEventId) {
@@ -16464,6 +16500,19 @@ function submitEventModal() {
   closeEventModal();
   renderEventsCalendar();
 }
+// 미리보기 실시간 갱신 — 모달 안에서 입력될 때마다 호출
+document.addEventListener('input', (e) => {
+  const t = e.target;
+  if (!t || !t.id) return;
+  if (['event-site','event-name','event-date-start','event-date-end'].includes(t.id)) {
+    _evUpdateTitlePreview();
+  }
+});
+document.addEventListener('change', (e) => {
+  const t = e.target;
+  if (!t || !t.id) return;
+  if (t.id === 'event-site') _evUpdateTitlePreview();
+});
 function deleteCurrentEvent() {
   if (!_editingEventId) return;
   if (!confirm('이 행사를 삭제할까요?')) return;
