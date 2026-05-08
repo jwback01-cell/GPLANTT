@@ -10045,19 +10045,14 @@ function _todoModalEnterHandler(e) {
   const bd = document.getElementById('todo-modal-backdrop');
   if (!bd || !bd.classList.contains('open')) return;
   e.preventDefault();
+  e.stopPropagation();   // input 의 keydown 이 document 까지 버블되어 두 번 호출되는 것 방지
   submitTodoModal();
 }
 document.addEventListener('keydown', _todoModalEnterHandler);
 
-function _bindTodoModalEnterKeys() {
-  const ids = ['todo-title','todo-due','todo-due-end','todo-team','repeat-monthly-day'];
-  for (const id of ids) {
-    const el = document.getElementById(id);
-    if (!el || el._enterBound) continue;
-    el.addEventListener('keydown', _todoModalEnterHandler);
-    el._enterBound = true;
-  }
-}
+// _bindTodoModalEnterKeys 는 호환을 위해 남겨두지만, 입력별 리스너는 더이상 추가하지 않음
+// (document keydown 하나만으로 충분 — 이전엔 둘 다 등록되어 Enter 한 번에 submit 이 2번 호출됐음)
+function _bindTodoModalEnterKeys() { /* no-op */ }
 
 function selectPriority(color) {
   if (color === 'orange') color = 'blue';
@@ -10195,7 +10190,10 @@ function _generateRepeatTodos(base, startDate) {
   return items;
 }
 
+let _submittingTodo = false;
 async function submitTodoModal() {
+  // 동시 호출 방지 — Enter 더블 트리거 / 더블클릭 등
+  if (_submittingTodo) return;
   const title = document.getElementById('todo-title').value.trim();
   const team  = document.getElementById('todo-team').value.trim();
   const due   = document.getElementById('todo-due').value;
@@ -10206,6 +10204,7 @@ async function submitTodoModal() {
     document.getElementById('todo-title').focus();
     return;
   }
+  _submittingTodo = true;
 
   const startDate = due ? new Date(due + 'T00:00:00') : new Date();
   const dueEndVal = document.getElementById('todo-due-end').value;
@@ -10255,6 +10254,7 @@ async function submitTodoModal() {
   renderTodoList();
   renderDashboardTodos();
   closeAddTodoModal();
+  _submittingTodo = false;
 }
 
 function addTodo() { openAddTodoModal(); }
