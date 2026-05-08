@@ -15700,6 +15700,8 @@ function buildPeriodButtons(tabId) {
   const container = document.getElementById(tabId + '-period-btns');
   if (!container) return;
   let html = `<button onclick="setDetailPeriod('${tabId}',0)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold bg-brand-black text-white transition-all">전체</button>`;
+  // "오늘" 버튼 — dp-today-btn 으로 별도 마킹 (인덱스 기반 활성화에서 제외)
+  html += `<button onclick="setTodayPeriod('${tabId}')" class="dp-btn dp-today-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">오늘</button>`;
   for (let m = 1; m <= _currentMonth; m++) {
     html += `<button onclick="setDetailPeriod('${tabId}',${m})" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">${m}월</button>`;
   }
@@ -15722,7 +15724,14 @@ const _fmtW = n => n.toLocaleString('ko-KR');
 
 function setDetailPeriod(tab, m) {
   _detailPeriod[tab] = m;
-  document.querySelectorAll('#' + tab + '-period-btns .dp-btn').forEach((btn, i) => {
+  // "오늘" 버튼은 항상 비활성화 (인덱스 매칭에서 제외)
+  const todayBtn = document.querySelector('#' + tab + '-period-btns .dp-today-btn');
+  if (todayBtn) {
+    todayBtn.className = 'dp-btn dp-today-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all';
+  }
+  // 전체/1월/2월/... 버튼만 인덱스로 활성화
+  const btns = document.querySelectorAll('#' + tab + '-period-btns .dp-btn:not(.dp-today-btn)');
+  btns.forEach((btn, i) => {
     btn.className = (i === m)
       ? 'dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold bg-brand-black text-white transition-all'
       : 'dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all';
@@ -15736,6 +15745,43 @@ function setDetailPeriod(tab, m) {
   else if (tab === 'supplier') renderSupplierTab(m);
   else if (tab === 'channel')  renderChannelTab(m);
   else if (tab === 'analysis') renderAnalysisTab(m);
+}
+
+// 오늘 버튼 — 시작/종료를 모두 오늘로 설정해 직접 선택 모드와 동일한 흐름으로 렌더
+function setTodayPeriod(tab) {
+  const today = new Date();
+  const y = today.getFullYear();
+  const mo = String(today.getMonth() + 1).padStart(2, '0');
+  const d = String(today.getDate()).padStart(2, '0');
+  const k = `${y}-${mo}-${d}`;
+
+  // 빠른선택(전체/1월/...) 모두 비활성화 + 오늘 버튼만 활성화
+  const all = document.querySelectorAll('#' + tab + '-period-btns .dp-btn');
+  all.forEach(b => {
+    if (b.classList.contains('dp-today-btn')) {
+      b.className = 'dp-btn dp-today-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold bg-brand-black text-white transition-all';
+    } else {
+      b.className = 'dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all';
+    }
+  });
+
+  // 라벨
+  const label = `${y}년 ${today.getMonth() + 1}월 ${today.getDate()}일`;
+  ['period-label', 'table-label'].forEach(sfx => {
+    const el = document.getElementById(tab + '-' + sfx);
+    if (el) el.textContent = label;
+  });
+  // 직접 선택 input 도 채움
+  const sEl = document.getElementById(tab + '-range-start');
+  const eEl = document.getElementById(tab + '-range-end');
+  if (sEl) sEl.value = k;
+  if (eEl) eEl.value = k;
+
+  const range = { start: k, end: k };
+  if (tab === 'product')       renderProductTab(0, range);
+  else if (tab === 'supplier') renderSupplierTab(0, range);
+  else if (tab === 'channel')  renderChannelTab(0, range);
+  else if (tab === 'analysis') renderAnalysisTab(0, range);
 }
 
 // ── 직접 선택 range picker ────────────────────
@@ -15790,9 +15836,11 @@ function applyDetailRange(tab) {
   const fmtKo = d => `${d.getMonth()+1}월 ${d.getDate()}일`;
   const label = `${startDate.getFullYear()}년 ${fmtKo(startDate)} ~ ${fmtKo(endDate)}`;
 
-  // 빠른 선택 버튼 모두 비활성화
+  // 빠른 선택 버튼 모두 비활성화 (오늘 버튼 클래스 보존)
   document.querySelectorAll('#' + tab + '-period-btns .dp-btn').forEach(b => {
-    b.className = 'dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all';
+    b.className = b.classList.contains('dp-today-btn')
+      ? 'dp-btn dp-today-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all'
+      : 'dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all';
   });
   // 레이블 업데이트
   ['period-label', 'table-label'].forEach(sfx => {
