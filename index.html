@@ -17179,24 +17179,49 @@ function cpsExportCombined() {
   const ioRows = _cpsAllRows('io');
   const shipRows = _cpsAllRows('ship');
 
-  // 입출고비 시트
-  const ioAoa = [['파일', ...CPS_IO_COLS],
-    ...ioRows.map(r => ['', ...CPS_IO_COLS.map(c => r[c] != null ? r[c] : '')].map((v, i) => i === 0 ? r._src : v))
-  ];
-  // 배송비 시트
-  const shipAoa = [['파일', ...CPS_SHIP_COLS],
-    ...shipRows.map(r => ['', ...CPS_SHIP_COLS.map(c => r[c] != null ? r[c] : '')].map((v, i) => i === 0 ? r._src : v))
-  ];
+  // 숫자로 저장할 컬럼들 (SUM 함수가 동작하도록)
+  const NUM_COLS = new Set([
+    '단품 판매가','총 판매가','판매수량','단품 기준 구매 수량','구매 수량 총 사이즈',
+    '발생비용(A)','할인가(B)','할인적용가(A-B)','추가비용','최종비용'
+  ]);
+  // 셀 값 변환 — 숫자 컬럼이면 Number, 빈 값은 빈 셀로 유지
+  const _cellVal = (col, v) => {
+    if (NUM_COLS.has(col)) {
+      if (v == null || String(v).trim() === '') return '';
+      const n = Number(String(v).replace(/[,\s원]/g, ''));
+      return isNaN(n) ? v : n; // 숫자 변환 실패 시 원본 유지
+    }
+    return v != null ? v : '';
+  };
+
+  // 시트 객체 생성 + 숫자 컬럼은 cell type 을 'n' 으로 강제 (확실한 보장)
+  const _buildSheet = (cols, rows) => {
+    const aoa = [['파일', ...cols], ...rows.map(r => [r._src, ...cols.map(c => _cellVal(c, r[c]))])];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    // 데이터 행(row index 1부터)에서 숫자 컬럼 셀 type 강제
+    cols.forEach((col, idx) => {
+      if (!NUM_COLS.has(col)) return;
+      const colIdx = idx + 1; // +1 = '파일' 컬럼 자리
+      for (let r = 1; r < aoa.length; r++) {
+        const addr = XLSX.utils.encode_cell({ r, c: colIdx });
+        const cell = ws[addr];
+        if (!cell) continue;
+        if (cell.v === '' || cell.v === null || cell.v === undefined) continue;
+        const n = typeof cell.v === 'number' ? cell.v : Number(String(cell.v).replace(/[,\s원]/g, ''));
+        if (!isNaN(n)) {
+          cell.t = 'n';
+          cell.v = n;
+          delete cell.w; // 캐시된 표시 문자열 제거 → Excel 이 다시 포맷
+          cell.z = '#,##0'; // 천단위 콤마 형식
+        }
+      }
+    });
+    return ws;
+  };
 
   const wb = XLSX.utils.book_new();
-  if (ioRows.length) {
-    const ws = XLSX.utils.aoa_to_sheet(ioAoa);
-    XLSX.utils.book_append_sheet(wb, ws, '입출고비');
-  }
-  if (shipRows.length) {
-    const ws = XLSX.utils.aoa_to_sheet(shipAoa);
-    XLSX.utils.book_append_sheet(wb, ws, '배송비');
-  }
+  if (ioRows.length) XLSX.utils.book_append_sheet(wb, _buildSheet(CPS_IO_COLS, ioRows), '입출고비');
+  if (shipRows.length) XLSX.utils.book_append_sheet(wb, _buildSheet(CPS_SHIP_COLS, shipRows), '배송비');
   if (!wb.SheetNames.length) { alert('내보낼 데이터가 없습니다.'); return; }
   const stamp = new Date().toISOString().slice(0, 10);
   XLSX.writeFile(wb, `쿠팡정산_합산_${stamp}.xlsx`);
