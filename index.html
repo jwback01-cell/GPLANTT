@@ -964,12 +964,38 @@ tailwind.config = {
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs font-bold text-brand-gray mb-1.5">시작일 <span class="text-brand-pink">*</span></label>
-                <input id="event-date-start" type="date" class="drawer-input w-full">
+                <input id="event-date-start" type="date" class="drawer-input w-full" onchange="_evRpSyncFromInput()">
               </div>
               <div>
                 <label class="block text-xs font-bold text-brand-gray mb-1.5">종료일</label>
-                <input id="event-date-end" type="date" class="drawer-input w-full">
+                <input id="event-date-end" type="date" class="drawer-input w-full" onchange="_evRpSyncFromInput()">
               </div>
+            </div>
+            <!-- 인라인 Range 캘린더 -->
+            <div class="rounded-2xl border border-brand-border p-3 bg-brand-bg/30">
+              <div class="flex items-center justify-between mb-2 px-1">
+                <span id="event-rp-month-label" class="font-bold text-sm">2026년 5월</span>
+                <div class="flex items-center gap-1">
+                  <button type="button" onclick="evRpPrev()" class="w-7 h-7 rounded-full hover:bg-white flex items-center justify-center" title="이전 달">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                  </button>
+                  <button type="button" onclick="evRpToday()" class="px-2 py-0.5 rounded-md text-[11px] font-bold hover:bg-white">오늘</button>
+                  <button type="button" onclick="evRpNext()" class="w-7 h-7 rounded-full hover:bg-white flex items-center justify-center" title="다음 달">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="grid grid-cols-7 gap-0 mb-1 px-1">
+                <div class="text-center text-[11px] font-bold text-brand-pink py-1">일</div>
+                <div class="text-center text-[11px] font-bold text-brand-gray py-1">월</div>
+                <div class="text-center text-[11px] font-bold text-brand-gray py-1">화</div>
+                <div class="text-center text-[11px] font-bold text-brand-gray py-1">수</div>
+                <div class="text-center text-[11px] font-bold text-brand-gray py-1">목</div>
+                <div class="text-center text-[11px] font-bold text-brand-gray py-1">금</div>
+                <div class="text-center text-[11px] font-bold text-brand-blue py-1">토</div>
+              </div>
+              <div id="event-rp-grid" class="grid grid-cols-7 gap-0 px-1 pb-1"></div>
+              <div class="text-[10px] text-brand-gray text-center mt-2">날짜를 두 번 클릭하면 시작일·종료일 범위가 설정됩니다.</div>
             </div>
             <div>
               <label class="block text-xs font-bold text-brand-gray mb-1.5">행사 제품 / 메모</label>
@@ -16387,6 +16413,133 @@ function _evFmtMD(yyyymmdd) {
   const m = String(yyyymmdd).match(/^(\d{4})-(\d{2})-(\d{2})$/);
   return m ? `${m[2]}.${m[3]}` : String(yyyymmdd);
 }
+
+// ── Range picker (모달 안 인라인 캘린더) ─────────────────────
+let _evRpYear  = new Date().getFullYear();
+let _evRpMonth = new Date().getMonth();
+// 0 = 다음 클릭은 시작일 (range 새로 시작)
+// 1 = 다음 클릭은 종료일 (range 확장)
+let _evRpStage = 0;
+
+function evRpPrev() {
+  _evRpMonth--;
+  if (_evRpMonth < 0) { _evRpMonth = 11; _evRpYear--; }
+  evRpRender();
+}
+function evRpNext() {
+  _evRpMonth++;
+  if (_evRpMonth > 11) { _evRpMonth = 0; _evRpYear++; }
+  evRpRender();
+}
+function evRpToday() {
+  const t = new Date();
+  _evRpYear = t.getFullYear();
+  _evRpMonth = t.getMonth();
+  evRpRender();
+}
+function _evRpSyncFromInput() {
+  // input 직접 입력 시 그 달로 캘린더 이동
+  const ds = document.getElementById('event-date-start')?.value || '';
+  if (ds) {
+    const m = ds.match(/^(\d{4})-(\d{2})-/);
+    if (m) {
+      _evRpYear = parseInt(m[1]);
+      _evRpMonth = parseInt(m[2]) - 1;
+    }
+  }
+  _evRpStage = 0;
+  evRpRender();
+  if (typeof _evUpdateTitlePreview === 'function') _evUpdateTitlePreview();
+}
+
+function evRpPickDay(key) {
+  const startEl = document.getElementById('event-date-start');
+  const endEl   = document.getElementById('event-date-end');
+  if (_evRpStage === 0) {
+    // 새 range 시작 — 시작일만 설정, 종료일 비움
+    startEl.value = key;
+    endEl.value = '';
+    _evRpStage = 1;
+  } else {
+    // range 확장 — 시작일보다 빠르면 시작일 교체, 늦으면 종료일 설정
+    const curStart = startEl.value;
+    if (!curStart) {
+      startEl.value = key;
+    } else if (key < curStart) {
+      endEl.value = curStart;
+      startEl.value = key;
+    } else {
+      endEl.value = key;
+    }
+    _evRpStage = 0;
+  }
+  evRpRender();
+  if (typeof _evUpdateTitlePreview === 'function') _evUpdateTitlePreview();
+}
+
+function evRpRender() {
+  const monthLabel = document.getElementById('event-rp-month-label');
+  if (monthLabel) monthLabel.textContent = `${_evRpYear}년 ${_evRpMonth + 1}월`;
+  const grid = document.getElementById('event-rp-grid');
+  if (!grid) return;
+  const ds = document.getElementById('event-date-start')?.value || '';
+  const de = document.getElementById('event-date-end')?.value || '';
+  const today = (new Date()).toISOString().slice(0,10);
+
+  const firstDow = new Date(_evRpYear, _evRpMonth, 1).getDay();
+  const lastDate = new Date(_evRpYear, _evRpMonth + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) {
+    const d = new Date(_evRpYear, _evRpMonth, 1 - (firstDow - i));
+    cells.push({ date: d, isOther: true });
+  }
+  for (let day = 1; day <= lastDate; day++) {
+    cells.push({ date: new Date(_evRpYear, _evRpMonth, day), isOther: false });
+  }
+  while (cells.length % 7 !== 0) {
+    const last = cells[cells.length - 1].date;
+    const d = new Date(last);
+    d.setDate(d.getDate() + 1);
+    cells.push({ date: d, isOther: true });
+  }
+
+  grid.innerHTML = cells.map(cell => {
+    const k = `${cell.date.getFullYear()}-${String(cell.date.getMonth()+1).padStart(2,'0')}-${String(cell.date.getDate()).padStart(2,'0')}`;
+    const dow = cell.date.getDay();
+    const isToday = k === today;
+    const isStart = ds && k === ds;
+    const isEnd   = de && k === de;
+    const inRange = ds && de && k > ds && k < de;
+    let bg = '', fg = '', radius = '999px', shadow = '';
+    if (isStart && isEnd) {
+      bg = '#1A73E8'; fg = '#fff';
+    } else if (isStart) {
+      bg = '#1A73E8'; fg = '#fff';
+      radius = de ? '999px 0 0 999px' : '999px';
+    } else if (isEnd) {
+      bg = '#1A73E8'; fg = '#fff';
+      radius = '0 999px 999px 0';
+    } else if (inRange) {
+      bg = '#DBEAFE'; fg = '#1E40AF'; radius = '0';
+    } else if (isToday) {
+      fg = '#1A73E8'; shadow = 'inset 0 0 0 1.5px #1A73E8';
+    }
+    const dowColor = cell.isOther
+      ? '#D1D5DB'
+      : (dow === 0 ? '#E91E63' : (dow === 6 ? '#2196F3' : '#1A1A1A'));
+    const useColor = (isStart || isEnd || inRange) ? fg : dowColor;
+    const cls = cell.isOther ? 'opacity-40' : '';
+    const style = `
+      display:flex;align-items:center;justify-content:center;
+      height:30px;font-size:12px;font-weight:600;cursor:pointer;
+      color:${useColor};
+      ${bg ? `background:${bg};` : ''}
+      ${shadow ? `box-shadow:${shadow};` : ''}
+      border-radius:${radius};
+    `.replace(/\s+/g, ' ');
+    return `<div class="${cls}" style="${style}" onclick="evRpPickDay('${k}')">${cell.date.getDate()}</div>`;
+  }).join('');
+}
 // 사이트+이름+날짜로 표시 제목 합성 (예: "이베이 빡세일 05.08-05.14")
 function _evComposeTitle(site, name, dateStart, dateEnd) {
   const dateRange = (dateStart && dateEnd && dateEnd !== dateStart)
@@ -16415,6 +16568,17 @@ function openAddEventModal(dateKey) {
   document.getElementById('event-date-end').value = '';
   document.getElementById('event-products').value = '';
   _evUpdateTitlePreview();
+  // Range picker 초기화 — 클릭한 날짜(또는 오늘) 의 달로 이동
+  if (dateKey) {
+    const m = dateKey.match(/^(\d{4})-(\d{2})-/);
+    if (m) { _evRpYear = parseInt(m[1]); _evRpMonth = parseInt(m[2]) - 1; }
+  } else {
+    const t = new Date();
+    _evRpYear = t.getFullYear();
+    _evRpMonth = t.getMonth();
+  }
+  _evRpStage = dateKey ? 1 : 0; // dateKey 가 있으면 시작일 이미 있는 상태 → 다음 클릭은 종료일
+  evRpRender();
   // 모달 열기
   const bd = document.getElementById('event-modal-backdrop');
   bd.classList.remove('hidden');
@@ -16452,6 +16616,11 @@ function openEditEventModal(id) {
   document.getElementById('event-date-end').value = ev.dateEnd || '';
   document.getElementById('event-products').value = ev.products || '';
   _evUpdateTitlePreview();
+  // Range picker 를 시작일이 있는 달로 이동
+  const sm = (ev.dateStart || '').match(/^(\d{4})-(\d{2})-/);
+  if (sm) { _evRpYear = parseInt(sm[1]); _evRpMonth = parseInt(sm[2]) - 1; }
+  _evRpStage = 0;
+  evRpRender();
   const bd = document.getElementById('event-modal-backdrop');
   bd.classList.remove('hidden');
   bd.classList.add('open');
