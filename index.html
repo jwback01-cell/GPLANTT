@@ -16755,52 +16755,111 @@ function deleteCurrentEvent() {
   renderEventsCalendar();
 }
 
-// 현재 표시 중인 달의 행사들을 .txt 파일로 내보내기
-// 형식:  {title}\n{products}\n\n{title}\n{products}\n\n...
+// 행사 내보내기 — 사용자에게 시작일/종료일을 직접 입력받아 .txt 다운로드
+// 기본 범위: 캘린더가 가리키는 달 기준 [전달 8일 ~ 이번달 10일]
 function exportEventsAsText() {
+  // 기본값 계산 — 현재 표시된 달의 [전달 8일 ~ 이번달 10일]
+  const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const defStart = fmt(new Date(_eventsYear, _eventsMonth - 1, 8));
+  const defEnd   = fmt(new Date(_eventsYear, _eventsMonth, 10));
+
+  // 기존 모달 제거
+  const old = document.getElementById('events-export-modal');
+  if (old) old.remove();
+  const m = document.createElement('div');
+  m.id = 'events-export-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML = `
+    <div style="background:white;border-radius:16px;max-width:440px;width:100%;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="padding:18px 22px;border-bottom:1px solid #eee;">
+        <div style="font-weight:bold;font-size:16px;">📤 행사 내역 내보내기</div>
+        <div style="color:#888;font-size:12px;margin-top:4px;">선택한 기간에 걸친 행사를 메모장(.txt) 파일로 다운로드합니다.</div>
+      </div>
+      <div style="padding:18px 22px;display:flex;flex-direction:column;gap:14px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <label style="display:block;font-size:11px;font-weight:bold;color:#666;margin-bottom:4px;">시작일</label>
+            <input id="ev-export-start" type="date" value="${defStart}" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:bold;color:#666;margin-bottom:4px;">종료일</label>
+            <input id="ev-export-end" type="date" value="${defEnd}" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+          </div>
+        </div>
+        <div style="font-size:11px;color:#666;background:#F9FAFB;border-radius:8px;padding:10px 12px;">
+          기본값: 현재 캘린더가 가리키는 달 기준 <b>전달 8일 ~ 이번달 10일</b><br>
+          행사의 일부라도 이 기간에 걸치면 포함됩니다.
+        </div>
+      </div>
+      <div style="padding:14px 22px;border-top:1px solid #eee;display:flex;justify-content:flex-end;gap:8px;">
+        <button onclick="document.getElementById('events-export-modal').remove()"
+                style="padding:9px 18px;border-radius:14px;border:1px solid #ddd;background:white;cursor:pointer;font-size:13px;font-weight:bold;">취소</button>
+        <button onclick="_doEventsExport()"
+                style="padding:9px 22px;border-radius:14px;border:none;background:#1A1A1A;color:white;cursor:pointer;font-size:13px;font-weight:bold;">다운로드</button>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+}
+
+function _doEventsExport() {
+  const startEl = document.getElementById('ev-export-start');
+  const endEl   = document.getElementById('ev-export-end');
+  const rangeStart = startEl ? startEl.value : '';
+  const rangeEnd   = endEl   ? endEl.value   : '';
+  if (!rangeStart || !rangeEnd) { alert('시작일과 종료일을 모두 선택해 주세요.'); return; }
+  if (rangeEnd < rangeStart) { alert('종료일은 시작일보다 빠를 수 없어요.'); return; }
+
   const events = _loadEvents();
-  // 현재 달과 겹치는 행사만 (시작일 ≤ 월말 AND 종료일 ≥ 월초)
-  const monthStart = `${_eventsYear}-${String(_eventsMonth + 1).padStart(2,'0')}-01`;
-  const lastDay = new Date(_eventsYear, _eventsMonth + 1, 0).getDate();
-  const monthEnd = `${_eventsYear}-${String(_eventsMonth + 1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
   const catSel = document.getElementById('events-category-filter');
   const filterCat = catSel ? catSel.value : '';
 
+  // 행사가 [rangeStart, rangeEnd] 와 일부라도 겹치면 포함
   const visible = events.filter(ev => {
     const start = ev.dateStart || ev.dateEnd;
     const end   = ev.dateEnd   || ev.dateStart;
     if (!start) return false;
-    if (end < monthStart || start > monthEnd) return false;
+    if (end < rangeStart || start > rangeEnd) return false;
     if (filterCat && (ev.site || ev.category) !== filterCat) return false;
     return true;
   });
 
   if (!visible.length) {
-    alert('현재 달에 내보낼 행사가 없습니다.');
+    alert('해당 기간에 내보낼 행사가 없습니다.');
     return;
   }
 
   // 시작일 오름차순 정렬
   visible.sort((a, b) => String(a.dateStart || '').localeCompare(String(b.dateStart || '')));
 
-  // 각 행사 = 제목 + 빈 줄 + 행사 제품 메모, 행사 사이는 빈 줄
+  // 각 행사 = 제목 + 줄바꿈 + 행사 제품 메모, 행사 사이는 빈 줄
   const text = visible.map(ev => {
     const title = ev.title || '';
     const products = (ev.products || '').trim();
     return products ? `${title}\n${products}` : title;
   }).join('\n\n');
 
+  // 파일명 — "행사내역_3월08일-4월10일.txt" 형식
+  const _toMD = (yyyymmdd) => {
+    const m = yyyymmdd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? `${parseInt(m[2])}월${m[3]}일` : yyyymmdd;
+  };
+  const fileName = `행사내역_${_toMD(rangeStart)}-${_toMD(rangeEnd)}.txt`;
+
   // .txt 파일로 다운로드 — UTF-8 BOM 포함 (메모장이 한글 잘 읽도록)
   const BOM = '﻿';
   const blob = new Blob([BOM + text], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const stamp = `${_eventsYear}-${String(_eventsMonth + 1).padStart(2,'0')}`;
   a.href = url;
-  a.download = `행사내역_${stamp}.txt`;
+  a.download = fileName;
   document.body.appendChild(a);
   a.click();
   setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+
+  // 모달 닫기
+  const m = document.getElementById('events-export-modal');
+  if (m) m.remove();
 }
 
 function prevMonth() {
