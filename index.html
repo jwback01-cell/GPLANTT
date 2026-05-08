@@ -361,9 +361,11 @@ tailwind.config = {
     font-size: 11px; font-weight: 700;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     position: relative; z-index: 2; align-self: center;
-    margin: 1px 0; pointer-events: auto; cursor: grab;
+    /* 셀 padding(8px) 안쪽에 위치하도록 좌우 여백 — 둥근 테두리 안에 표시 */
+    margin: 1px 6px; pointer-events: auto; cursor: grab;
     display: flex; align-items: center; line-height: 1;
     user-select: none;
+    box-sizing: border-box;
   }
   .cal-bar:active { cursor: grabbing; }
   .cal-bar--dragging { opacity: 0.4; }
