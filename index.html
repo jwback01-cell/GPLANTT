@@ -2711,6 +2711,10 @@ tailwind.config = {
             <span class="absolute right-4 top-1/2 -translate-y-1/2 text-brand-gray text-sm font-bold pointer-events-none">원</span>
           </div>
         </div>
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-bold">폴더코드 <span class="text-brand-gray font-medium">(분류용, 예: 0001)</span></label>
+          <input id="new-product-folder-code" type="text" placeholder="예: 0001" class="drawer-input">
+        </div>
       </div>
       <!-- 오류 메시지 -->
       <div id="drawer-error" class="hidden bg-brand-pink-light/60 border border-brand-pink-light rounded-xl p-3.5 flex items-start gap-2.5 text-brand-pink">
@@ -11173,7 +11177,7 @@ function renderProductsPage() {
       '<div class="flex items-center gap-3 md:gap-4 cursor-pointer rounded-xl -mx-1 px-1 py-1 hover:bg-brand-bg transition-colors" onclick="openEditProduct(' + p.id + ')" title="클릭하여 수정">' +
         '<div class="w-12 md:w-14 h-12 md:h-14 rounded-xl ' + bg + ' ' + fg + ' flex items-center justify-center font-bold shrink-0">' + escHtml(initials) + '</div>' +
         '<div><div class="font-bold text-sm mb-0.5">' + escHtml(p.name) + linkBadge + '</div>' +
-        '<div class="text-brand-gray text-xs font-medium">SKU: ' + escHtml(p.sku||'') + ' | ' + escHtml(p.category||'') + (p.cost ? ' | 원가 ' + Number(p.cost).toLocaleString('ko-KR') + '원' : '') + (p.supply_price ? ' | 공급가 ' + Number(p.supply_price).toLocaleString('ko-KR') + '원' : '') + (p.shipping_fee ? ' | 택배비 ' + Number(p.shipping_fee).toLocaleString('ko-KR') + '원' : '') + (p.shipping_cost ? ' | 택배비용 ' + Number(p.shipping_cost).toLocaleString('ko-KR') + '원' : '') + (p.created_at ? ' | 등록 ' + String(p.created_at).slice(0, 10) : '') + '</div></div>' +
+        '<div class="text-brand-gray text-xs font-medium">SKU: ' + escHtml(p.sku||'') + ' | ' + escHtml(p.category||'') + (p.folder_code ? ' | 📁 ' + escHtml(p.folder_code) : '') + (p.cost ? ' | 원가 ' + Number(p.cost).toLocaleString('ko-KR') + '원' : '') + (p.supply_price ? ' | 공급가 ' + Number(p.supply_price).toLocaleString('ko-KR') + '원' : '') + (p.shipping_fee ? ' | 택배비 ' + Number(p.shipping_fee).toLocaleString('ko-KR') + '원' : '') + (p.shipping_cost ? ' | 택배비용 ' + Number(p.shipping_cost).toLocaleString('ko-KR') + '원' : '') + (p.created_at ? ' | 등록 ' + String(p.created_at).slice(0, 10) : '') + '</div></div>' +
       '</div>' +
       '<div class="text-right"><input type="number" value="' + p.stock + '" class="' + stockClass + '"></div>' +
       '<div class="text-right"><input type="number" value="' + p.safety_stock + '" class="input-stock" style="border-style:dashed"></div>' +
@@ -11364,9 +11368,13 @@ async function submitBulkEditProducts() {
   closeBulkEditProductDrawer();
 
   if (strippedCols.size) {
-    const colLabels = { cost: '원가', supply_price: '공급가', shipping_fee: '택배비', shipping_cost: '택배비용' };
+    const colLabels = { cost: '원가', supply_price: '공급가', shipping_fee: '택배비', shipping_cost: '택배비용', folder_code: '폴더코드' };
     const missingLabels = [...strippedCols].map(c => colLabels[c] || c).join(' · ');
-    const sqlCols = [...strippedCols].map(c => `ALTER TABLE products ADD COLUMN IF NOT EXISTS ${c} INTEGER DEFAULT 0;`).join('\n');
+    const sqlCols = [...strippedCols].map(c => {
+      // folder_code 는 TEXT, 그 외는 INTEGER 기본
+      const type = (c === 'folder_code') ? 'TEXT' : 'INTEGER DEFAULT 0';
+      return `ALTER TABLE products ADD COLUMN IF NOT EXISTS ${c} ${type};`;
+    }).join('\n');
     showAppAlert(
       '일부 항목이 저장되지 않았어요',
       `"${missingLabels}" 값은 반영되지 않았습니다. 데이터베이스에 해당 컬럼이 없기 때문이에요.\n\n해결 방법: Supabase → SQL Editor에서 아래 SQL을 한 번만 실행한 뒤 다시 시도해 주세요.`,
@@ -11572,8 +11580,8 @@ function resetImport() {
 
 function downloadImportTemplate() {
   const ws = XLSX.utils.aoa_to_sheet([
-    ['상품명', 'SKU', '카테고리', '현재 재고', '안전 재고', '원가', '공급가', '택배비', '택배비용', '등록일'],
-    ['예시) 프리미엄 코튼 티셔츠', 'TS-24SS-WH-01', '지플랜', 100, 20, 8500, 9500, 3000, 2500, ''],
+    ['상품명', 'SKU', '카테고리', '현재 재고', '안전 재고', '원가', '공급가', '택배비', '택배비용', '등록일', '폴더코드'],
+    ['예시) 프리미엄 코튼 티셔츠', 'TS-24SS-WH-01', '지플랜', 100, 20, 8500, 9500, 3000, 2500, '', '0001'],
   ]);
   ws['!cols'] = [
     { wch: 40 }, // 상품명
@@ -11586,6 +11594,7 @@ function downloadImportTemplate() {
     { wch: 12 }, // 택배비
     { wch: 12 }, // 택배비용
     { wch: 12 }, // 등록일
+    { wch: 12 }, // 폴더코드
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '상품 목록');
@@ -11628,6 +11637,7 @@ function processExcelFile(file) {
         supply:  findColIdx(header, ['공급가', 'supply_price', '공급단가']),
         shipFee: findColIdx(header, ['택배비', '배송비', 'shipping_fee']),
         shipCost: findColIdx(header, ['택배비용', '택배 비용', 'shipping_cost', '배송비용']),
+        folderCode: findColIdx(header, ['폴더코드', '폴더 코드', 'folder_code', '폴더']),
       };
 
       if (idx.name === -1 || idx.sku === -1) {
@@ -11647,6 +11657,7 @@ function processExcelFile(file) {
           supply:   idx.supply   !== -1 ? (parseInt(row[idx.supply])   || 0) : 0,
           shipFee:  idx.shipFee  !== -1 ? (parseInt(row[idx.shipFee])  || 0) : 0,
           shipCost: idx.shipCost !== -1 ? (parseInt(row[idx.shipCost]) || 0) : 0,
+          folderCode: idx.folderCode !== -1 ? String(row[idx.folderCode] || '').trim() : '',
         }));
 
       // SKU 중복 자동 병합 (대소문자/공백 무시, 마지막 행 우선)
@@ -11759,7 +11770,8 @@ async function confirmImport() {
       cost: r.cost || 0,
       supply_price: r.supply || 0,
       shipping_fee: r.shipFee || 0,
-      shipping_cost: r.shipCost || 0
+      shipping_cost: r.shipCost || 0,
+      folder_code: r.folderCode || ''
     };
     const skuKey = r.sku ? r.sku.trim().toLowerCase() : '';
     const matchedId = skuKey && existingBySku.get(skuKey);
@@ -11829,9 +11841,13 @@ async function confirmImport() {
   if (hasError) summary += `\n실패: 수정 ${updErr}건 · 신규 ${insErr}건`;
 
   if (hasMissing) {
-    const colLabels = { cost: '원가', supply_price: '공급가', shipping_fee: '택배비', shipping_cost: '택배비용' };
+    const colLabels = { cost: '원가', supply_price: '공급가', shipping_fee: '택배비', shipping_cost: '택배비용', folder_code: '폴더코드' };
     const missingLabels = [...strippedCols].map(c => colLabels[c] || c).join(' · ');
-    const sqlCols = [...strippedCols].map(c => `ALTER TABLE products ADD COLUMN IF NOT EXISTS ${c} INTEGER DEFAULT 0;`).join('\n');
+    const sqlCols = [...strippedCols].map(c => {
+      // folder_code 는 TEXT, 그 외는 INTEGER 기본
+      const type = (c === 'folder_code') ? 'TEXT' : 'INTEGER DEFAULT 0';
+      return `ALTER TABLE products ADD COLUMN IF NOT EXISTS ${c} ${type};`;
+    }).join('\n');
     showAppAlert(
       '일부 항목이 저장되지 않았어요',
       `${summary}\n\n"${missingLabels}" 값은 반영되지 않았습니다.\n데이터베이스에 해당 컬럼이 없기 때문이에요.\n\n해결 방법: Supabase → SQL Editor에서 아래 SQL을 한 번만 실행한 뒤 다시 가져오기 해 주세요.`,
@@ -12499,6 +12515,8 @@ function openEditProduct(id) {
   document.getElementById('new-product-supply').value = p.supply_price ?? 0;
   document.getElementById('new-product-ship-fee').value = p.shipping_fee ?? 0;
   document.getElementById('new-product-ship-cost').value = p.shipping_cost ?? 0;
+  const _fcEl = document.getElementById('new-product-folder-code');
+  if (_fcEl) _fcEl.value = p.folder_code ?? '';
   document.getElementById('drawer-error').classList.add('hidden');
 
   // 모달 제목/버튼 변경
@@ -12913,6 +12931,8 @@ function openAddProductDrawer() {
   document.getElementById('new-product-supply').value = '0';
   document.getElementById('new-product-ship-fee').value = '0';
   document.getElementById('new-product-ship-cost').value = '0';
+  const _fcEl2 = document.getElementById('new-product-folder-code');
+  if (_fcEl2) _fcEl2.value = '';
   document.getElementById('drawer-error').classList.add('hidden');
   // 제목/버튼 초기화
   var titleEl = document.querySelector('#add-product-drawer .text-xl');
@@ -12951,6 +12971,7 @@ async function submitAddProduct() {
   const supply   = parseInt(document.getElementById('new-product-supply').value) || 0;
   const shipFee  = parseInt(document.getElementById('new-product-ship-fee').value) || 0;
   const shipCost = parseInt(document.getElementById('new-product-ship-cost').value) || 0;
+  const folderCode = String(document.getElementById('new-product-folder-code')?.value || '').trim();
   const errEl    = document.getElementById('drawer-error');
   const errMsg   = document.getElementById('drawer-error-msg');
   const showErr  = (msg) => { errMsg.textContent = msg; errEl.classList.remove('hidden'); };
@@ -12985,6 +13006,7 @@ async function submitAddProduct() {
     if (m.includes("'supply_price'") || (m.includes('supply_price') && m.includes('column')) || (m.includes('supply') && m.includes('column'))) cols.push('supply_price');
     if (m.includes("'shipping_fee'") || (m.includes('shipping_fee') && m.includes('column'))) cols.push('shipping_fee');
     if (m.includes("'shipping_cost'") || (m.includes('shipping_cost') && m.includes('column'))) cols.push('shipping_cost');
+    if (m.includes("'folder_code'") || (m.includes('folder_code') && m.includes('column'))) cols.push('folder_code');
     return cols;
   };
   const _stripCols = (obj, cols) => { const out = { ...obj }; for (const c of cols) delete out[c]; return out; };
@@ -13016,7 +13038,7 @@ async function submitAddProduct() {
     return prev ? Number(prev.stock || 0) : 0;
   })() : 0;
   try {
-    const fullBase = { name, sku, category: cat, stock, safety_stock: safety, cost, supply_price: supply, shipping_fee: shipFee, shipping_cost: shipCost };
+    const fullBase = { name, sku, category: cat, stock, safety_stock: safety, cost, supply_price: supply, shipping_fee: shipFee, shipping_cost: shipCost, folder_code: folderCode };
     const full = isEditing ? fullBase : { user_id: session.user.id, ...fullBase };
     const error = await tryWrite(full);
     if (error) { showErr((isEditing ? '수정 실패: ' : '상품 추가 실패: ') + error.message + (error.details ? ` (${error.details})` : '')); return; }
@@ -13042,9 +13064,13 @@ async function submitAddProduct() {
 
   // DB 컬럼이 없어서 필드가 누락된 경우 — 사용자에게 명확히 알려줌
   if (strippedCols.size) {
-    const colLabels = { cost: '원가', supply_price: '공급가', shipping_fee: '택배비', shipping_cost: '택배비용' };
+    const colLabels = { cost: '원가', supply_price: '공급가', shipping_fee: '택배비', shipping_cost: '택배비용', folder_code: '폴더코드' };
     const missingLabels = [...strippedCols].map(c => colLabels[c] || c).join(' · ');
-    const sqlCols = [...strippedCols].map(c => `ALTER TABLE products ADD COLUMN IF NOT EXISTS ${c} INTEGER DEFAULT 0;`).join('\n');
+    const sqlCols = [...strippedCols].map(c => {
+      // folder_code 는 TEXT, 그 외는 INTEGER 기본
+      const type = (c === 'folder_code') ? 'TEXT' : 'INTEGER DEFAULT 0';
+      return `ALTER TABLE products ADD COLUMN IF NOT EXISTS ${c} ${type};`;
+    }).join('\n');
     showAppAlert(
       '일부 항목이 저장되지 않았어요',
       `"${missingLabels}" 값은 반영되지 않았습니다.\n데이터베이스에 해당 컬럼이 없기 때문이에요.\n\n해결 방법: Supabase → SQL Editor에서 아래 SQL을 한 번만 실행한 뒤 다시 저장해 주세요.`,
@@ -13097,7 +13123,7 @@ function exportProductsExcel() {
   }
 
   // SKU 컬럼이 재업로드 시 기존 상품을 매칭하기 위한 키 (수정하지 마세요)
-  const headers = ['상품명', 'SKU', '카테고리', '현재 재고', '안전 재고', '원가', '공급가', '택배비', '택배비용', '등록일'];
+  const headers = ['상품명', 'SKU', '카테고리', '현재 재고', '안전 재고', '원가', '공급가', '택배비', '택배비용', '등록일', '폴더코드'];
   const data = [headers];
   list.forEach(p => {
     data.push([
@@ -13110,7 +13136,8 @@ function exportProductsExcel() {
       Number(p.supply_price || 0),
       Number(p.shipping_fee || 0),
       Number(p.shipping_cost || 0),
-      p.created_at ? String(p.created_at).slice(0, 10) : ''
+      p.created_at ? String(p.created_at).slice(0, 10) : '',
+      p.folder_code || ''
     ]);
   });
 
