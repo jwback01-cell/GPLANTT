@@ -25337,6 +25337,7 @@ function _aggregateJetByItemName(rows) {
         qty: 0, price: 0, supply: 0, ship: 0, shipCost: 0, cost: 0, profit: 0,
         receiver: '',
         savedAt: '',
+        _months: new Set(),
         _minDate: '', _maxDate: '',
       });
     }
@@ -25349,17 +25350,23 @@ function _aggregateJetByItemName(rows) {
     a.cost     += Number(r.cost) || 0;
     a.profit   += Number(r.profit) || 0;
     if (r.date) {
+      // 월(MM) 추출 — 'YYYY-MM-DD', 'YYYYMMDD' 등 다양한 포맷 처리
+      const m = String(r.date).match(/(\d{4})[-./]?(\d{2})/);
+      if (m) a._months.add(parseInt(m[2], 10));
       if (!a._minDate || r.date < a._minDate) a._minDate = r.date;
       if (!a._maxDate || r.date > a._maxDate) a._maxDate = r.date;
     }
     if (r.itemCode && !a.itemCode) a.itemCode = r.itemCode;
   }
-  return [...map.values()].map(a => ({
-    ...a,
-    date: (a._minDate && a._maxDate)
-      ? (a._minDate === a._maxDate ? a._minDate : `${a._minDate} ~ ${a._maxDate}`)
-      : '',
-  }));
+  return [...map.values()].map(a => {
+    // 월 목록: 1월, 2월, 3월 형태 (정산주기 기준이므로 월별로 묶음)
+    const months = [...a._months].sort((x, y) => x - y);
+    let dateLabel = '';
+    if (months.length === 1) dateLabel = `${months[0]}월`;
+    else if (months.length > 1) dateLabel = months.map(m => `${m}월`).join(', ');
+    else if (a._minDate) dateLabel = a._minDate; // 폴백
+    return { ...a, date: dateLabel };
+  });
 }
 
 function renderUploadData() {
