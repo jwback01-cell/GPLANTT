@@ -27276,13 +27276,28 @@ function _jetRowToUploadEntry(reportType, r) {
   return base;
 }
 
-// 리포트 행들을 업로드 데이터에 누적 추가
+// 리포트 행들을 업로드 데이터에 누적 추가 (중복 방지 — 같은 주문ID+배송ID+SKU+금액 조합은 한 번만)
 function _appendJetRowsToUploadData(reportType, rows) {
   if (!Array.isArray(rows) || !rows.length) return;
   try {
     const data = _loadUploadData();
-    const entries = rows.map(r => _jetRowToUploadEntry(reportType, r));
-    _saveUploadData(data.concat(entries));
+    const tpl = 'jet-' + reportType;
+    // 같은 reportType 의 기존 행에서 (siteCode=주문ID + itemCode=SKU + shipCost+supply 금액) 키 추출
+    const seen = new Set(
+      data.filter(r => r.template === tpl)
+          .map(r => `${r.siteCode}|${r.itemCode}|${r.shipCost}|${r.supply}|${r.date}`)
+    );
+    const newEntries = [];
+    let dropped = 0;
+    rows.forEach(r => {
+      const e = _jetRowToUploadEntry(reportType, r);
+      const k = `${e.siteCode}|${e.itemCode}|${e.shipCost}|${e.supply}|${e.date}`;
+      if (seen.has(k)) { dropped++; return; }
+      seen.add(k);
+      newEntries.push(e);
+    });
+    if (dropped > 0) console.log(`[jet→upload] ${tpl} 중복 ${dropped}건 제외, 신규 ${newEntries.length}건 추가`);
+    if (newEntries.length) _saveUploadData(data.concat(newEntries));
     if (typeof renderUploadData === 'function') try { renderUploadData(); } catch(_) {}
   } catch (e) { console.warn('[jet→upload] 추가 실패', e); }
 }
@@ -27483,13 +27498,25 @@ async function handleJetIoShipFile(evt) {
     }
     if (ioRows.length) {
       const prev = _loadJetReport('io');
-      _saveJetReport('io', prev.concat(ioRows));
-      _appendJetRowsToUploadData('io', ioRows);
+      const seen = new Set(prev.map(r => `${r.orderId}|${r.shipId}|${r.skuId}|${r.amount}|${r.date}`));
+      const fresh = ioRows.filter(r => {
+        const k = `${r.orderId}|${r.shipId}|${r.skuId}|${r.amount}|${r.date}`;
+        if (seen.has(k)) return false;
+        seen.add(k); return true;
+      });
+      _saveJetReport('io', prev.concat(fresh));
+      _appendJetRowsToUploadData('io', fresh);
     }
     if (shipRows.length) {
       const prev = _loadJetReport('ship');
-      _saveJetReport('ship', prev.concat(shipRows));
-      _appendJetRowsToUploadData('ship', shipRows);
+      const seen = new Set(prev.map(r => `${r.orderId}|${r.shipId}|${r.skuId}|${r.amount}|${r.date}`));
+      const fresh = shipRows.filter(r => {
+        const k = `${r.orderId}|${r.shipId}|${r.skuId}|${r.amount}|${r.date}`;
+        if (seen.has(k)) return false;
+        seen.add(k); return true;
+      });
+      _saveJetReport('ship', prev.concat(fresh));
+      _appendJetRowsToUploadData('ship', fresh);
     }
     const detail = debug.map(d => `${d.sheetName}→${d.target}(${d.rows}건)`).join(' / ');
     _jetStatus('io', `✅ 입출고비 ${ioRows.length}건 / 배송비 ${shipRows.length}건 추가됨 (업로드 데이터에도 자동 반영) · ${detail}`, 'ok');
