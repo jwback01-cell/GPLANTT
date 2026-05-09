@@ -27514,8 +27514,8 @@ function _parseJetIoSheet(aoa) {
     name:  _jetHeaderIdx(h, '등록상품명'),
     optName: _jetHeaderIdx(h, '옵션명'),
     qty:   _jetHeaderIdx(h, '판매수량','수량'),
-    // 입출고비: 발생비용(A) 우선 (사용자 요청대로 raw cost). 없으면 할인적용가/최종비용/입출고비 폴백
-    cost:  _jetHeaderIdx(h, '발생비용(A)','발생비용','할인적용가(A-B)','할인적용가','최종비용','입출고비','입출고요금'),
+    // 입출고비: 할인적용가(A-B) 우선 — 실제 청구되는 금액 (발생비용에서 할인 차감 후)
+    cost:  _jetHeaderIdx(h, '할인적용가(A-B)','할인적용가','발생비용(A)','발생비용','최종비용','입출고비','입출고요금'),
   };
   const rows = [];
   for (let i = (meta.dataStartIdx != null ? meta.dataStartIdx : meta.headerRowIdx + 1); i < aoa.length; i++) {
@@ -27557,8 +27557,8 @@ function _parseJetShipSheet(aoa) {
     name:  _jetHeaderIdx(h, '등록상품명'),
     optName: _jetHeaderIdx(h, '옵션명'),
     qty:   _jetHeaderIdx(h, '판매수량','수량'),
-    // 배송비: 발생비용(A) 우선 (사용자 요청대로 raw cost — 최종비용은 추가비용 포함되어 더 큼)
-    cost:  _jetHeaderIdx(h, '발생비용(A)','발생비용','할인적용가(A-B)','할인적용가','최종비용','배송비','배송요금'),
+    // 배송비: 최종비용 우선 — 실제 청구되는 금액 (할인적용가 + 추가비용)
+    cost:  _jetHeaderIdx(h, '최종비용','할인적용가(A-B)','할인적용가','발생비용(A)','발생비용','배송비','배송요금'),
   };
   const rows = [];
   for (let i = (meta.dataStartIdx != null ? meta.dataStartIdx : meta.headerRowIdx + 1); i < aoa.length; i++) {
