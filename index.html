@@ -2902,8 +2902,8 @@ tailwind.config = {
           <div class="w-16 h-16 rounded-2xl bg-brand-blue-light flex items-center justify-center mb-4">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2196F3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           </div>
-          <div class="font-bold text-lg mb-1">여기에 파일을 끌어다 놓으세요</div>
-          <div class="text-brand-gray text-sm mb-3">또는 클릭하여 파일을 선택하세요</div>
+          <div class="font-bold text-lg mb-1">📂 드래그 앤 드롭으로 파일 업로드</div>
+          <div class="text-brand-gray text-sm mb-3">파일을 이 영역에 끌어다 놓거나 클릭해 선택하세요</div>
           <div class="text-xs text-brand-gray mb-5">지원 형식: .xlsx, .xls · 최대 10MB</div>
           <input id="upload-file-input" type="file" accept=".xlsx,.xls" class="hidden" onchange="uploadFileSelected(event)">
           <div class="flex items-center gap-2 flex-wrap justify-center">
@@ -26477,6 +26477,15 @@ function _setUploadStatus(msg, show) {
   document.getElementById('upload-status-msg').textContent = msg;
   bar.classList.remove('hidden');
 }
+
+// 페이지 어디에 파일을 떨어뜨려도 브라우저가 파일을 열지 않도록 document 레벨에서 기본 동작 차단
+// (dropzone 외부에 잘못 떨어뜨려도 페이지가 바뀌지 않음)
+window.addEventListener('dragover', (e) => { e.preventDefault(); }, false);
+window.addEventListener('drop', (e) => {
+  // dropzone 안이면 그쪽 핸들러가 알아서 처리 — 외부면 그냥 무시
+  const inDropzone = e.target.closest && e.target.closest('#upload-dropzone, [id^="jet-"][id$="-drop"], #cps-drop, #event-modal-backdrop');
+  if (!inDropzone) e.preventDefault();
+}, false);
 
 function uploadDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('border-brand-black','bg-brand-bg/50'); }
 function uploadDragLeave(e) { e.currentTarget.classList.remove('border-brand-black','bg-brand-bg/50'); }
