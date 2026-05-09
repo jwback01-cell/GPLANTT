@@ -27505,7 +27505,8 @@ function _parseJetIoSheet(aoa) {
   console.log('[jet-io] 헤더 행 idx=' + meta.headerRowIdx + ', 컬럼:', meta.header);
   const h = meta.header;
   const I = {
-    date:  _jetHeaderIdx(h, '매출인식일','발생일'),
+    // 날짜: 정산주기(종료일) 우선 — 월말 정산 기준 (사용자 요청)
+    date:  _jetHeaderIdx(h, '정산주기(종료일)','정산주기 종료일','정산주기','매출인식일','발생일(배송완료일)','발생일'),
     ordId: _jetHeaderIdx(h, '주문ID'),
     shipId: _jetHeaderIdx(h, '배송ID'),
     skuId: _jetHeaderIdx(h, 'SKU ID','SKU'),
@@ -27548,7 +27549,8 @@ function _parseJetShipSheet(aoa) {
   console.log('[jet-ship] 헤더 행 idx=' + meta.headerRowIdx + ', 컬럼:', meta.header);
   const h = meta.header;
   const I = {
-    date:  _jetHeaderIdx(h, '매출인식일','발생일'),
+    // 날짜: 정산주기(종료일) 우선 — 월말 정산 기준 (사용자 요청)
+    date:  _jetHeaderIdx(h, '정산주기(종료일)','정산주기 종료일','정산주기','매출인식일','발생일(배송완료일)','발생일'),
     ordId: _jetHeaderIdx(h, '주문ID'),
     shipId: _jetHeaderIdx(h, '배송ID'),
     skuId: _jetHeaderIdx(h, 'SKU ID','SKU'),
@@ -27654,7 +27656,7 @@ function _parseJetOrderSheet(aoa) {
   console.log('[jet-order] 헤더 행 idx=' + meta.headerRowIdx + ', 컬럼:', meta.header);
   const h = meta.header;
   const I = {
-    date:  _jetHeaderIdx(h, '매출인식일','발생일'),
+    date:  _jetHeaderIdx(h, '정산주기(종료일)','정산주기 종료일','정산주기','매출인식일','발생일(배송완료일)','발생일'),
     ordId: _jetHeaderIdx(h, '주문ID'),
     skuId: _jetHeaderIdx(h, 'SKU ID','SKU'),
     prodId: _jetHeaderIdx(h, '등록상품 ID','등록상품ID'),
@@ -27702,7 +27704,7 @@ function _parseJetFeeSheet(aoa) {
   console.log('[jet-fee] 헤더 행 idx=' + meta.headerRowIdx + ', 컬럼:', meta.header);
   const h = meta.header;
   const I = {
-    date:  _jetHeaderIdx(h, '매출인식일','발생일'),
+    date:  _jetHeaderIdx(h, '정산주기(종료일)','정산주기 종료일','정산주기','매출인식일','발생일(배송완료일)','발생일'),
     ordId: _jetHeaderIdx(h, '주문ID'),
     skuId: _jetHeaderIdx(h, 'SKU ID','SKU'),
     prodId: _jetHeaderIdx(h, '등록상품 ID','등록상품ID'),
@@ -27757,7 +27759,7 @@ async function handleJetStorageFile(evt) {
     const h = meta.header;
     console.log('[jet-storage] 헤더 행 idx=' + meta.headerRowIdx + ', dataStartIdx=' + meta.dataStartIdx + ', 컬럼:', h);
     const I = {
-      date:    _jetHeaderIdx(h, '매출인식일','발생일'),
+      date:    _jetHeaderIdx(h, '정산주기(종료일)','정산주기 종료일','정산주기','매출인식일','발생일(배송완료일)','발생일'),
       display: _jetHeaderIdx(h, '진열일'),
       period:  _jetHeaderIdx(h, '보관기간'),
       skuId:   _jetHeaderIdx(h, 'SKU ID','SKU'),
