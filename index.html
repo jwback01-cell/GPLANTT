@@ -26078,7 +26078,8 @@ function _reconcileParseSheet(data, mode = 'sale') {
     const type = typeIdx >= 0 ? String(row[typeIdx] || '').trim() : '';
     if (type) {
       if (mode === 'purchase') {
-        if (!/매입|수금/.test(type)) continue; // 매출 행 스킵
+        // 매입 모드 — 매입 행만 (수금/매출 행 모두 스킵)
+        if (!/매입/.test(type) || /수금/.test(type)) continue;
       } else {
         if (!/매출/.test(type)) continue; // 매입/수금 행 스킵
       }
@@ -26177,12 +26178,15 @@ function _reconcileCompare(ledgerRows, mode = 'sale') {
   const ledgerKeySet = new Set(ledgerRows.map(L => _key(L.date, L.recv)));
   const onlyGplan = targets.filter(r => !usedGplan.has(r._idx) && !ledgerKeySet.has(_key(r.date, r.receiver)));
 
-  // GPLAN 택배비용(shipCost) 일자별 합계 — 거래원장 택배 행과 비교용
+  // GPLAN 택배 합계 일자별 — 거래원장 택배 행과 비교용
+  // sale 모드: r.shipCost(택배비용 — 우리 실비)
+  // purchase 모드: r.ship(택배비 — 거래처와 정산하는 금액)
   const gplanShipByDate = {};
   targets.forEach(r => {
     const d = String(r.date || '').slice(0, 10);
     if (!d) return;
-    gplanShipByDate[d] = (gplanShipByDate[d] || 0) + (Number(r.shipCost) || 0);
+    const v = mode === 'purchase' ? (Number(r.ship) || 0) : (Number(r.shipCost) || 0);
+    gplanShipByDate[d] = (gplanShipByDate[d] || 0) + v;
   });
 
   // GPLAN을 (날짜+수령자) 키로 그룹핑 — 세트상품 합계 비교용
@@ -26607,9 +26611,9 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
         tQty,                                 // 수량 합
         tUnit,                                // 단가
         tSale,                                // 매출/지급 또는 매입/수금 합
-        'GPLAN 택배비용(shipCost) 합계',       // 품명(GPLAN)
+        isPurchase ? 'GPLAN 택배비(ship) 합계' : 'GPLAN 택배비용(shipCost) 합계', // 품명(GPLAN)
         '',                                   // 수령자(GPLAN)
-        gShipSum,                             // 원가/단가(GPLAN) → 택배비용 합계
+        gShipSum,                             // 매입(택배비) 또는 매출(택배비용) 합계
         tDiff,                                // 차이
       ]);
 
