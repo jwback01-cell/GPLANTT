@@ -26513,7 +26513,8 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile) {
           sumDiff += diffNoMatch;
           unmatchedInGroup++;
         } else {
-          const diff = ledgerGroupSale - gplanGroupCost;
+          // 차이 = 업로드데이터(GPLAN 원가) - 엑셀(거래원장 매출)
+          const diff = gplanGroupCost - ledgerGroupSale;
           // 다중 행 그룹이면 안내 표시
           const groupLabel = (groupItems.length > 1 || gplanRows.length > 1)
             ? `${gplanNameLabel} [그룹 합계: 거래원장 ${groupItems.length}건 ↔ GPLAN ${gplanRows.length}건]`
@@ -26574,7 +26575,8 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile) {
     });
     onlyGforDate.forEach(G => {
       const gCost = Number(G.cost) || 0;
-      const diffG = 0 - gCost;
+      // 차이 = 업로드데이터(GPLAN 원가) - 엑셀(0, 거래원장에 없음)
+      const diffG = gCost - 0;
       rows.push([
         G.date || '',                         // 거래일자
         '매출',                                // 구분
