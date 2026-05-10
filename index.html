@@ -26336,7 +26336,9 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile) {
         const gplanRecvLabel = gplanRows.length > 0 ? _displayRecv(gplanRows[0].receiver) : '';
 
         if (gplanRows.length === 0) {
-          rows.push([...left, '', '', '', '값 없음']);
+          // GPLAN 에 매칭 행 없음 — 차이 = 거래원장 그룹 합계 (GPLAN 원가 0이므로)
+          rows.push([...left, '', '', '', ledgerGroupSale]);
+          sumDiff += ledgerGroupSale;
           unmatchedInGroup++;
         } else {
           const diff = ledgerGroupSale - gplanGroupCost;
@@ -26388,9 +26390,11 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile) {
     }
 
     // 3) GPLAN 에만 있는 행 (해당 날짜) — 거래원장 컬럼은 비우고 GPLAN 측만 채움
+    //    차이 = 거래원장 매출(0) - GPLAN 원가 = -gCost
     const onlyGforDate = onlyGByDate[date] || [];
     onlyGforDate.forEach(G => {
       const gCost = Number(G.cost) || 0;
+      const diffG = 0 - gCost;
       rows.push([
         G.date || '',                         // 거래일자
         '매출',                                // 구분
@@ -26402,16 +26406,15 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile) {
         G.itemName || '',                      // 품명(GPLAN)
         _displayRecv(G.receiver),              // 수령자(GPLAN)
         gCost,                                 // 원가(GPLAN)
-        '거래원장에 없음',                     // 차이
+        diffG,                                 // 차이 (-gCost)
       ]);
       sumGCost += gCost;
+      sumDiff += diffG;
     });
 
-    // 4) 날짜별 소계 행
+    // 4) 날짜별 소계 행 — 값 없음 행도 차이에 포함됨 (위에서 sumDiff += ledgerGroupSale)
     const totalCount = regularItems.length + (taekbaeItems.length > 0 ? 1 : 0) + onlyGforDate.length;
-    const diffCell = (unmatchedInGroup > 0)
-      ? `${sumDiff.toLocaleString('ko-KR')} (값없음 ${unmatchedInGroup}건 제외)`
-      : sumDiff;
+    const diffCell = sumDiff;
     rows.push([
       '',                                 // 거래일자
       '소 계',                            // 구분
