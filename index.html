@@ -25726,16 +25726,24 @@ function _doConvertSelectedToReturn(targetRows) {
   const todayDate = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
   const savedAt = `${todayDate} ${String(_now.getHours()).padStart(2,'0')}:${String(_now.getMinutes()).padStart(2,'0')}`;
 
-  // 각 행을 음수로 복제
-  const NUM_FIELDS = ['qty','price','supply','ship','shipCost','cost','profit','shipFee'];
+  // 각 행을 음수로 복제 — profit 은 수동 재계산 (입력값이 음수면 결과가 양수가 될 수 있음)
+  const NEG_FIELDS = ['qty','price','supply','ship','shipCost','cost','shipFee'];
   const newRows = targetRows.map(orig => {
     const clone = { ...orig };
-    NUM_FIELDS.forEach(k => {
+    NEG_FIELDS.forEach(k => {
       if (clone[k] != null && clone[k] !== '') {
         const n = Number(clone[k]) || 0;
-        clone[k] = -Math.abs(n); // 항상 음수 (이미 음수면 그대로)
+        clone[k] = -Math.abs(n); // 항상 음수
       }
     });
+    // 마진 재계산: 공급가 + 택배비 - 원가 - 택배비용
+    // (원본이 -13,500 이면 반품 후 +13,500 이 정상 — 비용이 음수가 되어 회수됨)
+    const _supply   = Number(clone.supply)   || 0;
+    const _ship     = Number(clone.ship)     || 0;
+    const _cost     = Number(clone.cost)     || 0;
+    const _shipCost = Number(clone.shipCost) || 0;
+    clone.profit = _supply + _ship - _cost - _shipCost;
+
     // 사이트에 '반품' 표시 (구분용)
     const origSite = String(orig.site || '').trim();
     clone.site = /반품/.test(origSite) ? origSite : (origSite ? `${origSite} (반품)` : '반품');
