@@ -29678,8 +29678,10 @@ function previewEcountTransfer() {
           const stateBadge = isDup
             ? '<span class="px-2 py-0.5 rounded-md bg-brand-bg text-brand-gray text-[11px] font-bold">중복</span>'
             : '<span class="px-2 py-0.5 rounded-md bg-brand-blue-light text-brand-blue text-[11px] font-bold">신규</span>';
+          // 신규 행은 기본 체크 (전송 대상). 중복은 미체크 (강제 재전송 시 사용자가 직접 체크)
+          const checkedAttr = isDup ? '' : 'checked';
           return `<tr class="border-t border-brand-border ${dimCls}">
-            <td class="px-3 py-2.5 text-center"><input type="checkbox" class="ecount-prev-cb" data-idx="${r._origIdx}" onchange="_updateEcountPreviewSelCount()"></td>
+            <td class="px-3 py-2.5 text-center"><input type="checkbox" class="ecount-prev-cb" data-idx="${r._origIdx}" data-is-dup="${isDup ? '1' : '0'}" ${checkedAttr} onchange="_updateEcountPreviewSelCount()"></td>
             <td class="px-4 py-2.5">${stateBadge}</td>
             <td class="px-4 py-2.5">${r.date||''}</td>
             <td class="px-4 py-2.5">${r.vendor||''}</td>
@@ -30204,11 +30206,38 @@ async function sendToEcount() {
   const items = Array.from(document.querySelectorAll('.ecount-item:checked')).map(c => c.value);
   if (items.length === 0) { _markAbort('선택 항목 없음'); showAppAlert('선택 항목 없음', '전송할 데이터가 없습니다. 기간/항목을 다시 선택해 주세요.', 'warn'); return; }
   const all = _collectEcountRows();
-  const { fresh: rows, dup, sent } = _splitDuplicates(all);
+  const split = _splitDuplicates(all);
+  const sent = split.sent;
+  // 미리보기 화면에서 체크박스로 선택된 행만 전송
+  // (체크박스가 없으면 — 미리보기 미사용 — 종전처럼 신규 전체를 전송)
+  const previewCbs = document.querySelectorAll('.ecount-prev-cb');
+  let rows;
+  let dup;
+  if (previewCbs.length > 0) {
+    const checkedIdx = new Set(
+      [...previewCbs]
+        .filter(c => c.checked)
+        .map(c => parseInt(c.getAttribute('data-idx'), 10))
+        .filter(n => !isNaN(n))
+    );
+    rows = all.filter(r => checkedIdx.has(r._origIdx));
+    // 체크된 행 중에 시그니처가 이미 보낸 적 있는 것은 강제 재전송 처리
+    rows.forEach(r => { try { sent.delete(_rowSignature(r)); } catch(_) {} });
+    _saveSentSignatures(sent);
+    dup = []; // 체크 기반 전송에서는 dup 안내 모달 띄우지 않음
+  } else {
+    rows = split.fresh;
+    dup  = split.dup;
+  }
   if (rows.length === 0) {
     _markAbort('전송할 데이터 없음');
-    if (dup.length > 0) _openEcountDupModal(dup);
-    else showAppAlert('전송할 데이터 없음', '기간/항목을 다시 선택해 주세요.', 'warn');
+    if (previewCbs.length > 0) {
+      showAppAlert('전송할 데이터 없음', '미리보기에서 전송할 행을 1개 이상 체크해 주세요.', 'warn');
+    } else if (dup.length > 0) {
+      _openEcountDupModal(dup);
+    } else {
+      showAppAlert('전송할 데이터 없음', '기간/항목을 다시 선택해 주세요.', 'warn');
+    }
     return;
   }
 
