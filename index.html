@@ -4106,6 +4106,7 @@ tailwind.config = {
               <button onclick="openSeoulLivingReconcile()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-blue hover:bg-brand-bg" title="서울리빙 거래원장 엑셀과 비교해 누락/추가/값 불일치 행 찾기">🔍 거래원장 대조</button>
               <input type="file" id="reconcile-file-input" accept=".xlsx,.xls,.csv" class="hidden" onchange="_reconcileFileChosen(event)">
               <button onclick="openManualUploadModal()" class="px-4 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:-translate-y-0.5 transition-transform shadow-md">+ 수기 등록</button>
+              <button onclick="convertSelectedToReturn()" class="px-4 py-2 rounded-full border border-brand-pink bg-brand-pink-light text-sm font-bold text-brand-pink hover:bg-brand-pink hover:text-white transition-colors" title="선택한 행의 모든 숫자(수량/단가/공급가/택배비/원가 등)를 음수로 복제">↩ 반품으로 처리</button>
               <button onclick="exportUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg">엑셀 내보내기</button>
               <button id="upload-data-delete-btn" onclick="deleteSelectedUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-pink hover:bg-brand-bg">선택 삭제 <span id="upload-data-sel-count" class="ml-1 text-xs text-brand-gray">(0)</span></button>
             </div>
@@ -25688,6 +25689,76 @@ function toggleAllUploadData(cb) {
   document.querySelectorAll('.upload-data-cb').forEach(c => { c.checked = cb.checked; });
   updateUploadDataSelCount();
 }
+// ── 선택한 행을 반품으로 처리 (모든 금액·수량을 음수로 복제) ──
+function convertSelectedToReturn() {
+  const checkedRows = Array.from(document.querySelectorAll('.upload-data-cb:checked'));
+  // 일반 행만 처리 (제트 집계 행은 데이터 자체가 아니므로 제외)
+  const directIdxs = checkedRows
+    .filter(c => !c.classList.contains('upload-data-cb-jet'))
+    .map(c => parseInt(c.getAttribute('data-idx'), 10))
+    .filter(n => !isNaN(n));
+
+  if (directIdxs.length === 0) {
+    showAppAlert('선택 항목 없음', '반품 처리할 행을 먼저 선택해 주세요.', 'warn');
+    return;
+  }
+
+  const data = _loadUploadData();
+  const targetRows = directIdxs.map(i => data[i]).filter(Boolean);
+  if (!targetRows.length) {
+    showAppAlert('선택 행 없음', '선택한 행을 찾을 수 없습니다.', 'warn');
+    return;
+  }
+
+  if (!confirm(
+    `${targetRows.length}건을 반품으로 처리합니다.\n\n` +
+    `→ 같은 행을 복제하여 모든 숫자(수량 / 단가 / 공급가 / 택배비 / 원가 / 마진 등) 를 음수로 저장\n` +
+    `→ 사이트에 '반품' 표시가 추가됨\n\n` +
+    `진행하시겠습니까?`
+  )) return;
+
+  const _now = new Date();
+  const savedAt = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')} ${String(_now.getHours()).padStart(2,'0')}:${String(_now.getMinutes()).padStart(2,'0')}`;
+
+  // 각 행을 음수로 복제
+  const NUM_FIELDS = ['qty','price','supply','ship','shipCost','cost','profit','shipFee'];
+  const newRows = targetRows.map(orig => {
+    const clone = { ...orig };
+    NUM_FIELDS.forEach(k => {
+      if (clone[k] != null && clone[k] !== '') {
+        const n = Number(clone[k]) || 0;
+        clone[k] = -Math.abs(n); // 항상 음수 (이미 음수면 그대로)
+      }
+    });
+    // 사이트에 '반품' 표시 (구분용)
+    const origSite = String(orig.site || '').trim();
+    clone.site = /반품/.test(origSite) ? origSite : (origSite ? `${origSite} (반품)` : '반품');
+    clone.template = 'manual-return';
+    clone._isReturn = true;
+    clone._returnFrom = orig.savedAt || '';
+    clone.savedAt = savedAt;
+    return clone;
+  });
+
+  data.push(...newRows);
+  _saveUploadData(data);
+
+  // 화면 갱신 + 매출장부 동기화
+  if (typeof renderUploadData === 'function') renderUploadData();
+  if (typeof syncLedgerFromUploadData === 'function') syncLedgerFromUploadData();
+
+  // 체크박스 해제
+  document.querySelectorAll('.upload-data-cb').forEach(c => { c.checked = false; });
+  const sa = document.getElementById('upload-data-select-all'); if (sa) sa.checked = false;
+  if (typeof updateUploadDataSelCount === 'function') updateUploadDataSelCount();
+
+  showAppAlert('반품 처리 완료',
+    `${newRows.length}건이 음수 행으로 추가되었습니다.\n` +
+    `사이트에 '반품' 표시가 붙어 구분 가능합니다.\n` +
+    `매출장부에도 자동 반영되어 합계가 차감됩니다.`,
+    'success');
+}
+
 async function deleteSelectedUploadData() {
   // 일반 행 선택 (data-idx 기반)
   const checkedRows = Array.from(document.querySelectorAll('.upload-data-cb:checked'));
