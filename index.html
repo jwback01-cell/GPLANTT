@@ -26447,9 +26447,12 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile) {
         const gplanRecvLabel = gplanRows.length > 0 ? _displayRecv(gplanRows[0].receiver) : '';
 
         if (gplanRows.length === 0) {
-          // GPLAN 에 매칭 행 없음 — 차이 = 거래원장 그룹 합계 (GPLAN 원가 0이므로)
-          rows.push([...left, '', '', '', ledgerGroupSale]);
-          sumDiff += ledgerGroupSale;
+          // GPLAN 에 매칭 행 없음 — 차이 = -거래원장 매출 (부호 반대)
+          // 예: 한지희 매출 -10,000 → 차이 +10,000
+          //     (거래원장에서 환불(-) 처리됐는데 GPLAN 에 없으면 우리 입장에선 +)
+          const diffNoMatch = -ledgerGroupSale;
+          rows.push([...left, '', '', '', diffNoMatch]);
+          sumDiff += diffNoMatch;
           unmatchedInGroup++;
         } else {
           const diff = ledgerGroupSale - gplanGroupCost;
