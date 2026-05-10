@@ -2339,6 +2339,7 @@ tailwind.config = {
                 <th class="px-4 py-3 font-bold text-brand-gray text-xs uppercase tracking-wider text-right whitespace-nowrap">공급가</th>
                 <th class="px-4 py-3 font-bold text-brand-gray text-xs uppercase tracking-wider text-right whitespace-nowrap">택배비</th>
                 <th class="px-4 py-3 font-bold text-brand-gray text-xs uppercase tracking-wider text-right whitespace-nowrap">택배비용</th>
+                <th class="px-4 py-3 font-bold text-brand-gray text-xs uppercase tracking-wider text-center whitespace-nowrap">폴더코드</th>
               </tr>
             </thead>
             <tbody id="import-preview-tbody"></tbody>
@@ -11722,25 +11723,29 @@ function showImportPreview(filename, rows) {
   tbody.innerHTML = '';
   const existingSkus = new Set((typeof _allProducts !== 'undefined' ? _allProducts : []).map(p => String(p.sku || '').trim()).filter(Boolean));
   let updateCnt = 0, insertCnt = 0;
+  // undefined/null 은 '-' (변경 안 함), 명시적 값은 그대로 표시
+  const _disp = (v) => (v === undefined || v === null) ? '<span class="text-brand-gray">-</span>' : String(v);
+  const _dispNum = (v) => (v === undefined || v === null) ? '<span class="text-brand-gray">-</span>' : Number(v).toLocaleString();
   rows.forEach(r => {
     const isUpdate = !!r.sku && existingSkus.has(r.sku);
     if (isUpdate) updateCnt++; else insertCnt++;
-    const isLow = r.stock < r.safety && r.safety > 0;
+    const isLow = (r.stock !== undefined) && (r.safety !== undefined) && r.stock < r.safety && r.safety > 0;
     const tr = document.createElement('tr');
     tr.className = 'border-t border-brand-border hover:bg-brand-bg transition-colors';
     tr.innerHTML = `
       <td class="px-4 py-3 text-center">
         <span class="px-2 py-0.5 rounded-md text-[11px] font-bold ${isUpdate ? 'bg-brand-blue-light text-brand-blue' : 'bg-brand-green-light text-[#00C853]'}">${isUpdate ? '수정' : '신규'}</span>
       </td>
-      <td class="px-4 py-3 font-semibold text-sm max-w-[180px] truncate">${escHtml(r.name)}</td>
+      <td class="px-4 py-3 font-semibold text-sm max-w-[180px] truncate">${_disp(r.name ? escHtml(r.name) : null)}</td>
       <td class="px-4 py-3 text-xs font-mono text-brand-gray">${escHtml(r.sku)}</td>
-      <td class="px-4 py-3 text-sm">${escHtml(r.cat || '-')}</td>
-      <td class="px-4 py-3 text-sm text-right font-medium ${isLow ? 'text-brand-pink' : ''}">${r.stock.toLocaleString()}</td>
-      <td class="px-4 py-3 text-sm text-right font-medium">${r.safety.toLocaleString()}</td>
-      <td class="px-4 py-3 text-sm text-right font-medium">${(r.cost || 0).toLocaleString()}</td>
-      <td class="px-4 py-3 text-sm text-right font-medium">${(r.supply || 0).toLocaleString()}</td>
-      <td class="px-4 py-3 text-sm text-right font-medium">${(r.shipFee || 0).toLocaleString()}</td>
-      <td class="px-4 py-3 text-sm text-right font-medium">${(r.shipCost || 0).toLocaleString()}</td>`;
+      <td class="px-4 py-3 text-sm">${_disp(r.cat ? escHtml(r.cat) : null)}</td>
+      <td class="px-4 py-3 text-sm text-right font-medium ${isLow ? 'text-brand-pink' : ''}">${_dispNum(r.stock)}</td>
+      <td class="px-4 py-3 text-sm text-right font-medium">${_dispNum(r.safety)}</td>
+      <td class="px-4 py-3 text-sm text-right font-medium">${_dispNum(r.cost)}</td>
+      <td class="px-4 py-3 text-sm text-right font-medium">${_dispNum(r.supply)}</td>
+      <td class="px-4 py-3 text-sm text-right font-medium">${_dispNum(r.shipFee)}</td>
+      <td class="px-4 py-3 text-sm text-right font-medium">${_dispNum(r.shipCost)}</td>
+      <td class="px-4 py-3 text-sm text-center font-mono">${_disp(r.folderCode ? escHtml(r.folderCode) : null)}</td>`;
     tbody.appendChild(tr);
   });
   const rc = document.getElementById('import-rowcount');
