@@ -11645,19 +11645,33 @@ function processExcelFile(file) {
         errEl.classList.remove('hidden'); return;
       }
 
+      // 빈 셀은 undefined 로 보존 — UPDATE 시 그 컬럼은 변경하지 않음
+      // (값이 명시적으로 0/'' 으로 들어오면 그대로 적용, 진짜 비어있으면 변경 X)
+      const _txt = (v) => {
+        if (v === undefined || v === null) return undefined;
+        const s = String(v).trim();
+        return s === '' ? undefined : s;
+      };
+      const _num = (v) => {
+        if (v === undefined || v === null) return undefined;
+        const s = String(v).trim();
+        if (s === '') return undefined;
+        const n = parseInt(s);
+        return isNaN(n) ? undefined : n;
+      };
       const rawRows = data.slice(1)
-        .filter(row => String(row[idx.name] || '').trim() && String(row[idx.sku] || '').trim())
+        .filter(row => String(row[idx.sku] || '').trim()) // SKU 만 필수 (이름은 신규 등록 시 검증)
         .map(row => ({
-          name:     String(row[idx.name]  || '').trim(),
-          sku:      String(row[idx.sku]   || '').trim(),
-          cat:      idx.cat      !== -1 ? String(row[idx.cat]      || '').trim() : '',
-          stock:    idx.stock    !== -1 ? (parseInt(row[idx.stock])    || 0) : 0,
-          safety:   idx.safety   !== -1 ? (parseInt(row[idx.safety])   || 0) : 0,
-          cost:     idx.cost     !== -1 ? (parseInt(row[idx.cost])     || 0) : 0,
-          supply:   idx.supply   !== -1 ? (parseInt(row[idx.supply])   || 0) : 0,
-          shipFee:  idx.shipFee  !== -1 ? (parseInt(row[idx.shipFee])  || 0) : 0,
-          shipCost: idx.shipCost !== -1 ? (parseInt(row[idx.shipCost]) || 0) : 0,
-          folderCode: idx.folderCode !== -1 ? String(row[idx.folderCode] || '').trim() : '',
+          name:     idx.name     !== -1 ? _txt(row[idx.name])     : undefined,
+          sku:      String(row[idx.sku] || '').trim(),
+          cat:      idx.cat      !== -1 ? _txt(row[idx.cat])      : undefined,
+          stock:    idx.stock    !== -1 ? _num(row[idx.stock])    : undefined,
+          safety:   idx.safety   !== -1 ? _num(row[idx.safety])   : undefined,
+          cost:     idx.cost     !== -1 ? _num(row[idx.cost])     : undefined,
+          supply:   idx.supply   !== -1 ? _num(row[idx.supply])   : undefined,
+          shipFee:  idx.shipFee  !== -1 ? _num(row[idx.shipFee])  : undefined,
+          shipCost: idx.shipCost !== -1 ? _num(row[idx.shipCost]) : undefined,
+          folderCode: idx.folderCode !== -1 ? _txt(row[idx.folderCode]) : undefined,
         }));
 
       // SKU 중복 자동 병합 (대소문자/공백 무시, 마지막 행 우선)
@@ -11760,28 +11774,46 @@ async function confirmImport() {
   const inserts = [];
   // inserts 안에서도 SKU 중복이 발생하지 않도록 방어 (대소문자 무시)
   const insertedSkus = new Set();
+  let skippedNoChange = 0;        // UPDATE 인데 변경할 필드가 없는 행
+  let skippedNewNoName = 0;       // 신규 등록인데 상품명 누락된 행
   importedRows.forEach(r => {
-    const base = {
-      name: r.name,
-      sku: r.sku,
-      category: r.cat || '미분류',
-      stock: r.stock || 0,
-      safety_stock: r.safety || 0,
-      cost: r.cost || 0,
-      supply_price: r.supply || 0,
-      shipping_fee: r.shipFee || 0,
-      shipping_cost: r.shipCost || 0,
-      folder_code: r.folderCode || ''
-    };
     const skuKey = r.sku ? r.sku.trim().toLowerCase() : '';
     const matchedId = skuKey && existingBySku.get(skuKey);
     if (matchedId != null) {
-      updates.push({ id: matchedId, patch: base });
+      // ── UPDATE: 빈 셀은 변경 안 함, 값 있는 컬럼만 patch ──
+      const patch = {};
+      if (r.name      !== undefined) patch.name = r.name;
+      if (r.cat       !== undefined) patch.category = r.cat || '미분류';
+      if (r.stock     !== undefined) patch.stock = r.stock;
+      if (r.safety    !== undefined) patch.safety_stock = r.safety;
+      if (r.cost      !== undefined) patch.cost = r.cost;
+      if (r.supply    !== undefined) patch.supply_price = r.supply;
+      if (r.shipFee   !== undefined) patch.shipping_fee = r.shipFee;
+      if (r.shipCost  !== undefined) patch.shipping_cost = r.shipCost;
+      if (r.folderCode !== undefined) patch.folder_code = r.folderCode;
+      if (Object.keys(patch).length === 0) {
+        skippedNoChange++;
+        return;
+      }
+      updates.push({ id: matchedId, patch });
     } else {
-      // 같은 SKU가 inserts 안에 이미 있으면 건너뛰기 (방어)
+      // ── INSERT: 신규 등록 (이름 필수). 빈 값은 0/빈문자열로 폴백 ──
+      if (!r.name) { skippedNewNoName++; return; }
       if (skuKey && insertedSkus.has(skuKey)) return;
       if (skuKey) insertedSkus.add(skuKey);
-      inserts.push({ user_id: session.user.id, ...base });
+      inserts.push({
+        user_id: session.user.id,
+        name: r.name,
+        sku: r.sku,
+        category: r.cat || '미분류',
+        stock: r.stock ?? 0,
+        safety_stock: r.safety ?? 0,
+        cost: r.cost ?? 0,
+        supply_price: r.supply ?? 0,
+        shipping_fee: r.shipFee ?? 0,
+        shipping_cost: r.shipCost ?? 0,
+        folder_code: r.folderCode || ''
+      });
     }
   });
 
@@ -11871,6 +11903,9 @@ async function confirmImport() {
   if (okI) parts.push(`${okI}건 신규 등록`);
   let summary = parts.length ? parts.join(' · ') + ' 완료' : '처리된 상품이 없습니다';
   if (hasError) summary += `\n실패: 수정 ${updErr}건 · 신규 ${insErr}건`;
+  // 스킵 사유 안내
+  if (skippedNoChange > 0) summary += `\n변경 없음(빈 셀만): ${skippedNoChange}건`;
+  if (skippedNewNoName > 0) summary += `\n신규 등록 스킵(상품명 누락): ${skippedNewNoName}건`;
 
   // 실패 샘플 — 어떤 SKU/상품이 왜 실패했는지 표시
   let failureDetail = '';
