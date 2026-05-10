@@ -13400,12 +13400,16 @@ function _rcvUpdatePreview() {
   const prevCost  = Number(p.cost) || 0;
   const newStock  = prevStock + qty;
   const total     = qty * unit;
+  // 이동가중평균법 — 새 평균원가 = (기존재고×기존원가 + 입고수량×입고단가) / 새재고
+  const avgCost = (newStock > 0 && unit > 0)
+    ? Math.round((prevStock * prevCost + qty * unit) / newStock)
+    : (unit > 0 ? unit : prevCost);
   box.classList.remove('hidden');
   box.innerHTML = `
     <div class="font-bold text-brand-black mb-2">${_escapeHtml(p.name)} <span class="text-xs text-brand-gray font-mono">(${_escapeHtml(p.sku)})</span></div>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
       <div><span class="text-brand-gray">재고</span> <span class="font-bold">${prevStock.toLocaleString('ko-KR')}</span> → <span class="font-bold text-brand-blue">${newStock.toLocaleString('ko-KR')}</span> <span class="text-brand-gray">(+${qty.toLocaleString('ko-KR')})</span></div>
-      <div><span class="text-brand-gray">원가</span> <span class="font-bold">${prevCost.toLocaleString('ko-KR')}원</span> → <span class="font-bold text-brand-blue">${unit > 0 ? unit.toLocaleString('ko-KR') + '원' : '(미입력)'}</span></div>
+      <div><span class="text-brand-gray">평균 원가</span> <span class="font-bold">${prevCost.toLocaleString('ko-KR')}원</span> → <span class="font-bold text-brand-blue">${avgCost.toLocaleString('ko-KR')}원</span><br><span class="text-[10px] text-brand-gray">기존 ${prevStock}×${prevCost.toLocaleString('ko-KR')} + 신규 ${qty}×${(unit||0).toLocaleString('ko-KR')}</span></div>
       <div><span class="text-brand-gray">입고합계</span> <span class="font-bold text-brand-black">${total.toLocaleString('ko-KR')}원</span></div>
       <div><span class="text-brand-gray">카테고리</span> <span class="font-bold">${_escapeHtml(p.category || '-')}</span></div>
     </div>`;
@@ -13430,6 +13434,10 @@ async function submitReceiving() {
   const prevCost  = Number(product.cost) || 0;
   const newStock  = prevStock + qty;
   const total     = qty * unit;
+  // 이동가중평균법 — 기존 재고는 기존 원가, 신규 입고는 입고 단가로 가중평균
+  const avgCost = newStock > 0
+    ? Math.round((prevStock * prevCost + qty * unit) / newStock)
+    : unit;
 
   const ok = confirm(
     `입고 등록 확인\n─────────────────────\n` +
@@ -13442,15 +13450,16 @@ async function submitReceiving() {
     (memo ? `메모: ${memo}\n` : '') +
     `─────────────────────\n` +
     `재고: ${prevStock.toLocaleString('ko-KR')} → ${newStock.toLocaleString('ko-KR')}\n` +
-    `원가: ${prevCost.toLocaleString('ko-KR')}원 → ${unit.toLocaleString('ko-KR')}원\n\n` +
+    `평균 원가: ${prevCost.toLocaleString('ko-KR')}원 → ${avgCost.toLocaleString('ko-KR')}원\n` +
+    `  (기존 ${prevStock}개×${prevCost.toLocaleString('ko-KR')} + 신규 ${qty}개×${unit.toLocaleString('ko-KR')})\n\n` +
     `진행하시겠습니까?`
   );
   if (!ok) return;
 
-  // Supabase 업데이트
+  // Supabase 업데이트 — cost 는 가중평균
   try {
     const { error } = await _supabase.from('products')
-      .update({ stock: newStock, cost: unit })
+      .update({ stock: newStock, cost: avgCost })
       .eq('id', product.id);
     if (error) throw error;
   } catch (e) {
@@ -13459,7 +13468,7 @@ async function submitReceiving() {
   }
 
   // 재고 연동: 같은 그룹의 다른 상품도 동일하게 업데이트
-  try { await _syncLinkedFields(product.id, { stock: newStock, cost: unit }); } catch (_) {}
+  try { await _syncLinkedFields(product.id, { stock: newStock, cost: avgCost }); } catch (_) {}
 
   // 수불 이력 — 입고
   try {
@@ -13470,7 +13479,7 @@ async function submitReceiving() {
     });
   } catch (_) {}
 
-  // 이력 기록
+  // 이력 기록 — 입고 단가 + 가중평균 결과 모두 보관
   const hist = _loadReceivingHistory();
   hist.unshift({
     id: Date.now() + '_' + Math.random().toString(36).slice(2, 8),
@@ -13483,7 +13492,8 @@ async function submitReceiving() {
     total,
     memo,
     prevStock, newStock,
-    prevCost, newCost: unit,
+    prevCost, newCost: avgCost,    // 새 평균 원가
+    inboundUnit: unit,             // 입고 당시 신규 단가
     createdAt: new Date().toISOString(),
   });
   if (hist.length > 10000) hist.length = 10000;
@@ -13495,7 +13505,11 @@ async function submitReceiving() {
   document.getElementById('rcv-unit-price').value = '';
   _rcvUpdatePreview();
 
-  showAppAlert('입고 완료', `${product.name}\n+${qty.toLocaleString('ko-KR')}개 입고 처리되었습니다.\n원가: ${unit.toLocaleString('ko-KR')}원`, 'success');
+  showAppAlert('입고 완료',
+    `${product.name}\n+${qty.toLocaleString('ko-KR')}개 입고 처리되었습니다.\n` +
+    `입고 단가: ${unit.toLocaleString('ko-KR')}원\n` +
+    `평균 원가: ${prevCost.toLocaleString('ko-KR')}원 → ${avgCost.toLocaleString('ko-KR')}원 (가중평균)`,
+    'success');
 
   // _allProducts 새로고침 → 일반상품 / 재고금액 / 통계 카드 모두 자동 갱신
   await loadProductsFromDB();
