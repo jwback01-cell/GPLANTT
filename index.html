@@ -29524,6 +29524,44 @@ function _loadSentSignatures() {
 function _saveSentSignatures(set) {
   try { localStorage.setItem(ECOUNT_SENT_KEY, JSON.stringify(Array.from(set))); } catch (_) {}
 }
+// 이카운트 미리보기 선택 관리
+function _toggleAllEcountPreview(cb) {
+  document.querySelectorAll('.ecount-prev-cb').forEach(c => { c.checked = cb.checked; });
+  _updateEcountPreviewSelCount();
+}
+function _updateEcountPreviewSelCount() {
+  const all = document.querySelectorAll('.ecount-prev-cb');
+  const checked = [...all].filter(c => c.checked).length;
+  const lab = document.getElementById('ecount-prev-sel-count');
+  if (lab) lab.textContent = `(${checked})`;
+  const sa = document.getElementById('ecount-prev-select-all');
+  if (sa) sa.checked = all.length > 0 && checked === all.length;
+}
+function _deleteSelectedEcountPreview() {
+  const checked = [...document.querySelectorAll('.ecount-prev-cb:checked')];
+  if (!checked.length) { alert('삭제할 행을 먼저 선택해 주세요.'); return; }
+  const idxs = new Set(checked.map(c => parseInt(c.getAttribute('data-idx'), 10)).filter(n => !isNaN(n)));
+  if (!idxs.size) return;
+  showAppConfirm(
+    '선택한 행 삭제',
+    `${idxs.size}건을 업로드 데이터에서 영구 삭제합니다.\n\n` +
+    `→ 업로드 데이터에서 제거됨\n` +
+    `→ 매출장부 합계도 자동 갱신됨\n` +
+    `(이카운트 전송 이력은 그대로 유지)`,
+    () => {
+      const data = _loadUploadData();
+      const next = data.filter((_, i) => !idxs.has(i));
+      _saveUploadData(next);
+      if (typeof renderUploadData === 'function') try { renderUploadData(); } catch(_){}
+      if (typeof syncLedgerFromUploadData === 'function') try { syncLedgerFromUploadData(); } catch(_){}
+      // 미리보기 다시 그리기
+      previewEcountTransfer();
+      showAppAlert('삭제 완료', `${idxs.size}건이 삭제되었습니다.`, { type: 'success' });
+    },
+    { type: 'danger', confirmText: '삭제', confirmStyle: 'danger' }
+  );
+}
+
 function _splitDuplicates(rows) {
   const sent = _loadSentSignatures();
   const fresh = [];
@@ -29565,13 +29603,16 @@ function _collectEcountRows() {
   const startKey = start.replace(/-/g,'');
   const endKey   = end.replace(/-/g,'');
   const data  = _loadUploadData();
-  return data.filter(r => {
+  // 원본 인덱스 함께 반환 (선택 삭제용)
+  const out = [];
+  data.forEach((r, origIdx) => {
     const d = _normalizeDateStr(r.date).replace(/-/g,'');
-    if (!d || d.length < 8) return false;
-    if (startKey && d < startKey) return false;
-    if (endKey   && d > endKey)   return false;
-    return true;
+    if (!d || d.length < 8) return;
+    if (startKey && d < startKey) return;
+    if (endKey   && d > endKey)   return;
+    out.push(Object.assign({}, r, { _origIdx: origIdx }));
   });
+  return out;
 }
 function previewEcountTransfer() {
   const items = Array.from(document.querySelectorAll('.ecount-item:checked')).map(c => c.value);
@@ -29595,20 +29636,33 @@ function previewEcountTransfer() {
     document.getElementById('ecount-preview').scrollIntoView({behavior:'smooth', block:'start'});
     return;
   }
-  if (rows.length === 0) {
+  if (rows.length === 0 && dup.length === 0) {
     const total = _loadUploadData().length;
-    const msg = dup.length > 0
-      ? '선택한 기간의 ' + dup.length + '건 모두 이미 이카운트로 전송된 중복 데이터입니다.'
-      : '선택한 기간에 해당하는 업로드 데이터가 없습니다.<br>현재 저장된 업로드 데이터: <b>' + total + '건</b>. 기간을 넓혀서 다시 시도해 주세요.';
-    body.innerHTML = '<div class="p-6 text-sm text-brand-gray">' + msg + '</div>';
+    body.innerHTML = '<div class="p-6 text-sm text-brand-gray">선택한 기간에 해당하는 업로드 데이터가 없습니다.<br>현재 저장된 업로드 데이터: <b>' + total + '건</b>. 기간을 넓혀서 다시 시도해 주세요.</div>';
     document.getElementById('ecount-preview').scrollIntoView({behavior:'smooth', block:'start'});
     return;
   }
   const _f = v => Number(v||0).toLocaleString('ko-KR');
+  // 신규 + 중복 모두 표시 (중복은 회색/취소선)
+  const allDisplay = [
+    ...rows.map(r => ({ row: r, isDup: false })),
+    ...dup.map(r  => ({ row: r, isDup: true })),
+  ];
   body.innerHTML = `
+    <div class="px-4 py-3 border-b border-brand-border flex items-center justify-between gap-2 flex-wrap bg-brand-bg/40">
+      <div class="text-xs text-brand-gray">
+        <span class="text-brand-blue font-bold">신규 ${rows.length}건</span>
+        ${dup.length > 0 ? ` · <span class="text-brand-gray font-bold">중복 ${dup.length}건</span> (회색 표시 — 이미 전송됨)` : ''}
+      </div>
+      <button onclick="_deleteSelectedEcountPreview()" class="px-3 py-1.5 rounded-full border border-brand-pink bg-white text-xs font-bold text-brand-pink hover:bg-brand-pink hover:text-white transition-colors">
+        선택 삭제 <span id="ecount-prev-sel-count" class="ml-1 text-brand-gray">(0)</span>
+      </button>
+    </div>
     <table class="w-full text-sm">
       <thead>
         <tr class="bg-brand-bg text-brand-gray">
+          <th class="text-center px-3 py-3 font-bold text-xs w-10"><input type="checkbox" id="ecount-prev-select-all" onchange="_toggleAllEcountPreview(this)"></th>
+          <th class="text-left px-4 py-3 font-bold text-xs">상태</th>
           <th class="text-left px-4 py-3 font-bold text-xs">날짜</th>
           <th class="text-left px-4 py-3 font-bold text-xs">거래처</th>
           <th class="text-left px-4 py-3 font-bold text-xs">사이트</th>
@@ -29619,8 +29673,14 @@ function previewEcountTransfer() {
         </tr>
       </thead>
       <tbody>
-        ${rows.map(r => `
-          <tr class="border-t border-brand-border">
+        ${allDisplay.map(({ row: r, isDup }) => {
+          const dimCls = isDup ? 'opacity-50 bg-brand-bg/30' : '';
+          const stateBadge = isDup
+            ? '<span class="px-2 py-0.5 rounded-md bg-brand-bg text-brand-gray text-[11px] font-bold">중복</span>'
+            : '<span class="px-2 py-0.5 rounded-md bg-brand-blue-light text-brand-blue text-[11px] font-bold">신규</span>';
+          return `<tr class="border-t border-brand-border ${dimCls}">
+            <td class="px-3 py-2.5 text-center"><input type="checkbox" class="ecount-prev-cb" data-idx="${r._origIdx}" onchange="_updateEcountPreviewSelCount()"></td>
+            <td class="px-4 py-2.5">${stateBadge}</td>
             <td class="px-4 py-2.5">${r.date||''}</td>
             <td class="px-4 py-2.5">${r.vendor||''}</td>
             <td class="px-4 py-2.5">${r.site||''}</td>
@@ -29628,7 +29688,8 @@ function previewEcountTransfer() {
             <td class="px-4 py-2.5 text-right">${_f(r.qty)}</td>
             ${items.indexOf('sale')     !== -1 ? '<td class="px-4 py-2.5 text-right">' + _f(r.price) + '</td>' : ''}
             ${items.indexOf('purchase') !== -1 ? '<td class="px-4 py-2.5 text-right">' + _f(r.cost)  + '</td>' : ''}
-          </tr>`).join('')}
+          </tr>`;
+        }).join('')}
       </tbody>
     </table>`;
   document.getElementById('ecount-preview').scrollIntoView({behavior:'smooth', block:'start'});
