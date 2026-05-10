@@ -4106,7 +4106,8 @@ tailwind.config = {
               <button onclick="openSeoulLivingReconcile()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-blue hover:bg-brand-bg" title="서울리빙 거래원장 엑셀과 비교해 누락/추가/값 불일치 행 찾기">🔍 거래원장 대조</button>
               <input type="file" id="reconcile-file-input" accept=".xlsx,.xls,.csv" class="hidden" onchange="_reconcileFileChosen(event)">
               <button onclick="openManualUploadModal()" class="px-4 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:-translate-y-0.5 transition-transform shadow-md">+ 수기 등록</button>
-              <button onclick="convertSelectedToReturn()" class="px-4 py-2 rounded-full border border-brand-pink bg-brand-pink-light text-sm font-bold text-brand-pink hover:bg-brand-pink hover:text-white transition-colors" title="선택한 행의 모든 숫자(수량/단가/공급가/택배비/원가 등)를 음수로 복제">↩ 반품으로 처리</button>
+              <button onclick="convertSelectedToReturn('buyer')" class="px-4 py-2 rounded-full border border-brand-pink bg-brand-pink-light text-sm font-bold text-brand-pink hover:bg-brand-pink hover:text-white transition-colors" title="구매자 귀책 — 택배비용은 양수 그대로 (우리가 부담)">↩ 반품(구매자귀책)</button>
+              <button onclick="convertSelectedToReturn('seller')" class="px-4 py-2 rounded-full border border-brand-pink bg-brand-pink-light text-sm font-bold text-brand-pink hover:bg-brand-pink hover:text-white transition-colors" title="판매자 귀책 — 택배비용도 음수 처리 (회수)">↩ 반품(판매자귀책)</button>
               <button onclick="exportUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg">엑셀 내보내기</button>
               <button id="upload-data-delete-btn" onclick="deleteSelectedUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-pink hover:bg-brand-bg">선택 삭제 <span id="upload-data-sel-count" class="ml-1 text-xs text-brand-gray">(0)</span></button>
             </div>
@@ -25690,7 +25691,9 @@ function toggleAllUploadData(cb) {
   updateUploadDataSelCount();
 }
 // ── 선택한 행을 반품으로 처리 (모든 금액·수량을 음수로 복제) ──
-function convertSelectedToReturn() {
+// reason: 'buyer' = 구매자 귀책 (택배비용은 양수 유지 — 우리 부담)
+//          'seller' = 판매자 귀책 (택배비용도 음수 — 회수)
+function convertSelectedToReturn(reason) {
   const checkedRows = Array.from(document.querySelectorAll('.upload-data-cb:checked'));
   // 일반 행만 처리 (제트 집계 행은 데이터 자체가 아니므로 제외)
   const directIdxs = checkedRows
@@ -25710,24 +25713,38 @@ function convertSelectedToReturn() {
     return;
   }
 
+  const isSeller = reason === 'seller';
+  const reasonLabel = isSeller ? '판매자 귀책' : '구매자 귀책';
+  const shipCostNote = isSeller
+    ? '택배비용도 음수 처리 (우리 잘못 → 비용 회수)'
+    : '택배비용은 양수 유지 (구매자 잘못 → 우리가 부담)';
+
   showAppConfirm(
-    '반품으로 처리할까요?',
+    `반품(${reasonLabel})으로 처리할까요?`,
     `${targetRows.length}건의 행을 반품으로 변환합니다.\n\n` +
-    `→ 같은 행을 복제하여 모든 숫자(수량 / 단가 / 공급가 / 택배비 / 원가 / 마진 등)를 음수로 저장\n` +
-    `→ 사이트에 '반품' 표시가 추가되어 구분됩니다\n` +
-    `→ 매출장부 합계가 음수만큼 자동 차감됩니다`,
-    () => { _doConvertSelectedToReturn(targetRows); },
-    { type: 'warning', confirmText: '반품 처리', confirmStyle: 'danger' }
+    `→ 같은 행을 복제하여 수량 / 단가 / 공급가 / 원가 / 마진을 음수로 저장\n` +
+    `→ ${shipCostNote}\n` +
+    `→ 사이트에 '반품-${reasonLabel}' 표시가 추가됩니다\n` +
+    `→ 매출장부 합계가 자동 차감됩니다`,
+    () => { _doConvertSelectedToReturn(targetRows, reason); },
+    { type: 'warning', confirmText: `반품(${reasonLabel})`, confirmStyle: 'danger' }
   );
 }
 
-function _doConvertSelectedToReturn(targetRows) {
+function _doConvertSelectedToReturn(targetRows, reason) {
+  const isSeller = reason === 'seller';
+  const reasonLabel = isSeller ? '판매자귀책' : '구매자귀책';
   const _now = new Date();
   const todayDate = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
   const savedAt = `${todayDate} ${String(_now.getHours()).padStart(2,'0')}:${String(_now.getMinutes()).padStart(2,'0')}`;
 
-  // 각 행을 음수로 복제 — profit 은 수동 재계산 (입력값이 음수면 결과가 양수가 될 수 있음)
-  const NEG_FIELDS = ['qty','price','supply','ship','shipCost','cost','shipFee'];
+  // 음수로 변환할 필드들 — 판매자 귀책일 때만 shipCost 도 포함
+  // 구매자 귀책: 택배비용은 우리가 부담 (양수 유지) → shipCost 제외
+  // 판매자 귀책: 택배비용도 회수 (음수) → shipCost 포함
+  const NEG_FIELDS = isSeller
+    ? ['qty','price','supply','ship','shipCost','cost','shipFee']
+    : ['qty','price','supply','ship','cost','shipFee'];
+
   const newRows = targetRows.map(orig => {
     const clone = { ...orig };
     NEG_FIELDS.forEach(k => {
@@ -25736,19 +25753,23 @@ function _doConvertSelectedToReturn(targetRows) {
         clone[k] = -Math.abs(n); // 항상 음수
       }
     });
+    // 구매자 귀책일 때 — shipCost 는 그대로(양수) 유지 (우리가 부담)
+    // (clone.shipCost 는 ...orig 로 복사된 양수값 그대로)
+
     // 마진 재계산: 공급가 + 택배비 - 원가 - 택배비용
-    // (원본이 -13,500 이면 반품 후 +13,500 이 정상 — 비용이 음수가 되어 회수됨)
     const _supply   = Number(clone.supply)   || 0;
     const _ship     = Number(clone.ship)     || 0;
     const _cost     = Number(clone.cost)     || 0;
     const _shipCost = Number(clone.shipCost) || 0;
     clone.profit = _supply + _ship - _cost - _shipCost;
 
-    // 사이트에 '반품' 표시 (구분용)
+    // 사이트에 '반품-귀책' 표시
     const origSite = String(orig.site || '').trim();
-    clone.site = /반품/.test(origSite) ? origSite : (origSite ? `${origSite} (반품)` : '반품');
+    const tag = `반품-${reasonLabel}`;
+    clone.site = /반품/.test(origSite) ? origSite : (origSite ? `${origSite} (${tag})` : tag);
     clone.template = 'manual-return';
     clone._isReturn = true;
+    clone._returnReason = reason; // 'buyer' | 'seller'
     clone._returnFrom = orig.savedAt || '';
     clone._returnFromDate = orig.date || ''; // 원본 매출일 보관 (역추적)
     clone.date = todayDate;                  // 날짜 = 반품 처리한 오늘 날짜
@@ -25769,10 +25790,11 @@ function _doConvertSelectedToReturn(targetRows) {
   const sa = document.getElementById('upload-data-select-all'); if (sa) sa.checked = false;
   if (typeof updateUploadDataSelCount === 'function') updateUploadDataSelCount();
 
-  showAppAlert('반품 처리 완료',
+  showAppAlert(`반품(${reasonLabel}) 처리 완료`,
     `${newRows.length}건이 음수 행으로 추가되었습니다.\n` +
-    `사이트에 '반품' 표시가 붙어 구분 가능합니다.\n` +
-    `매출장부에도 자동 반영되어 합계가 차감됩니다.`,
+    (isSeller
+      ? `택배비용도 음수 처리되어 회수됩니다.`
+      : `택배비용은 양수 유지 (우리가 부담).`),
     { type: 'success' });
 }
 
