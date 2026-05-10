@@ -25723,7 +25723,8 @@ function convertSelectedToReturn() {
 
 function _doConvertSelectedToReturn(targetRows) {
   const _now = new Date();
-  const savedAt = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')} ${String(_now.getHours()).padStart(2,'0')}:${String(_now.getMinutes()).padStart(2,'0')}`;
+  const todayDate = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
+  const savedAt = `${todayDate} ${String(_now.getHours()).padStart(2,'0')}:${String(_now.getMinutes()).padStart(2,'0')}`;
 
   // 각 행을 음수로 복제
   const NUM_FIELDS = ['qty','price','supply','ship','shipCost','cost','profit','shipFee'];
@@ -25741,6 +25742,8 @@ function _doConvertSelectedToReturn(targetRows) {
     clone.template = 'manual-return';
     clone._isReturn = true;
     clone._returnFrom = orig.savedAt || '';
+    clone._returnFromDate = orig.date || ''; // 원본 매출일 보관 (역추적)
+    clone.date = todayDate;                  // 날짜 = 반품 처리한 오늘 날짜
     clone.savedAt = savedAt;
     return clone;
   });
