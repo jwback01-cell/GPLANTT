@@ -11793,10 +11793,12 @@ async function confirmImport() {
     if (m.includes("'supply_price'") || (m.includes('supply_price') && m.includes('column'))) cols.push('supply_price');
     if (m.includes("'shipping_fee'") || (m.includes('shipping_fee') && m.includes('column'))) cols.push('shipping_fee');
     if (m.includes("'shipping_cost'") || (m.includes('shipping_cost') && m.includes('column'))) cols.push('shipping_cost');
+    if (m.includes("'folder_code'") || (m.includes('folder_code') && m.includes('column'))) cols.push('folder_code');
     return cols;
   };
   const _stripCols = (obj, cols) => { const out = { ...obj }; for (const c of cols) delete out[c]; return out; };
   const strippedCols = new Set();
+  const failureSamples = []; // { sku, name, msg } — 실패 샘플 최대 10건
 
   let updErr = 0, insErr = 0;
   for (const u of updates) {
@@ -11810,10 +11812,15 @@ async function confirmImport() {
       patch = _stripCols(patch, missing);
       ({ error } = await _supabase.from('products').update(patch).eq('id', u.id));
     }
-    if (error) { updErr++; console.error('update error:', error); }
+    if (error) {
+      updErr++;
+      console.error('update error:', error, 'patch:', patch);
+      if (failureSamples.length < 10) failureSamples.push({ sku: patch.sku || '?', name: patch.name || '?', msg: error.message || String(error) });
+    }
   }
   if (inserts.length) {
     let rows = inserts;
+    // INSERT 도 missing column 자동 폴백 (한 번에 처리)
     let { error } = await _supabase.from('products').insert(rows);
     let attempts = 0;
     while (error && attempts++ < 4) {
@@ -11823,7 +11830,32 @@ async function confirmImport() {
       rows = rows.map(r => _stripCols(r, missing));
       ({ error } = await _supabase.from('products').insert(rows));
     }
-    if (error) { insErr = inserts.length; console.error('insert error:', error); }
+    if (error) {
+      // 일괄 INSERT 가 실패하면 행 단위로 다시 시도해서 어느 행이 문제인지 식별
+      console.error('insert (batch) error:', error);
+      let okOne = 0;
+      for (const row of rows) {
+        let r = row;
+        let { error: e1 } = await _supabase.from('products').insert([r]);
+        let a = 0;
+        while (e1 && a++ < 4) {
+          const m1 = _missingColFromErr(e1);
+          if (!m1.length) break;
+          m1.forEach(c => strippedCols.add(c));
+          r = _stripCols(r, m1);
+          ({ error: e1 } = await _supabase.from('products').insert([r]));
+        }
+        if (e1) {
+          insErr++;
+          console.error('insert (single) error:', e1, 'row:', r);
+          if (failureSamples.length < 10) failureSamples.push({ sku: r.sku || '?', name: r.name || '?', msg: e1.message || String(e1) });
+        } else {
+          okOne++;
+        }
+      }
+      // 최종 성공 갯수는 단일 모드 결과 사용
+      // (insErr 은 누적, 성공은 inserts.length - insErr)
+    }
   }
 
   closeImportModal();
@@ -11840,6 +11872,13 @@ async function confirmImport() {
   let summary = parts.length ? parts.join(' · ') + ' 완료' : '처리된 상품이 없습니다';
   if (hasError) summary += `\n실패: 수정 ${updErr}건 · 신규 ${insErr}건`;
 
+  // 실패 샘플 — 어떤 SKU/상품이 왜 실패했는지 표시
+  let failureDetail = '';
+  if (failureSamples.length) {
+    failureDetail = '\n\n실패 상세 (최대 10건):\n'
+      + failureSamples.map(f => `· [${f.sku}] ${f.name} — ${f.msg}`).join('\n');
+  }
+
   if (hasMissing) {
     const colLabels = { cost: '원가', supply_price: '공급가', shipping_fee: '택배비', shipping_cost: '택배비용', folder_code: '폴더코드' };
     const missingLabels = [...strippedCols].map(c => colLabels[c] || c).join(' · ');
@@ -11850,11 +11889,11 @@ async function confirmImport() {
     }).join('\n');
     showAppAlert(
       '일부 항목이 저장되지 않았어요',
-      `${summary}\n\n"${missingLabels}" 값은 반영되지 않았습니다.\n데이터베이스에 해당 컬럼이 없기 때문이에요.\n\n해결 방법: Supabase → SQL Editor에서 아래 SQL을 한 번만 실행한 뒤 다시 가져오기 해 주세요.`,
+      `${summary}\n\n"${missingLabels}" 값은 반영되지 않았습니다.\n데이터베이스에 해당 컬럼이 없기 때문이에요.\n\n해결 방법: Supabase → SQL Editor에서 아래 SQL을 한 번만 실행한 뒤 다시 가져오기 해 주세요.${failureDetail}`,
       { type: 'warning', code: sqlCols }
     );
   } else if (hasError) {
-    showAppAlert('가져오기 중 오류가 있었어요', summary, { type: 'warning' });
+    showAppAlert('가져오기 중 오류가 있었어요', summary + failureDetail, { type: 'warning' });
   } else if (parts.length) {
     showAppAlert('가져오기 완료', summary, { type: 'success' });
   }
