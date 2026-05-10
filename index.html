@@ -26523,6 +26523,9 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
   const allDateSet = new Set([...byDate.keys(), ...Object.keys(onlyGByDate)]);
   const sortedDates = [...allDateSet].sort();
 
+  // 전체 총계용 누적
+  let grandQty = 0, grandSale = 0, grandGCost = 0, grandDiff = 0, grandCount = 0;
+
   sortedDates.forEach(date => {
     const group = byDate.get(date) || [];
     let sumQty = 0, sumSale = 0, sumGCost = 0, sumDiff = 0;
@@ -26669,7 +26672,31 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
       sumGCost,                           // 원가(GPLAN) 합
       diffCell,                           // 차이 합
     ]);
+
+    // 전체 총계 누적
+    grandQty   += sumQty;
+    grandSale  += sumSale;
+    grandGCost += sumGCost;
+    grandDiff  += sumDiff;
+    grandCount += totalCount;
   });
+
+  // 모든 날짜 종료 후 — 총계 행 (전체 합계)
+  if (sortedDates.length > 0) {
+    rows.push([
+      '',
+      '총 계',
+      '',
+      `(${grandCount}건)`,
+      grandQty,
+      '',
+      grandSale,
+      '',
+      '',
+      grandGCost,
+      grandDiff,
+    ]);
+  }
 
   // GPLAN 에만 있는 행은 위에서 각 날짜의 소계 위에 이미 삽입됨 → 별도 섹션 불필요
   const extraSection = [];
@@ -26777,17 +26804,22 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
       }
     }
 
-    // 2) 소계 행 (B 컬럼이 '소 계') → 연한 녹색 배경 + 굵게
+    // 2) 소계 / 총계 행 (B 컬럼이 '소 계' 또는 '총 계') → 녹색 배경 + 굵게
+    //    총계는 더 진한 녹색으로 시각적 구분
+    const TOTAL_BG = 'B7DDA0'; // 총계 — 더 진한 녹색
     for (let r = dataStartRow; r <= range.e.r; r++) {
       const bAddr = XLSX.utils.encode_cell({ r, c: 1 });
       const bCell = ws[bAddr];
-      if (bCell && String(bCell.v || '').trim() === '소 계') {
+      const bVal = bCell ? String(bCell.v || '').trim() : '';
+      const isSub   = bVal === '소 계';
+      const isTotal = bVal === '총 계';
+      if (isSub || isTotal) {
         for (let c = range.s.c; c <= range.e.c; c++) {
           const addr = XLSX.utils.encode_cell({ r, c });
           if (!ws[addr]) ws[addr] = { v: '', t: 's' };
           ws[addr].s = Object.assign({}, ws[addr].s || {}, {
             font: { bold: true },
-            fill: { patternType: 'solid', fgColor: { rgb: SUBTOTAL_BG } }
+            fill: { patternType: 'solid', fgColor: { rgb: isTotal ? TOTAL_BG : SUBTOTAL_BG } }
           });
         }
       }
@@ -26799,9 +26831,10 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
       const addr = XLSX.utils.encode_cell({ r, c: diffColIdx });
       const cell = ws[addr];
       if (!cell) continue;
-      // 소계 행은 위에서 이미 녹색 배경 처리됨 — 덮어쓰지 않음
+      // 소계/총계 행은 위에서 이미 녹색 배경 처리됨 — 덮어쓰지 않음
       const bAddr = XLSX.utils.encode_cell({ r, c: 1 });
-      const isSubtotal = ws[bAddr] && String(ws[bAddr].v || '').trim() === '소 계';
+      const bv = ws[bAddr] ? String(ws[bAddr].v || '').trim() : '';
+      const isSubtotal = bv === '소 계' || bv === '총 계';
       if (isSubtotal) {
         // 소계 행의 차이 셀은 녹색 배경 + 빨강 글씨 (불일치면)
         const v = cell.v;
