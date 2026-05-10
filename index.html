@@ -26228,7 +26228,7 @@ function _reconcileExportExcel() {
 }
 
 // 결과 객체 + 파일명을 받아 엑셀 생성/다운로드 — 모달/직접 호출 양쪽에서 재사용
-function _reconcileExportExcelFromResult(resultObj, srcFile) {
+async function _reconcileExportExcelFromResult(resultObj, srcFile) {
   const { matched, matchedSame, onlyLedger, onlyGplan, ledgerCount, gplanCount, minDate, maxDate, gplanShipByDate, gplanByDateRecv } = resultObj;
   const _shipByDate = gplanShipByDate || {};
   const _gByGroup = gplanByDateRecv || {};
@@ -26337,8 +26337,8 @@ function _reconcileExportExcelFromResult(resultObj, srcFile) {
           sumDiff += diff;
         }
       } else {
-        // 같은 그룹의 후속 행 — GPLAN 정보는 비우고 "↑ 위 그룹 합산" 안내
-        rows.push([...left, '↑ 위 그룹과 합산 비교', '', '', '↑ 위 행 참조']);
+        // 같은 그룹의 후속 행 — 위 그룹의 수령자명으로 채우고 차이는 0
+        rows.push([...left, recv, recv, 0, 0]);
       }
       sumQty += Number(L.qty) || 0;
       sumSale += Number(L.sale) || 0;
@@ -26456,6 +26456,40 @@ function _reconcileExportExcelFromResult(resultObj, srcFile) {
   ws['!freeze'] = { xSplit: 0, ySplit: summaryBlock.length + 2 };
 
   XLSX.utils.book_append_sheet(wb, ws, '거래원장 대조');
+
+  // 차이 컬럼(K, index 10) — 0이 아니거나 '값 없음' 이면 빨간 굵은 글씨
+  // xlsx-js-style 라이브러리가 로드되어 있으면 스타일 적용 (없으면 무시)
+  try {
+    if (typeof _ensureXlsxStyle === 'function') {
+      await _ensureXlsxStyle();
+    }
+  } catch (_) {}
+  if (window.XLSX && window.XLSX._jsStyleLoaded) {
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const diffColIdx = 10; // K 컬럼 (차이)
+    for (let r = range.s.r; r <= range.e.r; r++) {
+      const addr = XLSX.utils.encode_cell({ r, c: diffColIdx });
+      const cell = ws[addr];
+      if (!cell) continue;
+      const v = cell.v;
+      // 숫자 0 이나 빈 문자열은 일치 (스킵)
+      let isMismatch = false;
+      if (typeof v === 'number' && v !== 0) isMismatch = true;
+      else if (typeof v === 'string') {
+        if (v === '값 없음' || /값없음/.test(v)) isMismatch = true;
+        else {
+          // "12,345 (값없음 N건 제외)" 같은 형태도 0이 아니면 빨강
+          const num = Number(String(v).replace(/[^0-9.\-]/g, ''));
+          if (!isNaN(num) && num !== 0) isMismatch = true;
+        }
+      }
+      if (isMismatch) {
+        cell.s = Object.assign({}, cell.s || {}, {
+          font: { bold: true, color: { rgb: 'DC2626' } }
+        });
+      }
+    }
+  }
 
   // 파일명: GPLAN_거래원장대조_YYYY-MM-DD.xlsx
   const today = new Date();
