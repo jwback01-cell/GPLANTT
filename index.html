@@ -26307,24 +26307,11 @@ function _renderReconcileSameHtml(matchedSame) {
   </div>`;
 }
 
-// 모달 없이 거래원장 파일을 받아서 바로 엑셀 다운로드 — 결과 모달 우회
+// 모달 없이 거래원장 파일을 받아서 바로 엑셀 다운로드 — 결과 모달/알림 모두 우회
 function _reconcileDownloadDirect(ledgerRows, fileName) {
   const result = _reconcileCompare(ledgerRows);
   _reconcileExportExcelFromResult(result, fileName);
-  const totalDiff = result.matched.length + result.onlyLedger.length + result.onlyGplan.length;
-  const rangeLabel = (result.minDate && result.maxDate)
-    ? (result.minDate === result.maxDate ? result.minDate : `${result.minDate} ~ ${result.maxDate}`)
-    : '범위 없음';
-  showAppAlert(
-    '엑셀 다운로드 완료',
-    `📥 거래원장 대조 엑셀 다운로드 완료\n\n` +
-    `파일: ${fileName}\n` +
-    `기간: ${rangeLabel}\n` +
-    `거래원장 ${result.ledgerCount}건 / 같은 기간 GPLAN ${result.gplanCount}건\n\n` +
-    `일치 ${result.matchedSame.length}건 · 차이 ${totalDiff}건\n` +
-    `(값 불일치 ${result.matched.length} · 누락 ${result.onlyLedger.length} · 추가 ${result.onlyGplan.length})`,
-    totalDiff === 0 ? 'success' : 'info'
-  );
+  // 다운로드 완료 알림 제거 — 사용자 요청
 }
 
 // 단일 시트 — 거래원장 행 순서 그대로 보존 + 옆에 GPLAN 매칭값 + 차이
