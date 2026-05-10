@@ -4105,6 +4105,7 @@ tailwind.config = {
               <button onclick="syncJetReportsToUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-blue hover:bg-brand-bg" title="저장된 제트배송 리포트(입출고비/배송비/보관비/재고손실/주문/수수료) 데이터를 업로드 데이터로 가져오기">⟳ 제트배송 동기화</button>
               <button onclick="openSeoulLivingReconcile()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-blue hover:bg-brand-bg" title="서울리빙 거래원장 엑셀과 비교해 누락/추가/값 불일치 행 찾기">🔍 거래원장 대조</button>
               <input type="file" id="reconcile-file-input" accept=".xlsx,.xls,.csv" class="hidden" onchange="_reconcileFileChosen(event)">
+              <button onclick="openManualUploadModal()" class="px-4 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:-translate-y-0.5 transition-transform shadow-md">+ 수기 등록</button>
               <button onclick="exportUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg">엑셀 내보내기</button>
               <button id="upload-data-delete-btn" onclick="deleteSelectedUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-pink hover:bg-brand-bg">선택 삭제 <span id="upload-data-sel-count" class="ml-1 text-xs text-brand-gray">(0)</span></button>
             </div>
@@ -26595,6 +26596,185 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile) {
   const stamp = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
   const outName = `GPLAN_거래원장대조_${stamp}.xlsx`;
   XLSX.writeFile(wb, outName);
+}
+
+// ── 업로드 데이터 수기 등록 ─────────────────────────────────────
+function openManualUploadModal() {
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+  // 기존 모달 제거
+  const prev = document.getElementById('manual-upload-modal');
+  if (prev) prev.remove();
+  const m = document.createElement('div');
+  m.id = 'manual-upload-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+
+  // 사이트 옵션 — _adSitesRaw 또는 기본 목록
+  const siteOptions = ['스마트스토어','스마트스토어-A','스마트스토어-B','스마트스토어-C','쿠팡','쿠팡(제트배송)','11번가','롯데온','네이버','옥션','지마켓','SSG','오늘의집','알리','이베이','텐바이텐','토스 쇼핑','에이블리','지마켓(동합)','SSG(동합)','직접입력']
+    .map(s => `<option value="${s}">${s}</option>`).join('');
+
+  m.innerHTML = `
+    <div style="background:white;border-radius:18px;max-width:780px;width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="padding:18px 24px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:bold;font-size:17px;">+ 업로드 데이터 수기 등록</div>
+          <div style="color:#888;font-size:12px;margin-top:3px;">엑셀 업로드 없이 행을 직접 추가합니다.</div>
+        </div>
+        <button onclick="document.getElementById('manual-upload-modal').remove()" style="background:none;border:none;cursor:pointer;color:#888;font-size:22px;">×</button>
+      </div>
+      <div style="padding:18px 24px;overflow-y:auto;flex:1;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+          <div>
+            <label style="display:block;font-size:11px;font-weight:bold;color:#666;margin-bottom:4px;">날짜 <span style="color:#E91E63;">*</span></label>
+            <input id="mu-date" type="date" value="${todayStr}" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:bold;color:#666;margin-bottom:4px;">거래처명</label>
+            <input id="mu-vendor" type="text" placeholder="예: 쿠팡, 지플랜" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:bold;color:#666;margin-bottom:4px;">사이트(쇼핑몰)</label>
+            <select id="mu-site" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;background:white;">
+              <option value="">(선택)</option>
+              ${siteOptions}
+            </select>
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:bold;color:#666;margin-bottom:4px;">품목코드(SKU)</label>
+            <input id="mu-itemCode" type="text" placeholder="예: GB0017" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:monospace;">
+          </div>
+          <div style="grid-column:span 2;">
+            <label style="display:block;font-size:11px;font-weight:bold;color:#666;margin-bottom:4px;">품목명 <span style="color:#E91E63;">*</span></label>
+            <input id="mu-itemName" type="text" placeholder="상품명" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:bold;color:#666;margin-bottom:4px;">수령자명</label>
+            <input id="mu-receiver" type="text" placeholder="예: 홍길동" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:bold;color:#666;margin-bottom:4px;">주문번호</label>
+            <input id="mu-siteCode" type="text" placeholder="쇼핑몰 주문번호" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:monospace;">
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:bold;color:#666;margin-bottom:4px;">택배코드</label>
+            <input id="mu-shipCode" type="text" placeholder="송장번호" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:monospace;">
+          </div>
+        </div>
+        <div style="margin-top:14px;border-top:1px solid #f0f0f0;padding-top:14px;">
+          <div style="font-size:12px;font-weight:bold;color:#444;margin-bottom:8px;">금액·수량</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div>
+              <label style="display:block;font-size:11px;font-weight:bold;color:#666;margin-bottom:4px;">수량 <span style="color:#E91E63;">*</span></label>
+              <input id="mu-qty" type="number" min="0" value="1" oninput="_muUpdatePreview()" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;text-align:right;font-family:monospace;">
+            </div>
+            <div>
+              <label style="display:block;font-size:11px;font-weight:bold;color:#666;margin-bottom:4px;">단가(VAT포함)</label>
+              <input id="mu-price" type="number" min="0" value="0" oninput="_muUpdatePreview()" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;text-align:right;font-family:monospace;">
+            </div>
+            <div>
+              <label style="display:block;font-size:11px;font-weight:bold;color:#666;margin-bottom:4px;">공급가</label>
+              <input id="mu-supply" type="number" min="0" value="0" oninput="_muUpdatePreview()" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;text-align:right;font-family:monospace;">
+            </div>
+            <div>
+              <label style="display:block;font-size:11px;font-weight:bold;color:#666;margin-bottom:4px;">택배비</label>
+              <input id="mu-ship" type="number" min="0" value="0" oninput="_muUpdatePreview()" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;text-align:right;font-family:monospace;">
+            </div>
+            <div>
+              <label style="display:block;font-size:11px;font-weight:bold;color:#666;margin-bottom:4px;">택배비용 (실비용)</label>
+              <input id="mu-shipCost" type="number" min="0" value="0" oninput="_muUpdatePreview()" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;text-align:right;font-family:monospace;">
+            </div>
+            <div>
+              <label style="display:block;font-size:11px;font-weight:bold;color:#666;margin-bottom:4px;">원가</label>
+              <input id="mu-cost" type="number" min="0" value="0" oninput="_muUpdatePreview()" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;text-align:right;font-family:monospace;">
+            </div>
+          </div>
+          <div id="mu-preview" style="margin-top:10px;background:#F9FAFB;border-radius:8px;padding:10px 12px;font-size:11px;color:#666;display:flex;justify-content:space-between;">
+            <span>마진(공급가 + 택배비 - 원가 - 택배비용): <b id="mu-profit-val" style="color:#22C55E;">0원</b></span>
+            <span style="color:#888;">마진은 자동 계산되며 직접 수정 불가</span>
+          </div>
+        </div>
+      </div>
+      <div style="padding:14px 24px;border-top:1px solid #eee;display:flex;justify-content:flex-end;gap:8px;">
+        <button onclick="document.getElementById('manual-upload-modal').remove()"
+                style="padding:9px 18px;border-radius:14px;border:1px solid #ddd;background:white;cursor:pointer;font-size:13px;font-weight:bold;">취소</button>
+        <button onclick="submitManualUpload()"
+                style="padding:9px 22px;border-radius:14px;border:none;background:#1A1A1A;color:white;cursor:pointer;font-size:13px;font-weight:bold;">저장</button>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+  setTimeout(() => document.getElementById('mu-itemName')?.focus(), 80);
+  _muUpdatePreview();
+}
+
+function _muUpdatePreview() {
+  const supply = Number(document.getElementById('mu-supply')?.value) || 0;
+  const ship = Number(document.getElementById('mu-ship')?.value) || 0;
+  const cost = Number(document.getElementById('mu-cost')?.value) || 0;
+  const shipCost = Number(document.getElementById('mu-shipCost')?.value) || 0;
+  const profit = supply + ship - cost - shipCost;
+  const el = document.getElementById('mu-profit-val');
+  if (el) {
+    el.textContent = profit.toLocaleString('ko-KR') + '원';
+    el.style.color = profit >= 0 ? '#22C55E' : '#E91E63';
+  }
+}
+
+function submitManualUpload() {
+  const date = document.getElementById('mu-date')?.value || '';
+  const itemName = (document.getElementById('mu-itemName')?.value || '').trim();
+  const qty = Number(document.getElementById('mu-qty')?.value) || 0;
+  if (!date) { alert('날짜를 선택해 주세요.'); return; }
+  if (!itemName) { alert('품목명을 입력해 주세요.'); document.getElementById('mu-itemName')?.focus(); return; }
+  if (!qty || qty <= 0) { alert('수량을 1 이상 입력해 주세요.'); document.getElementById('mu-qty')?.focus(); return; }
+
+  const supply = Number(document.getElementById('mu-supply')?.value) || 0;
+  const ship = Number(document.getElementById('mu-ship')?.value) || 0;
+  const cost = Number(document.getElementById('mu-cost')?.value) || 0;
+  const shipCost = Number(document.getElementById('mu-shipCost')?.value) || 0;
+  const price = Number(document.getElementById('mu-price')?.value) || 0;
+  const profit = supply + ship - cost - shipCost;
+
+  const _now = new Date();
+  const savedAt = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')} ${String(_now.getHours()).padStart(2,'0')}:${String(_now.getMinutes()).padStart(2,'0')}`;
+
+  const row = {
+    template:   'manual',
+    vendor:     (document.getElementById('mu-vendor')?.value || '').trim() || '수기',
+    site:       (document.getElementById('mu-site')?.value || '').trim() || '직접입력',
+    date:       date,
+    siteCode:   (document.getElementById('mu-siteCode')?.value || '').trim(),
+    vendorCode: '',
+    shipCode:   (document.getElementById('mu-shipCode')?.value || '').trim(),
+    itemCode:   (document.getElementById('mu-itemCode')?.value || '').trim(),
+    skuCode:    (document.getElementById('mu-itemCode')?.value || '').trim(),
+    itemName:   itemName,
+    qty:        qty,
+    price:      price,
+    supply:     supply,
+    ship:       ship,
+    shipCost:   shipCost,
+    cost:       cost,
+    receiver:   (document.getElementById('mu-receiver')?.value || '').trim(),
+    profit:     profit,
+    savedAt:    savedAt,
+    _manualEntry: true,
+  };
+
+  const data = _loadUploadData();
+  data.push(row);
+  _saveUploadData(data);
+  if (typeof renderUploadData === 'function') renderUploadData();
+  if (typeof syncLedgerFromUploadData === 'function') syncLedgerFromUploadData();
+
+  // 모달 닫기
+  document.getElementById('manual-upload-modal')?.remove();
+
+  // 성공 알림
+  if (typeof showAppAlert === 'function') {
+    showAppAlert('수기 등록 완료', `${itemName}\n수량 ${qty} · 마진 ${profit.toLocaleString('ko-KR')}원`, 'success');
+  }
 }
 
 function exportUploadData() {
