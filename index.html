@@ -25894,7 +25894,12 @@ function _normVendor(v) { return String(v || '').replace(/\s+/g, '').trim(); }
 function _normName(s) { return String(s || '').replace(/\s+/g, '').replace(/[\(\)\[\]\.,_\-\/·]/g, '').toLowerCase(); }
 // 수령자 정규화 — 매칭/표시 모두에서 숫자 제거 (예: "류용규1" → "류용규")
 function _normRecv(s) { return String(s || '').replace(/\s+/g, '').replace(/\d+/g, '').trim(); }
-function _displayRecv(s) { return String(s || '').replace(/\d+/g, '').trim(); }
+function _displayRecv(s) {
+  return String(s || '')
+    .replace(/\([^)]*\)/g, '')   // 괄호 부분 모두 제거 (예: '(주문자:장*애)')
+    .replace(/\d+/g, '')          // 숫자 제거
+    .trim();
+}
 // "26-04-01" → "2026-04-01" / Excel serial / 다양한 포맷 처리
 function _reconcileNormDate(v) {
   if (v == null || v === '') return '';
