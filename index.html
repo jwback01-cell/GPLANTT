@@ -26457,8 +26457,7 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile) {
 
   XLSX.utils.book_append_sheet(wb, ws, '거래원장 대조');
 
-  // 차이 컬럼(K, index 10) — 0이 아니거나 '값 없음' 이면 빨간 굵은 글씨
-  // xlsx-js-style 라이브러리가 로드되어 있으면 스타일 적용 (없으면 무시)
+  // ── 셀 스타일 적용 (xlsx-js-style 동적 로드) ──
   try {
     if (typeof _ensureXlsxStyle === 'function') {
       await _ensureXlsxStyle();
@@ -26466,28 +26465,85 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile) {
   } catch (_) {}
   if (window.XLSX && window.XLSX._jsStyleLoaded) {
     const range = XLSX.utils.decode_range(ws['!ref']);
-    const diffColIdx = 10; // K 컬럼 (차이)
-    for (let r = range.s.r; r <= range.e.r; r++) {
+    const diffColIdx = 10; // K (차이)
+    const headerGroupRow = summaryBlock.length;       // 그룹 헤더 행 (예: 5)
+    const headerColRow   = summaryBlock.length + 1;   // 컬럼 헤더 행 (예: 6)
+    const dataStartRow   = summaryBlock.length + 2;   // 데이터 시작 행 (예: 7)
+
+    const HEADER_BG = 'D9D9D9'; // 회색
+    const SUBTOTAL_BG = 'D8E4BC'; // 연한 녹색
+    const DIFF_BG = 'FDE9D9'; // 연한 주황
+
+    // 1) 헤더 행 2줄 → 회색 배경 + 굵게
+    for (let r = headerGroupRow; r <= headerColRow; r++) {
+      for (let c = range.s.c; c <= range.e.c; c++) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        if (!ws[addr]) ws[addr] = { v: '', t: 's' };
+        ws[addr].s = Object.assign({}, ws[addr].s || {}, {
+          font: { bold: true },
+          fill: { patternType: 'solid', fgColor: { rgb: HEADER_BG } },
+          alignment: { horizontal: 'center', vertical: 'center' }
+        });
+      }
+    }
+
+    // 2) 소계 행 (B 컬럼이 '소 계') → 연한 녹색 배경 + 굵게
+    for (let r = dataStartRow; r <= range.e.r; r++) {
+      const bAddr = XLSX.utils.encode_cell({ r, c: 1 });
+      const bCell = ws[bAddr];
+      if (bCell && String(bCell.v || '').trim() === '소 계') {
+        for (let c = range.s.c; c <= range.e.c; c++) {
+          const addr = XLSX.utils.encode_cell({ r, c });
+          if (!ws[addr]) ws[addr] = { v: '', t: 's' };
+          ws[addr].s = Object.assign({}, ws[addr].s || {}, {
+            font: { bold: true },
+            fill: { patternType: 'solid', fgColor: { rgb: SUBTOTAL_BG } }
+          });
+        }
+      }
+    }
+
+    // 3) 차이 컬럼 (K) — 데이터 행 전체에 연한 주황 배경
+    //    + 0이 아닌 값(불일치) / '값 없음' 은 빨간색 굵은 글씨 추가
+    for (let r = dataStartRow; r <= range.e.r; r++) {
       const addr = XLSX.utils.encode_cell({ r, c: diffColIdx });
       const cell = ws[addr];
       if (!cell) continue;
+      // 소계 행은 위에서 이미 녹색 배경 처리됨 — 덮어쓰지 않음
+      const bAddr = XLSX.utils.encode_cell({ r, c: 1 });
+      const isSubtotal = ws[bAddr] && String(ws[bAddr].v || '').trim() === '소 계';
+      if (isSubtotal) {
+        // 소계 행의 차이 셀은 녹색 배경 + 빨강 글씨 (불일치면)
+        const v = cell.v;
+        let isMismatchSub = false;
+        if (typeof v === 'number' && v !== 0) isMismatchSub = true;
+        else if (typeof v === 'string') {
+          const numS = Number(String(v).replace(/[^0-9.\-]/g, ''));
+          if (!isNaN(numS) && numS !== 0) isMismatchSub = true;
+          if (/값없음/.test(v)) isMismatchSub = true;
+        }
+        if (isMismatchSub) {
+          cell.s = Object.assign({}, cell.s || {}, {
+            font: { bold: true, color: { rgb: 'DC2626' } }
+          });
+        }
+        continue;
+      }
+      // 일반 데이터 행 — 차이 컬럼 배경 #FDE9D9
       const v = cell.v;
-      // 숫자 0 이나 빈 문자열은 일치 (스킵)
       let isMismatch = false;
       if (typeof v === 'number' && v !== 0) isMismatch = true;
       else if (typeof v === 'string') {
         if (v === '값 없음' || /값없음/.test(v)) isMismatch = true;
         else {
-          // "12,345 (값없음 N건 제외)" 같은 형태도 0이 아니면 빨강
           const num = Number(String(v).replace(/[^0-9.\-]/g, ''));
           if (!isNaN(num) && num !== 0) isMismatch = true;
         }
       }
-      if (isMismatch) {
-        cell.s = Object.assign({}, cell.s || {}, {
-          font: { bold: true, color: { rgb: 'DC2626' } }
-        });
-      }
+      cell.s = Object.assign({}, cell.s || {}, {
+        fill: { patternType: 'solid', fgColor: { rgb: DIFF_BG } },
+        font: isMismatch ? { bold: true, color: { rgb: 'DC2626' } } : (cell.s?.font || {})
+      });
     }
   }
 
