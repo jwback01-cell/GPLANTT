@@ -25710,13 +25710,18 @@ function convertSelectedToReturn() {
     return;
   }
 
-  if (!confirm(
-    `${targetRows.length}건을 반품으로 처리합니다.\n\n` +
-    `→ 같은 행을 복제하여 모든 숫자(수량 / 단가 / 공급가 / 택배비 / 원가 / 마진 등) 를 음수로 저장\n` +
-    `→ 사이트에 '반품' 표시가 추가됨\n\n` +
-    `진행하시겠습니까?`
-  )) return;
+  showAppConfirm(
+    '반품으로 처리할까요?',
+    `${targetRows.length}건의 행을 반품으로 변환합니다.\n\n` +
+    `→ 같은 행을 복제하여 모든 숫자(수량 / 단가 / 공급가 / 택배비 / 원가 / 마진 등)를 음수로 저장\n` +
+    `→ 사이트에 '반품' 표시가 추가되어 구분됩니다\n` +
+    `→ 매출장부 합계가 음수만큼 자동 차감됩니다`,
+    () => { _doConvertSelectedToReturn(targetRows); },
+    { type: 'warning', confirmText: '반품 처리', confirmStyle: 'danger' }
+  );
+}
 
+function _doConvertSelectedToReturn(targetRows) {
   const _now = new Date();
   const savedAt = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')} ${String(_now.getHours()).padStart(2,'0')}:${String(_now.getMinutes()).padStart(2,'0')}`;
 
@@ -25740,6 +25745,7 @@ function convertSelectedToReturn() {
     return clone;
   });
 
+  const data = _loadUploadData();
   data.push(...newRows);
   _saveUploadData(data);
 
@@ -25756,7 +25762,7 @@ function convertSelectedToReturn() {
     `${newRows.length}건이 음수 행으로 추가되었습니다.\n` +
     `사이트에 '반품' 표시가 붙어 구분 가능합니다.\n` +
     `매출장부에도 자동 반영되어 합계가 차감됩니다.`,
-    'success');
+    { type: 'success' });
 }
 
 async function deleteSelectedUploadData() {
