@@ -26394,8 +26394,9 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile) {
   });
 
   // ── Fuzzy 매칭 헬퍼 ──
-  // 정확한 키가 없으면 같은 날짜의 다른 키들 중 prefix 매칭 시도
-  // 예: '국혜인' (3자) ↔ '국혜인복지사' (6자) 처럼 한쪽이 다른쪽의 시작 부분이면 같은 사람으로 간주
+  // 정확한 키가 없으면 같은 날짜의 다른 키들 중:
+  //   1차) prefix 매칭 — '국혜인' ↔ '국혜인복지사'
+  //   2차) 공통 글자 >= 2 — '이승메' ↔ '이승매' (오타·이형 표기 대응)
   const usedGplanKeys = new Set(); // fuzzy 로 매칭된 GPLAN 키들 — onlyGplan 에서 제외용
   const _findGplanGroup = (date, recvKey) => {
     const exactKey = `${date}__${recvKey}`;
@@ -26405,14 +26406,32 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile) {
       return exact;
     }
     if (!recvKey || recvKey.length < 2) return [];
-    // 같은 날짜의 다른 키들 검색
     const prefix = date + '__';
+
+    // 1차: prefix 매칭
     for (const k of Object.keys(_gByGroup)) {
       if (!k.startsWith(prefix)) continue;
+      if (usedGplanKeys.has(k)) continue;
       const otherRecv = k.substring(prefix.length);
       if (!otherRecv || otherRecv.length < 2 || otherRecv === recvKey) continue;
-      // 한쪽이 다른쪽의 prefix
       if (otherRecv.startsWith(recvKey) || recvKey.startsWith(otherRecv)) {
+        usedGplanKeys.add(k);
+        return _gByGroup[k];
+      }
+    }
+
+    // 2차: 공통 글자(set 교집합) 2개 이상이면 매칭 시도
+    //   짧은 쪽 길이 >= 2 + 공통 글자 >= 2 (예: '이승메' ∩ '이승매' = {이,승} 2개)
+    const setA = new Set(recvKey.split(''));
+    for (const k of Object.keys(_gByGroup)) {
+      if (!k.startsWith(prefix)) continue;
+      if (usedGplanKeys.has(k)) continue;
+      const otherRecv = k.substring(prefix.length);
+      if (!otherRecv || otherRecv.length < 2 || otherRecv === recvKey) continue;
+      let common = 0;
+      const setB = new Set(otherRecv.split(''));
+      setA.forEach(c => { if (setB.has(c)) common++; });
+      if (common >= 2) {
         usedGplanKeys.add(k);
         return _gByGroup[k];
       }
