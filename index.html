@@ -26278,10 +26278,22 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile) {
     if (!byDate.has(d)) byDate.set(d, []);
     byDate.get(d).push(item);
   });
-  const sortedDates = [...byDate.keys()].sort();
+
+  // GPLAN 에만 있는 행을 날짜별로 분배 — 각 날짜 소계 위에 삽입
+  const onlyGByDate = {};
+  (onlyGplan || []).forEach(G => {
+    const d = G.date || '';
+    if (!d) return;
+    if (!onlyGByDate[d]) onlyGByDate[d] = [];
+    onlyGByDate[d].push(G);
+  });
+
+  // 거래원장 날짜 + GPLAN 전용 날짜 병합 → 오름차순
+  const allDateSet = new Set([...byDate.keys(), ...Object.keys(onlyGByDate)]);
+  const sortedDates = [...allDateSet].sort();
 
   sortedDates.forEach(date => {
-    const group = byDate.get(date);
+    const group = byDate.get(date) || [];
     let sumQty = 0, sumSale = 0, sumGCost = 0, sumDiff = 0;
     let unmatchedInGroup = 0;
 
@@ -26375,8 +26387,28 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile) {
       sumDiff += tDiff;
     }
 
-    // 3) 날짜별 소계 행
-    const totalCount = regularItems.length + (taekbaeItems.length > 0 ? 1 : 0);
+    // 3) GPLAN 에만 있는 행 (해당 날짜) — 거래원장 컬럼은 비우고 GPLAN 측만 채움
+    const onlyGforDate = onlyGByDate[date] || [];
+    onlyGforDate.forEach(G => {
+      const gCost = Number(G.cost) || 0;
+      rows.push([
+        G.date || '',                         // 거래일자
+        '매출',                                // 구분
+        '',                                    // 품명 (거래원장 측 비움)
+        '',                                    // 규격
+        '',                                    // 수량
+        '',                                    // 단가
+        '',                                    // 매출/지급
+        G.itemName || '',                      // 품명(GPLAN)
+        _displayRecv(G.receiver),              // 수령자(GPLAN)
+        gCost,                                 // 원가(GPLAN)
+        '거래원장에 없음',                     // 차이
+      ]);
+      sumGCost += gCost;
+    });
+
+    // 4) 날짜별 소계 행
+    const totalCount = regularItems.length + (taekbaeItems.length > 0 ? 1 : 0) + onlyGforDate.length;
     const diffCell = (unmatchedInGroup > 0)
       ? `${sumDiff.toLocaleString('ko-KR')} (값없음 ${unmatchedInGroup}건 제외)`
       : sumDiff;
@@ -26395,26 +26427,8 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile) {
     ]);
   });
 
-  // GPLAN 에만 있는 행 — 별도 구역으로 맨 아래에 (날짜 오름차순 정렬)
-  let extraSection = [];
-  if (onlyGplan.length) {
-    const sortedOnlyGplan = onlyGplan.slice().sort((a, b) =>
-      String(a.date || '').localeCompare(String(b.date || ''))
-    );
-    extraSection.push([]); // 빈 줄
-    extraSection.push([`▼ GPLAN 에만 있고 거래원장에 없는 행 (${sortedOnlyGplan.length}건)`]);
-    extraSection.push(header); // 같은 헤더 반복
-    sortedOnlyGplan.forEach(G => {
-      const gCost = Number(G.cost) || 0;
-      extraSection.push([
-        G.date || '', '매출', '', '', Number(G.qty) || 0, Number(G.price) || 0, '',
-        G.itemName || '',
-        _displayRecv(G.receiver),
-        gCost,
-        '거래원장에 없음',
-      ]);
-    });
-  }
+  // GPLAN 에만 있는 행은 위에서 각 날짜의 소계 위에 이미 삽입됨 → 별도 섹션 불필요
+  const extraSection = [];
 
   // 상단 요약 + 그룹헤더 + 컬럼헤더 + 본문 + (별도 구역)
   const totalDiff = matched.length + onlyLedger.length + onlyGplan.length;
