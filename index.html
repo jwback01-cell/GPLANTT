@@ -26367,7 +26367,9 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile) {
       const tUnit = firstUnit || (tQty ? Math.round(tSale / tQty) : 0);
 
       const gShipSum = Number(_shipByDate[date]) || 0;
-      const tDiff = tSale - gShipSum;
+      // 택배는 비용 항목 — 차이 = GPLAN 택배비용(shipCost) - 거래원장 매출
+      // (음수면 우리가 더 받은 것, 양수면 우리가 더 쓴 것)
+      const tDiff = gShipSum - tSale;
       const taekbaeName = taekbaeItems.length > 1 ? `택배 (${taekbaeItems.length}건 합산)` : '택배';
 
       rows.push([
