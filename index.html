@@ -26393,7 +26393,35 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile) {
     byDate.get(d).push(item);
   });
 
+  // ── Fuzzy 매칭 헬퍼 ──
+  // 정확한 키가 없으면 같은 날짜의 다른 키들 중 prefix 매칭 시도
+  // 예: '국혜인' (3자) ↔ '국혜인복지사' (6자) 처럼 한쪽이 다른쪽의 시작 부분이면 같은 사람으로 간주
+  const usedGplanKeys = new Set(); // fuzzy 로 매칭된 GPLAN 키들 — onlyGplan 에서 제외용
+  const _findGplanGroup = (date, recvKey) => {
+    const exactKey = `${date}__${recvKey}`;
+    const exact = _gByGroup[exactKey];
+    if (exact && exact.length) {
+      usedGplanKeys.add(exactKey);
+      return exact;
+    }
+    if (!recvKey || recvKey.length < 2) return [];
+    // 같은 날짜의 다른 키들 검색
+    const prefix = date + '__';
+    for (const k of Object.keys(_gByGroup)) {
+      if (!k.startsWith(prefix)) continue;
+      const otherRecv = k.substring(prefix.length);
+      if (!otherRecv || otherRecv.length < 2 || otherRecv === recvKey) continue;
+      // 한쪽이 다른쪽의 prefix
+      if (otherRecv.startsWith(recvKey) || recvKey.startsWith(otherRecv)) {
+        usedGplanKeys.add(k);
+        return _gByGroup[k];
+      }
+    }
+    return [];
+  };
+
   // GPLAN 에만 있는 행을 날짜별로 분배 — 각 날짜 소계 위에 삽입
+  // (단, 아래 sortedDates.forEach 에서 fuzzy 매칭된 행은 제외 — usedGplanKeys 활용)
   const onlyGByDate = {};
   (onlyGplan || []).forEach(G => {
     const d = G.date || '';
@@ -26439,9 +26467,8 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile) {
         const groupItems = regularItems.filter(it => _normRecv(String(it.L.recv || '')) === recvKey);
         const ledgerGroupSale = groupItems.reduce((s, it) => s + (Number(it.L.sale) || 0), 0);
 
-        // GPLAN 측 같은 (날짜+수령자) 그룹 합계
-        const gKey = `${date}__${recvKey}`;
-        const gplanRows = _gByGroup[gKey] || [];
+        // GPLAN 측 같은 (날짜+수령자) 그룹 합계 — fuzzy 매칭 (prefix) 도 시도
+        const gplanRows = _findGplanGroup(date, recvKey);
         const gplanGroupCost = gplanRows.reduce((s, r) => s + (Number(r.cost) || 0), 0);
         const gplanNames = gplanRows.map(r => r.itemName).filter(Boolean);
         const gplanNameLabel = gplanNames.length === 0 ? ''
@@ -26510,7 +26537,13 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile) {
 
     // 3) GPLAN 에만 있는 행 (해당 날짜) — 거래원장 컬럼은 비우고 GPLAN 측만 채움
     //    차이 = 거래원장 매출(0) - GPLAN 원가 = -gCost
-    const onlyGforDate = onlyGByDate[date] || [];
+    //    fuzzy 매칭(prefix) 으로 이미 처리된 행은 제외 (usedGplanKeys)
+    const _onlyGRaw = onlyGByDate[date] || [];
+    const onlyGforDate = _onlyGRaw.filter(G => {
+      const recvKey = _normRecv(G.receiver);
+      const gKey = `${date}__${recvKey}`;
+      return !usedGplanKeys.has(gKey);
+    });
     onlyGforDate.forEach(G => {
       const gCost = Number(G.cost) || 0;
       const diffG = 0 - gCost;
