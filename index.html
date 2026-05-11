@@ -6386,7 +6386,7 @@ async function runKwAutoTrack(isAuto) {
     const productIds = _extractProductIds(product.url);
     const productKey = product.url || product.name;
     const keyword = it.keyword;
-    const range = 100;
+    const range = 200; // 자동 추적 조회 범위 — 상위 200위까지 (사용자 요청)
     const rankTypes = Array.isArray(it.rankTypes) && it.rankTypes.length ? it.rankTypes : ['price'];
 
     const apiCache = new Map();
