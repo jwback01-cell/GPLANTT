@@ -19426,15 +19426,8 @@ async function runPaMinusCheck() {
     return { ...r, margin, isMinus: margin != null && margin < 0 };
   });
 
-  // 4단계: 광고비 차감 — 일별/사이트별 광고비를 같은 날·같은 사이트의 주문에 균등 배분
-  // (광고비 업로드 탭에서 등록한 데이터 기준. 데이터 없으면 adCost=0)
-  // 차감 후 마진(marginAfterAd)이 음수이면 isMinus 도 true 로 갱신
-  if (typeof _adAllocateToMinusRows === 'function') {
-    _adAllocateToMinusRows(_paMinusRows);
-    _paMinusRows.forEach(r => {
-      if (r.marginAfterAd != null && r.marginAfterAd < 0) r.isMinus = true;
-    });
-  }
+  // 4단계: 광고비는 마이너스 확인에 반영하지 않음 (사용자 요청)
+  // isMinus 판정은 오직 기본 마진(공급가 + 택배비 − 원가 − 택배비용) 기준으로만 수행
 
   // 진단 로그: 택배비용 매칭 통계
   const shipMatched = _paMinusRows.filter(r => r.shipCostMatched).length;
