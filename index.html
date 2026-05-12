@@ -14651,14 +14651,38 @@ function todoUncomplete(id) {
 function todoDelete(id) {
   const idx = todos.findIndex(t => t.id === id);
   if (idx === -1) return;
-  deleteTodoDB(id);
-  const row = document.querySelector('#todo-list [data-id="' + id + '"]');
-  if (row) {
-    row.classList.add('slide-out');
-    setTimeout(() => { todos.splice(idx, 1); renderTodoList(); renderDashboardTodos(); }, 320);
-  } else {
-    todos.splice(idx, 1); renderTodoList(); renderDashboardTodos();
+  const target = todos[idx];
+
+  // 반복 업무 — 같은 시리즈(title + repeatLabel + team) 전체 삭제
+  // 완료는 해당 월만 처리되지만 삭제는 모든 월에 적용
+  let toDelete = [id];
+  if (target.repeatLabel) {
+    const siblings = todos.filter(t =>
+      t.id !== id &&
+      t.repeatLabel === target.repeatLabel &&
+      t.title === target.title &&
+      t.team === target.team
+    );
+    toDelete = [id, ...siblings.map(s => s.id)];
   }
+
+  (async () => {
+    for (const tid of toDelete) {
+      await deleteTodoDB(tid);
+      const i = todos.findIndex(t => t.id === tid);
+      if (i !== -1) todos.splice(i, 1);
+    }
+    renderTodoList();
+    renderDashboardTodos();
+    const calOpenEl = document.getElementById('todo-calendar-panel');
+    if (calOpenEl && !calOpenEl.classList.contains('hidden')) {
+      try { renderCalendar(); if (_calSelectedKey) renderCalDetail(_calSelectedKey); } catch(_) {}
+    }
+  })();
+
+  // 클릭된 행만 즉시 fade-out
+  const row = document.querySelector('#todo-list [data-id="' + id + '"]');
+  if (row) row.classList.add('slide-out');
 }
 
 function updateTodoSelectLabel() {
@@ -14682,9 +14706,31 @@ function toggleSelectAllTodos() {
 async function deleteSelectedTodos() {
   const checked = [...document.querySelectorAll('#todo-list .todo-row-cb:checked')];
   if (checked.length === 0) { alert('선택된 업무가 없습니다.'); return; }
-  if (!confirm('선택한 ' + checked.length + '개 업무를 삭제하시겠습니까?')) return;
-  const ids = checked.map(cb => Number(cb.dataset.todoId));
-  for (const id of ids) {
+  const selectedIds = checked.map(cb => Number(cb.dataset.todoId));
+
+  // 반복 업무가 포함된 경우 — 같은 시리즈의 다른 월도 함께 삭제 대상에 포함
+  const expanded = new Set(selectedIds);
+  selectedIds.forEach(id => {
+    const item = todos.find(t => t.id === id);
+    if (!item || !item.repeatLabel) return;
+    todos.forEach(t => {
+      if (t.repeatLabel === item.repeatLabel &&
+          t.title === item.title &&
+          t.team === item.team) {
+        expanded.add(t.id);
+      }
+    });
+  });
+
+  const totalCount = expanded.size;
+  const extraCount = totalCount - selectedIds.length;
+  let msg = '선택한 ' + selectedIds.length + '개 업무를 삭제하시겠습니까?';
+  if (extraCount > 0) {
+    msg += '\n\n반복 업무가 포함되어 있어 다른 월의 반복도 함께 삭제됩니다.\n총 ' + totalCount + '개 삭제 (반복 시리즈 +' + extraCount + '개).';
+  }
+  if (!confirm(msg)) return;
+
+  for (const id of expanded) {
     await deleteTodoDB(id);
     const idx = todos.findIndex(t => t.id === id);
     if (idx !== -1) todos.splice(idx, 1);
