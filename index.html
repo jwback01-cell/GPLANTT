@@ -3760,6 +3760,10 @@ tailwind.config = {
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 업로드 양식 다운로드
               </button>
+              <button id="ext-fetch-mail-btn" onclick="fetchExternalOrdersFromMail()" class="px-4 py-2 rounded-full bg-brand-blue text-white text-xs font-bold hover:opacity-90 flex items-center gap-1.5" title="seoulbjs@naver.com 발신 최신 메일의 엑셀 첨부파일을 자동으로 가져와서 업로드합니다">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                📥 메일에서 자동 가져오기
+              </button>
               <button onclick="clearExternalOrderUpload()" id="ext-upload-clear-btn" class="hidden px-4 py-2 rounded-full border border-brand-border bg-white text-xs font-bold text-brand-pink hover:bg-brand-bg">업로드 데이터 삭제</button>
               <button onclick="exportExternalOrderUpload()" id="ext-upload-export-btn" class="hidden px-4 py-2 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">엑셀로 다시 내보내기</button>
             </div>
@@ -20507,6 +20511,75 @@ function extUploadFileSelected(e) {
   const file = e.target && e.target.files && e.target.files[0];
   if (file) _processExternalOrderFile(file);
   if (e.target) e.target.value = '';
+}
+
+// 📥 메일에서 자동 가져오기 — /api/naver-mail-fetch 호출 후 첨부파일을 업로드 흐름에 투입
+async function fetchExternalOrdersFromMail() {
+  const btn = document.getElementById('ext-fetch-mail-btn');
+  const origLabel = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="animate-pulse">메일 조회 중...</span>';
+  }
+  _extUploadMsg('메일함에서 첨부파일을 조회하고 있습니다...', 'info');
+  try {
+    const res = await fetch('/api/naver-mail-fetch?sender=seoulbjs@naver.com&days=7&limit=10');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = data.error || ('HTTP ' + res.status);
+      const hint = data.hint ? '\n\n' + data.hint : '';
+      throw new Error(err + hint);
+    }
+    if (!data.items || data.items.length === 0) {
+      _extUploadMsg('서울코리아(seoulbjs@naver.com) 발신의 새 첨부 메일이 없습니다 (최근 7일).', 'warn');
+      showAppAlert('가져올 메일 없음', '서울코리아 발신의 엑셀 첨부 메일이 최근 7일 내에 없습니다.', 'info');
+      return;
+    }
+
+    // 가장 최근 1건만 처리 (서울코리아가 매번 새 답장을 보낸다는 가정)
+    // 여러 건이면 사용자가 콘솔에서 확인 가능하도록 로그 출력
+    const items = data.items;
+    if (items.length > 1) {
+      console.log('[메일 가져오기] 최근 ' + items.length + '건 중 가장 최신 1건만 처리합니다:', items.map(it => ({ date: it.date, subject: it.subject, fileName: it.fileName })));
+    }
+    const it = items[0];
+    console.log('[메일 가져오기] 처리 대상:', { date: it.date, subject: it.subject, fileName: it.fileName, fileSize: it.fileSize });
+
+    // base64 → Uint8Array → File (기존 _processExternalOrderFile 흐름 재사용)
+    const binary = atob(it.fileBase64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const mimeMap = {
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      xls:  'application/vnd.ms-excel',
+      csv:  'text/csv',
+    };
+    const ext = (it.fileName.split('.').pop() || '').toLowerCase();
+    const mime = mimeMap[ext] || 'application/octet-stream';
+    const file = new File([bytes], it.fileName, { type: mime });
+
+    _processExternalOrderFile(file);
+    // 결과 메시지 보강 — 처리 시각/발신 정보 추가
+    setTimeout(() => {
+      const dateStr = it.date ? new Date(it.date).toLocaleString('ko-KR') : '(시간 정보 없음)';
+      const subj = it.subject ? ` · "${it.subject}"` : '';
+      const more = items.length > 1 ? `\n\n(최근 ${items.length}건 발견 — 가장 최신 1건만 적용. 더 보려면 F12 콘솔 확인)` : '';
+      showAppAlert(
+        '메일에서 가져오기 완료',
+        `발신: ${it.from}\n수신 시각: ${dateStr}${subj}\n파일: ${it.fileName}${more}`,
+        'success'
+      );
+    }, 200);
+  } catch (e) {
+    console.error('[메일 자동 가져오기] 실패:', e);
+    _extUploadMsg('메일 가져오기 실패: ' + (e.message || e), 'error');
+    showAppAlert('가져오기 실패', e.message || String(e), 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origLabel;
+    }
+  }
 }
 
 function _processExternalOrderFile(file) {
