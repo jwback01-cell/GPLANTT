@@ -20071,7 +20071,7 @@ const EXT_EMAIL_SCHEDULE_KEY = 'gplan_ext_email_schedule_v1';
 function _loadExtEmailSchedule() {
   try {
     const raw = localStorage.getItem(EXT_EMAIL_SCHEDULE_KEY);
-    if (!raw) return { enabled: false, days: [], time: '09:00', depots: [], lastRunDay: '' };
+    if (!raw) return { enabled: false, days: [], time: '09:00', depots: [], lastRunDay: '', testMode: true };
     const s = JSON.parse(raw);
     return {
       enabled: !!s.enabled,
@@ -20079,9 +20079,11 @@ function _loadExtEmailSchedule() {
       time:    s.time    || '09:00',
       depots:  Array.isArray(s.depots) ? s.depots : [],
       lastRunDay: s.lastRunDay || '',
+      // 신규 필드 — 기존 저장에 없으면 기본 true (테스트로 시작 → 검증 후 사용자가 끄도록)
+      testMode: s.testMode === undefined ? true : !!s.testMode,
     };
   } catch (_) {
-    return { enabled: false, days: [], time: '09:00', depots: [], lastRunDay: '' };
+    return { enabled: false, days: [], time: '09:00', depots: [], lastRunDay: '', testMode: true };
   }
 }
 function _saveExtEmailSchedule(s) {
@@ -20106,7 +20108,10 @@ function _renderExtEmailScheduleStatus() {
   }
   const dowStr = s.days.slice().sort().map(_extDowLabel).join('·') + '요일';
   const depotStr = s.depots.map(_extDepotLabel).join(', ');
-  el.innerHTML = `<span class="text-brand-blue">${dowStr} ${s.time}</span> · ${depotStr}` +
+  const modeTag = s.testMode
+    ? ' <span class="text-brand-orange font-bold">🧪 테스트 모드 (jwback01@nate.com)</span>'
+    : '';
+  el.innerHTML = `<span class="text-brand-blue">${dowStr} ${s.time}</span> · ${depotStr}${modeTag}` +
                  (s.lastRunDay ? ` <span class="text-brand-gray font-normal">(마지막 ${s.lastRunDay})</span>` : '');
   el.className = 'font-bold text-brand-black';
 }
@@ -20164,6 +20169,19 @@ function openExtEmailScheduleModal() {
           </label>
         </div>
 
+        <div style="background:${s.testMode ? '#FFF7E6' : '#F0F9FF'};border:1px solid ${s.testMode ? '#FFD180' : '#90CAF9'};border-radius:10px;padding:12px;">
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+            <input type="checkbox" id="ext-sched-test-mode" ${s.testMode ? 'checked' : ''} style="width:18px;height:18px;margin-top:2px;">
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:bold;color:#333;">🧪 테스트 모드</div>
+              <div style="font-size:11px;color:#666;margin-top:3px;line-height:1.5;">
+                켜져 있으면 발주서가 <b>jwback01@nate.com</b> 으로 발송됩니다 (실제 거래처 X).<br>
+                기능 검증을 완료한 후 끄면 실제 거래처 메일로 발송됩니다.
+              </div>
+            </div>
+          </label>
+        </div>
+
         <div>
           <label style="display:block;font-size:12px;font-weight:bold;color:#444;margin-bottom:8px;">반복 요일</label>
           <div id="ext-sched-dows" style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -20212,6 +20230,7 @@ function _toggleExtSchedDow(btn) {
 
 function submitExtEmailSchedule() {
   const enabled = document.getElementById('ext-sched-enabled').checked;
+  const testMode = document.getElementById('ext-sched-test-mode')?.checked !== false;
   const time    = document.getElementById('ext-sched-time').value || '09:00';
   const days = [...document.querySelectorAll('#ext-sched-dows .dow-btn.bg-brand-black')]
     .map(b => parseInt(b.dataset.dow, 10)).filter(n => !isNaN(n));
@@ -20224,13 +20243,18 @@ function submitExtEmailSchedule() {
 
   const prev = _loadExtEmailSchedule();
   _saveExtEmailSchedule({
-    enabled, days, time, depots,
+    enabled, days, time, depots, testMode,
     lastRunDay: prev.lastRunDay || '',
   });
   _renderExtEmailScheduleStatus();
   document.getElementById('ext-email-schedule-modal')?.remove();
   if (typeof showAppAlert === 'function') {
-    showAppAlert('예약 설정 저장됨', enabled ? '예약 자동 발송이 활성화되었습니다.' : '예약 자동 발송이 비활성화되었습니다.', 'success');
+    const modeMsg = testMode ? '\n\n🧪 테스트 모드: jwback01@nate.com 으로 발송됩니다.' : '';
+    showAppAlert(
+      '예약 설정 저장됨',
+      (enabled ? '예약 자동 발송이 활성화되었습니다.' : '예약 자동 발송이 비활성화되었습니다.') + modeMsg,
+      'success'
+    );
   }
 }
 
@@ -20259,10 +20283,15 @@ async function _extEmailScheduleTick() {
     _saveExtEmailSchedule({ ...s, lastRunDay: today });
     _renderExtEmailScheduleStatus();
 
-    console.log('[예약 메일 발송] 실행 시작 —', s.depots.join(', '));
+    const modeLabel = s.testMode ? '🧪 테스트 모드 (jwback01@nate.com)' : '실제 거래처 발송';
+    console.log(`[예약 메일 발송] 실행 시작 — ${modeLabel} — ${s.depots.join(', ')}`);
     for (const depot of s.depots) {
       try {
-        await sendSeoulLivingEmail(depot);
+        if (s.testMode) {
+          await sendSeoulLivingTestEmail(depot);
+        } else {
+          await sendSeoulLivingEmail(depot);
+        }
         console.log(`[예약 메일 발송] ✅ ${depot} 완료`);
       } catch (e) {
         console.error(`[예약 메일 발송] ❌ ${depot} 실패:`, e);
