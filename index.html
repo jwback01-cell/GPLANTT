@@ -2887,6 +2887,7 @@ tailwind.config = {
         <button id="upload-tab-ad" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black" onclick="switchUploadTab('ad')">광고비 업로드</button>
         <button id="upload-tab-data" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black" onclick="switchUploadTab('data')">업로드 데이터</button>
         <button id="upload-tab-returns" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black" onclick="switchUploadTab('returns')">반품 데이터</button>
+        <button id="upload-tab-ops" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black" onclick="switchUploadTab('ops')">운영비</button>
       </div>
 
       <!-- ── Tab: 엑셀 업로드 ── -->
@@ -4251,6 +4252,91 @@ tailwind.config = {
         </div>
       </div>
       <!-- /Tab: 반품 데이터 -->
+
+      <!-- ── Tab: 운영비 관리 ── -->
+      <div id="upload-panel-ops" class="flex flex-col gap-6 hidden">
+
+        <!-- 상단 요약 카드 -->
+        <div class="bg-white rounded-3xl panel p-6 md:p-8">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-brand-orange-light flex items-center justify-center">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF9800" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            </div>
+            <div>
+              <div class="font-bold text-[15px]">주문당 단가 (마이너스 확인 자동 차감)</div>
+              <div class="text-xs text-brand-gray mt-1">활성 항목의 단가가 모든 주문의 마진에서 자동으로 차감되어 실 순이익이 계산됩니다.</div>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between flex-wrap gap-3 mb-4">
+            <div class="text-xs text-brand-gray">
+              주문당 합산 단가:
+              <span id="ops-total-unit" class="text-brand-black font-bold text-base ml-1">0원</span>
+              <span class="ml-2 text-brand-gray">(활성 항목만 계산됨)</span>
+            </div>
+            <button onclick="addOpsUnitItem()" class="px-4 py-2 rounded-full bg-brand-black text-white text-xs font-bold hover:bg-[#333] flex items-center gap-1.5">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              항목 추가
+            </button>
+          </div>
+
+          <div class="overflow-x-auto border border-brand-border rounded-2xl">
+            <table class="w-full text-sm">
+              <thead class="bg-brand-bg">
+                <tr class="text-brand-gray">
+                  <th class="px-4 py-3 text-left font-bold text-xs w-20">활성</th>
+                  <th class="px-4 py-3 text-left font-bold text-xs">항목명</th>
+                  <th class="px-4 py-3 text-right font-bold text-xs">주문당 단가 (원)</th>
+                  <th class="px-4 py-3 text-center font-bold text-xs w-32">분류</th>
+                  <th class="px-4 py-3 text-center font-bold text-xs w-24">삭제</th>
+                </tr>
+              </thead>
+              <tbody id="ops-unit-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 월별 총액 카드 (회계용 기록) -->
+        <div class="bg-white rounded-3xl panel p-6 md:p-8">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-brand-blue-light flex items-center justify-center">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2196F3" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <div>
+              <div class="font-bold text-[15px]">월별 총액 (회계용 기록)</div>
+              <div class="text-xs text-brand-gray mt-1">실제 그 달에 지출한 운영비 총액을 항목별로 기록 — 집계/비교용. 마진 계산에는 영향 없음.</div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3 flex-wrap mb-4">
+            <label class="flex items-center gap-2 text-xs">
+              <span class="text-brand-gray font-bold">월 선택:</span>
+              <input type="month" id="ops-monthly-month" onchange="renderOpsMonthly()" class="px-3 py-1.5 rounded-lg border border-brand-border bg-white text-xs font-mono">
+            </label>
+            <button onclick="addOpsMonthlyItem()" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg flex items-center gap-1.5">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              항목 추가
+            </button>
+          </div>
+
+          <div class="overflow-x-auto border border-brand-border rounded-2xl">
+            <table class="w-full text-sm">
+              <thead class="bg-brand-bg">
+                <tr class="text-brand-gray">
+                  <th class="px-4 py-3 text-left font-bold text-xs">항목명</th>
+                  <th class="px-4 py-3 text-right font-bold text-xs">총 지출액 (원)</th>
+                  <th class="px-4 py-3 text-left font-bold text-xs">메모</th>
+                  <th class="px-4 py-3 text-center font-bold text-xs w-24">삭제</th>
+                </tr>
+              </thead>
+              <tbody id="ops-monthly-tbody"></tbody>
+              <tfoot id="ops-monthly-tfoot" class="bg-brand-bg/40"></tfoot>
+            </table>
+          </div>
+        </div>
+
+      </div>
+      <!-- /Tab: 운영비 관리 -->
     </main>
   </div>
 </div>
@@ -5273,6 +5359,7 @@ const GPLAN_SYNC_KEYS = [
   'gplan_returns_v1',               // 반품 데이터
   'gplan_stock_movements_v1',       // 재고 수불 이력 (입출고 로그)
   'gplan_events_v1',                // 행사 내역 (할 일 페이지의 행사 캘린더)
+  'gplan_ops_costs_v1',             // 운영비 — 박스/테이프/포장지 등 (주문당 단가 + 월별 총액)
   'kw_extra_products',              // 키워드 추가 상품
   'kw_naver_api',                   // 네이버 API 키
   'kw_rank_history',                // 키워드 순위 이력
@@ -17759,7 +17846,7 @@ function renderCalDetail(key) {
 
 // ── 장부 업로드 / 이카운트 연동 ─────────────────
 function switchUploadTab(tab) {
-  const tabs = ['file','ecount','playauto','ad','data','returns'];
+  const tabs = ['file','ecount','playauto','ad','data','returns','ops'];
   if (tabs.indexOf(tab) === -1) tab = 'file';
   tabs.forEach(t => {
     const btn = document.getElementById('upload-tab-' + t);
@@ -17775,6 +17862,7 @@ function switchUploadTab(tab) {
   if (tab === 'ad')        { title.textContent = '광고비 업로드 💸'; desc.textContent = '사이트별 광고비를 업로드하고 마진에서 차감해 실제 수익을 확인하세요.'; _initAdTab(); }
   if (tab === 'data')      { title.textContent = '업로드 데이터 📚'; desc.textContent = '엑셀 업로드로 저장된 매출 데이터를 확인하세요.'; renderUploadData(); }
   if (tab === 'returns')   { title.textContent = '반품 데이터 📦'; desc.textContent = '반품 엑셀 업로드로 저장된 반품 데이터를 확인하고 통계를 봅니다.'; renderReturnData(); }
+  if (tab === 'ops')       { title.textContent = '운영비 관리 📦'; desc.textContent = '박스·테이프·포장지 등 주문 처리 시 발생하는 비용을 등록해 마이너스 확인에 자동으로 반영합니다.'; renderOpsCosts(); }
 }
 
 // 플레이오토 "신규주문" 탭의 주문들을 가져오기 — 상태=신규주문 + 최근 90일로 세팅 후 조회
@@ -19482,10 +19570,14 @@ async function runPaMinusCheck() {
     console.log(`[마이너스확인] 묶음 내 택배비 단일화: ${shipFeeRowsZeroed}건의 행을 0원 처리 (가장 큰 택배비 1건만 유지)`);
   }
 
-  // 3단계: 최종 마진 = 공급가 + 택배비 − 원가 − 택배비용 (원가 없으면 null)
+  // 3단계: 최종 마진 = 공급가 + 택배비 − 원가 − 택배비용 − 운영비 (박스/테이프 등)
+  //   ※ 운영비는 운영비 관리 탭에서 등록한 "활성" 항목의 단가 합계
+  const opsUnitTotal = (typeof _opsActiveUnitTotal === 'function') ? _opsActiveUnitTotal() : 0;
   _paMinusRows = _paMinusRows.map(r => {
-    const margin = r.cost == null ? null : (Number(r.supply) || 0) + (Number(r.shipFee) || 0) - Number(r.cost) - (Number(r.shipCost) || 0);
-    return { ...r, margin, isMinus: margin != null && margin < 0 };
+    const baseMargin = r.cost == null ? null
+      : (Number(r.supply) || 0) + (Number(r.shipFee) || 0) - Number(r.cost) - (Number(r.shipCost) || 0);
+    const margin = baseMargin == null ? null : baseMargin - opsUnitTotal;
+    return { ...r, margin, opsCost: opsUnitTotal, isMinus: margin != null && margin < 0 };
   });
 
   // 4단계: 광고비는 마이너스 확인에 반영하지 않음 (사용자 요청)
@@ -19562,7 +19654,8 @@ function renderPaMinus() {
       { key: 'shipFee',    label: '택배비',     align: 'text-right', extra: '' },
       { key: 'cost',       label: '원가',       align: 'text-right', extra: '' },
       { key: 'shipCost',   label: '택배비용',   align: 'text-right', extra: '' },
-      { key: 'margin',     label: '마진(공급가+택배비−원가−택배비용)', align: 'text-right', extra: '' },
+      { key: 'opsCost',    label: '운영비',     align: 'text-right', extra: '' },
+      { key: 'margin',     label: '마진(공급가+택배비−원가−택배비용−운영비)', align: 'text-right', extra: '' },
       { key: 'receiver',   label: '수령자',     align: '',           extra: 'pr-5' },
     ];
     thead.innerHTML = '<tr class="text-brand-gray text-xs">' + cols.map(c => {
@@ -19606,10 +19699,11 @@ function renderPaMinus() {
       <td class="p-3 text-right text-xs">${money(r.shipFee)}</td>
       <td class="p-3 text-right text-xs">${money(r.cost)}</td>
       <td class="p-3 text-right text-xs">${shipCostCell(r)}</td>
+      <td class="p-3 text-right text-xs ${(Number(r.opsCost)||0) > 0 ? 'text-brand-orange font-semibold' : 'text-brand-gray'}" title="운영비 관리 탭의 활성 항목 단가 합계">${(Number(r.opsCost)||0) > 0 ? fmt(r.opsCost) + '원' : '-'}</td>
       <td class="p-3 text-right text-xs">${marginCell(r.margin)}</td>
       <td class="p-3 pr-5 text-xs">${_escapeHtml(r.receiver)}</td>
     </tr>`;
-  }).join('') : '<tr><td colspan="13" class="p-8 text-center text-brand-gray text-sm">주문이 없습니다</td></tr>';
+  }).join('') : '<tr><td colspan="14" class="p-8 text-center text-brand-gray text-sm">주문이 없습니다</td></tr>';
 
   // 합계 행
   const tfoot = document.getElementById('pa-minus-tfoot');
@@ -19624,9 +19718,10 @@ function renderPaMinus() {
         a.shipFee += Number(r.shipFee) || 0;
         if (r.cost != null) { a.cost += Number(r.cost) || 0; a.costN++; }
         a.shipCost += Number(r.shipCost) || 0;
+        a.opsCost += Number(r.opsCost) || 0;
         if (r.margin != null) { a.margin += Number(r.margin) || 0; a.marginN++; }
         return a;
-      }, { qty: 0, price: 0, supply: 0, shipFee: 0, cost: 0, costN: 0, shipCost: 0, margin: 0, marginN: 0 });
+      }, { qty: 0, price: 0, supply: 0, shipFee: 0, cost: 0, costN: 0, shipCost: 0, opsCost: 0, margin: 0, marginN: 0 });
       const marginCls = sum.margin < 0 ? 'text-brand-pink font-bold' : (sum.margin > 0 ? 'text-brand-green font-bold' : '');
       tfoot.innerHTML = `<tr class="border-t-2 border-brand-border font-bold">
         <td class="p-3 pl-5 text-xs" colspan="5">합계 (${rows.length}건)</td>
@@ -19636,6 +19731,7 @@ function renderPaMinus() {
         <td class="p-3 text-right text-xs">${fmt(sum.shipFee)}원</td>
         <td class="p-3 text-right text-xs">${sum.costN ? fmt(sum.cost) + '원' : '<span class="text-brand-gray font-normal">-</span>'}</td>
         <td class="p-3 text-right text-xs">${fmt(sum.shipCost)}원</td>
+        <td class="p-3 text-right text-xs ${sum.opsCost > 0 ? 'text-brand-orange' : 'text-brand-gray font-normal'}">${sum.opsCost > 0 ? fmt(sum.opsCost) + '원' : '-'}</td>
         <td class="p-3 text-right text-xs ${marginCls}">${sum.marginN ? fmt(sum.margin) + '원' : '<span class="text-brand-gray font-normal">-</span>'}</td>
         <td class="p-3 pr-5"></td>
       </tr>`;
@@ -19655,17 +19751,18 @@ function exportPaMinus() {
     a.shipFee += Number(r.shipFee) || 0;
     if (r.cost != null) a.cost += Number(r.cost) || 0;
     a.shipCost += Number(r.shipCost) || 0;
+    a.opsCost += Number(r.opsCost) || 0;
     if (r.margin != null) a.margin += Number(r.margin) || 0;
     return a;
-  }, { qty: 0, price: 0, supply: 0, shipFee: 0, cost: 0, shipCost: 0, margin: 0 });
+  }, { qty: 0, price: 0, supply: 0, shipFee: 0, cost: 0, shipCost: 0, opsCost: 0, margin: 0 });
   const data = [
-    ['쇼핑몰', '주문일', 'SKU코드', 'SKU상품명', '온라인 상품명', '수량', '판매가', '공급가', '택배비', '원가', '택배비용', '마진(공급가+택배비-원가-택배비용)', '수령자', '마이너스'],
-    ...rows.map(r => [r.shop, String(r.date).slice(0, 10), r.skuCode || '', r.name, r.onlineName || '', r.qty, r.price, r.supply, r.shipFee || 0, r.cost == null ? '' : r.cost, r.shipCost || 0, r.margin == null ? '' : r.margin, r.receiver, r.isMinus ? 'Y' : 'N']),
-    ['합계', '', '', `${rows.length}건`, '', sum.qty, sum.price, sum.supply, sum.shipFee, sum.cost, sum.shipCost, sum.margin, '', ''],
+    ['쇼핑몰', '주문일', 'SKU코드', 'SKU상품명', '온라인 상품명', '수량', '판매가', '공급가', '택배비', '원가', '택배비용', '운영비', '마진(공급가+택배비-원가-택배비용-운영비)', '수령자', '마이너스'],
+    ...rows.map(r => [r.shop, String(r.date).slice(0, 10), r.skuCode || '', r.name, r.onlineName || '', r.qty, r.price, r.supply, r.shipFee || 0, r.cost == null ? '' : r.cost, r.shipCost || 0, r.opsCost || 0, r.margin == null ? '' : r.margin, r.receiver, r.isMinus ? 'Y' : 'N']),
+    ['합계', '', '', `${rows.length}건`, '', sum.qty, sum.price, sum.supply, sum.shipFee, sum.cost, sum.shipCost, sum.opsCost, sum.margin, '', ''],
   ];
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{wch:10},{wch:12},{wch:14},{wch:40},{wch:40},{wch:6},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:22},{wch:10},{wch:8}];
+  ws['!cols'] = [{wch:10},{wch:12},{wch:14},{wch:40},{wch:40},{wch:6},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:22},{wch:10},{wch:8}];
   XLSX.utils.book_append_sheet(wb, ws, '마이너스확인');
   XLSX.writeFile(wb, `GPLAN_마이너스확인_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
@@ -28002,6 +28099,227 @@ function _normReturnOutDate(v) {
   m = s.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
   if (m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
   return s;
+}
+
+// ── 운영비 관리 (Ops Costs) ────────────────────
+// 박스·테이프·포장지 등 주문 처리 시 발생하는 비용
+// 두 가지 저장:
+//   1) unitItems  — 주문당 단가 (마이너스 확인에 자동 차감됨)
+//   2) monthlyTotals — 월별 실 지출 총액 (회계용 기록, 마진 계산엔 영향 X)
+const OPS_COSTS_KEY = 'gplan_ops_costs_v1';
+
+function _opsDefaultUnitItems() {
+  // 사용자가 처음 들어왔을 때 보이는 기본 프리셋 (active=false 로 시작 — 의도하지 않은 자동 차감 방지)
+  return [
+    { id: 'preset_box',     name: '박스',     unit: 0, active: false, isPreset: true },
+    { id: 'preset_tape',    name: '테이프',   unit: 0, active: false, isPreset: true },
+    { id: 'preset_wrap',    name: '포장지',   unit: 0, active: false, isPreset: true },
+    { id: 'preset_cushion', name: '완충재',   unit: 0, active: false, isPreset: true },
+    { id: 'preset_sticker', name: '스티커',   unit: 0, active: false, isPreset: true },
+  ];
+}
+
+function _loadOpsCosts() {
+  try {
+    const raw = localStorage.getItem(OPS_COSTS_KEY);
+    if (!raw) return { unitItems: _opsDefaultUnitItems(), monthlyTotals: {} };
+    const obj = JSON.parse(raw);
+    return {
+      unitItems:     Array.isArray(obj.unitItems)     ? obj.unitItems     : _opsDefaultUnitItems(),
+      monthlyTotals: (obj.monthlyTotals && typeof obj.monthlyTotals === 'object') ? obj.monthlyTotals : {},
+    };
+  } catch (_) {
+    return { unitItems: _opsDefaultUnitItems(), monthlyTotals: {} };
+  }
+}
+
+function _saveOpsCosts(o) {
+  try { localStorage.setItem(OPS_COSTS_KEY, JSON.stringify(o)); } catch(_) {}
+  // 마이너스 확인 화면이 떠 있으면 즉시 재계산
+  try { if (typeof renderPaMinus === 'function' && Array.isArray(window._paMinusRows)) renderPaMinus(); } catch(_) {}
+}
+
+// 현재 활성 항목의 단가 합계 (마이너스 확인에서 차감되는 값)
+function _opsActiveUnitTotal() {
+  const { unitItems } = _loadOpsCosts();
+  return unitItems.filter(it => it.active).reduce((s, it) => s + (Number(it.unit) || 0), 0);
+}
+
+// 현재 활성 항목 배열 (마이너스 확인 컬럼 라벨용)
+function _opsActiveUnitItems() {
+  const { unitItems } = _loadOpsCosts();
+  return unitItems.filter(it => it.active && (Number(it.unit) || 0) > 0);
+}
+
+function _opsUid() { return 'usr_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+function renderOpsCosts() {
+  // 월 선택 input 초기값 — 현재 월
+  const monthEl = document.getElementById('ops-monthly-month');
+  if (monthEl && !monthEl.value) {
+    const d = new Date();
+    monthEl.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+  _renderOpsUnitTable();
+  renderOpsMonthly();
+}
+
+function _renderOpsUnitTable() {
+  const tbody = document.getElementById('ops-unit-tbody');
+  if (!tbody) return;
+  const { unitItems } = _loadOpsCosts();
+  if (!unitItems.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-brand-gray text-sm">등록된 항목이 없습니다. "항목 추가" 버튼을 눌러 시작하세요.</td></tr>';
+  } else {
+    tbody.innerHTML = unitItems.map(it => `
+      <tr class="border-t border-brand-border ${it.active ? '' : 'opacity-60'}">
+        <td class="px-4 py-3">
+          <label class="inline-flex items-center cursor-pointer">
+            <input type="checkbox" ${it.active ? 'checked' : ''} onchange="toggleOpsUnitItem('${it.id}', this.checked)" class="w-4 h-4">
+          </label>
+        </td>
+        <td class="px-4 py-3">
+          <input type="text" value="${_escapeHtml(it.name)}" onchange="updateOpsUnitItem('${it.id}', 'name', this.value)" class="w-full bg-transparent border-0 outline-none focus:bg-brand-bg rounded px-2 py-1 text-sm font-semibold">
+        </td>
+        <td class="px-4 py-3 text-right">
+          <input type="number" min="0" step="1" value="${Number(it.unit) || 0}" onchange="updateOpsUnitItem('${it.id}', 'unit', this.value)" class="w-32 bg-transparent border-0 outline-none focus:bg-brand-bg rounded px-2 py-1 text-sm font-mono text-right">
+        </td>
+        <td class="px-4 py-3 text-center">
+          ${it.isPreset
+            ? '<span class="inline-flex px-2 py-0.5 rounded-full bg-brand-bg text-brand-gray text-[10px] font-bold">프리셋</span>'
+            : '<span class="inline-flex px-2 py-0.5 rounded-full bg-brand-blue-light text-brand-blue text-[10px] font-bold">사용자 추가</span>'}
+        </td>
+        <td class="px-4 py-3 text-center">
+          <button onclick="deleteOpsUnitItem('${it.id}')" class="text-brand-pink hover:bg-brand-pink-light/40 rounded-full px-2 py-1 text-xs font-bold">삭제</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+  // 합계 표시
+  const totalEl = document.getElementById('ops-total-unit');
+  if (totalEl) totalEl.textContent = _opsActiveUnitTotal().toLocaleString('ko-KR') + '원';
+}
+
+function addOpsUnitItem() {
+  const data = _loadOpsCosts();
+  data.unitItems.push({ id: _opsUid(), name: '신규 항목', unit: 0, active: false, isPreset: false });
+  _saveOpsCosts(data);
+  _renderOpsUnitTable();
+}
+
+function updateOpsUnitItem(id, field, value) {
+  const data = _loadOpsCosts();
+  const it = data.unitItems.find(x => x.id === id);
+  if (!it) return;
+  if (field === 'name') it.name = String(value || '').trim() || it.name;
+  else if (field === 'unit') it.unit = Math.max(0, Number(value) || 0);
+  _saveOpsCosts(data);
+  // 단가만 변경된 경우 합계만 갱신, 이름은 그대로 두고 옆 표시만 갱신 — 둘 다 안전하게 재렌더
+  const totalEl = document.getElementById('ops-total-unit');
+  if (totalEl) totalEl.textContent = _opsActiveUnitTotal().toLocaleString('ko-KR') + '원';
+}
+
+function toggleOpsUnitItem(id, checked) {
+  const data = _loadOpsCosts();
+  const it = data.unitItems.find(x => x.id === id);
+  if (!it) return;
+  it.active = !!checked;
+  _saveOpsCosts(data);
+  _renderOpsUnitTable();
+}
+
+function deleteOpsUnitItem(id) {
+  const data = _loadOpsCosts();
+  const it = data.unitItems.find(x => x.id === id);
+  if (!it) return;
+  if (!confirm(`"${it.name}" 항목을 삭제할까요?`)) return;
+  data.unitItems = data.unitItems.filter(x => x.id !== id);
+  _saveOpsCosts(data);
+  _renderOpsUnitTable();
+}
+
+// ── 월별 총액 ──────────────────────────────
+function renderOpsMonthly() {
+  const tbody = document.getElementById('ops-monthly-tbody');
+  const tfoot = document.getElementById('ops-monthly-tfoot');
+  const monthEl = document.getElementById('ops-monthly-month');
+  if (!tbody || !tfoot || !monthEl) return;
+  const month = monthEl.value || '';
+  if (!month) {
+    tbody.innerHTML = '<tr><td colspan="4" class="p-6 text-center text-brand-gray text-sm">월을 선택해주세요.</td></tr>';
+    tfoot.innerHTML = '';
+    return;
+  }
+  const data = _loadOpsCosts();
+  const arr = Array.isArray(data.monthlyTotals[month]) ? data.monthlyTotals[month] : [];
+  if (!arr.length) {
+    tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-brand-gray text-sm">${month} 의 등록된 지출이 없습니다. "항목 추가" 버튼으로 시작하세요.</td></tr>`;
+    tfoot.innerHTML = '';
+    return;
+  }
+  tbody.innerHTML = arr.map((it, idx) => `
+    <tr class="border-t border-brand-border">
+      <td class="px-4 py-3">
+        <input type="text" value="${_escapeHtml(it.name || '')}" onchange="updateOpsMonthlyItem(${idx}, 'name', this.value)" class="w-full bg-transparent border-0 outline-none focus:bg-brand-bg rounded px-2 py-1 text-sm font-semibold">
+      </td>
+      <td class="px-4 py-3 text-right">
+        <input type="number" min="0" step="1" value="${Number(it.amount) || 0}" onchange="updateOpsMonthlyItem(${idx}, 'amount', this.value)" class="w-36 bg-transparent border-0 outline-none focus:bg-brand-bg rounded px-2 py-1 text-sm font-mono text-right">
+      </td>
+      <td class="px-4 py-3">
+        <input type="text" value="${_escapeHtml(it.memo || '')}" placeholder="(선택) 메모" onchange="updateOpsMonthlyItem(${idx}, 'memo', this.value)" class="w-full bg-transparent border-0 outline-none focus:bg-brand-bg rounded px-2 py-1 text-xs text-brand-gray">
+      </td>
+      <td class="px-4 py-3 text-center">
+        <button onclick="deleteOpsMonthlyItem(${idx})" class="text-brand-pink hover:bg-brand-pink-light/40 rounded-full px-2 py-1 text-xs font-bold">삭제</button>
+      </td>
+    </tr>
+  `).join('');
+  const sum = arr.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+  tfoot.innerHTML = `
+    <tr class="border-t border-brand-border font-bold">
+      <td class="px-4 py-3 text-right">${month} 합계</td>
+      <td class="px-4 py-3 text-right font-mono">${sum.toLocaleString('ko-KR')}원</td>
+      <td colspan="2"></td>
+    </tr>
+  `;
+}
+
+function addOpsMonthlyItem() {
+  const monthEl = document.getElementById('ops-monthly-month');
+  if (!monthEl || !monthEl.value) { alert('먼저 월을 선택해주세요.'); return; }
+  const month = monthEl.value;
+  const data = _loadOpsCosts();
+  if (!Array.isArray(data.monthlyTotals[month])) data.monthlyTotals[month] = [];
+  data.monthlyTotals[month].push({ name: '신규 항목', amount: 0, memo: '' });
+  _saveOpsCosts(data);
+  renderOpsMonthly();
+}
+
+function updateOpsMonthlyItem(idx, field, value) {
+  const monthEl = document.getElementById('ops-monthly-month');
+  if (!monthEl || !monthEl.value) return;
+  const month = monthEl.value;
+  const data = _loadOpsCosts();
+  const arr = data.monthlyTotals[month];
+  if (!Array.isArray(arr) || !arr[idx]) return;
+  if (field === 'name')       arr[idx].name   = String(value || '').trim() || arr[idx].name;
+  else if (field === 'amount') arr[idx].amount = Math.max(0, Number(value) || 0);
+  else if (field === 'memo')   arr[idx].memo   = String(value || '');
+  _saveOpsCosts(data);
+  if (field === 'amount') renderOpsMonthly(); // 합계 갱신
+}
+
+function deleteOpsMonthlyItem(idx) {
+  const monthEl = document.getElementById('ops-monthly-month');
+  if (!monthEl || !monthEl.value) return;
+  const month = monthEl.value;
+  const data = _loadOpsCosts();
+  const arr = data.monthlyTotals[month];
+  if (!Array.isArray(arr) || !arr[idx]) return;
+  if (!confirm(`"${arr[idx].name}" 항목을 삭제할까요?`)) return;
+  arr.splice(idx, 1);
+  if (arr.length === 0) delete data.monthlyTotals[month];
+  _saveOpsCosts(data);
+  renderOpsMonthly();
 }
 
 // 반품 페이지 상태 + 렌더
