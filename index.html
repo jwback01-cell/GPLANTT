@@ -20210,13 +20210,45 @@ function openExtEmailScheduleModal() {
 
       </div>
 
-      <div style="padding:14px 24px;border-top:1px solid #eee;display:flex;justify-content:flex-end;gap:8px;">
-        <button onclick="document.getElementById('ext-email-schedule-modal').remove()" style="padding:9px 18px;border-radius:14px;border:1px solid #ddd;background:white;cursor:pointer;font-size:13px;font-weight:bold;">취소</button>
-        <button onclick="submitExtEmailSchedule()" style="padding:9px 22px;border-radius:14px;border:none;background:#1A1A1A;color:white;cursor:pointer;font-size:13px;font-weight:bold;">저장</button>
+      <div style="padding:14px 24px;border-top:1px solid #eee;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+        <button onclick="runExtEmailScheduleNow()"
+                title="저장된 예약 설정과 무관하게 지금 즉시 1회 발송 — 테스트용"
+                style="padding:9px 18px;border-radius:14px;border:1px solid #FFD180;background:#FFF7E6;color:#E65100;cursor:pointer;font-size:13px;font-weight:bold;">
+          ▶ 지금 즉시 1회 실행
+        </button>
+        <div style="display:flex;gap:8px;">
+          <button onclick="document.getElementById('ext-email-schedule-modal').remove()" style="padding:9px 18px;border-radius:14px;border:1px solid #ddd;background:white;cursor:pointer;font-size:13px;font-weight:bold;">취소</button>
+          <button onclick="submitExtEmailSchedule()" style="padding:9px 22px;border-radius:14px;border:none;background:#1A1A1A;color:white;cursor:pointer;font-size:13px;font-weight:bold;">저장</button>
+        </div>
       </div>
     </div>
   `;
   document.body.appendChild(m);
+}
+
+// 모달에서 "지금 즉시 1회 실행" 버튼 — 저장된 예약과 무관하게 현재 폼 선택값대로 즉시 발송
+async function runExtEmailScheduleNow() {
+  const testMode = document.getElementById('ext-sched-test-mode')?.checked !== false;
+  const depots = [...document.querySelectorAll('.ext-sched-depot:checked')].map(c => c.value);
+  if (!depots.length) {
+    alert('발송 대상 배송처를 1개 이상 선택해주세요.');
+    return;
+  }
+  if (!confirm(`${testMode ? '🧪 테스트 모드 — jwback01@nate.com 으로' : '⚠ 실제 거래처 메일로'} 지금 즉시 발송하시겠습니까?\n\n대상: ${depots.map(_extDepotLabel).join(', ')}`)) {
+    return;
+  }
+  document.getElementById('ext-email-schedule-modal')?.remove();
+  console.log(`[예약 메일 발송 — 즉시 1회] ${testMode ? '테스트' : '실제'} 모드 / ${depots.join(', ')}`);
+  for (const depot of depots) {
+    try {
+      if (testMode) await sendSeoulLivingTestEmail(depot);
+      else          await sendSeoulLivingEmail(depot);
+      console.log(`[예약 메일 발송 — 즉시 1회] ✅ ${depot} 완료`);
+    } catch (e) {
+      console.error(`[예약 메일 발송 — 즉시 1회] ❌ ${depot} 실패:`, e);
+    }
+    await new Promise(r => setTimeout(r, 1500));
+  }
 }
 
 function _toggleExtSchedDow(btn) {
@@ -20239,6 +20271,11 @@ function submitExtEmailSchedule() {
   if (enabled) {
     if (!days.length) { alert('반복 요일을 1개 이상 선택해주세요.'); return; }
     if (!depots.length) { alert('발송 대상 배송처를 1개 이상 선택해주세요.'); return; }
+  } else if (days.length && depots.length && time) {
+    // 활성화는 꺼져 있지만 다른 필드는 모두 채워진 경우 — 사용자가 켜는 걸 잊었을 수 있음
+    if (!confirm('"예약 자동 발송 사용" 이 꺼져 있어 자동 발송이 작동하지 않습니다.\n\n그래도 이 설정값으로 저장할까요?\n\n(취소를 누르고 "예약 자동 발송 사용" 을 체크하면 활성화됩니다.)')) {
+      return;
+    }
   }
 
   const prev = _loadExtEmailSchedule();
