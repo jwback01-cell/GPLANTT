@@ -11244,6 +11244,9 @@ function renderProductsPage() {
   // 여러 값 동시 검색: 공백·쉼표·세미콜론·줄바꿈·탭 어떤 구분자든 OR 매칭
   // 예) "GB0080 GB0081" 또는 "GB0080, GB0081" → 둘 중 하나라도 포함되면 표시
   const queryTokens = queryRaw ? queryRaw.split(/[\s,;]+/).filter(Boolean) : [];
+  // 다중 검색(3개 이상) 시 SKU 정확 일치 모드 — 검색어 1개당 최대 1상품
+  // 단일/2개 검색 시는 부분 일치 (브라우즈/검색 편의)
+  const isExactMode = queryTokens.length >= 3;
   // 검색어 메타 정보 (X 버튼 / 토큰 수 / 결과 수) 갱신 — filter 후에 결과 수 채움
   _updateProductSearchClearBtn();
   const catSel = document.getElementById('product-category-filter')?.value || '카테고리 전체';
@@ -11258,7 +11261,11 @@ function renderProductsPage() {
     const cat  = p.category || '';
     const isLow  = p.safety_stock > 0 && p.stock < p.safety_stock;
 
-    const matchQuery = !queryTokens.length || queryTokens.some(t => name.includes(t) || sku.includes(t));
+    // isExactMode → SKU 정확 일치만 (다중 검색의 1:1 매칭 보장)
+    // 그 외(1-2개 토큰) → 상품명/SKU 부분 일치
+    const matchQuery = !queryTokens.length || queryTokens.some(t =>
+      isExactMode ? (sku === t) : (name.includes(t) || sku.includes(t))
+    );
     const matchCat   = catAll || cat === catSel;
     const matchStat  = activeStatFilter === 'all'
                     || (activeStatFilter === 'low'  && isLow);
@@ -11328,13 +11335,14 @@ function renderProductsPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / _productsPerPage));
   if (_productPage > totalPages) _productPage = totalPages;
 
-  // 검색어 메타 — '검색어 N개 · 결과 M건' (검색어 있을 때만)
+  // 검색어 메타 — '검색어 N개 · 결과 M건 · 모드' (검색어 있을 때만)
   const metaEl = document.getElementById('product-search-meta');
   if (metaEl) {
     if (queryTokens.length > 0) {
       metaEl.classList.remove('hidden');
       const tokenText = queryTokens.length > 1 ? `검색어 ${queryTokens.length}개 · ` : '';
-      metaEl.textContent = `${tokenText}결과 ${filtered.length.toLocaleString('ko-KR')}건`;
+      const modeText  = isExactMode ? ` · SKU 정확 일치 (다중 검색)` : '';
+      metaEl.textContent = `${tokenText}결과 ${filtered.length.toLocaleString('ko-KR')}건${modeText}`;
     } else {
       metaEl.classList.add('hidden');
     }
