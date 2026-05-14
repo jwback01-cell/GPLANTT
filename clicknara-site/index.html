@@ -5578,10 +5578,10 @@ function _ppColIndex(headerRow, keywords) {
 function _ppParseRows(rows, side) {
   if (!rows || !rows.length) return { error: '엑셀이 비어 있습니다.' };
   if (side === 'A') {
-    const headerIdx = _ppFindHeaderRow(rows, [['상품명','품명','제품명'], ['수량','출고수량','판매수량'], ['출고일','매출일','출고날짜']]);
+    const headerIdx = _ppFindHeaderRow(rows, [['상품명','품명','제품명','품목명','품목'], ['수량','출고수량','판매수량'], ['출고일','매출일','출고날짜']]);
     if (headerIdx < 0) return { error: '헤더(상품명/수량/출고일)를 찾지 못했습니다.' };
     const h = rows[headerIdx];
-    const pi = _ppColIndex(h, ['상품명','품명','제품명']);
+    const pi = _ppColIndex(h, ['상품명','품명','제품명','품목명','품목']);
     const qi = _ppColIndex(h, ['수량','출고수량','판매수량']);
     const di = _ppColIndex(h, ['출고일','매출일','출고날짜']);
     if (pi < 0 || qi < 0 || di < 0) return { error: `필수 컬럼 누락 (상품명:${pi>=0?'✓':'✗'} 수량:${qi>=0?'✓':'✗'} 출고일:${di>=0?'✓':'✗'})` };
@@ -5604,7 +5604,7 @@ function _ppParseRows(rows, side) {
     const di = _ppColIndex(h, ['수불일자','일자']);
     const gi = _ppColIndex(h, ['수불구분','구분']);
     const oi = _ppColIndex(h, ['출고']);  // '출고대기' 보다 '출고'가 먼저 매치되도록 키워드 순서 주의 — _ppColIndex 는 첫 매치만 반환
-    const pi = _ppColIndex(h, ['상품명','품명','제품명']);  // 없을 수도 있음
+    const pi = _ppColIndex(h, ['상품명','품명','제품명','품목명','품목']);  // 없을 수도 있음
     if (di < 0 || gi < 0 || oi < 0) return { error: `필수 컬럼 누락 (수불일자:${di>=0?'✓':'✗'} 수불구분:${gi>=0?'✓':'✗'} 출고:${oi>=0?'✓':'✗'})` };
     const out = [];
     let skipped = 0;
