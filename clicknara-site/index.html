@@ -1375,7 +1375,7 @@ tailwind.config = {
     <main class="flex-1 overflow-y-auto pr-0 md:pr-2 pb-10 flex flex-col gap-6">
       <section class="mt-2 pl-1 md:pl-2">
         <h1 class="text-[1.8rem] md:text-[2.25rem] font-bold tracking-tight mb-2">데이터가공 🔀</h1>
-        <p class="text-brand-gray text-base md:text-[1.1rem]">두 엑셀 파일을 업로드해서 <strong>상품명 · 수량 · 출고일</strong> 이 일치하는지 비교합니다. 두 번째 엑셀(수불 장부)의 <strong>'매출출고'</strong> 행만 비교 대상이 됩니다.</p>
+        <p class="text-brand-gray text-base md:text-[1.1rem]">두 엑셀 파일을 업로드해서 <strong>상품명 · 수량 · 출고일</strong> 이 일치하는지 비교합니다. 두 번째 엑셀(수불 장부)에서는 <strong>출고 수량이 있는 행</strong>(매출출고·이동출고 등)만 비교 대상이 됩니다.</p>
       </section>
 
       <!-- 업로드 영역: 2-column -->
@@ -1405,7 +1405,7 @@ tailwind.config = {
               <div class="w-8 h-8 rounded-[10px] flex items-center justify-center bg-brand-green-light shrink-0 text-brand-green font-black text-sm">B</div>
               <h3 class="font-bold">엑셀 B — 수불 장부</h3>
             </div>
-            <p class="text-brand-gray text-xs mb-3">필요 컬럼: <strong>수불일자 · 수불구분 · 출고</strong> (상품명 컬럼이 있으면 함께 매칭. '매출출고' 행만 사용)</p>
+            <p class="text-brand-gray text-xs mb-3">필요 컬럼: <strong>수불일자 · 수불구분 · 출고</strong> (상품명 컬럼이 있으면 함께 매칭. 출고 수량이 있는 행만 사용 — 매출출고/이동출고 모두 인식)</p>
             <label class="block border-2 border-dashed border-brand-border rounded-2xl p-6 text-center cursor-pointer hover:bg-brand-bg transition-colors"
               ondragover="ppDragOver(event, this)" ondragleave="ppDragLeave(event, this)" ondrop="ppDrop(event, 'B')">
               <input type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="ppUpload(event, 'B')">
@@ -5617,13 +5617,14 @@ function _ppParseRows(rows, side) {
     for (let r = headerIdx + 1; r < rows.length; r++) {
       const row = rows[r];
       const gubun = String(row[gi] || '').trim();
-      if (!/매출\s*출고/.test(gubun)) { skipped++; continue; }  // 매출출고 외에는 모두 제외
       const qty  = _ppNormQty(row[oi]);
       const date = _ppNormDate(row[di]);
+      // 출고 컬럼 값이 양수인 행만 — 수불구분 종류(매출출고/이동출고)에 관계없이 출고 발생 행 채택
+      // (이동입고/매출반품 등 입고 행은 자동 제외, 누적 0 행도 제외)
+      if (qty == null || qty <= 0 || !date) { skipped++; continue; }
       // 상품명 컬럼이 없으면 '*' (와일드카드 — ppCompare 가 상품 비교 없이 수량+날짜로만 매칭)
       const product = pi >= 0 ? _ppNormProduct(row[pi]) : '*';
-      if (qty == null || qty === 0 || !date) { skipped++; continue; }
-      out.push({ product, qty, date, rowIdx: r + 1 });
+      out.push({ product, qty, date, rowIdx: r + 1, gubun });
     }
     return { rows: out, skipped };
   }
