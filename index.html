@@ -10259,11 +10259,12 @@ function _setModalMode(mode) {
   }
 }
 
-function openAddTodoModal() {
+function openAddTodoModal(prefillDate) {
   _editingTodoId = null;
   todoPriority = 'blue';
   document.getElementById('todo-title').value   = '';
-  document.getElementById('todo-due').value     = '';
+  // prefillDate (YYYY-MM-DD) 가 전달되면 마감일에 자동 입력 — 캘린더에서 날짜 클릭 시
+  document.getElementById('todo-due').value     = prefillDate || '';
   document.getElementById('todo-due-end').value = '';
   document.getElementById('todo-memo').value    = '';
   document.getElementById('todo-modal-error').classList.add('hidden');
@@ -10275,6 +10276,12 @@ function openAddTodoModal() {
   document.body.style.overflow = 'hidden';
   _bindTodoModalEnterKeys();
   setTimeout(() => document.getElementById('todo-title').focus(), 300);
+}
+
+// 캘린더 날짜 셀 클릭 — 선택 표시 + 해당 날짜로 업무 추가 모달 오픈
+function calDayAddTodo(key) {
+  _calSelectedKey = key;
+  openAddTodoModal(key);
 }
 
 function todoEdit(id) {
@@ -17676,7 +17683,7 @@ function renderCalendar() {
       if (isSel)   cls += ' cal-day--selected';
       const numCls = cell.dow === 0 ? 'dow-sun' : (cell.dow === 6 ? 'dow-sat' : '');
       const todayBadge = isToday ? '<span class="cal-day-today-badge">TODAY</span>' : '';
-      html += `<div class="${cls}" style="grid-column:${idx+1};" onclick="selectCalDay('${cell.key}')" ondragover="calDayDragOver(event,this)" ondragleave="calDayDragLeave(this)" ondrop="calDayDrop(event,'${cell.key}',this)">
+      html += `<div class="${cls}" style="grid-column:${idx+1};" onclick="calDayAddTodo('${cell.key}')" ondragover="calDayDragOver(event,this)" ondragleave="calDayDragLeave(this)" ondrop="calDayDrop(event,'${cell.key}',this)">
         <div class="cal-day-header">
           <span class="cal-day-num ${numCls}">${cell.day}</span>
           ${todayBadge}
