@@ -1426,7 +1426,7 @@ tailwind.config = {
           </button>
           <button onclick="ppReset()" class="px-4 py-2 rounded-full text-sm font-semibold border border-brand-border hover:bg-brand-bg">초기화</button>
           <label class="flex items-center gap-2 text-sm cursor-pointer select-none ml-2">
-            <input type="checkbox" id="pp-a-plus1" onchange="if(_ppState.result.length) ppCompare()" class="w-4 h-4 rounded border-brand-border">
+            <input type="checkbox" id="pp-a-plus1" onchange="ppOnOffsetChange()" class="w-4 h-4 rounded border-brand-border">
             <span>A 출고일에 <strong>+1일</strong> 보정 (실제 배송일이 다음날인 경우)</span>
           </label>
         </div>
@@ -5667,6 +5667,16 @@ function _ppNormDate(v) {
     return d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0') + '-' + String(d.getUTCDate()).padStart(2,'0');
   }
   return null;
+}
+// 체크박스 토글 시 — 이미 비교 결과가 있으면 자동 재비교
+function ppOnOffsetChange() {
+  if (_ppState.result.length) ppCompare();
+  else {
+    // 결과 아직 없으면 헤더만 갱신
+    const offsetOn = document.getElementById('pp-a-plus1').checked;
+    const th = document.getElementById('pp-th-dateA');
+    if (th) th.innerHTML = offsetOn ? 'A 출고일 <span class="text-brand-blue font-bold">(+1일)</span>' : 'A 출고일';
+  }
 }
 // YYYY-MM-DD 문자열에 일수 더하기
 function _ppAddDays(dateStr, days) {
