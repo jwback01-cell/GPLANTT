@@ -708,7 +708,7 @@ tailwind.config = {
         <div class="bg-white p-6 md:p-8 rounded-4xl panel flex flex-col" style="min-height:400px;">
           <div class="text-brand-gray text-[0.78rem] font-bold mb-2 tracking-widest uppercase">Operations Dashboard</div>
           <h2 class="text-[1.2rem] md:text-[1.35rem] font-bold mb-6 md:mb-8 flex items-center justify-between">
-            주간 실적 요약
+            주별 실적 요약
             <button class="w-8 h-8 rounded-full hover:bg-brand-border flex items-center justify-center transition-colors">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
             </button>
@@ -729,7 +729,7 @@ tailwind.config = {
               <div class="pill active group" style="height:0%" data-h="90"><div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-brand-black text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">36,000,000</div></div>
               <div class="pill group" style="height:0%" data-h="40"><div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-brand-black text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">16,000,000</div></div>
             </div>
-            <div class="flex justify-between text-brand-gray text-[0.82rem] font-medium mt-3 px-1">
+            <div id="bar-chart-labels" class="flex justify-between text-brand-gray text-[0.82rem] font-medium mt-3 px-1">
               <span class="flex-1 text-center">월</span><span class="flex-1 text-center">화</span><span class="flex-1 text-center">수</span><span class="flex-1 text-center">목</span><span class="flex-1 text-center">금</span><span class="flex-1 text-center text-brand-black font-bold">오늘</span><span class="flex-1 text-center">일</span>
             </div>
           </div>
@@ -5527,7 +5527,7 @@ function navigate(page) {
   }
   updateNavItems(page);
   closeSidebar();
-  if (page === 'dashboard') { syncLedgerFromUploadData(); syncDashboardRevenue(); animateBars(); }
+  if (page === 'dashboard') { syncLedgerFromUploadData(); syncDashboardRevenue(); renderWeeklyBars(); }
   if (page === 'ledger') { syncLedgerFromUploadData(); syncDashboardRevenue(); animateDonut(); try { if (typeof _refreshActiveLedgerTab === 'function') _refreshActiveLedgerTab(); } catch(_) {} }
   if (page === 'upload') { try { _fillEcountSettingsForm(); _renderEcountHistory && _renderEcountHistory(); } catch(_) {} }
   if (page === 'products') loadProductsFromDB();
@@ -10113,6 +10113,71 @@ function animateBars() {
     pill.style.height = '0%';
     setTimeout(() => { pill.style.height = h + '%'; }, 200 + i * 60);
   });
+}
+
+// 주별 실적 차트 — 최근 7주의 월~일 합계로 막대 생성 + 라벨 갱신
+function renderWeeklyBars() {
+  // 1) 매출 장부 entries 에서 날짜별 매출 합계
+  const dailySales = {};
+  if (typeof _ledgerEntries !== 'undefined' && _ledgerEntries && _ledgerEntries.length) {
+    _ledgerEntries.forEach(r => {
+      const d = r['날짜'] || '';
+      if (!d) return;
+      const qty = r['수량'] || 0;
+      const price = r['단가(vat포함)'] || 0;
+      dailySales[d] = (dailySales[d] || 0) + (qty * price);
+    });
+  }
+
+  // 2) 이번주의 월요일 기준으로 최근 7주 (월~일) 구간 계산
+  const today = new Date();
+  const todayDow = today.getDay();  // 0=일 ~ 6=토
+  const mondayOffset = (todayDow === 0) ? 6 : (todayDow - 1);
+  const thisMonday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - mondayOffset);
+  const pad = n => String(n).padStart(2, '0');
+  const keyOf = d => d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+
+  const weeks = [];
+  for (let i = 6; i >= 0; i--) {
+    const monday = new Date(thisMonday);
+    monday.setDate(monday.getDate() - i * 7);
+    let sum = 0;
+    for (let dOff = 0; dOff < 7; dOff++) {
+      const dt = new Date(monday);
+      dt.setDate(dt.getDate() + dOff);
+      sum += dailySales[keyOf(dt)] || 0;
+    }
+    weeks.push({ monday, sum, isCurrent: i === 0 });
+  }
+
+  // 3) 0보다 큰 최대값 기준 비율 (최대 90%)
+  const maxSum = Math.max(...weeks.map(w => w.sum), 1);
+
+  // 4) 막대 HTML 생성 (기존 컨테이너 교체)
+  const barChart = document.getElementById('bar-chart');
+  if (barChart) {
+    barChart.innerHTML = weeks.map(w => {
+      const pct = w.sum > 0 ? Math.max(5, Math.round((w.sum / maxSum) * 90)) : 0;
+      const tooltip = w.sum > 0 ? w.sum.toLocaleString('ko-KR') + '원' : '0원';
+      const activeCls = w.isCurrent ? ' active' : '';
+      return `<div class="pill group${activeCls}" style="height:0%" data-h="${pct}">`
+           + `<div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-brand-black text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">${tooltip}</div>`
+           + `</div>`;
+    }).join('');
+  }
+
+  // 5) 라벨 (월요일 날짜 / 이번주는 강조)
+  const labelRow = document.getElementById('bar-chart-labels');
+  if (labelRow) {
+    labelRow.innerHTML = weeks.map(w => {
+      const label = w.isCurrent ? '이번주' : `${w.monday.getMonth()+1}/${pad(w.monday.getDate())}`;
+      const cls = w.isCurrent ? 'flex-1 text-center text-brand-black font-bold' : 'flex-1 text-center';
+      return `<span class="${cls}">${label}</span>`;
+    }).join('');
+  }
+
+  // 6) 애니메이션
+  animateBars();
 }
 
 // ── Donut animation ──────────────────────────
