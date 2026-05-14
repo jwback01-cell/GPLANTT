@@ -1419,12 +1419,16 @@ tailwind.config = {
           </div>
         </div>
 
-        <div class="mt-6 flex items-center gap-3">
+        <div class="mt-6 flex items-center gap-3 flex-wrap">
           <button id="pp-compare-btn" onclick="ppCompare()" disabled class="px-6 py-2.5 rounded-full text-sm font-bold bg-brand-black text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/></svg>
             비교하기
           </button>
           <button onclick="ppReset()" class="px-4 py-2 rounded-full text-sm font-semibold border border-brand-border hover:bg-brand-bg">초기화</button>
+          <label class="flex items-center gap-2 text-sm cursor-pointer select-none ml-2">
+            <input type="checkbox" id="pp-a-plus1" onchange="if(_ppState.result.length) ppCompare()" class="w-4 h-4 rounded border-brand-border">
+            <span>A 출고일에 <strong>+1일</strong> 보정 (실제 배송일이 다음날인 경우)</span>
+          </label>
         </div>
       </section>
 
@@ -1472,7 +1476,7 @@ tailwind.config = {
                 <th class="text-left  px-3 py-3 font-bold text-xs whitespace-nowrap">#</th>
                 <th class="text-left  px-3 py-3 font-bold text-xs">상품명</th>
                 <th class="text-right px-3 py-3 font-bold text-xs whitespace-nowrap">수량</th>
-                <th class="text-left  px-3 py-3 font-bold text-xs whitespace-nowrap">A 출고일</th>
+                <th class="text-left  px-3 py-3 font-bold text-xs whitespace-nowrap"><span id="pp-th-dateA">A 출고일</span></th>
                 <th class="text-left  px-3 py-3 font-bold text-xs whitespace-nowrap">B 수불일자</th>
                 <th class="text-left  px-3 py-3 font-bold text-xs whitespace-nowrap">상태</th>
               </tr>
@@ -5664,10 +5668,26 @@ function _ppNormDate(v) {
   }
   return null;
 }
+// YYYY-MM-DD 문자열에 일수 더하기
+function _ppAddDays(dateStr, days) {
+  if (!dateStr || !days) return dateStr;
+  const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return dateStr;
+  const d = new Date(Date.UTC(+m[1], +m[2]-1, +m[3]));
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0') + '-' + String(d.getUTCDate()).padStart(2,'0');
+}
 // 핵심 매칭 로직 — 상품명+수량으로 짝짓고, 날짜가 다르면 '날짜 불일치'
 //   B에 상품명 컬럼이 없으면(모두 '*') 수량만으로 매칭 (단일 상품 장부 가정)
+//   A 출고일 +1일 옵션 체크 시 비교/표시 모두 보정된 날짜 사용
 function ppCompare() {
-  const aRows = _ppState.a.rows.slice();
+  const offsetDays = document.getElementById('pp-a-plus1').checked ? 1 : 0;
+  // A 행에 보정 적용 (원본을 dateOrig 에 보존, date 는 보정값)
+  const aRows = _ppState.a.rows.map(r => ({
+    ...r,
+    dateOrig: r.date,
+    date: offsetDays ? _ppAddDays(r.date, offsetDays) : r.date
+  }));
   const bRows = _ppState.b.rows.slice();
   const bHasProduct = bRows.length > 0 && bRows.some(r => r.product !== '*');
   // B에 상품명이 없으면 → 매칭 키는 수량만, 그렇지 않으면 → 상품명+수량
@@ -5729,6 +5749,10 @@ function ppRender() {
   const filter = document.getElementById('pp-filter').value;
   const q = (document.getElementById('pp-search').value || '').trim().toLowerCase();
   const tbody = document.getElementById('pp-tbody');
+  // 헤더 — +1 보정 시 표시
+  const offsetOn = document.getElementById('pp-a-plus1').checked;
+  const th = document.getElementById('pp-th-dateA');
+  if (th) th.innerHTML = offsetOn ? 'A 출고일 <span class="text-brand-blue font-bold">(+1일)</span>' : 'A 출고일';
   const filtered = _ppState.result.filter(r => {
     if (filter === 'match' && r.status !== 'match') return false;
     if (filter === 'bad'   && r.status === 'match') return false;
