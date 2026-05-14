@@ -5742,10 +5742,21 @@ function ppCompare() {
     result.push({ product: a.product, qty: a.qty, dateA: a.date, dateAOrig: a.dateOrig, dateB: '', status: 'onlyA' });
   });
   // B에는 있는데 A에 없는 행 (남은 미사용 B) — B는 보정 영향 없음
+  // B에 상품명이 없으면 A 의 (가장 흔한 / 유일한) 상품명으로 추정해서 표시
+  let inferredProduct = '';
+  if (!bHasProduct && aRows.length) {
+    const counts = new Map();
+    aRows.forEach(a => counts.set(a.product, (counts.get(a.product) || 0) + 1));
+    let bestCount = 0;
+    counts.forEach((c, p) => { if (c > bestCount) { bestCount = c; inferredProduct = p; } });
+  }
   bByKey.forEach(bucket => {
     bucket.forEach(b => {
       if (!b._used) {
-        result.push({ product: b.product === '*' ? '(B 상품명 없음)' : b.product, qty: b.qty, dateA: '', dateAOrig: '', dateB: b.date, status: 'onlyB' });
+        const productLabel = b.product === '*'
+          ? (inferredProduct || '(B 상품명 없음)')
+          : b.product;
+        result.push({ product: productLabel, qty: b.qty, dateA: '', dateAOrig: '', dateB: b.date, status: 'onlyB' });
       }
     });
   });
