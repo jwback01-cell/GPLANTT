@@ -1667,9 +1667,15 @@ tailwind.config = {
       <!-- Product List -->
       <div class="bg-white rounded-4xl panel flex flex-col">
         <div class="p-4 md:p-6 border-b border-brand-border flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div class="relative w-full md:w-auto">
-            <input id="product-search" type="text" placeholder="상품명, SKU 검색 (여러 개는 공백·쉼표·줄바꿈)" class="pl-10 pr-4 py-2.5 bg-brand-bg rounded-full border border-transparent focus:bg-white focus:border-brand-border transition-all w-full md:w-[280px] text-sm outline-none" oninput="filterProducts(true)" onpaste="setTimeout(() => { this.value = this.value.replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' '); filterProducts(true); }, 0)">
-            <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-gray" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <div class="relative w-full md:w-auto flex flex-col gap-1">
+            <div class="relative">
+              <input id="product-search" type="text" placeholder="상품명, SKU 검색 (엑셀 한 열 복사 후 붙여넣기 가능)" class="pl-10 pr-9 py-2.5 bg-brand-bg rounded-full border border-transparent focus:bg-white focus:border-brand-border transition-all w-full md:w-[320px] text-sm outline-none" oninput="onProductSearchInput()" onpaste="onProductSearchPaste(this)">
+              <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-gray" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <button id="product-search-clear" type="button" onclick="clearProductSearch()" class="hidden absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-brand-border hover:bg-brand-gray hover:text-white flex items-center justify-center transition-colors" title="검색어 지우기">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div id="product-search-meta" class="hidden text-[11px] text-brand-gray pl-3"></div>
           </div>
           <div class="flex items-center gap-2 w-full md:w-auto flex-wrap">
             <div class="flex items-center gap-1 bg-brand-bg rounded-full px-2 py-1.5 border border-transparent">
@@ -11238,6 +11244,8 @@ function renderProductsPage() {
   // 여러 값 동시 검색: 공백·쉼표·세미콜론·줄바꿈·탭 어떤 구분자든 OR 매칭
   // 예) "GB0080 GB0081" 또는 "GB0080, GB0081" → 둘 중 하나라도 포함되면 표시
   const queryTokens = queryRaw ? queryRaw.split(/[\s,;]+/).filter(Boolean) : [];
+  // 검색어 메타 정보 (X 버튼 / 토큰 수 / 결과 수) 갱신 — filter 후에 결과 수 채움
+  _updateProductSearchClearBtn();
   const catSel = document.getElementById('product-category-filter')?.value || '카테고리 전체';
   const catAll = catSel === '카테고리 전체';
   const dateStart = (document.getElementById('product-date-start')?.value || '').replace(/-/g,'');
@@ -11319,6 +11327,18 @@ function renderProductsPage() {
   // 페이지네이션
   const totalPages = Math.max(1, Math.ceil(filtered.length / _productsPerPage));
   if (_productPage > totalPages) _productPage = totalPages;
+
+  // 검색어 메타 — '검색어 N개 · 결과 M건' (검색어 있을 때만)
+  const metaEl = document.getElementById('product-search-meta');
+  if (metaEl) {
+    if (queryTokens.length > 0) {
+      metaEl.classList.remove('hidden');
+      const tokenText = queryTokens.length > 1 ? `검색어 ${queryTokens.length}개 · ` : '';
+      metaEl.textContent = `${tokenText}결과 ${filtered.length.toLocaleString('ko-KR')}건`;
+    } else {
+      metaEl.classList.add('hidden');
+    }
+  }
   const startIdx = (_productPage - 1) * _productsPerPage;
   const pageItems = filtered.slice(startIdx, startIdx + _productsPerPage);
 
@@ -11693,6 +11713,44 @@ function setProductDate(mode) {
 function filterProducts(resetPage) {
   if (resetPage) _productPage = 1;
   renderProductsPage();
+}
+
+// 상품 검색 — 엑셀에서 한 컬럼 통째로 복사·붙여넣기 지원
+//   줄바꿈/탭/BOM/NBSP/제로폭 공백 → 일반 공백, 다중 공백 압축
+function _cleanProductSearchValue(s) {
+  return String(s || '')
+    .replace(/[﻿ ​-‍⁠]/g, '')   // BOM, NBSP, ZWSP
+    .replace(/[\r\n\t]+/g, ' ')                           // 줄바꿈/탭 → 공백
+    .replace(/\s{2,}/g, ' ')                              // 다중 공백 압축
+    .trim();
+}
+function onProductSearchInput() {
+  _updateProductSearchClearBtn();
+  filterProducts(true);
+}
+function onProductSearchPaste(el) {
+  // setTimeout 0 — 붙여넣은 값이 input.value 에 반영된 후 정리
+  setTimeout(() => {
+    const before = el.value;
+    el.value = _cleanProductSearchValue(before);
+    _updateProductSearchClearBtn();
+    filterProducts(true);
+  }, 0);
+}
+function clearProductSearch() {
+  const el = document.getElementById('product-search');
+  if (!el) return;
+  el.value = '';
+  _updateProductSearchClearBtn();
+  filterProducts(true);
+  el.focus();
+}
+function _updateProductSearchClearBtn() {
+  const el = document.getElementById('product-search');
+  const btn = document.getElementById('product-search-clear');
+  if (!el || !btn) return;
+  if ((el.value || '').length > 0) btn.classList.remove('hidden');
+  else                              btn.classList.add('hidden');
 }
 
 function renderProductPagination(totalPages) {
