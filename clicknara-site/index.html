@@ -5577,9 +5577,16 @@ function _ppFindHeaderRow(rows, keywordSets) {
 }
 function _ppColIndex(headerRow, keywords, opts) {
   const exclude = (opts && opts.exclude) || [];
+  // 1차: 정확히 일치하는 헤더 우선 ('출고일자' vs '출고일시' 같이 비슷한 이름이 섞여 있어도 정확 매칭이 이김)
   for (let i = 0; i < headerRow.length; i++) {
     const c = String(headerRow[i] || '').trim();
-    if (exclude.some(e => c.includes(e))) continue;  // '품목코드' 같은 헤더 제외
+    if (exclude.some(e => c.includes(e))) continue;
+    if (keywords.some(k => c === k)) return i;
+  }
+  // 2차: 부분 일치 (위에서 못 찾았을 때)
+  for (let i = 0; i < headerRow.length; i++) {
+    const c = String(headerRow[i] || '').trim();
+    if (exclude.some(e => c.includes(e))) continue;
     if (keywords.some(k => c.includes(k))) return i;
   }
   return -1;
@@ -5587,13 +5594,14 @@ function _ppColIndex(headerRow, keywords, opts) {
 function _ppParseRows(rows, side) {
   if (!rows || !rows.length) return { error: '엑셀이 비어 있습니다.' };
   if (side === 'A') {
-    const headerIdx = _ppFindHeaderRow(rows, [['상품명','품명','제품명','품목명','품목'], ['수량','출고수량','판매수량'], ['출고일','매출일','출고날짜']]);
+    const headerIdx = _ppFindHeaderRow(rows, [['품목명','상품명','품명','제품명','품목'], ['출고수량','수량','판매수량'], ['출고일자','출고일','매출일자','매출일','출고날짜']]);
     if (headerIdx < 0) return { error: '헤더(상품명/수량/출고일)를 찾지 못했습니다.' };
     const h = rows[headerIdx];
-    // 상품명: '품목코드' 같은 코드 컬럼은 제외하고 매칭
-    const pi = _ppColIndex(h, ['상품명','품명','제품명','품목명','품목'], { exclude: ['코드'] });
-    const qi = _ppColIndex(h, ['수량','출고수량','판매수량']);
-    const di = _ppColIndex(h, ['출고일','매출일','출고날짜']);
+    // 상품명: '품목코드' 같은 코드 컬럼은 제외하고 매칭. '품목명' 정확 매칭 우선
+    const pi = _ppColIndex(h, ['품목명','상품명','품명','제품명','품목'], { exclude: ['코드'] });
+    const qi = _ppColIndex(h, ['출고수량','수량','판매수량']);
+    // 출고일자 정확 매칭 우선 — '출고시간/출고연월' 등이 같이 있어도 헷갈리지 않음
+    const di = _ppColIndex(h, ['출고일자','출고일','매출일자','매출일','출고날짜']);
     if (pi < 0 || qi < 0 || di < 0) return { error: `필수 컬럼 누락 (상품명:${pi>=0?'✓':'✗'} 수량:${qi>=0?'✓':'✗'} 출고일:${di>=0?'✓':'✗'})` };
     const out = [];
     let skipped = 0;
@@ -5611,10 +5619,11 @@ function _ppParseRows(rows, side) {
     const headerIdx = _ppFindHeaderRow(rows, [['수불일자','일자'], ['수불구분','구분'], ['출고']]);
     if (headerIdx < 0) return { error: '헤더(수불일자/수불구분/출고)를 찾지 못했습니다.' };
     const h = rows[headerIdx];
+    // '수불일자' 정확 매칭 우선
     const di = _ppColIndex(h, ['수불일자','일자']);
     const gi = _ppColIndex(h, ['수불구분','구분']);
     const oi = _ppColIndex(h, ['출고'], { exclude: ['대기'] });  // '출고대기' 는 별개 컬럼, 우리는 '출고' 만 원함
-    const pi = _ppColIndex(h, ['상품명','품명','제품명','품목명','품목'], { exclude: ['코드'] });  // 없을 수도 있음 (단일 상품 장부)
+    const pi = _ppColIndex(h, ['품목명','상품명','품명','제품명','품목'], { exclude: ['코드'] });  // 없을 수도 있음 (단일 상품 장부)
     if (di < 0 || gi < 0 || oi < 0) return { error: `필수 컬럼 누락 (수불일자:${di>=0?'✓':'✗'} 수불구분:${gi>=0?'✓':'✗'} 출고:${oi>=0?'✓':'✗'})` };
     const out = [];
     let skipped = 0;
