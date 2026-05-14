@@ -17683,7 +17683,7 @@ function renderCalendar() {
       const label    = t.showTitle ? escHtml(t.title) : '';
       const teamColor = (!t.completed && t.team) ? _teamColor(t.team) : null;
       const teamStyle = teamColor ? `background:${teamColor};color:#fff;` : '';
-      html += `<div class="cal-bar ${baseCls}" draggable="true" ondragstart="calBarDragStart(event,${t.id})" ondragend="calBarDragEnd()" style="grid-column:${colStart} / ${colEnd}; grid-row:${row}; cursor:grab;${teamStyle}">${label}</div>`;
+      html += `<div class="cal-bar ${baseCls}" draggable="true" onclick="event.stopPropagation();todoEdit(${t.id})" ondragstart="calBarDragStart(event,${t.id})" ondragend="calBarDragEnd()" style="grid-column:${colStart} / ${colEnd}; grid-row:${row}; cursor:pointer;${teamStyle}" title="클릭하면 상세 보기/수정">${label}</div>`;
     });
 
     html += `</div>`;
