@@ -14536,7 +14536,8 @@ function renderDashboardTodos() {
     return t.dateKey <= _todayKey && end >= _todayKey;
   };
   const inc  = todos.filter(t => !t.completed && _onToday(t));
-  const done = todos.filter(t =>  t.completed && t.completedAt && t.completedAt.startsWith(_todayKey));
+  // 완료 업무: 해당 날짜에 '예정된' 업무 중 완료된 것 (드래그 이동 후에도 새 날짜에 보이도록 dateKey 기준)
+  const done = todos.filter(t =>  t.completed && _onToday(t));
   const shown = [...inc, ...done].slice(0, 5);
   container.innerHTML = shown.map(item => {
     const ac = TODO_ACCENT[item.accent] || TODO_ACCENT.blue;
@@ -14633,7 +14634,8 @@ function renderTodoList() {
     return t.dateKey <= _todayKey && end >= _todayKey;
   };
   const inc  = todos.filter(t => !t.completed && _onToday(t));
-  const done = todos.filter(t =>  t.completed && t.completedAt && t.completedAt.startsWith(_todayKey));
+  // 완료 업무: 해당 날짜에 '예정된' 업무 중 완료된 것 (드래그 이동 후에도 새 날짜에 보이도록 dateKey 기준)
+  const done = todos.filter(t =>  t.completed && _onToday(t));
 
   if (cnt) cnt.textContent = inc.length + '개';
 
@@ -16549,9 +16551,17 @@ function switchTodoTab(tab) {
   document.getElementById('todo-calendar-panel').classList.toggle('hidden', !isCal);
   const evPanel = document.getElementById('todo-events-panel');
   if (evPanel) evPanel.classList.toggle('hidden', !isEvents);
-  const _tn = new Date();
-  const _tk = _tn.getFullYear() + '-' + String(_tn.getMonth()+1).padStart(2,'0') + '-' + String(_tn.getDate()).padStart(2,'0');
-  document.getElementById('todo-completed-section').classList.toggle('hidden', !isList || todos.filter(t => t.completed && t.completedAt && t.completedAt.startsWith(_tk)).length === 0);
+  // 완료 섹션 표시 여부: 현재 보고 있는 날짜에 '예정된' 완료 업무가 있는지로 판단 (dateKey 기준)
+  const _tk = (typeof _todoListEffectiveDateKey === 'function') ? _todoListEffectiveDateKey() : (() => {
+    const n = new Date();
+    return n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0') + '-' + String(n.getDate()).padStart(2,'0');
+  })();
+  const _hasDoneOnDay = todos.filter(t => {
+    if (!t.completed || !t.dateKey) return false;
+    const end = t.endDateKey || t.dateKey;
+    return t.dateKey <= _tk && end >= _tk;
+  }).length > 0;
+  document.getElementById('todo-completed-section').classList.toggle('hidden', !isList || !_hasDoneOnDay);
   const detPanel = document.getElementById('cal-detail-panel');
   if (!isCal) {
     detPanel.classList.add('hidden');
