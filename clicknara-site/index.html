@@ -1425,10 +1425,16 @@ tailwind.config = {
             비교하기
           </button>
           <button onclick="ppReset()" class="px-4 py-2 rounded-full text-sm font-semibold border border-brand-border hover:bg-brand-bg">초기화</button>
-          <label class="flex items-center gap-2 text-sm cursor-pointer select-none ml-2">
-            <input type="checkbox" id="pp-a-plus1" onchange="ppOnOffsetChange()" class="w-4 h-4 rounded border-brand-border">
-            <span>A 출고일에 <strong>+1일</strong> 보정 (실제 배송일이 다음날인 경우)</span>
-          </label>
+          <div class="flex flex-col gap-1 ml-2">
+            <label class="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input type="checkbox" id="pp-a-plus1" onchange="ppOnOffsetChange()" class="w-4 h-4 rounded border-brand-border">
+              <span>A 출고일에 <strong>+1일</strong> 보정</span>
+            </label>
+            <label class="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input type="checkbox" id="pp-a-workday" onchange="ppOnOffsetChange()" class="w-4 h-4 rounded border-brand-border">
+              <span>주말/공휴일 출고는 <strong>다음 영업일</strong>로 이동 (한국 기준)</span>
+            </label>
+          </div>
         </div>
       </section>
 
@@ -5677,15 +5683,64 @@ function _ppNormDate(v) {
   }
   return null;
 }
+// 한국 공휴일 (2023~2027) — 양력 기준
+const KR_HOLIDAYS = new Set([
+  // 2023
+  '2023-01-01','2023-01-21','2023-01-22','2023-01-23','2023-01-24','2023-03-01',
+  '2023-05-05','2023-05-27','2023-05-29','2023-06-06','2023-08-15',
+  '2023-09-28','2023-09-29','2023-09-30','2023-10-02','2023-10-03','2023-10-09','2023-12-25',
+  // 2024
+  '2024-01-01','2024-02-09','2024-02-10','2024-02-11','2024-02-12','2024-03-01','2024-04-10',
+  '2024-05-05','2024-05-06','2024-05-15','2024-06-06','2024-08-15',
+  '2024-09-16','2024-09-17','2024-09-18','2024-10-01','2024-10-03','2024-10-09','2024-12-25',
+  // 2025
+  '2025-01-01','2025-01-27','2025-01-28','2025-01-29','2025-01-30','2025-03-01','2025-03-03',
+  '2025-05-05','2025-05-06','2025-06-03','2025-06-06','2025-08-15',
+  '2025-10-03','2025-10-05','2025-10-06','2025-10-07','2025-10-08','2025-10-09','2025-12-25',
+  // 2026
+  '2026-01-01','2026-02-16','2026-02-17','2026-02-18','2026-03-01','2026-03-02',
+  '2026-05-05','2026-05-24','2026-05-25','2026-06-06','2026-08-15',
+  '2026-09-24','2026-09-25','2026-09-26','2026-09-28','2026-10-03','2026-10-09','2026-12-25',
+  // 2027 (대체공휴일 일부는 미확정)
+  '2027-01-01','2027-02-06','2027-02-07','2027-02-08','2027-02-09','2027-03-01',
+  '2027-05-05','2027-05-13','2027-06-06','2027-06-07','2027-08-15','2027-08-16',
+  '2027-09-14','2027-09-15','2027-09-16','2027-10-03','2027-10-04','2027-10-09','2027-12-25',
+]);
+function _ppIsWorkday(dateStr) {
+  if (!dateStr) return false;
+  if (KR_HOLIDAYS.has(dateStr)) return false;
+  const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return false;
+  const day = new Date(Date.UTC(+m[1], +m[2]-1, +m[3])).getUTCDay();
+  return day !== 0 && day !== 6;  // 일요일(0), 토요일(6) 제외
+}
+function _ppShiftToNextWorkday(dateStr) {
+  let d = dateStr;
+  let guard = 0;
+  while (d && !_ppIsWorkday(d) && guard++ < 30) {
+    d = _ppAddDays(d, 1);
+  }
+  return d;
+}
 // 체크박스 토글 시 — 이미 비교 결과가 있으면 자동 재비교
 function ppOnOffsetChange() {
   if (_ppState.result.length) ppCompare();
   else {
     // 결과 아직 없으면 헤더만 갱신
-    const offsetOn = document.getElementById('pp-a-plus1').checked;
-    const th = document.getElementById('pp-th-dateA');
-    if (th) th.innerHTML = offsetOn ? 'A 출고일 <span class="text-brand-blue font-bold">(+1일)</span>' : 'A 출고일';
+    _ppUpdateDateAHeader();
   }
+}
+function _ppUpdateDateAHeader() {
+  const th = document.getElementById('pp-th-dateA');
+  if (!th) return;
+  const offsetOn  = document.getElementById('pp-a-plus1').checked;
+  const workdayOn = document.getElementById('pp-a-workday').checked;
+  const badge = [];
+  if (offsetOn)  badge.push('+1일');
+  if (workdayOn) badge.push('영업일');
+  th.innerHTML = badge.length
+    ? `A 출고일 <span class="text-brand-blue font-bold">(${badge.join(' · ')})</span>`
+    : 'A 출고일';
 }
 // YYYY-MM-DD 문자열에 일수 더하기
 function _ppAddDays(dateStr, days) {
@@ -5701,12 +5756,16 @@ function _ppAddDays(dateStr, days) {
 //   A 출고일 +1일 옵션 체크 시 비교/표시 모두 보정된 날짜 사용
 function ppCompare() {
   const offsetDays = document.getElementById('pp-a-plus1').checked ? 1 : 0;
+  const useWorkday = document.getElementById('pp-a-workday').checked;
   // A 행에 보정 적용 (원본을 dateOrig 에 보존, date 는 보정값)
-  const aRows = _ppState.a.rows.map(r => ({
-    ...r,
-    dateOrig: r.date,
-    date: offsetDays ? _ppAddDays(r.date, offsetDays) : r.date
-  }));
+  //   1) +1일 보정 (옵션 시)
+  //   2) 결과가 주말/공휴일이면 다음 영업일로 추가 이동 (옵션 시)
+  //   B는 손대지 않음
+  const aRows = _ppState.a.rows.map(r => {
+    let d = offsetDays ? _ppAddDays(r.date, offsetDays) : r.date;
+    if (useWorkday) d = _ppShiftToNextWorkday(d);
+    return { ...r, dateOrig: r.date, date: d };
+  });
   const bRows = _ppState.b.rows.slice();
   const bHasProduct = bRows.length > 0 && bRows.some(r => r.product !== '*');
   // B에 상품명이 없으면 → 매칭 키는 수량만, 그렇지 않으면 → 상품명+수량
@@ -5779,10 +5838,11 @@ function ppRender() {
   const filter = document.getElementById('pp-filter').value;
   const q = (document.getElementById('pp-search').value || '').trim().toLowerCase();
   const tbody = document.getElementById('pp-tbody');
-  // 헤더 — +1 보정 시 표시
-  const offsetOn = document.getElementById('pp-a-plus1').checked;
-  const th = document.getElementById('pp-th-dateA');
-  if (th) th.innerHTML = offsetOn ? 'A 출고일 <span class="text-brand-blue font-bold">(+1일)</span>' : 'A 출고일';
+  // 헤더 — 보정 옵션에 따라 (+1일/영업일) 배지 표시
+  _ppUpdateDateAHeader();
+  const offsetOn  = document.getElementById('pp-a-plus1').checked;
+  const workdayOn = document.getElementById('pp-a-workday').checked;
+  const hasAdjust = offsetOn || workdayOn;
   const filtered = _ppState.result.filter(r => {
     if (filter === 'match' && r.status !== 'match') return false;
     if (filter === 'bad'   && r.status === 'match') return false;
@@ -5805,9 +5865,9 @@ function ppRender() {
     const rowCls = r.status === 'match' ? '' : 'bg-red-50/40';
     const dateACls = r.status === 'dateMismatch' ? 'text-red-700 font-bold' : '';
     const dateBCls = r.status === 'dateMismatch' ? 'text-red-700 font-bold' : '';
-    // A 셀: +1일 보정 상태이고 원본 날짜가 다르면 '원본 X' 작은 줄로 함께 표시
+    // A 셀: 보정 옵션 켜져있고 원본과 다르면 '원본 X' 작은 줄로 함께 표시
     const aCell = r.dateA
-      ? (offsetOn && r.dateAOrig && r.dateAOrig !== r.dateA
+      ? (hasAdjust && r.dateAOrig && r.dateAOrig !== r.dateA
           ? `<div class="${dateACls}">${r.dateA}</div><div class="text-[10px] text-brand-gray font-normal">원본 ${r.dateAOrig}</div>`
           : `<span class="${dateACls}">${r.dateA}</span>`)
       : '<span class="text-brand-gray">—</span>';
@@ -5826,18 +5886,21 @@ function _ppEsc(s) {
 }
 function ppDownload() {
   if (!_ppState.result.length) { alert('비교 결과가 없습니다.'); return; }
-  const offsetOn = document.getElementById('pp-a-plus1').checked;
+  const offsetOn  = document.getElementById('pp-a-plus1').checked;
+  const workdayOn = document.getElementById('pp-a-workday').checked;
+  const hasAdjust = offsetOn || workdayOn;
   const statusLabel = { match: '일치', dateMismatch: '날짜 불일치', onlyA: 'B에 없음', onlyB: 'A에 없음' };
-  const header = offsetOn
-    ? ['#', '상품명', '수량', 'A 출고일(원본)', 'A 출고일(+1일)', 'B 수불일자', '상태']
+  const adjustLabel = [offsetOn && '+1일', workdayOn && '영업일'].filter(Boolean).join('·') || '보정';
+  const header = hasAdjust
+    ? ['#', '상품명', '수량', 'A 출고일(원본)', `A 출고일(${adjustLabel})`, 'B 수불일자', '상태']
     : ['#', '상품명', '수량', 'A 출고일', 'B 수불일자', '상태'];
   const data = [header];
   _ppState.result.forEach((r, i) => {
-    if (offsetOn) data.push([i+1, r.product, r.qty, r.dateAOrig || '', r.dateA || '', r.dateB || '', statusLabel[r.status] || r.status]);
-    else          data.push([i+1, r.product, r.qty, r.dateA    || '', r.dateB || '', statusLabel[r.status] || r.status]);
+    if (hasAdjust) data.push([i+1, r.product, r.qty, r.dateAOrig || '', r.dateA || '', r.dateB || '', statusLabel[r.status] || r.status]);
+    else           data.push([i+1, r.product, r.qty, r.dateA    || '', r.dateB || '', statusLabel[r.status] || r.status]);
   });
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = offsetOn
+  ws['!cols'] = hasAdjust
     ? [{ wch: 5 }, { wch: 36 }, { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }]
     : [{ wch: 5 }, { wch: 36 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
   const wb = XLSX.utils.book_new();
