@@ -1460,7 +1460,7 @@ tailwind.config = {
         <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
           <div class="rounded-2xl bg-brand-bg px-4 py-3"><div class="text-[11px] text-brand-gray">전체</div><div class="font-black text-xl"><span id="pp-stat-total">0</span></div></div>
           <div class="rounded-2xl bg-green-50 px-4 py-3"><div class="text-[11px] text-green-700">일치</div><div class="font-black text-xl text-green-700"><span id="pp-stat-match">0</span></div></div>
-          <div class="rounded-2xl bg-red-50 px-4 py-3"><div class="text-[11px] text-red-700">날짜 불일치</div><div class="font-black text-xl text-red-700"><span id="pp-stat-mismatch">0</span></div></div>
+          <div class="rounded-2xl bg-red-50 px-4 py-3"><div class="text-[11px] text-red-700">수량 불일치</div><div class="font-black text-xl text-red-700"><span id="pp-stat-mismatch">0</span></div></div>
           <div class="rounded-2xl bg-orange-50 px-4 py-3"><div class="text-[11px] text-orange-700">한쪽만 존재</div><div class="font-black text-xl text-orange-700"><span id="pp-stat-orphan">0</span></div></div>
         </div>
 
@@ -1481,7 +1481,8 @@ tailwind.config = {
               <tr class="bg-brand-bg text-brand-gray sticky top-0">
                 <th class="text-left  px-3 py-3 font-bold text-xs whitespace-nowrap">#</th>
                 <th class="text-left  px-3 py-3 font-bold text-xs">상품명</th>
-                <th class="text-right px-3 py-3 font-bold text-xs whitespace-nowrap">수량</th>
+                <th class="text-right px-3 py-3 font-bold text-xs whitespace-nowrap">A 수량</th>
+                <th class="text-right px-3 py-3 font-bold text-xs whitespace-nowrap">B 수량</th>
                 <th class="text-left  px-3 py-3 font-bold text-xs whitespace-nowrap"><span id="pp-th-dateA">A 출고일</span></th>
                 <th class="text-left  px-3 py-3 font-bold text-xs whitespace-nowrap">B 수불일자</th>
                 <th class="text-left  px-3 py-3 font-bold text-xs whitespace-nowrap">상태</th>
@@ -5751,16 +5752,15 @@ function _ppAddDays(dateStr, days) {
   d.setUTCDate(d.getUTCDate() + days);
   return d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0') + '-' + String(d.getUTCDate()).padStart(2,'0');
 }
-// 핵심 매칭 로직 — 상품명+수량으로 짝짓고, 날짜가 다르면 '날짜 불일치'
-//   B에 상품명 컬럼이 없으면(모두 '*') 수량만으로 매칭 (단일 상품 장부 가정)
-//   A 출고일 +1일 옵션 체크 시 비교/표시 모두 보정된 날짜 사용
+// 핵심 매칭 로직 — (상품명, 보정된 출고일) 별로 수량 합산 후 B의 (상품명, 수불일자) 합산과 비교
+//   B에 상품명 컬럼이 없으면 상품 비교 없이 날짜별로만 합산
+//   B의 한 행에 여러 주문이 합쳐진 경우(예: B 11-04 qty=2 = A 11-04 qty=1+1)도 정상 매칭
+//   날짜가 일치하면 수량 같음→'일치', 수량 다름→'수량 불일치'
+//   한쪽 날짜에만 있으면 'B에 없음' / 'A에 없음'
 function ppCompare() {
   const offsetDays = document.getElementById('pp-a-plus1').checked ? 1 : 0;
   const useWorkday = document.getElementById('pp-a-workday').checked;
-  // A 행에 보정 적용 (원본을 dateOrig 에 보존, date 는 보정값)
-  //   1) +1일 보정 (옵션 시)
-  //   2) 결과가 주말/공휴일이면 다음 영업일로 추가 이동 (옵션 시)
-  //   B는 손대지 않음
+  // A 행 보정 (+1일 / 영업일)
   const aRows = _ppState.a.rows.map(r => {
     let d = offsetDays ? _ppAddDays(r.date, offsetDays) : r.date;
     if (useWorkday) d = _ppShiftToNextWorkday(d);
@@ -5768,40 +5768,26 @@ function ppCompare() {
   });
   const bRows = _ppState.b.rows.slice();
   const bHasProduct = bRows.length > 0 && bRows.some(r => r.product !== '*');
-  // B에 상품명이 없으면 → 매칭 키는 수량만, 그렇지 않으면 → 상품명+수량
-  const keyFn = bHasProduct
-    ? (r => r.product + '|' + r.qty)
-    : (r => 'Q|' + r.qty);
-  // B를 bucket 에 넣기
-  const bByKey = new Map();
-  bRows.forEach((r, i) => {
-    const key = keyFn(r);
-    if (!bByKey.has(key)) bByKey.set(key, []);
-    bByKey.get(key).push({ ...r, _used: false, _idx: i });
-  });
-  const result = [];
+  const keyFn = bHasProduct ? (r => r.product + '|' + r.date) : (r => '*|' + r.date);
+  // (상품, 날짜) 단위로 합산
+  const aggA = new Map();
   aRows.forEach(a => {
     const key = keyFn(a);
-    const bucket = bByKey.get(key) || [];
-    // 1) 같은 날짜의 B 행 우선 (완전 일치)
-    let pick = bucket.find(b => !b._used && b.date === a.date);
-    if (pick) {
-      pick._used = true;
-      result.push({ product: a.product, qty: a.qty, dateA: a.date, dateAOrig: a.dateOrig, dateB: pick.date, status: 'match' });
-      return;
-    }
-    // 2) 같은 상품+수량의 미사용 B 행 (날짜 다름)
-    pick = bucket.find(b => !b._used);
-    if (pick) {
-      pick._used = true;
-      result.push({ product: a.product, qty: a.qty, dateA: a.date, dateAOrig: a.dateOrig, dateB: pick.date, status: 'dateMismatch' });
-      return;
-    }
-    // 3) B에 없음
-    result.push({ product: a.product, qty: a.qty, dateA: a.date, dateAOrig: a.dateOrig, dateB: '', status: 'onlyA' });
+    if (!aggA.has(key)) aggA.set(key, { product: a.product, date: a.date, qty: 0, rows: 0, origs: new Set() });
+    const g = aggA.get(key);
+    g.qty += a.qty;
+    g.rows += 1;
+    if (a.dateOrig) g.origs.add(a.dateOrig);
   });
-  // B에는 있는데 A에 없는 행 (남은 미사용 B) — B는 보정 영향 없음
-  // B에 상품명이 없으면 A 의 (가장 흔한 / 유일한) 상품명으로 추정해서 표시
+  const aggB = new Map();
+  bRows.forEach(b => {
+    const key = keyFn(b);
+    if (!aggB.has(key)) aggB.set(key, { product: b.product, date: b.date, qty: 0, rows: 0 });
+    const g = aggB.get(key);
+    g.qty += b.qty;
+    g.rows += 1;
+  });
+  // B에 상품명 없을 때 표시용 추정 상품명
   let inferredProduct = '';
   if (!bHasProduct && aRows.length) {
     const counts = new Map();
@@ -5809,27 +5795,61 @@ function ppCompare() {
     let bestCount = 0;
     counts.forEach((c, p) => { if (c > bestCount) { bestCount = c; inferredProduct = p; } });
   }
-  bByKey.forEach(bucket => {
-    bucket.forEach(b => {
-      if (!b._used) {
-        const productLabel = b.product === '*'
-          ? (inferredProduct || '(B 상품명 없음)')
-          : b.product;
-        result.push({ product: productLabel, qty: b.qty, dateA: '', dateAOrig: '', dateB: b.date, status: 'onlyB' });
-      }
-    });
+  // 합산 비교
+  const result = [];
+  const allKeys = new Set([...aggA.keys(), ...aggB.keys()]);
+  allKeys.forEach(key => {
+    const a = aggA.get(key);
+    const b = aggB.get(key);
+    const summarizeOrigs = origs => {
+      const arr = [...origs].sort();
+      return arr.length === 0 ? '' : arr.length === 1 ? arr[0] : `${arr[0]} 외 ${arr.length-1}건`;
+    };
+    if (a && b) {
+      const status = (a.qty === b.qty) ? 'match' : 'qtyMismatch';
+      result.push({
+        product: a.product || inferredProduct,
+        qty: a.qty, bQty: b.qty,
+        aRows: a.rows, bRows: b.rows,
+        dateA: a.date, dateAOrig: summarizeOrigs(a.origs),
+        dateB: b.date, status
+      });
+    } else if (a) {
+      result.push({
+        product: a.product,
+        qty: a.qty, bQty: 0,
+        aRows: a.rows, bRows: 0,
+        dateA: a.date, dateAOrig: summarizeOrigs(a.origs),
+        dateB: '', status: 'onlyA'
+      });
+    } else {
+      const productLabel = b.product === '*' ? (inferredProduct || '(B 상품명 없음)') : b.product;
+      result.push({
+        product: productLabel,
+        qty: 0, bQty: b.qty,
+        aRows: 0, bRows: b.rows,
+        dateA: '', dateAOrig: '',
+        dateB: b.date, status: 'onlyB'
+      });
+    }
+  });
+  // 날짜 오름차순 정렬 (A 날짜 우선, 없으면 B 날짜)
+  result.sort((x, y) => {
+    const dx = x.dateA || x.dateB;
+    const dy = y.dateA || y.dateB;
+    return dx.localeCompare(dy);
   });
   _ppState.result = result;
   // 통계
-  let match = 0, dateMismatch = 0, orphan = 0;
+  let match = 0, qtyMis = 0, orphan = 0;
   result.forEach(r => {
     if (r.status === 'match') match++;
-    else if (r.status === 'dateMismatch') dateMismatch++;
+    else if (r.status === 'qtyMismatch') qtyMis++;
     else orphan++;
   });
   document.getElementById('pp-stat-total').textContent = result.length;
   document.getElementById('pp-stat-match').textContent = match;
-  document.getElementById('pp-stat-mismatch').textContent = dateMismatch;
+  document.getElementById('pp-stat-mismatch').textContent = qtyMis;
   document.getElementById('pp-stat-orphan').textContent = orphan;
   document.getElementById('pp-result').classList.remove('hidden');
   ppRender();
@@ -5855,28 +5875,34 @@ function ppRender() {
     return;
   }
   const statusLabel = {
-    match:        { txt: '✓ 일치',        cls: 'text-green-700 bg-green-50' },
-    dateMismatch: { txt: '⚠ 날짜 불일치', cls: 'text-red-700 bg-red-50' },
-    onlyA:        { txt: 'B에 없음',       cls: 'text-orange-700 bg-orange-50' },
-    onlyB:        { txt: 'A에 없음',       cls: 'text-orange-700 bg-orange-50' },
+    match:        { txt: '✓ 일치',         cls: 'text-green-700 bg-green-50' },
+    qtyMismatch:  { txt: '⚠ 수량 불일치',  cls: 'text-red-700 bg-red-50' },
+    onlyA:        { txt: 'B에 없음',        cls: 'text-orange-700 bg-orange-50' },
+    onlyB:        { txt: 'A에 없음',        cls: 'text-orange-700 bg-orange-50' },
   };
   tbody.innerHTML = filtered.map((r, i) => {
     const s = statusLabel[r.status] || { txt: r.status, cls: '' };
     const rowCls = r.status === 'match' ? '' : 'bg-red-50/40';
-    const dateACls = r.status === 'dateMismatch' ? 'text-red-700 font-bold' : '';
-    const dateBCls = r.status === 'dateMismatch' ? 'text-red-700 font-bold' : '';
-    // A 셀: 보정 옵션 켜져있고 원본과 다르면 '원본 X' 작은 줄로 함께 표시
+    const qtyCls = r.status === 'qtyMismatch' ? 'text-red-700 font-bold' : '';
+    // A 셀: 보정 옵션 켜져있고 원본과 다르면 '원본 X' 작은 줄로 함께 표시. 여러 행 합산이면 N건 배지
     const aCell = r.dateA
-      ? (hasAdjust && r.dateAOrig && r.dateAOrig !== r.dateA
-          ? `<div class="${dateACls}">${r.dateA}</div><div class="text-[10px] text-brand-gray font-normal">원본 ${r.dateAOrig}</div>`
-          : `<span class="${dateACls}">${r.dateA}</span>`)
+      ? `<div>${r.dateA}${r.aRows > 1 ? ` <span class="text-[10px] text-brand-gray">(A ${r.aRows}건)</span>` : ''}</div>` +
+        (hasAdjust && r.dateAOrig && r.dateAOrig !== r.dateA
+          ? `<div class="text-[10px] text-brand-gray font-normal">원본 ${r.dateAOrig}</div>`
+          : '')
       : '<span class="text-brand-gray">—</span>';
+    const bCell = r.dateB
+      ? `${r.dateB}${r.bRows > 1 ? ` <span class="text-[10px] text-brand-gray">(B ${r.bRows}건)</span>` : ''}`
+      : '<span class="text-brand-gray">—</span>';
+    const aQtyTxt = r.dateA ? r.qty.toLocaleString('ko-KR') : '<span class="text-brand-gray">—</span>';
+    const bQtyTxt = r.dateB ? r.bQty.toLocaleString('ko-KR') : '<span class="text-brand-gray">—</span>';
     return `<tr class="border-t border-brand-border ${rowCls}">
       <td class="px-3 py-2 text-xs text-brand-gray">${i+1}</td>
       <td class="px-3 py-2">${_ppEsc(r.product)}</td>
-      <td class="px-3 py-2 text-right tabular-nums">${r.qty.toLocaleString('ko-KR')}</td>
+      <td class="px-3 py-2 text-right tabular-nums ${qtyCls}">${aQtyTxt}</td>
+      <td class="px-3 py-2 text-right tabular-nums ${qtyCls}">${bQtyTxt}</td>
       <td class="px-3 py-2 tabular-nums whitespace-nowrap">${aCell}</td>
-      <td class="px-3 py-2 tabular-nums whitespace-nowrap ${dateBCls}">${r.dateB || '<span class="text-brand-gray">—</span>'}</td>
+      <td class="px-3 py-2 tabular-nums whitespace-nowrap">${bCell}</td>
       <td class="px-3 py-2"><span class="inline-block px-2 py-0.5 rounded-full text-xs font-bold ${s.cls}">${s.txt}</span></td>
     </tr>`;
   }).join('');
@@ -5889,20 +5915,20 @@ function ppDownload() {
   const offsetOn  = document.getElementById('pp-a-plus1').checked;
   const workdayOn = document.getElementById('pp-a-workday').checked;
   const hasAdjust = offsetOn || workdayOn;
-  const statusLabel = { match: '일치', dateMismatch: '날짜 불일치', onlyA: 'B에 없음', onlyB: 'A에 없음' };
+  const statusLabel = { match: '일치', qtyMismatch: '수량 불일치', onlyA: 'B에 없음', onlyB: 'A에 없음' };
   const adjustLabel = [offsetOn && '+1일', workdayOn && '영업일'].filter(Boolean).join('·') || '보정';
   const header = hasAdjust
-    ? ['#', '상품명', '수량', 'A 출고일(원본)', `A 출고일(${adjustLabel})`, 'B 수불일자', '상태']
-    : ['#', '상품명', '수량', 'A 출고일', 'B 수불일자', '상태'];
+    ? ['#','상품명','A 수량','B 수량','A 행수','B 행수','A 출고일(원본)',`A 출고일(${adjustLabel})`,'B 수불일자','상태']
+    : ['#','상품명','A 수량','B 수량','A 행수','B 행수','A 출고일','B 수불일자','상태'];
   const data = [header];
   _ppState.result.forEach((r, i) => {
-    if (hasAdjust) data.push([i+1, r.product, r.qty, r.dateAOrig || '', r.dateA || '', r.dateB || '', statusLabel[r.status] || r.status]);
-    else           data.push([i+1, r.product, r.qty, r.dateA    || '', r.dateB || '', statusLabel[r.status] || r.status]);
+    if (hasAdjust) data.push([i+1, r.product, r.dateA?r.qty:'', r.dateB?r.bQty:'', r.aRows||'', r.bRows||'', r.dateAOrig||'', r.dateA||'', r.dateB||'', statusLabel[r.status]||r.status]);
+    else           data.push([i+1, r.product, r.dateA?r.qty:'', r.dateB?r.bQty:'', r.aRows||'', r.bRows||'', r.dateA||'', r.dateB||'', statusLabel[r.status]||r.status]);
   });
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws['!cols'] = hasAdjust
-    ? [{ wch: 5 }, { wch: 36 }, { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }]
-    : [{ wch: 5 }, { wch: 36 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+    ? [{wch:5},{wch:36},{wch:8},{wch:8},{wch:7},{wch:7},{wch:14},{wch:14},{wch:12},{wch:12}]
+    : [{wch:5},{wch:36},{wch:8},{wch:8},{wch:7},{wch:7},{wch:12},{wch:12},{wch:12}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '비교결과');
   const today = new Date();
