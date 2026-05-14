@@ -5728,24 +5728,24 @@ function ppCompare() {
     let pick = bucket.find(b => !b._used && b.date === a.date);
     if (pick) {
       pick._used = true;
-      result.push({ product: a.product, qty: a.qty, dateA: a.date, dateB: pick.date, status: 'match' });
+      result.push({ product: a.product, qty: a.qty, dateA: a.date, dateAOrig: a.dateOrig, dateB: pick.date, status: 'match' });
       return;
     }
     // 2) 같은 상품+수량의 미사용 B 행 (날짜 다름)
     pick = bucket.find(b => !b._used);
     if (pick) {
       pick._used = true;
-      result.push({ product: a.product, qty: a.qty, dateA: a.date, dateB: pick.date, status: 'dateMismatch' });
+      result.push({ product: a.product, qty: a.qty, dateA: a.date, dateAOrig: a.dateOrig, dateB: pick.date, status: 'dateMismatch' });
       return;
     }
     // 3) B에 없음
-    result.push({ product: a.product, qty: a.qty, dateA: a.date, dateB: '', status: 'onlyA' });
+    result.push({ product: a.product, qty: a.qty, dateA: a.date, dateAOrig: a.dateOrig, dateB: '', status: 'onlyA' });
   });
-  // B에는 있는데 A에 없는 행 (남은 미사용 B)
+  // B에는 있는데 A에 없는 행 (남은 미사용 B) — B는 보정 영향 없음
   bByKey.forEach(bucket => {
     bucket.forEach(b => {
       if (!b._used) {
-        result.push({ product: b.product === '*' ? '(B 상품명 없음)' : b.product, qty: b.qty, dateA: '', dateB: b.date, status: 'onlyB' });
+        result.push({ product: b.product === '*' ? '(B 상품명 없음)' : b.product, qty: b.qty, dateA: '', dateAOrig: '', dateB: b.date, status: 'onlyB' });
       }
     });
   });
@@ -5794,11 +5794,17 @@ function ppRender() {
     const rowCls = r.status === 'match' ? '' : 'bg-red-50/40';
     const dateACls = r.status === 'dateMismatch' ? 'text-red-700 font-bold' : '';
     const dateBCls = r.status === 'dateMismatch' ? 'text-red-700 font-bold' : '';
+    // A 셀: +1일 보정 상태이고 원본 날짜가 다르면 '원본 X' 작은 줄로 함께 표시
+    const aCell = r.dateA
+      ? (offsetOn && r.dateAOrig && r.dateAOrig !== r.dateA
+          ? `<div class="${dateACls}">${r.dateA}</div><div class="text-[10px] text-brand-gray font-normal">원본 ${r.dateAOrig}</div>`
+          : `<span class="${dateACls}">${r.dateA}</span>`)
+      : '<span class="text-brand-gray">—</span>';
     return `<tr class="border-t border-brand-border ${rowCls}">
       <td class="px-3 py-2 text-xs text-brand-gray">${i+1}</td>
       <td class="px-3 py-2">${_ppEsc(r.product)}</td>
       <td class="px-3 py-2 text-right tabular-nums">${r.qty.toLocaleString('ko-KR')}</td>
-      <td class="px-3 py-2 tabular-nums whitespace-nowrap ${dateACls}">${r.dateA || '<span class="text-brand-gray">—</span>'}</td>
+      <td class="px-3 py-2 tabular-nums whitespace-nowrap">${aCell}</td>
       <td class="px-3 py-2 tabular-nums whitespace-nowrap ${dateBCls}">${r.dateB || '<span class="text-brand-gray">—</span>'}</td>
       <td class="px-3 py-2"><span class="inline-block px-2 py-0.5 rounded-full text-xs font-bold ${s.cls}">${s.txt}</span></td>
     </tr>`;
@@ -5809,13 +5815,20 @@ function _ppEsc(s) {
 }
 function ppDownload() {
   if (!_ppState.result.length) { alert('비교 결과가 없습니다.'); return; }
+  const offsetOn = document.getElementById('pp-a-plus1').checked;
   const statusLabel = { match: '일치', dateMismatch: '날짜 불일치', onlyA: 'B에 없음', onlyB: 'A에 없음' };
-  const data = [['#', '상품명', '수량', 'A 출고일', 'B 수불일자', '상태']];
+  const header = offsetOn
+    ? ['#', '상품명', '수량', 'A 출고일(원본)', 'A 출고일(+1일)', 'B 수불일자', '상태']
+    : ['#', '상품명', '수량', 'A 출고일', 'B 수불일자', '상태'];
+  const data = [header];
   _ppState.result.forEach((r, i) => {
-    data.push([i+1, r.product, r.qty, r.dateA || '', r.dateB || '', statusLabel[r.status] || r.status]);
+    if (offsetOn) data.push([i+1, r.product, r.qty, r.dateAOrig || '', r.dateA || '', r.dateB || '', statusLabel[r.status] || r.status]);
+    else          data.push([i+1, r.product, r.qty, r.dateA    || '', r.dateB || '', statusLabel[r.status] || r.status]);
   });
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{ wch: 5 }, { wch: 36 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+  ws['!cols'] = offsetOn
+    ? [{ wch: 5 }, { wch: 36 }, { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }]
+    : [{ wch: 5 }, { wch: 36 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '비교결과');
   const today = new Date();
