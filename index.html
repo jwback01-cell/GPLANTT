@@ -28352,7 +28352,7 @@ function _renderOpsUnitTable() {
           <input type="text" value="${_escapeHtml(it.name)}" onchange="updateOpsUnitItem('${it.id}', 'name', this.value)" class="w-full bg-transparent border-0 outline-none focus:bg-brand-bg rounded px-2 py-1 text-sm font-semibold">
         </td>
         <td class="px-4 py-3 text-right">
-          <input type="number" min="0" step="1" value="${Number(it.unit) || 0}" onchange="updateOpsUnitItem('${it.id}', 'unit', this.value)" class="w-32 bg-transparent border-0 outline-none focus:bg-brand-bg rounded px-2 py-1 text-sm font-mono text-right">
+          <input type="text" inputmode="numeric" value="${(Number(it.unit) || 0).toLocaleString('ko-KR')}" onchange="updateOpsUnitItem('${it.id}', 'unit', this.value)" class="w-32 bg-transparent border-0 outline-none focus:bg-brand-bg rounded px-2 py-1 text-sm tabular-nums text-right">
         </td>
         <td class="px-4 py-3 text-center">
           ${it.isPreset
@@ -28382,11 +28382,14 @@ function updateOpsUnitItem(id, field, value) {
   const it = data.unitItems.find(x => x.id === id);
   if (!it) return;
   if (field === 'name') it.name = String(value || '').trim() || it.name;
-  else if (field === 'unit') it.unit = Math.max(0, Number(value) || 0);
+  else if (field === 'unit') it.unit = Math.max(0, Number(String(value).replace(/,/g, '')) || 0);
   _saveOpsCosts(data);
-  // 단가만 변경된 경우 합계만 갱신, 이름은 그대로 두고 옆 표시만 갱신 — 둘 다 안전하게 재렌더
-  const totalEl = document.getElementById('ops-total-unit');
-  if (totalEl) totalEl.textContent = _opsActiveUnitTotal().toLocaleString('ko-KR') + '원';
+  // 합계 갱신 + 단가 셀 콤마 포맷팅을 위해 전체 재렌더 (blur 시점이라 focus 손실 영향 없음)
+  if (field === 'unit') _renderOpsUnitTable();
+  else {
+    const totalEl = document.getElementById('ops-total-unit');
+    if (totalEl) totalEl.textContent = _opsActiveUnitTotal().toLocaleString('ko-KR') + '원';
+  }
 }
 
 function toggleOpsUnitItem(id, checked) {
@@ -28439,7 +28442,7 @@ function renderOpsMonthly() {
         </div>
       </td>
       <td class="px-4 py-3 text-right">
-        <input type="number" min="0" step="1" value="${Number(it.amount) || 0}" onchange="updateOpsRecurringItem('${it.id}', 'amount', this.value)" class="w-36 bg-transparent border-0 outline-none focus:bg-white rounded px-2 py-1 text-sm font-mono text-right">
+        <input type="text" inputmode="numeric" value="${(Number(it.amount) || 0).toLocaleString('ko-KR')}" onchange="updateOpsRecurringItem('${it.id}', 'amount', this.value)" class="w-36 bg-transparent border-0 outline-none focus:bg-white rounded px-2 py-1 text-sm tabular-nums text-right">
       </td>
       <td class="px-4 py-3">
         <input type="text" value="${_escapeHtml(it.memo || '')}" placeholder="(선택) 메모" onchange="updateOpsRecurringItem('${it.id}', 'memo', this.value)" class="w-full bg-transparent border-0 outline-none focus:bg-white rounded px-2 py-1 text-xs text-brand-gray">
@@ -28456,7 +28459,7 @@ function renderOpsMonthly() {
         <input type="text" value="${_escapeHtml(it.name || '')}" onchange="updateOpsMonthlyItem(${idx}, 'name', this.value)" class="w-full bg-transparent border-0 outline-none focus:bg-brand-bg rounded px-2 py-1 text-sm font-semibold">
       </td>
       <td class="px-4 py-3 text-right">
-        <input type="number" min="0" step="1" value="${Number(it.amount) || 0}" onchange="updateOpsMonthlyItem(${idx}, 'amount', this.value)" class="w-36 bg-transparent border-0 outline-none focus:bg-brand-bg rounded px-2 py-1 text-sm font-mono text-right">
+        <input type="text" inputmode="numeric" value="${(Number(it.amount) || 0).toLocaleString('ko-KR')}" onchange="updateOpsMonthlyItem(${idx}, 'amount', this.value)" class="w-36 bg-transparent border-0 outline-none focus:bg-brand-bg rounded px-2 py-1 text-sm tabular-nums text-right">
       </td>
       <td class="px-4 py-3">
         <input type="text" value="${_escapeHtml(it.memo || '')}" placeholder="(선택) 메모" onchange="updateOpsMonthlyItem(${idx}, 'memo', this.value)" class="w-full bg-transparent border-0 outline-none focus:bg-brand-bg rounded px-2 py-1 text-xs text-brand-gray">
@@ -28480,7 +28483,7 @@ function renderOpsMonthly() {
   tfoot.innerHTML = `
     <tr class="border-t border-brand-border font-bold">
       <td class="px-4 py-3 text-right">${month} 합계 ${recSum > 0 ? `<span class="text-[10px] text-brand-gray font-normal">(반복 ${recSum.toLocaleString('ko-KR')} + 이번 달 ${onceSum.toLocaleString('ko-KR')})</span>` : ''}</td>
-      <td class="px-4 py-3 text-right font-mono">${totalSum.toLocaleString('ko-KR')}원</td>
+      <td class="px-4 py-3 text-right tabular-nums font-bold">${totalSum.toLocaleString('ko-KR')}원</td>
       <td colspan="2"></td>
     </tr>
   `;
@@ -28499,10 +28502,10 @@ function updateOpsRecurringItem(id, field, value) {
   const it = (data.recurringItems || []).find(x => x.id === id);
   if (!it) return;
   if (field === 'name')        it.name   = String(value || '').trim() || it.name;
-  else if (field === 'amount') it.amount = Math.max(0, Number(value) || 0);
+  else if (field === 'amount') it.amount = Math.max(0, Number(String(value).replace(/,/g, '')) || 0);
   else if (field === 'memo')   it.memo   = String(value || '');
   _saveOpsCosts(data);
-  if (field === 'amount') renderOpsMonthly(); // 합계 갱신
+  if (field === 'amount') renderOpsMonthly(); // 합계 갱신 + 콤마 포맷
 }
 async function deleteOpsRecurringItem(id) {
   const data = _loadOpsCosts();
@@ -28537,10 +28540,10 @@ function updateOpsMonthlyItem(idx, field, value) {
   const arr = data.monthlyTotals[month];
   if (!Array.isArray(arr) || !arr[idx]) return;
   if (field === 'name')       arr[idx].name   = String(value || '').trim() || arr[idx].name;
-  else if (field === 'amount') arr[idx].amount = Math.max(0, Number(value) || 0);
+  else if (field === 'amount') arr[idx].amount = Math.max(0, Number(String(value).replace(/,/g, '')) || 0);
   else if (field === 'memo')   arr[idx].memo   = String(value || '');
   _saveOpsCosts(data);
-  if (field === 'amount') renderOpsMonthly(); // 합계 갱신
+  if (field === 'amount') renderOpsMonthly(); // 합계 갱신 + 콤마 포맷
 }
 
 async function deleteOpsMonthlyItem(idx) {
