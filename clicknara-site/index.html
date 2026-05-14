@@ -5545,7 +5545,10 @@ function _ppHandleFile(file, side) {
       const parsed = _ppParseRows(rows, side);
       if (parsed.error) { _ppSetStatus(side, parsed.error, false); return; }
       _ppState[side.toLowerCase()] = { fileName: file.name, rows: parsed.rows };
-      _ppSetStatus(side, `${file.name} — ${parsed.rows.length}건 인식${parsed.skipped ? ` (제외 ${parsed.skipped}건)` : ''}`, true);
+      const noProductNote = (side === 'B' && parsed.rows.length > 0 && parsed.rows.every(r => r.product === '*'))
+        ? ' · 상품명 컬럼 없음 → 수량+날짜로 매칭'
+        : '';
+      _ppSetStatus(side, `${file.name} — ${parsed.rows.length}건 인식${parsed.skipped ? ` (제외 ${parsed.skipped}건)` : ''}${noProductNote}`, true);
       _ppUpdateCompareBtn();
     } catch (err) {
       console.error(err);
@@ -5568,9 +5571,11 @@ function _ppFindHeaderRow(rows, keywordSets) {
   }
   return bestIdx;
 }
-function _ppColIndex(headerRow, keywords) {
+function _ppColIndex(headerRow, keywords, opts) {
+  const exclude = (opts && opts.exclude) || [];
   for (let i = 0; i < headerRow.length; i++) {
     const c = String(headerRow[i] || '').trim();
+    if (exclude.some(e => c.includes(e))) continue;  // '품목코드' 같은 헤더 제외
     if (keywords.some(k => c.includes(k))) return i;
   }
   return -1;
@@ -5581,7 +5586,8 @@ function _ppParseRows(rows, side) {
     const headerIdx = _ppFindHeaderRow(rows, [['상품명','품명','제품명','품목명','품목'], ['수량','출고수량','판매수량'], ['출고일','매출일','출고날짜']]);
     if (headerIdx < 0) return { error: '헤더(상품명/수량/출고일)를 찾지 못했습니다.' };
     const h = rows[headerIdx];
-    const pi = _ppColIndex(h, ['상품명','품명','제품명','품목명','품목']);
+    // 상품명: '품목코드' 같은 코드 컬럼은 제외하고 매칭
+    const pi = _ppColIndex(h, ['상품명','품명','제품명','품목명','품목'], { exclude: ['코드'] });
     const qi = _ppColIndex(h, ['수량','출고수량','판매수량']);
     const di = _ppColIndex(h, ['출고일','매출일','출고날짜']);
     if (pi < 0 || qi < 0 || di < 0) return { error: `필수 컬럼 누락 (상품명:${pi>=0?'✓':'✗'} 수량:${qi>=0?'✓':'✗'} 출고일:${di>=0?'✓':'✗'})` };
@@ -5603,8 +5609,8 @@ function _ppParseRows(rows, side) {
     const h = rows[headerIdx];
     const di = _ppColIndex(h, ['수불일자','일자']);
     const gi = _ppColIndex(h, ['수불구분','구분']);
-    const oi = _ppColIndex(h, ['출고']);  // '출고대기' 보다 '출고'가 먼저 매치되도록 키워드 순서 주의 — _ppColIndex 는 첫 매치만 반환
-    const pi = _ppColIndex(h, ['상품명','품명','제품명','품목명','품목']);  // 없을 수도 있음
+    const oi = _ppColIndex(h, ['출고'], { exclude: ['대기'] });  // '출고대기' 는 별개 컬럼, 우리는 '출고' 만 원함
+    const pi = _ppColIndex(h, ['상품명','품명','제품명','품목명','품목'], { exclude: ['코드'] });  // 없을 수도 있음 (단일 상품 장부)
     if (di < 0 || gi < 0 || oi < 0) return { error: `필수 컬럼 누락 (수불일자:${di>=0?'✓':'✗'} 수불구분:${gi>=0?'✓':'✗'} 출고:${oi>=0?'✓':'✗'})` };
     const out = [];
     let skipped = 0;
@@ -5614,7 +5620,8 @@ function _ppParseRows(rows, side) {
       if (!/매출\s*출고/.test(gubun)) { skipped++; continue; }  // 매출출고 외에는 모두 제외
       const qty  = _ppNormQty(row[oi]);
       const date = _ppNormDate(row[di]);
-      const product = pi >= 0 ? _ppNormProduct(row[pi]) : '(미지정)';
+      // 상품명 컬럼이 없으면 '*' (와일드카드 — ppCompare 가 상품 비교 없이 수량+날짜로만 매칭)
+      const product = pi >= 0 ? _ppNormProduct(row[pi]) : '*';
       if (qty == null || qty === 0 || !date) { skipped++; continue; }
       out.push({ product, qty, date, rowIdx: r + 1 });
     }
@@ -5657,19 +5664,25 @@ function _ppNormDate(v) {
   return null;
 }
 // 핵심 매칭 로직 — 상품명+수량으로 짝짓고, 날짜가 다르면 '날짜 불일치'
+//   B에 상품명 컬럼이 없으면(모두 '*') 수량만으로 매칭 (단일 상품 장부 가정)
 function ppCompare() {
   const aRows = _ppState.a.rows.slice();
   const bRows = _ppState.b.rows.slice();
-  // B를 (상품명+수량) bucket 에 넣기
+  const bHasProduct = bRows.length > 0 && bRows.some(r => r.product !== '*');
+  // B에 상품명이 없으면 → 매칭 키는 수량만, 그렇지 않으면 → 상품명+수량
+  const keyFn = bHasProduct
+    ? (r => r.product + '|' + r.qty)
+    : (r => 'Q|' + r.qty);
+  // B를 bucket 에 넣기
   const bByKey = new Map();
   bRows.forEach((r, i) => {
-    const key = r.product + '|' + r.qty;
+    const key = keyFn(r);
     if (!bByKey.has(key)) bByKey.set(key, []);
     bByKey.get(key).push({ ...r, _used: false, _idx: i });
   });
   const result = [];
   aRows.forEach(a => {
-    const key = a.product + '|' + a.qty;
+    const key = keyFn(a);
     const bucket = bByKey.get(key) || [];
     // 1) 같은 날짜의 B 행 우선 (완전 일치)
     let pick = bucket.find(b => !b._used && b.date === a.date);
@@ -5692,7 +5705,7 @@ function ppCompare() {
   bByKey.forEach(bucket => {
     bucket.forEach(b => {
       if (!b._used) {
-        result.push({ product: b.product, qty: b.qty, dateA: '', dateB: b.date, status: 'onlyB' });
+        result.push({ product: b.product === '*' ? '(B 상품명 없음)' : b.product, qty: b.qty, dateA: '', dateB: b.date, status: 'onlyB' });
       }
     });
   });
