@@ -1691,13 +1691,19 @@ tailwind.config = {
             </select>
           </div>
         </div>
-        <!-- 전체 선택 / 일괄 수정 / 선택 삭제 -->
+        <!-- 전체 선택 / 일괄 수정 / 선택 삭제 + 페이지당 개수 -->
         <div class="flex items-center justify-between px-4 md:px-6 py-3 border-b border-brand-border">
           <div class="flex items-center gap-3 md:gap-4 flex-wrap">
             <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="product-select-all" class="w-4 h-4 rounded" onchange="toggleSelectAllProducts()"><span id="product-select-all-label" class="text-sm font-bold text-brand-gray">전체 선택 (0개)</span></label>
             <button onclick="openBulkEditProductDrawer()" class="text-sm font-bold text-brand-blue hover:opacity-80 flex items-center gap-1">📝 정보 일괄 수정</button>
             <button onclick="deleteSelectedProducts()" class="text-sm font-bold text-brand-pink hover:opacity-80 flex items-center gap-1">선택 삭제</button>
           </div>
+          <select id="product-per-page" class="px-3 py-1.5 bg-brand-bg rounded-full text-xs font-bold outline-none cursor-pointer" onchange="changeProductsPerPage(this.value)" title="페이지당 표시 개수">
+            <option value="10">10개씩</option>
+            <option value="100">100개씩</option>
+            <option value="1000">1000개씩</option>
+            <option value="0">전체</option>
+          </select>
         </div>
         <!-- 헤더 -->
         <div class="grid border-b border-brand-border bg-white px-4 md:px-6 py-3 select-none" style="grid-template-columns: 36px 1fr 100px 100px 80px 40px 40px;">
@@ -1717,14 +1723,8 @@ tailwind.config = {
           <p class="font-bold text-brand-gray">검색 결과가 없습니다</p>
           <p id="product-no-result-msg" class="text-sm text-brand-gray"></p>
         </div>
-        <div class="p-4 border-t border-brand-border flex items-center gap-2 relative">
+        <div class="p-4 border-t border-brand-border flex items-center gap-2">
           <div id="product-pagination" class="flex-1 flex justify-center gap-2"></div>
-          <select id="product-per-page" class="px-4 py-2.5 bg-brand-bg rounded-full text-sm font-medium outline-none cursor-pointer absolute right-4 top-1/2 -translate-y-1/2" onchange="changeProductsPerPage(this.value)" title="페이지당 표시 개수">
-            <option value="10">10개씩</option>
-            <option value="100">100개씩</option>
-            <option value="1000">1000개씩</option>
-            <option value="0">전체</option>
-          </select>
         </div>
       </div>
       </div><!-- /products-view-normal -->
