@@ -16990,10 +16990,8 @@ function renderEventsCalendar() {
       bar.style.cssText = `grid-column:${colStart}/${colEnd};grid-row:${row};background:${c.bg};color:${c.fg};border-radius:${radiusL} ${radiusR} ${radiusR} ${radiusL};${borderL}${borderR}padding:3px 8px;font-size:11px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:space-between;gap:6px;cursor:pointer;overflow:hidden;white-space:nowrap;margin:0 6px;z-index:2;position:relative;box-sizing:border-box;`;
       bar.title = t.ev.title || '';
       bar.onclick = (e) => { e.stopPropagation(); openEditEventModal(t.ev.id); };
-      // 제목 (첫 주에만 보임) + 종료 칸 우측에 작은 "끝" 표식
-      const titleHtml = t.showTitle ? `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(t.ev.title || '')}</span>` : '<span></span>';
-      const endHtml   = t.isEventEnd ? `<span style="font-size:9px;font-weight:900;background:${c.fg};color:${c.bg};border-radius:3px;padding:1px 4px;flex-shrink:0;">끝</span>` : '';
-      bar.innerHTML = titleHtml + endHtml;
+      // 제목 (첫 주에만 보임) — 시작/종료선은 막대 자체의 border 로 표현
+      bar.textContent = t.showTitle ? (t.ev.title || '') : '';
       weekDiv.appendChild(bar);
     });
 
