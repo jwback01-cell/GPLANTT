@@ -16913,6 +16913,8 @@ function renderEventsCalendar() {
       tasks.push({
         ev, startCol, endCol,
         showTitle: (evStart === barStart) || (startCol === 0),
+        isEventEnd: (evEnd === barEnd),   // 이 막대 마지막 칸 = 실제 행사 종료일
+        isEventStart: (evStart === barStart), // 이 막대 시작 칸 = 실제 행사 시작일
       });
     });
     // 정렬: 긴 행사 → 시작일 빠른 순
@@ -16979,10 +16981,19 @@ function renderEventsCalendar() {
       const colStart = t.startCol + 1;
       const colEnd   = t.endCol + 2; // exclusive
       const row      = t.lane + 2;
-      bar.style.cssText = `grid-column:${colStart}/${colEnd};grid-row:${row};background:${c.bg};color:${c.fg};border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;line-height:1;display:flex;align-items:center;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0 6px;z-index:2;position:relative;box-sizing:border-box;`;
+      // 시작/종료 표시: 시작 칸은 왼쪽 굵은 줄, 종료 칸은 오른쪽 굵은 줄 (해당 카테고리 진한 색)
+      // 양쪽 끝이 잘린 중간 주(week)는 모서리도 평평하게 → 양쪽이 막힌 막대 = 시작과 끝
+      const radiusL = t.isEventStart ? '6px' : '0';
+      const radiusR = t.isEventEnd   ? '6px' : '0';
+      const borderL = t.isEventStart ? `border-left:3px solid ${c.fg};`  : '';
+      const borderR = t.isEventEnd   ? `border-right:3px solid ${c.fg};` : '';
+      bar.style.cssText = `grid-column:${colStart}/${colEnd};grid-row:${row};background:${c.bg};color:${c.fg};border-radius:${radiusL} ${radiusR} ${radiusR} ${radiusL};${borderL}${borderR}padding:3px 8px;font-size:11px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:space-between;gap:6px;cursor:pointer;overflow:hidden;white-space:nowrap;margin:0 6px;z-index:2;position:relative;box-sizing:border-box;`;
       bar.title = t.ev.title || '';
       bar.onclick = (e) => { e.stopPropagation(); openEditEventModal(t.ev.id); };
-      bar.textContent = t.showTitle ? (t.ev.title || '') : '';
+      // 제목 (첫 주에만 보임) + 종료 칸 우측에 작은 "끝" 표식
+      const titleHtml = t.showTitle ? `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(t.ev.title || '')}</span>` : '<span></span>';
+      const endHtml   = t.isEventEnd ? `<span style="font-size:9px;font-weight:900;background:${c.fg};color:${c.bg};border-radius:3px;padding:1px 4px;flex-shrink:0;">끝</span>` : '';
+      bar.innerHTML = titleHtml + endHtml;
       weekDiv.appendChild(bar);
     });
 
