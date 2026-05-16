@@ -1696,6 +1696,7 @@ tailwind.config = {
           <div class="flex items-center gap-3 md:gap-4 flex-wrap">
             <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="product-select-all" class="w-4 h-4 rounded" onchange="toggleSelectAllProducts()"><span id="product-select-all-label" class="text-sm font-bold text-brand-gray">전체 선택 (0개)</span></label>
             <button onclick="openBulkEditProductDrawer()" class="text-sm font-bold text-brand-blue hover:opacity-80 flex items-center gap-1">📝 정보 일괄 수정</button>
+            <button onclick="exportSelectedProductsExcel()" class="text-sm font-bold text-emerald-600 hover:opacity-80 flex items-center gap-1">📥 선택 다운로드</button>
             <button onclick="deleteSelectedProducts()" class="text-sm font-bold text-brand-pink hover:opacity-80 flex items-center gap-1">선택 삭제</button>
           </div>
           <select id="product-per-page" class="px-3 py-1.5 bg-brand-bg rounded-full text-xs font-bold outline-none cursor-pointer" onchange="changeProductsPerPage(this.value)" title="페이지당 표시 개수">
@@ -13510,6 +13511,60 @@ function exportProductsExcel() {
   const today = new Date();
   const dateStr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
   XLSX.writeFile(wb, `GPLAN_상품목록_${dateStr}.xlsx`);
+}
+
+// 선택한 상품만 엑셀로 내보내기 (체크된 행만)
+function exportSelectedProductsExcel() {
+  const checkedIds = new Set(
+    [...document.querySelectorAll('#product-list-body .product-row-cb:checked')]
+      .map(cb => Number(cb.dataset.productId))
+  );
+  if (!checkedIds.size) {
+    showAppAlert('선택된 상품이 없어요', '먼저 다운로드할 상품을 체크해주세요.', { type: 'info' });
+    return;
+  }
+  const all = (typeof _allProducts !== 'undefined' ? _allProducts : []);
+  const list = all.filter(p => checkedIds.has(Number(p.id)));
+  if (!list.length) {
+    showAppAlert('선택한 상품을 찾을 수 없어요', '목록을 새로고침한 뒤 다시 시도해주세요.', { type: 'info' });
+    return;
+  }
+
+  const headers = ['상품명', 'SKU', '카테고리', '현재 재고', '안전 재고', '원가', '공급가', '택배비', '택배비용', '등록일', '폴더코드'];
+  const data = [headers];
+  list.forEach(p => {
+    data.push([
+      p.name || '',
+      p.sku || '',
+      p.category || '',
+      Number(p.stock || 0),
+      Number(p.safety_stock || 0),
+      Number(p.cost || 0),
+      Number(p.supply_price || 0),
+      Number(p.shipping_fee || 0),
+      Number(p.shipping_cost || 0),
+      p.created_at ? String(p.created_at).slice(0, 10) : '',
+      p.folder_code || ''
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  const headerRange = XLSX.utils.decode_range(ws['!ref']);
+  for (let c = headerRange.s.c; c <= headerRange.e.c; c++) {
+    const cell = ws[XLSX.utils.encode_cell({ r: 0, c })];
+    if (cell) cell.s = { font: { bold: true }, fill: { fgColor: { rgb: 'F2F2F7' } } };
+  }
+  ws['!cols'] = [
+    { wch: 40 }, { wch: 20 }, { wch: 14 }, { wch: 10 }, { wch: 10 },
+    { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '선택 상품');
+
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+  XLSX.writeFile(wb, `GPLAN_선택상품_${list.length}건_${dateStr}.xlsx`);
 }
 
 // ══════════════════════════════════════════════════════════════
