@@ -7599,27 +7599,44 @@ function _srcNgGenerateName(rowsIn, maxLen) {
   // 입력 셀을 검색수 내림차순으로 정렬해 그대로 사용 (셀 자체가 단위)
   const rows = rowsIn.slice().sort((a, b) => b.cnt - a.cnt);
 
-  let name = '';
-  const used = [];          // [{tok, score, kws}]
-  const seen = new Set();   // 같은 셀 중복 방지
+  // 1단계: substring 포함관계 정리 + 새 정보 기준으로 채택 셀 결정 (maxLen 무관)
+  const picked = []; // [{cell, score, idx}]
+  const seen = new Set();
 
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     const cell = r.kw.replace(/\s+/g, '');
     if (!cell || cell.length < 2 || seen.has(cell)) continue;
 
-    // 새 정보 검사: 현재 name 에 없는 글자가 1자라도 있어야 추가 (완전 중복 셀 skip)
-    const nameChars = new Set(name);
-    const newCharCount = [...cell].filter(c => !nameChars.has(c)).length;
-    if (newCharCount < 1) continue;
+    // (a) 이미 채택된 어떤 셀에 cell 이 통째로 포함됨 → skip (정보 없음)
+    if (picked.some(p => p.cell.includes(cell))) continue;
 
-    // maxLen 검사 — 길어서 못 넣으면 skip 하고 다음 셀 시도
-    const cand = name ? `${name} ${cell}` : cell;
-    if (cand.length > maxLen) continue;
+    // (b) cell 이 이미 채택된 더 짧은 셀(들)을 통째로 포함 → 그 짧은 셀들을 cell 이 흡수
+    for (let j = picked.length - 1; j >= 0; j--) {
+      if (cell.includes(picked[j].cell)) {
+        seen.delete(picked[j].cell);
+        picked.splice(j, 1);
+      }
+    }
 
-    name = cand;
+    // (c) 새 글자 검사 — picked 의 모든 글자 합집합에 없는 글자가 1개 이상이어야 추가
+    const allChars = new Set();
+    picked.forEach(p => { for (const c of p.cell) allChars.add(c); });
+    const newCount = [...cell].filter(c => !allChars.has(c)).length;
+    if (newCount < 1) continue;
+
+    picked.push({ cell, score: r.cnt, idx: i });
     seen.add(cell);
-    used.push({ tok: cell, score: r.cnt, kws: new Set([i]) });
+  }
+
+  // 2단계: 채택된 셀을 최대 글자수 안에서 공백으로 잇기
+  let name = '';
+  const used = [];
+  for (const p of picked) {
+    const cand = name ? `${name} ${p.cell}` : p.cell;
+    if (cand.length > maxLen) continue;
+    name = cand;
+    used.push({ tok: p.cell, score: p.score, kws: new Set([p.idx]) });
   }
 
   return { name, tokens: used };
