@@ -5074,22 +5074,21 @@ PBT키캡	1180
               <span id="src-ng-tokencount"></span>
             </div>
             <details class="mt-4">
-              <summary class="cursor-pointer text-xs font-bold text-brand-gray hover:text-brand-black">사용된 단어 상세 (클릭해서 보기)</summary>
+              <summary class="cursor-pointer text-xs font-bold text-brand-gray hover:text-brand-black">생성된 상품명에 포함된 입력 키워드 (클릭해서 보기)</summary>
               <div class="mt-3 overflow-x-auto">
                 <table class="w-full text-xs">
                   <thead class="bg-brand-bg">
                     <tr>
                       <th class="px-3 py-2 text-left font-bold w-10">순서</th>
-                      <th class="px-3 py-2 text-left font-bold">단어</th>
-                      <th class="px-3 py-2 text-right font-bold">총 검색수 합</th>
-                      <th class="px-3 py-2 text-right font-bold">등장 키워드 수</th>
+                      <th class="px-3 py-2 text-left font-bold">입력 키워드</th>
+                      <th class="px-3 py-2 text-right font-bold">총 검색수</th>
                     </tr>
                   </thead>
                   <tbody id="src-ng-tokens"></tbody>
                 </table>
               </div>
               <div class="mt-3 text-[11px] text-brand-gray leading-relaxed">
-                ※ 출력의 각 단어는 입력 키워드 셀(예: 핸드폰거치대, 휴대폰거치대) 통째로 사용. 검색수가 높은 셀부터 차례로 확인해 새 글자가 추가되는 셀만 채택하고, 정보가 겹치는 셀은 건너뜀. 최대 글자수 안에서 가능한 많은 셀을 담음.
+                ※ 엑셀에서 붙여넣은 입력 키워드 중, 생성된 상품명에 그대로 들어있는 키워드만 표시. 검색수 합이 높을수록 그 상품명이 더 많은 검색을 커버한다는 의미.
               </div>
             </details>
           </div>
@@ -7706,12 +7705,28 @@ function runSrcNgProcess() {
   }
   const tbody = document.getElementById('src-ng-tokens');
   if (tbody) {
-    tbody.innerHTML = result.tokens.map((t, i) => `<tr class="border-b border-brand-border">
-      <td class="px-3 py-2 text-brand-gray">${i + 1}</td>
-      <td class="px-3 py-2 font-bold text-brand-black">${escHtml(t.tok)}</td>
-      <td class="px-3 py-2 text-right">${t.score.toLocaleString('ko-KR')}</td>
-      <td class="px-3 py-2 text-right">${t.kws.size}</td>
-    </tr>`).join('');
+    // 생성된 상품명(공백 제거)에 substring 으로 포함되는 입력 키워드만 표시
+    const nameNoSpace = (result.name || '').replace(/\s+/g, '');
+    const matched = rawRows
+      .map(r => ({ kw: r.kw.replace(/\s+/g, ''), cnt: r.cnt }))
+      .filter(r => r.kw && nameNoSpace.includes(r.kw))
+      .sort((a, b) => b.cnt - a.cnt);
+    // 같은 키워드 중복 제거 (동일 키워드가 입력에 여러 번 있을 때)
+    const seenKw = new Set();
+    const unique = matched.filter(r => {
+      if (seenKw.has(r.kw)) return false;
+      seenKw.add(r.kw);
+      return true;
+    });
+    if (unique.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="3" class="px-3 py-4 text-center text-brand-gray">생성된 상품명에 포함된 입력 키워드가 없습니다.</td></tr>`;
+    } else {
+      tbody.innerHTML = unique.map((r, i) => `<tr class="border-b border-brand-border">
+        <td class="px-3 py-2 text-brand-gray">${i + 1}</td>
+        <td class="px-3 py-2 font-bold text-brand-black">${escHtml(r.kw)}</td>
+        <td class="px-3 py-2 text-right">${r.cnt.toLocaleString('ko-KR')}</td>
+      </tr>`).join('');
+    }
   }
 }
 
