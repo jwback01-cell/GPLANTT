@@ -5025,6 +5025,21 @@ PBT키캡	1180
             <span class="text-brand-gray leading-relaxed">검색수가 높은 키워드를 우선 고려하고, 단어 중복은 제거합니다.</span>
           </div>
 
+          <!-- 동의어 설정 -->
+          <div class="bg-brand-bg rounded-xl p-3 flex flex-col gap-2">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <div class="flex items-center gap-2 text-xs">
+                <span class="font-bold text-brand-black">동의어 그룹</span>
+                <span class="text-brand-gray">같은 의미의 단어들을 묶으면, 그 단어들이 들어간 키워드는 한 개로 합쳐지고 검색수가 가장 높은 것만 남습니다 (예: 핸드폰 = 휴대폰 등록 시 "핸드폰거치대"와 "휴대폰거치대"는 합쳐짐)</span>
+              </div>
+            </div>
+            <div class="flex gap-2 flex-wrap">
+              <input type="text" id="src-ng-synonym-input" onkeydown="if(event.key==='Enter'){event.preventDefault();addNgSynonym();}" placeholder='예: 핸드폰 = 휴대폰   (또는 "핸드폰, 휴대폰, 스마트폰")' class="flex-1 min-w-[200px] px-3 py-2 rounded-lg border border-brand-border bg-white text-xs focus:outline-none focus:border-brand-blue">
+              <button onclick="addNgSynonym()" class="px-4 py-2 rounded-lg bg-brand-blue text-white text-xs font-bold hover:opacity-90">+ 추가</button>
+            </div>
+            <div id="src-ng-synonyms-list" class="flex flex-wrap gap-2 mt-1"></div>
+          </div>
+
           <button onclick="runSrcNgProcess()" class="w-full bg-brand-blue text-white py-3 rounded-xl font-bold text-sm hover:opacity-90 flex items-center justify-center gap-2">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
             상품명 만들기
@@ -7445,6 +7460,7 @@ function switchSrcTab(tab) {
   document.getElementById('src-panel-tag').classList.toggle('hidden', tab !== 'tag');
   const ng = document.getElementById('src-panel-namegen');
   if (ng) ng.classList.toggle('hidden', tab !== 'namegen');
+  if (tab === 'namegen') { _loadNgSynonyms(); _renderNgSynonyms(); }
 }
 
 // ── 상품명 정제 (키워드+검색수 → 단일 상품명) ─────────────────
@@ -7481,6 +7497,88 @@ function _srcNgUpdateCount() {
   if (el) el.textContent = `${rows.length}개`;
 }
 
+// ── 동의어 그룹 (localStorage 저장) ──────────────
+const NG_SYNONYM_KEY = 'gplan_ng_synonyms_v1';
+let _ngSynonyms = []; // [[핸드폰, 휴대폰, 스마트폰], ...]
+
+function _loadNgSynonyms() {
+  try { _ngSynonyms = JSON.parse(localStorage.getItem(NG_SYNONYM_KEY) || '[]') || []; }
+  catch (_) { _ngSynonyms = []; }
+}
+function _saveNgSynonyms() {
+  try { localStorage.setItem(NG_SYNONYM_KEY, JSON.stringify(_ngSynonyms)); } catch (_) {}
+}
+
+function _renderNgSynonyms() {
+  const el = document.getElementById('src-ng-synonyms-list');
+  if (!el) return;
+  if (!_ngSynonyms.length) {
+    el.innerHTML = '<span class="text-[11px] text-brand-gray italic">등록된 동의어 그룹이 없습니다.</span>';
+    return;
+  }
+  el.innerHTML = _ngSynonyms.map((g, i) =>
+    `<span class="inline-flex items-center gap-2 bg-white border border-brand-blue rounded-full px-3 py-1 text-xs font-bold text-brand-blue">
+      ${g.map(s => escHtml(s)).join(' = ')}
+      <button onclick="removeNgSynonym(${i})" class="text-brand-pink hover:opacity-70 text-sm leading-none" title="삭제">×</button>
+    </span>`
+  ).join('');
+}
+
+function addNgSynonym() {
+  const input = document.getElementById('src-ng-synonym-input');
+  const raw = (input?.value || '').trim();
+  if (!raw) return;
+  // = , ; 공백 어느걸로 구분해도 OK
+  const parts = raw.split(/[=,;\s]+/).map(s => s.trim()).filter(Boolean);
+  if (parts.length < 2) {
+    showAppAlert('동의어 형식', '예: "핸드폰 = 휴대폰" 또는 "핸드폰, 휴대폰, 스마트폰" (단어 2개 이상)', { type: 'info' });
+    return;
+  }
+  const sig = parts.slice().sort().join('|');
+  if (_ngSynonyms.some(g => g.slice().sort().join('|') === sig)) {
+    showAppAlert('이미 등록됨', '동일한 단어 조합의 동의어 그룹이 이미 있어요.', { type: 'info' });
+    return;
+  }
+  _ngSynonyms.push(parts);
+  _saveNgSynonyms();
+  _renderNgSynonyms();
+  if (input) input.value = '';
+}
+
+function removeNgSynonym(idx) {
+  _ngSynonyms.splice(idx, 1);
+  _saveNgSynonyms();
+  _renderNgSynonyms();
+}
+
+// 키워드를 동의어 그룹의 대표어(첫 단어)로 통일 → 정규형 반환
+function _ngCanonicalize(kw) {
+  let out = kw;
+  for (const group of _ngSynonyms) {
+    if (!group || group.length < 2) continue;
+    // 길이 긴 단어부터 치환 (짧은 단어가 긴 단어의 부분문자열일 때 안전)
+    const sorted = group.slice().sort((a, b) => b.length - a.length);
+    const canonical = group[0];
+    for (const syn of sorted) {
+      if (syn === canonical) continue;
+      out = out.split(syn).join(canonical);
+    }
+  }
+  return out;
+}
+
+// 동의어 그룹 기준으로 dedup — 같은 정규형끼리 묶고 그룹 내 검색수 최댓값 row 만 유지
+function _ngDedupBySynonyms(rows) {
+  if (!_ngSynonyms.length) return rows;
+  const byCanon = new Map();
+  for (const r of rows) {
+    const canon = _ngCanonicalize(r.kw.replace(/\s+/g, ''));
+    const existing = byCanon.get(canon);
+    if (!existing || r.cnt > existing.cnt) byCanon.set(canon, r);
+  }
+  return [...byCanon.values()].sort((a, b) => b.cnt - a.cnt);
+}
+
 function _srcNgGenerateName(rowsIn, maxLen) {
   if (!rowsIn || !rowsIn.length) return { name: '', tokens: [] };
   // 입력 셀을 검색수 내림차순으로 정렬해 그대로 사용 (셀 자체가 단위)
@@ -7514,11 +7612,13 @@ function _srcNgGenerateName(rowsIn, maxLen) {
 
 function runSrcNgProcess() {
   const text = document.getElementById('src-ng-input')?.value || '';
-  const rows = _srcNgParseInput(text);
-  if (!rows.length) {
+  const rawRows = _srcNgParseInput(text);
+  if (!rawRows.length) {
     showAppAlert('입력된 데이터가 없어요', '엑셀에서 "키워드"와 "총 검색수" 두 열을 함께 복사해서 붙여넣어주세요.', { type: 'info' });
     return;
   }
+  const rows = _ngDedupBySynonyms(rawRows);
+  const mergedCount = rawRows.length - rows.length;
   const maxLen = Math.max(10, Math.min(200, parseInt(document.getElementById('src-ng-maxlen')?.value || '50', 10) || 50));
   const result = _srcNgGenerateName(rows, maxLen);
   const section = document.getElementById('src-ng-result-section');
@@ -7528,7 +7628,10 @@ function runSrcNgProcess() {
   const lenEl = document.getElementById('src-ng-namelen');
   if (lenEl) lenEl.textContent = `${result.name.length}자 / 최대 ${maxLen}자`;
   const tcEl = document.getElementById('src-ng-tokencount');
-  if (tcEl) tcEl.textContent = `단어 ${result.tokens.length}개 · 전체 키워드 ${rows.length}개 분석`;
+  if (tcEl) {
+    const dedupNote = mergedCount > 0 ? ` · 동의어 처리로 ${mergedCount}건 통합` : '';
+    tcEl.textContent = `단어 ${result.tokens.length}개 · 전체 키워드 ${rawRows.length}개 분석${dedupNote}`;
+  }
   const tbody = document.getElementById('src-ng-tokens');
   if (tbody) {
     tbody.innerHTML = result.tokens.map((t, i) => `<tr class="border-b border-brand-border">
