@@ -5019,7 +5019,7 @@ PBT키캡	1180
           <div class="bg-brand-bg rounded-xl p-3 flex items-center gap-4 text-xs flex-wrap">
             <label class="flex items-center gap-2">
               <span class="font-bold text-brand-black">최대 글자수</span>
-              <input type="number" id="src-ng-maxlen" value="200" min="10" max="500" class="w-16 px-2 py-1 rounded border border-brand-border bg-white focus:outline-none focus:border-brand-black">
+              <input type="number" id="src-ng-maxlen" value="50" min="10" max="500" class="w-16 px-2 py-1 rounded border border-brand-border bg-white focus:outline-none focus:border-brand-black">
               <span class="text-brand-gray">자</span>
             </label>
             <span class="text-brand-gray leading-relaxed">검색수가 높은 키워드를 우선 고려하고, 단어 중복은 제거합니다.</span>
@@ -7608,18 +7608,10 @@ function _srcNgGenerateName(rowsIn, maxLen) {
     const cell = r.kw.replace(/\s+/g, '');
     if (!cell || cell.length < 2 || seen.has(cell)) continue;
 
-    // (a) 이미 채택된 어떤 셀에 cell 이 통째로 포함됨 → skip (정보 없음)
-    if (picked.some(p => p.cell.includes(cell))) continue;
+    // (a) cell 이 이미 채택된 어떤 셀과 완전히 같으면 skip (단순 중복만 차단)
+    if (picked.some(p => p.cell === cell)) continue;
 
-    // (b) cell 이 이미 채택된 더 짧은 셀(들)을 통째로 포함 → 그 짧은 셀들을 cell 이 흡수
-    for (let j = picked.length - 1; j >= 0; j--) {
-      if (cell.includes(picked[j].cell)) {
-        seen.delete(picked[j].cell);
-        picked.splice(j, 1);
-      }
-    }
-
-    // (c) 새 글자 검사 — picked 의 모든 글자 합집합에 없는 글자가 1개 이상이어야 추가
+    // (b) 새 글자 검사 — picked 의 모든 글자 합집합에 없는 글자가 1개 이상이어야 추가
     const allChars = new Set();
     picked.forEach(p => { for (const c of p.cell) allChars.add(c); });
     const newCount = [...cell].filter(c => !allChars.has(c)).length;
@@ -7691,7 +7683,7 @@ function runSrcNgProcess() {
   }
   const rows = _ngDedupBySynonyms(rawRows);
   const mergedCount = rawRows.length - rows.length;
-  const maxLen = Math.max(10, Math.min(500, parseInt(document.getElementById('src-ng-maxlen')?.value || '200', 10) || 200));
+  const maxLen = Math.max(10, Math.min(500, parseInt(document.getElementById('src-ng-maxlen')?.value || '50', 10) || 50));
   const result = _srcNgGenerateName(rows, maxLen);
   const section = document.getElementById('src-ng-result-section');
   if (section) section.classList.remove('hidden');
