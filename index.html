@@ -7481,96 +7481,108 @@ function _srcNgUpdateCount() {
   if (el) el.textContent = `${rows.length}개`;
 }
 
+// 자주 쓰이는 제품 명사 (anchor 분리 시 사용) — 끝나면 그 앞에서 split
+const _NG_PRODUCT_TAILS = [
+  '거치대','받침대','받침','스탠드','케이스','커버','가방','파우치','박스','패드','필름','홀더',
+  '의자','쿠션','베개','매트','러그','카펫','테이블','책상','램프','거울','집게','걸이','고리','벨트',
+  '클립','캡','뚜껑','마개','마운트','브라켓','선반','수납함','정리함','보관함','케이블','충전기','전선'
+];
+
 function _srcNgGenerateName(rowsIn, maxLen) {
   if (!rowsIn || !rowsIn.length) return { name: '', tokens: [] };
   const rows = rowsIn.slice().sort((a, b) => b.cnt - a.cnt);
+  // 분석 대상: 상위 80개 키워드 (공백 제거)
+  const ks = rows.slice(0, 80).map(r => ({ kw: r.kw.replace(/\s+/g, ''), cnt: r.cnt }));
 
-  // 1) 모든 키워드의 2~5자 부분문자열을 모아 → "≥2 키워드에서 등장하는" 것만 후보
-  const subToKws = {}; // 부분문자열 → 등장 키워드 인덱스 Set
-  rows.forEach((r, idx) => {
-    const noSp = r.kw.replace(/\s+/g, '');
-    const seen = new Set();
-    const maxSub = Math.min(5, noSp.length);
-    for (let len = 2; len <= maxSub; len++) {
-      for (let i = 0; i + len <= noSp.length; i++) {
-        const s = noSp.substr(i, len);
-        if (seen.has(s)) continue;
-        seen.add(s);
-        if (!subToKws[s]) subToKws[s] = new Set();
-        subToKws[s].add(idx);
+  // 도우미: 어떤 부분문자열을 포함한 키워드 집합 / 점수합
+  const cScore = (s) => { let n = 0; for (const k of ks) if (k.kw.includes(s)) n += k.cnt; return n; };
+  const cKws   = (s) => { const set = new Set(); ks.forEach((k, i) => { if (k.kw.includes(s)) set.add(i); }); return set; };
+
+  // 1) Anchor 선정 — '입력 키워드 중' 다른 키워드에 substring 으로 자주 등장하는 것
+  //    점수: 포함횟수(상한 5) 우선 × 길이 가산 → 짧은 fragment 가 anchor 가 되는 것을 방지
+  let anchor = null, anchorScore = -1;
+  for (const cand of ks) {
+    if (cand.kw.length < 3) continue;
+    let containCount = 0;
+    for (const o of ks) {
+      if (o === cand) continue;
+      if (o.kw.includes(cand.kw)) containCount++;
+    }
+    if (containCount < 2) continue;
+    const score = Math.min(containCount, 5) * 100000 + cand.kw.length * 10000 + cand.cnt;
+    if (score > anchorScore) { anchor = cand.kw; anchorScore = score; }
+  }
+
+  // Anchor 없으면 최상위 키워드 그대로 반환
+  if (!anchor) {
+    const top = rows[0];
+    const name = top.kw.length > maxLen ? top.kw.substring(0, maxLen) : top.kw;
+    return { name, tokens: [{ tok: top.kw, score: top.cnt, kws: new Set([0]) }] };
+  }
+
+  // 2) Anchor 분리 — 알려진 제품 명사(거치대/케이스 등)로 끝나면 그 앞에서 자연 분리
+  let anchorSplit = [anchor];
+  for (const tail of _NG_PRODUCT_TAILS) {
+    if (anchor.endsWith(tail) && anchor.length > tail.length + 1) {
+      const head = anchor.substring(0, anchor.length - tail.length);
+      if (head.length >= 2) { anchorSplit = [head, tail]; break; }
+    }
+  }
+
+  // 3) Anchor 포함 키워드에서 prefix/suffix 추출 (길이 ≥2). fragment 가 아닌 실제 차분.
+  const prefScore = {}, sufScore = {};
+  for (const k of ks) {
+    const idx = k.kw.indexOf(anchor);
+    if (idx < 0) continue;
+    const pre = k.kw.substring(0, idx);
+    const suf = k.kw.substring(idx + anchor.length);
+    if (pre.length >= 2) prefScore[pre] = (prefScore[pre] || 0) + k.cnt;
+    if (suf.length >= 2) sufScore[suf] = (sufScore[suf] || 0) + k.cnt;
+  }
+
+  // 4) 정렬 + substring 중복 제거 (포함관계면 점수 높은 것 유지)
+  const dedup = (scores) => {
+    const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+    const out = [];
+    for (const [tok, sc] of sorted) {
+      let redundant = false;
+      for (const o of out) {
+        if (o.tok === tok || o.tok.includes(tok) || tok.includes(o.tok)) { redundant = true; break; }
       }
+      if (!redundant) out.push({ tok, score: sc });
     }
-  });
+    return out;
+  };
+  let prefs = dedup(prefScore);
+  let sufs  = dedup(sufScore);
 
-  // 2) 점수 계산 (포함 키워드 검색수 합), ≥2 키워드 등장 필수
-  const subScore = {};
-  for (const sub in subToKws) {
-    if (subToKws[sub].size < 2) continue;
-    let s = 0;
-    subToKws[sub].forEach(idx => { s += rows[idx].cnt; });
-    subScore[sub] = s;
-  }
-
-  // 3) 부분문자열 중 더 긴 토큰이 충분한 점수면 짧은 것을 흡수 (포함관계 제거)
-  const sorted = Object.keys(subScore).sort((a, b) => subScore[b] - subScore[a]);
-  const tokens = []; // {tok, score, kws}
-  for (const sub of sorted) {
-    let redundant = false;
-    for (const t of tokens) {
-      if (t.tok === sub) { redundant = true; break; }
-      // 기존 토큰이 sub 를 포함하고 점수도 충분 → sub 는 중복
-      if (t.tok.includes(sub) && t.score >= subScore[sub] * 0.7) { redundant = true; break; }
-    }
-    if (redundant) continue;
-    // sub 가 기존 토큰을 흡수 (sub 가 더 길고 점수도 충분)
-    for (let i = tokens.length - 1; i >= 0; i--) {
-      if (sub.includes(tokens[i].tok) && subScore[sub] >= tokens[i].score * 0.7) {
-        tokens.splice(i, 1);
-      }
-    }
-    tokens.push({ tok: sub, score: subScore[sub], kws: subToKws[sub] });
-  }
-
-  // 4) 동의어(같은 자리에 들어가는 대안) 정리 — 어떤 키워드에서도 함께 등장하지 않으면 대안으로 판단, 점수 높은 것만 유지
-  tokens.sort((a, b) => b.score - a.score);
-  const final = [];
-  for (const t of tokens) {
-    let isAlternative = false;
-    for (const f of final) {
-      const coOccur = [...t.kws].some(idx => f.kws.has(idx));
-      if (!coOccur) { isAlternative = true; break; }
-    }
-    if (!isAlternative) final.push(t);
-  }
-
-  // 5) 자연 순서 정렬 — 최종 토큰을 가장 많이 포함한 키워드 기준 (동률이면 검색수 큰 쪽)
-  let bestKw = null, bestMatch = -1, bestCnt = -1;
-  for (const r of rows) {
-    const ns = r.kw.replace(/\s+/g, '');
-    const match = final.filter(t => ns.includes(t.tok)).length;
-    if (match > bestMatch || (match === bestMatch && r.cnt > bestCnt)) {
-      bestMatch = match; bestKw = ns; bestCnt = r.cnt;
-    }
-  }
-  if (bestKw) {
-    final.sort((a, b) => {
-      const ia = bestKw.indexOf(a.tok);
-      const ib = bestKw.indexOf(b.tok);
-      if (ia === -1 && ib === -1) return b.score - a.score;
-      if (ia === -1) return 1;
-      if (ib === -1) return -1;
-      return ia - ib;
+  // 5) 동의어(같은 자리 대안) 필터 — #1 토큰과 같은 키워드에서 함께 등장한 적 없으면 drop
+  const filterAlts = (arr) => {
+    if (arr.length <= 1) return arr;
+    const top1Kws = cKws(arr[0].tok);
+    return arr.filter((t, i) => {
+      if (i === 0) return true;
+      const tKws = cKws(t.tok);
+      return [...tKws].some(idx => top1Kws.has(idx));
     });
-  }
+  };
+  prefs = filterAlts(prefs);
+  sufs  = filterAlts(sufs);
 
-  // 6) maxLen 안에서 공백으로 이어붙이기
+  // 6) 조립: prefix → anchorSplit → suffix
+  const parts = [];
+  prefs.forEach(p => parts.push({ tok: p.tok, score: p.score, kws: cKws(p.tok) }));
+  anchorSplit.forEach(p => parts.push({ tok: p, score: cScore(p), kws: cKws(p) }));
+  sufs.forEach(s => parts.push({ tok: s.tok, score: s.score, kws: cKws(s.tok) }));
+
+  // 7) maxLen 안에서 공백으로 이어붙임 (들어가지 않는 토큰은 skip 하고 다음 후보 시도)
   let name = '';
   const used = [];
-  for (const t of final) {
-    const c = name ? `${name} ${t.tok}` : t.tok;
-    if (c.length > maxLen) break;
-    name = c;
-    used.push(t);
+  for (const p of parts) {
+    const cand = name ? `${name} ${p.tok}` : p.tok;
+    if (cand.length > maxLen) continue;
+    name = cand;
+    used.push(p);
   }
   return { name, tokens: used };
 }
