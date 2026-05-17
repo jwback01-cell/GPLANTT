@@ -7608,10 +7608,18 @@ function _srcNgGenerateName(rowsIn, maxLen) {
     const cell = r.kw.replace(/\s+/g, '');
     if (!cell || cell.length < 2 || seen.has(cell)) continue;
 
-    // (a) cell 이 이미 채택된 어떤 셀과 완전히 같으면 skip (단순 중복만 차단)
-    if (picked.some(p => p.cell === cell)) continue;
+    // (a) 이미 채택된 어떤 셀에 cell 이 통째로 포함됨 → skip (짧은 셀은 긴 셀 안에 흡수)
+    if (picked.some(p => p.cell.includes(cell))) continue;
 
-    // (b) 새 글자 검사 — picked 의 모든 글자 합집합에 없는 글자가 1개 이상이어야 추가
+    // (b) cell 이 이미 채택된 더 짧은 셀(들)을 통째로 포함 → 그 짧은 셀들을 cell 이 흡수
+    for (let j = picked.length - 1; j >= 0; j--) {
+      if (cell.includes(picked[j].cell)) {
+        seen.delete(picked[j].cell);
+        picked.splice(j, 1);
+      }
+    }
+
+    // (c) 새 글자 검사 — picked 의 모든 글자 합집합에 없는 글자가 1개 이상이어야 추가
     const allChars = new Set();
     picked.forEach(p => { for (const c of p.cell) allChars.add(c); });
     const newCount = [...cell].filter(c => !allChars.has(c)).length;
@@ -7619,6 +7627,44 @@ function _srcNgGenerateName(rowsIn, maxLen) {
 
     picked.push({ cell, score: r.cnt, idx: i });
     seen.add(cell);
+  }
+
+  // 1.5단계: 겹치는 셀 합치기 — A의 뒤꼬리 ≥3자가 B의 머리와 같으면 A+B[overlap:] 으로 병합
+  //  예) 침대핸드폰거치대 + 핸드폰거치대스탠드 → 침대핸드폰거치대스탠드
+  let mChanged = true;
+  while (mChanged) {
+    mChanged = false;
+    let bestA = -1, bestB = -1, bestOv = 2;
+    for (let i = 0; i < picked.length; i++) {
+      for (let j = 0; j < picked.length; j++) {
+        if (i === j) continue;
+        const A = picked[i].cell, B = picked[j].cell;
+        const maxOv = Math.min(A.length, B.length) - 1;
+        for (let len = maxOv; len > bestOv; len--) {
+          if (A.endsWith(B.substring(0, len))) {
+            bestA = i; bestB = j; bestOv = len;
+            break;
+          }
+        }
+      }
+    }
+    if (bestA >= 0 && bestB >= 0) {
+      const A = picked[bestA], B = picked[bestB];
+      const merged = {
+        cell: A.cell + B.cell.substring(bestOv),
+        score: Math.max(A.score, B.score),
+        idx: A.idx,
+      };
+      const next = [];
+      for (let k = 0; k < picked.length; k++) {
+        if (k === bestA) next.push(merged);
+        else if (k === bestB) continue;
+        else next.push(picked[k]);
+      }
+      picked.length = 0;
+      next.forEach(p => picked.push(p));
+      mChanged = true;
+    }
   }
 
   // 2단계: 채택된 셀을 최대 글자수 안에서 공백으로 잇기
