@@ -4755,6 +4755,7 @@ tailwind.config = {
       <div class="border-b border-brand-border flex gap-5 px-1" style="padding-bottom:1px;">
         <button class="src-tab-btn tab-btn active" data-tab="product" onclick="switchSrcTab('product')">상품명</button>
         <button class="src-tab-btn tab-btn" data-tab="tag" onclick="switchSrcTab('tag')">검색태그</button>
+        <button class="src-tab-btn tab-btn" data-tab="namegen" onclick="switchSrcTab('namegen')">상품명 정제</button>
       </div>
 
       <!-- Panel: 상품명 -->
@@ -4998,6 +4999,76 @@ PBT키캡	1180
             </div>
             <!-- 태그 클라우드 -->
             <div id="src-tag-cloud" class="hidden flex flex-col"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel: 상품명 정제 (키워드 + 검색수 → 상품명 생성) -->
+      <div id="src-panel-namegen" class="hidden flex flex-col gap-6">
+        <div class="bg-white p-5 rounded-3xl panel flex flex-col gap-4">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-2">
+              <div class="w-1.5 h-5 bg-brand-blue rounded-full"></div>
+              <span class="font-bold text-sm">엑셀에서 '키워드'와 '총 검색수' 두 열을 복사해서 붙여넣기</span>
+              <span id="src-ng-count" class="text-[10px] font-bold text-brand-blue bg-brand-blue-light px-2 py-0.5 rounded-full">0개</span>
+            </div>
+            <button onclick="document.getElementById('src-ng-input').value='';_srcNgUpdateCount();" class="text-xs font-bold text-brand-gray hover:text-brand-black">지우기</button>
+          </div>
+          <textarea id="src-ng-input" oninput="_srcNgUpdateCount()" class="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-xs font-mono focus:outline-none focus:border-brand-black resize-y h-48" placeholder="예)&#10;핸드폰거치대	29370&#10;휴대폰거치대	20400&#10;침대핸드폰거치대	8490&#10;스마트폰거치대	6490&#10;..."></textarea>
+
+          <div class="bg-brand-bg rounded-xl p-3 flex items-center gap-4 text-xs flex-wrap">
+            <label class="flex items-center gap-2">
+              <span class="font-bold text-brand-black">최대 글자수</span>
+              <input type="number" id="src-ng-maxlen" value="50" min="10" max="200" class="w-16 px-2 py-1 rounded border border-brand-border bg-white focus:outline-none focus:border-brand-black">
+              <span class="text-brand-gray">자</span>
+            </label>
+            <span class="text-brand-gray leading-relaxed">검색수가 높은 키워드를 우선 고려하고, 단어 중복은 제거합니다.</span>
+          </div>
+
+          <button onclick="runSrcNgProcess()" class="w-full bg-brand-blue text-white py-3 rounded-xl font-bold text-sm hover:opacity-90 flex items-center justify-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            상품명 만들기
+          </button>
+        </div>
+
+        <!-- 결과 -->
+        <div id="src-ng-result-section" class="hidden bg-white rounded-3xl panel flex flex-col overflow-hidden">
+          <div class="flex justify-between items-center p-5 pb-3 flex-wrap gap-2">
+            <div class="flex items-center gap-3">
+              <div class="w-2 h-6 bg-brand-blue rounded-full"></div>
+              <h2 class="text-[1.2rem] font-bold">생성된 상품명</h2>
+            </div>
+            <button onclick="copySrcNgName()" class="px-3 py-1.5 rounded-full bg-white border border-brand-border text-xs font-semibold hover:bg-brand-bg flex items-center gap-1.5">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              복사
+            </button>
+          </div>
+          <div class="px-5 pb-5">
+            <div id="src-ng-name" class="bg-brand-bg border-2 border-brand-blue rounded-xl px-5 py-5 text-xl font-bold text-brand-black break-all"></div>
+            <div class="mt-2 flex items-center gap-3 text-xs text-brand-gray flex-wrap">
+              <span id="src-ng-namelen" class="font-bold"></span>
+              <span>·</span>
+              <span id="src-ng-tokencount"></span>
+            </div>
+            <details class="mt-4">
+              <summary class="cursor-pointer text-xs font-bold text-brand-gray hover:text-brand-black">사용된 단어 상세 (클릭해서 보기)</summary>
+              <div class="mt-3 overflow-x-auto">
+                <table class="w-full text-xs">
+                  <thead class="bg-brand-bg">
+                    <tr>
+                      <th class="px-3 py-2 text-left font-bold w-10">순서</th>
+                      <th class="px-3 py-2 text-left font-bold">단어</th>
+                      <th class="px-3 py-2 text-right font-bold">총 검색수 합</th>
+                      <th class="px-3 py-2 text-right font-bold">등장 키워드 수</th>
+                    </tr>
+                  </thead>
+                  <tbody id="src-ng-tokens"></tbody>
+                </table>
+              </div>
+              <div class="mt-3 text-[11px] text-brand-gray leading-relaxed">
+                ※ 토큰은 키워드 사이에 공통으로 등장하는 글자 묶음(2~5자)을 추출하여 검색수 합산으로 점수 매김. 같은 자리의 동의어(핸드폰/휴대폰/스마트폰 등)는 점수가 가장 높은 1개만 선택.
+              </div>
+            </details>
           </div>
         </div>
       </div>
@@ -7372,6 +7443,177 @@ function switchSrcTab(tab) {
   document.querySelectorAll('.src-tab-btn').forEach(b => { b.classList.toggle('active', b.dataset.tab === tab); });
   document.getElementById('src-panel-product').classList.toggle('hidden', tab !== 'product');
   document.getElementById('src-panel-tag').classList.toggle('hidden', tab !== 'tag');
+  const ng = document.getElementById('src-panel-namegen');
+  if (ng) ng.classList.toggle('hidden', tab !== 'namegen');
+}
+
+// ── 상품명 정제 (키워드+검색수 → 단일 상품명) ─────────────────
+function _srcNgParseInput(text) {
+  const lines = (text || '').split(/\r?\n/);
+  const rows = [];
+  for (const ln of lines) {
+    const trimmed = ln.trim();
+    if (!trimmed) continue;
+    // 헤더 라인 건너뛰기 ("키워드 총검색수" 등)
+    if (/^(키워드|keyword)/i.test(trimmed) && !/\d/.test(trimmed)) continue;
+    let parts;
+    if (trimmed.includes('\t')) parts = trimmed.split('\t');
+    else if (trimmed.includes(',')) parts = trimmed.split(',');
+    else parts = trimmed.split(/\s+/);
+    // 끝에서부터 숫자(검색수) 찾기
+    let cnt = 0, kw = '';
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = String(parts[i]).replace(/[,\s]/g, '');
+      if (/^\d+$/.test(p)) {
+        cnt = parseInt(p, 10);
+        kw = parts.slice(0, i).join(' ').replace(/\s+/g, ' ').trim();
+        break;
+      }
+    }
+    if (kw && cnt > 0) rows.push({ kw, cnt });
+  }
+  return rows;
+}
+
+function _srcNgUpdateCount() {
+  const rows = _srcNgParseInput(document.getElementById('src-ng-input')?.value || '');
+  const el = document.getElementById('src-ng-count');
+  if (el) el.textContent = `${rows.length}개`;
+}
+
+function _srcNgGenerateName(rowsIn, maxLen) {
+  if (!rowsIn || !rowsIn.length) return { name: '', tokens: [] };
+  const rows = rowsIn.slice().sort((a, b) => b.cnt - a.cnt);
+
+  // 1) 모든 키워드의 2~5자 부분문자열을 모아 → "≥2 키워드에서 등장하는" 것만 후보
+  const subToKws = {}; // 부분문자열 → 등장 키워드 인덱스 Set
+  rows.forEach((r, idx) => {
+    const noSp = r.kw.replace(/\s+/g, '');
+    const seen = new Set();
+    const maxSub = Math.min(5, noSp.length);
+    for (let len = 2; len <= maxSub; len++) {
+      for (let i = 0; i + len <= noSp.length; i++) {
+        const s = noSp.substr(i, len);
+        if (seen.has(s)) continue;
+        seen.add(s);
+        if (!subToKws[s]) subToKws[s] = new Set();
+        subToKws[s].add(idx);
+      }
+    }
+  });
+
+  // 2) 점수 계산 (포함 키워드 검색수 합), ≥2 키워드 등장 필수
+  const subScore = {};
+  for (const sub in subToKws) {
+    if (subToKws[sub].size < 2) continue;
+    let s = 0;
+    subToKws[sub].forEach(idx => { s += rows[idx].cnt; });
+    subScore[sub] = s;
+  }
+
+  // 3) 부분문자열 중 더 긴 토큰이 충분한 점수면 짧은 것을 흡수 (포함관계 제거)
+  const sorted = Object.keys(subScore).sort((a, b) => subScore[b] - subScore[a]);
+  const tokens = []; // {tok, score, kws}
+  for (const sub of sorted) {
+    let redundant = false;
+    for (const t of tokens) {
+      if (t.tok === sub) { redundant = true; break; }
+      // 기존 토큰이 sub 를 포함하고 점수도 충분 → sub 는 중복
+      if (t.tok.includes(sub) && t.score >= subScore[sub] * 0.7) { redundant = true; break; }
+    }
+    if (redundant) continue;
+    // sub 가 기존 토큰을 흡수 (sub 가 더 길고 점수도 충분)
+    for (let i = tokens.length - 1; i >= 0; i--) {
+      if (sub.includes(tokens[i].tok) && subScore[sub] >= tokens[i].score * 0.7) {
+        tokens.splice(i, 1);
+      }
+    }
+    tokens.push({ tok: sub, score: subScore[sub], kws: subToKws[sub] });
+  }
+
+  // 4) 동의어(같은 자리에 들어가는 대안) 정리 — 어떤 키워드에서도 함께 등장하지 않으면 대안으로 판단, 점수 높은 것만 유지
+  tokens.sort((a, b) => b.score - a.score);
+  const final = [];
+  for (const t of tokens) {
+    let isAlternative = false;
+    for (const f of final) {
+      const coOccur = [...t.kws].some(idx => f.kws.has(idx));
+      if (!coOccur) { isAlternative = true; break; }
+    }
+    if (!isAlternative) final.push(t);
+  }
+
+  // 5) 자연 순서 정렬 — 최종 토큰을 가장 많이 포함한 키워드 기준 (동률이면 검색수 큰 쪽)
+  let bestKw = null, bestMatch = -1, bestCnt = -1;
+  for (const r of rows) {
+    const ns = r.kw.replace(/\s+/g, '');
+    const match = final.filter(t => ns.includes(t.tok)).length;
+    if (match > bestMatch || (match === bestMatch && r.cnt > bestCnt)) {
+      bestMatch = match; bestKw = ns; bestCnt = r.cnt;
+    }
+  }
+  if (bestKw) {
+    final.sort((a, b) => {
+      const ia = bestKw.indexOf(a.tok);
+      const ib = bestKw.indexOf(b.tok);
+      if (ia === -1 && ib === -1) return b.score - a.score;
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+  }
+
+  // 6) maxLen 안에서 공백으로 이어붙이기
+  let name = '';
+  const used = [];
+  for (const t of final) {
+    const c = name ? `${name} ${t.tok}` : t.tok;
+    if (c.length > maxLen) break;
+    name = c;
+    used.push(t);
+  }
+  return { name, tokens: used };
+}
+
+function runSrcNgProcess() {
+  const text = document.getElementById('src-ng-input')?.value || '';
+  const rows = _srcNgParseInput(text);
+  if (!rows.length) {
+    showAppAlert('입력된 데이터가 없어요', '엑셀에서 "키워드"와 "총 검색수" 두 열을 함께 복사해서 붙여넣어주세요.', { type: 'info' });
+    return;
+  }
+  const maxLen = Math.max(10, Math.min(200, parseInt(document.getElementById('src-ng-maxlen')?.value || '50', 10) || 50));
+  const result = _srcNgGenerateName(rows, maxLen);
+  const section = document.getElementById('src-ng-result-section');
+  if (section) section.classList.remove('hidden');
+  const nameEl = document.getElementById('src-ng-name');
+  if (nameEl) nameEl.textContent = result.name || '(생성 가능한 결과 없음 — 키워드가 너무 적거나 공통 단어가 없습니다)';
+  const lenEl = document.getElementById('src-ng-namelen');
+  if (lenEl) lenEl.textContent = `${result.name.length}자 / 최대 ${maxLen}자`;
+  const tcEl = document.getElementById('src-ng-tokencount');
+  if (tcEl) tcEl.textContent = `단어 ${result.tokens.length}개 · 전체 키워드 ${rows.length}개 분석`;
+  const tbody = document.getElementById('src-ng-tokens');
+  if (tbody) {
+    tbody.innerHTML = result.tokens.map((t, i) => `<tr class="border-b border-brand-border">
+      <td class="px-3 py-2 text-brand-gray">${i + 1}</td>
+      <td class="px-3 py-2 font-bold text-brand-black">${escHtml(t.tok)}</td>
+      <td class="px-3 py-2 text-right">${t.score.toLocaleString('ko-KR')}</td>
+      <td class="px-3 py-2 text-right">${t.kws.size}</td>
+    </tr>`).join('');
+  }
+}
+
+function copySrcNgName() {
+  const n = document.getElementById('src-ng-name')?.textContent || '';
+  if (!n || n.startsWith('(')) {
+    showAppAlert('복사할 결과가 없어요', '먼저 "상품명 만들기" 를 눌러주세요.', { type: 'info' });
+    return;
+  }
+  navigator.clipboard.writeText(n).then(() => {
+    showAppAlert('복사 완료', '상품명이 클립보드에 복사되었습니다.', { type: 'success' });
+  }).catch(e => {
+    showAppAlert('복사 실패', String(e.message || e), { type: 'error' });
+  });
 }
 
 // ── 상품명 탭 ─────────────────────────────
