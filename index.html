@@ -7629,6 +7629,45 @@ function _srcNgGenerateName(rowsIn, maxLen) {
     seen.add(cell);
   }
 
+  // 1.5단계: 겹치는 셀 합치기 — A의 뒤꼬리 ≥3자가 B의 머리와 같으면 A+B[overlap:] 으로 병합
+  //  예) 침대핸드폰거치대 + 핸드폰거치대스탠드 → 침대핸드폰거치대스탠드
+  let changed = true;
+  while (changed) {
+    changed = false;
+    let bestA = -1, bestB = -1, bestOv = 2; // 최소 3자 겹쳐야 의미 있음
+    for (let i = 0; i < picked.length; i++) {
+      for (let j = 0; j < picked.length; j++) {
+        if (i === j) continue;
+        const A = picked[i].cell, B = picked[j].cell;
+        const maxOv = Math.min(A.length, B.length) - 1;
+        for (let len = maxOv; len > bestOv; len--) {
+          if (A.endsWith(B.substring(0, len))) {
+            bestA = i; bestB = j; bestOv = len;
+            break;
+          }
+        }
+      }
+    }
+    if (bestA >= 0 && bestB >= 0) {
+      const A = picked[bestA], B = picked[bestB];
+      const merged = {
+        cell: A.cell + B.cell.substring(bestOv),
+        score: Math.max(A.score, B.score),
+        idx: A.idx,
+      };
+      // bestA 자리에 merged, bestB 제거
+      const next = [];
+      for (let k = 0; k < picked.length; k++) {
+        if (k === bestA) next.push(merged);
+        else if (k === bestB) continue;
+        else next.push(picked[k]);
+      }
+      picked.length = 0;
+      next.forEach(p => picked.push(p));
+      changed = true;
+    }
+  }
+
   // 2단계: 채택된 셀을 최대 글자수 안에서 공백으로 잇기
   let name = '';
   const used = [];
