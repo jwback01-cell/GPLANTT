@@ -5019,7 +5019,7 @@ PBT키캡	1180
           <div class="bg-brand-bg rounded-xl p-3 flex items-center gap-4 text-xs flex-wrap">
             <label class="flex items-center gap-2">
               <span class="font-bold text-brand-black">최대 글자수</span>
-              <input type="number" id="src-ng-maxlen" value="50" min="10" max="200" class="w-16 px-2 py-1 rounded border border-brand-border bg-white focus:outline-none focus:border-brand-black">
+              <input type="number" id="src-ng-maxlen" value="100" min="10" max="200" class="w-16 px-2 py-1 rounded border border-brand-border bg-white focus:outline-none focus:border-brand-black">
               <span class="text-brand-gray">자</span>
             </label>
             <span class="text-brand-gray leading-relaxed">검색수가 높은 키워드를 우선 고려하고, 단어 중복은 제거합니다.</span>
@@ -7671,14 +7671,15 @@ function _srcNgGenerateName(rowsIn, maxLen) {
   // 2단계: 채택된 셀을 최대 글자수 안에서 공백으로 잇기
   let name = '';
   const used = [];
+  const dropped = [];
   for (const p of picked) {
     const cand = name ? `${name} ${p.cell}` : p.cell;
-    if (cand.length > maxLen) continue;
+    if (cand.length > maxLen) { dropped.push(p); continue; }
     name = cand;
     used.push({ tok: p.cell, score: p.score, kws: new Set([p.idx]) });
   }
 
-  return { name, tokens: used };
+  return { name, tokens: used, droppedCount: dropped.length };
 }
 
 function runSrcNgProcess() {
@@ -7690,7 +7691,7 @@ function runSrcNgProcess() {
   }
   const rows = _ngDedupBySynonyms(rawRows);
   const mergedCount = rawRows.length - rows.length;
-  const maxLen = Math.max(10, Math.min(200, parseInt(document.getElementById('src-ng-maxlen')?.value || '50', 10) || 50));
+  const maxLen = Math.max(10, Math.min(200, parseInt(document.getElementById('src-ng-maxlen')?.value || '100', 10) || 100));
   const result = _srcNgGenerateName(rows, maxLen);
   const section = document.getElementById('src-ng-result-section');
   if (section) section.classList.remove('hidden');
@@ -7701,7 +7702,8 @@ function runSrcNgProcess() {
   const tcEl = document.getElementById('src-ng-tokencount');
   if (tcEl) {
     const dedupNote = mergedCount > 0 ? ` · 동의어 처리로 ${mergedCount}건 통합` : '';
-    tcEl.textContent = `단어 ${result.tokens.length}개 · 전체 키워드 ${rawRows.length}개 분석${dedupNote}`;
+    const droppedNote = result.droppedCount > 0 ? ` · 글자수 부족으로 ${result.droppedCount}개 단어 못 담음 (최대 글자수를 늘려보세요)` : '';
+    tcEl.textContent = `단어 ${result.tokens.length}개 · 전체 키워드 ${rawRows.length}개 분석${dedupNote}${droppedNote}`;
   }
   const tbody = document.getElementById('src-ng-tokens');
   if (tbody) {
