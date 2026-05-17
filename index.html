@@ -5066,7 +5066,7 @@ PBT키캡	1180
                 </table>
               </div>
               <div class="mt-3 text-[11px] text-brand-gray leading-relaxed">
-                ※ 토큰은 키워드 사이에 공통으로 등장하는 글자 묶음(2~5자)을 추출하여 검색수 합산으로 점수 매김. 같은 자리의 동의어(핸드폰/휴대폰/스마트폰 등)는 점수가 가장 높은 1개만 선택.
+                ※ 메인 단어는 입력된 키워드 셀 중 다른 키워드들에 가장 자주 포함되는 것(예: 핸드폰거치대)으로 통째로 유지. 앞·뒤에 붙는 수식어(침대 / 스탠드 등)는 키워드 간 '차이'에서 자동 추출. 같은 자리의 동의어(핸드폰/휴대폰 등)는 점수 1위만 선택.
               </div>
             </details>
           </div>
@@ -7481,13 +7481,6 @@ function _srcNgUpdateCount() {
   if (el) el.textContent = `${rows.length}개`;
 }
 
-// 자주 쓰이는 제품 명사 (anchor 분리 시 사용) — 끝나면 그 앞에서 split
-const _NG_PRODUCT_TAILS = [
-  '거치대','받침대','받침','스탠드','케이스','커버','가방','파우치','박스','패드','필름','홀더',
-  '의자','쿠션','베개','매트','러그','카펫','테이블','책상','램프','거울','집게','걸이','고리','벨트',
-  '클립','캡','뚜껑','마개','마운트','브라켓','선반','수납함','정리함','보관함','케이블','충전기','전선'
-];
-
 function _srcNgGenerateName(rowsIn, maxLen) {
   if (!rowsIn || !rowsIn.length) return { name: '', tokens: [] };
   const rows = rowsIn.slice().sort((a, b) => b.cnt - a.cnt);
@@ -7520,14 +7513,8 @@ function _srcNgGenerateName(rowsIn, maxLen) {
     return { name, tokens: [{ tok: top.kw, score: top.cnt, kws: new Set([0]) }] };
   }
 
-  // 2) Anchor 분리 — 알려진 제품 명사(거치대/케이스 등)로 끝나면 그 앞에서 자연 분리
-  let anchorSplit = [anchor];
-  for (const tail of _NG_PRODUCT_TAILS) {
-    if (anchor.endsWith(tail) && anchor.length > tail.length + 1) {
-      const head = anchor.substring(0, anchor.length - tail.length);
-      if (head.length >= 2) { anchorSplit = [head, tail]; break; }
-    }
-  }
+  // 2) Anchor 는 키워드 셀 통째로 유지 (쪼개지 않음) — 사용자 요청
+  const anchorSplit = [anchor];
 
   // 3) Anchor 포함 키워드에서 prefix/suffix 추출 (길이 ≥2). fragment 가 아닌 실제 차분.
   const prefScore = {}, sufScore = {};
