@@ -8759,6 +8759,8 @@ function parseSrcTagJson() {
   if (!raw) { alert('JSON을 붙여넣어 주세요.'); return; }
 
   // manuTag 추출 — 엑셀 수식과 동일한 로직(정규식 매칭) 사용
+  // 제외 태그: 검색 의미 없는 배송/교환 안내성 태그
+  const EXCLUDE_TAGS = new Set(['오늘출발', '오늘발송', '무료교환', '무료반품', '무료교환반품', '무료반품교환']);
   const manuCount = {};
   const manuRe = /"manuTag"\s*:\s*"([^"]*)"/g;
   let m;
@@ -8767,7 +8769,8 @@ function parseSrcTagJson() {
     if (!val) continue;
     val.split(/[\s,\/|·]+/).filter(Boolean).forEach(t => {
       const tag = t.trim();
-      if (tag) manuCount[tag] = (manuCount[tag] || 0) + 1;
+      if (!tag || EXCLUDE_TAGS.has(tag)) return;
+      manuCount[tag] = (manuCount[tag] || 0) + 1;
     });
   }
   const manuTags = Object.entries(manuCount).sort((a, b) => b[1] - a[1]).map(([tag, count]) => ({ tag, count }));
