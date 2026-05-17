@@ -4755,6 +4755,7 @@ tailwind.config = {
       <div class="border-b border-brand-border flex gap-5 px-1" style="padding-bottom:1px;">
         <button class="src-tab-btn tab-btn active" data-tab="product" onclick="switchSrcTab('product')">상품명</button>
         <button class="src-tab-btn tab-btn" data-tab="tag" onclick="switchSrcTab('tag')">검색태그</button>
+        <button class="src-tab-btn tab-btn" data-tab="clean" onclick="switchSrcTab('clean')">상품명 정제</button>
       </div>
 
       <!-- Panel: 상품명 -->
@@ -4998,6 +4999,80 @@ PBT키캡	1180
             </div>
             <!-- 태그 클라우드 -->
             <div id="src-tag-cloud" class="hidden flex flex-col"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel: 상품명 정제 -->
+      <div id="src-panel-clean" class="hidden flex flex-col gap-6">
+        <!-- 입력 영역 -->
+        <div class="bg-white p-5 rounded-3xl panel flex flex-col gap-4">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-2">
+              <div class="w-1.5 h-5 bg-brand-blue rounded-full"></div>
+              <span class="font-bold text-sm">상품명 입력 (한 줄에 하나씩)</span>
+              <span id="src-clean-count" class="text-[10px] font-bold text-brand-blue bg-brand-blue-light px-2 py-0.5 rounded-full">0건</span>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="document.getElementById('src-clean-input').value=''; document.getElementById('src-clean-input').dispatchEvent(new Event('input'));" class="text-xs font-bold text-brand-gray hover:text-brand-black">지우기</button>
+            </div>
+          </div>
+          <textarea id="src-clean-input" oninput="_srcCleanUpdateCount()" class="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-xs font-mono focus:outline-none focus:border-brand-black resize-y h-40" placeholder="예) [당일출고] 빅픽 에어팟 헤드셋 잠금 케이스 프로2 화이트 (정품) 무료배송&#10;아이폰15 케이스 투명 강화 - 무료배송 오늘출발&#10;…"></textarea>
+
+          <!-- 옵션 -->
+          <div class="bg-brand-bg rounded-xl p-3 flex flex-col gap-2">
+            <div class="text-xs font-bold text-brand-black mb-1">정제 옵션</div>
+            <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs">
+              <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="src-clean-opt-bracket" checked class="w-3.5 h-3.5"><span>대괄호 [ ] 안 제거</span></label>
+              <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="src-clean-opt-paren" checked class="w-3.5 h-3.5"><span>소괄호 ( ) 안 제거</span></label>
+              <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="src-clean-opt-promo" checked class="w-3.5 h-3.5"><span>홍보 문구 제거</span></label>
+              <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="src-clean-opt-special" checked class="w-3.5 h-3.5"><span>특수문자 정리</span></label>
+              <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="src-clean-opt-space" checked class="w-3.5 h-3.5"><span>공백 정규화</span></label>
+              <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="src-clean-opt-dedup" class="w-3.5 h-3.5"><span>중복 제거</span></label>
+            </div>
+            <details class="mt-1">
+              <summary class="cursor-pointer text-xs text-brand-gray hover:text-brand-black">제거되는 홍보 문구 목록</summary>
+              <div class="mt-2 text-[11px] text-brand-gray leading-relaxed">
+                무료배송, 당일발송, 당일출고, 오늘출발, 오늘발송, 빠른배송, 무료반품, 무료교환, 정품, 정품보장, 공식, 공식판매, 신상, 신상품, 새상품, 신제품, 세일, 할인, 특가, 베스트, 인기, 가성비, 사은품증정, 사은품, 1+1, 1+2, 증정, 추천, 강추, 핫딜, 한정수량, 한정판매, 품절임박, 리뉴얼
+              </div>
+            </details>
+          </div>
+
+          <button onclick="runSrcCleanProcess()" class="w-full bg-brand-blue text-white py-3 rounded-xl font-bold text-sm hover:opacity-90 flex items-center justify-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            상품명 정제 실행
+          </button>
+        </div>
+
+        <!-- 결과 영역 -->
+        <div id="src-clean-result-section" class="hidden bg-white rounded-3xl panel flex flex-col overflow-hidden">
+          <div class="flex justify-between items-center p-5 pb-3 shrink-0 flex-wrap gap-2">
+            <div class="flex items-center gap-3">
+              <div class="w-2 h-6 bg-brand-blue rounded-full"></div>
+              <h2 class="text-[1.2rem] font-bold">정제 결과 <span id="src-clean-result-count" class="text-brand-blue">0</span>건</h2>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="copySrcCleanResult()" class="px-3 py-1.5 rounded-full bg-white border border-brand-border text-xs font-semibold hover:bg-brand-bg flex items-center gap-1.5">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                전체 복사
+              </button>
+              <button onclick="exportSrcCleanExcel()" class="px-3 py-1.5 rounded-full bg-white border border-brand-border text-xs font-semibold hover:bg-brand-bg flex items-center gap-1.5">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                엑셀
+              </button>
+            </div>
+          </div>
+          <div class="px-5 pb-5 overflow-x-auto">
+            <table class="w-full text-xs">
+              <thead class="bg-brand-bg">
+                <tr>
+                  <th class="px-3 py-2 text-left font-bold w-10">#</th>
+                  <th class="px-3 py-2 text-left font-bold">원본</th>
+                  <th class="px-3 py-2 text-left font-bold">정제 후</th>
+                </tr>
+              </thead>
+              <tbody id="src-clean-result-body"></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -7372,6 +7447,124 @@ function switchSrcTab(tab) {
   document.querySelectorAll('.src-tab-btn').forEach(b => { b.classList.toggle('active', b.dataset.tab === tab); });
   document.getElementById('src-panel-product').classList.toggle('hidden', tab !== 'product');
   document.getElementById('src-panel-tag').classList.toggle('hidden', tab !== 'tag');
+  document.getElementById('src-panel-clean').classList.toggle('hidden', tab !== 'clean');
+}
+
+// ── 상품명 정제 ─────────────────────────────
+const _SRC_CLEAN_PROMO = [
+  '무료배송','당일발송','당일출고','오늘출발','오늘발송','오늘출고','빠른배송','로켓배송','특급배송',
+  '무료반품','무료교환','무료반품교환','반품무료','교환무료',
+  '정품','정품보장','정품인증','공식','공식판매','공식판매점','공식대리점','공식수입',
+  '신상','신상품','새상품','신제품','리뉴얼',
+  '세일','할인','특가','초특가','초저가','파격특가','폭탄세일','가격인하',
+  '베스트','베스트셀러','인기','인기상품','가성비','가심비',
+  '사은품증정','사은품','선물증정','증정','1+1','1+2','2+1',
+  '추천','강추','핫딜','한정수량','한정판매','품절임박','마감임박','오늘만',
+  'best','BEST','NEW','new','HOT','hot','SALE','sale'
+];
+let _srcCleanLast = []; // [{idx, before, after}]
+
+function _srcCleanUpdateCount() {
+  const ta = document.getElementById('src-clean-input');
+  const lines = (ta?.value || '').split('\n').map(s => s.trim()).filter(Boolean);
+  const el = document.getElementById('src-clean-count');
+  if (el) el.textContent = `${lines.length}건`;
+}
+
+function _srcCleanOne(raw) {
+  let s = String(raw || '');
+  const optBracket = document.getElementById('src-clean-opt-bracket')?.checked;
+  const optParen   = document.getElementById('src-clean-opt-paren')?.checked;
+  const optPromo   = document.getElementById('src-clean-opt-promo')?.checked;
+  const optSpecial = document.getElementById('src-clean-opt-special')?.checked;
+  const optSpace   = document.getElementById('src-clean-opt-space')?.checked;
+  // 대괄호 [ ] 〔 〕 【 】
+  if (optBracket) s = s.replace(/[\[〔【][^\]〕】]*[\]〕】]/g, ' ');
+  // 소괄호 ( ) （ ）
+  if (optParen)   s = s.replace(/[\(（][^\)）]*[\)）]/g, ' ');
+  // 홍보 문구 — 단어 경계가 한글에선 모호하므로 단순 치환
+  if (optPromo) {
+    _SRC_CLEAN_PROMO.forEach(w => {
+      // 영문은 단어 경계, 한글은 그냥 substring
+      if (/^[a-zA-Z]+$/.test(w)) {
+        s = s.replace(new RegExp('\\b' + w + '\\b', 'g'), ' ');
+      } else {
+        s = s.split(w).join(' ');
+      }
+    });
+  }
+  // 특수문자 — 한글/영문/숫자/공백/하이픈/슬래시/콤마/플러스만 남김
+  if (optSpecial) s = s.replace(/[^가-힯ㄱ-ㆎa-zA-Z0-9\s\-\/,+]/g, ' ');
+  // 공백 정규화
+  if (optSpace) s = s.replace(/\s+/g, ' ').trim();
+  return s;
+}
+
+function runSrcCleanProcess() {
+  const ta = document.getElementById('src-clean-input');
+  const lines = (ta?.value || '').split('\n').map(s => s.trim()).filter(Boolean);
+  if (!lines.length) {
+    showAppAlert('정제할 상품명이 없어요', '위 입력란에 상품명을 한 줄에 하나씩 붙여넣어주세요.', { type: 'info' });
+    return;
+  }
+  const dedup = document.getElementById('src-clean-opt-dedup')?.checked;
+  let results = lines.map((raw, i) => ({ idx: i + 1, before: raw, after: _srcCleanOne(raw) }));
+  if (dedup) {
+    const seen = new Set();
+    results = results.filter(r => {
+      if (!r.after) return false;
+      if (seen.has(r.after)) return false;
+      seen.add(r.after);
+      return true;
+    });
+    // 인덱스 재부여
+    results.forEach((r, i) => r.idx = i + 1);
+  }
+  _srcCleanLast = results;
+  const section = document.getElementById('src-clean-result-section');
+  const body    = document.getElementById('src-clean-result-body');
+  const countEl = document.getElementById('src-clean-result-count');
+  if (section) section.classList.remove('hidden');
+  if (countEl) countEl.textContent = results.length.toLocaleString('ko-KR');
+  if (body) {
+    body.innerHTML = results.map(r => {
+      const changed = r.before !== r.after;
+      return `<tr class="border-b border-brand-border">
+        <td class="px-3 py-2 text-brand-gray align-top">${r.idx}</td>
+        <td class="px-3 py-2 text-brand-gray align-top break-all">${escHtml(r.before)}</td>
+        <td class="px-3 py-2 align-top break-all ${changed ? 'text-brand-black font-semibold' : 'text-brand-gray'}">${escHtml(r.after || '(빈 결과)')}</td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+function copySrcCleanResult() {
+  if (!_srcCleanLast.length) {
+    showAppAlert('복사할 결과가 없어요', '먼저 "상품명 정제 실행" 을 눌러주세요.', { type: 'info' });
+    return;
+  }
+  const text = _srcCleanLast.map(r => r.after).join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    showAppAlert('복사 완료', `${_srcCleanLast.length}건의 정제된 상품명이 클립보드에 복사되었습니다.`, { type: 'success' });
+  }).catch(e => {
+    showAppAlert('복사 실패', String(e.message || e), { type: 'error' });
+  });
+}
+
+function exportSrcCleanExcel() {
+  if (!_srcCleanLast.length) {
+    showAppAlert('내보낼 결과가 없어요', '먼저 "상품명 정제 실행" 을 눌러주세요.', { type: 'info' });
+    return;
+  }
+  const data = [['#', '원본', '정제 후']];
+  _srcCleanLast.forEach(r => data.push([r.idx, r.before, r.after]));
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{ wch: 6 }, { wch: 60 }, { wch: 60 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '상품명 정제');
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+  XLSX.writeFile(wb, `GPLAN_상품명정제_${_srcCleanLast.length}건_${dateStr}.xlsx`);
 }
 
 // ── 상품명 탭 ─────────────────────────────
