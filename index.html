@@ -5477,9 +5477,11 @@ async function gplanCloudPullAll() {
       console.warn('[cloud-pull] error', error); return 0;
     }
     let pulled = 0;
+    const pulledKeys = new Set();
     for (const row of (data || [])) {
       if (!GPLAN_SYNC_KEYS.includes(row.key)) continue;
       if (row.data == null) continue;
+      pulledKeys.add(row.key);
       try {
         const s = (typeof row.data === 'string') ? row.data : JSON.stringify(row.data);
         // 원본 setItem 사용 (PUSH 트리거 방지)
@@ -5489,6 +5491,20 @@ async function gplanCloudPullAll() {
     }
     _gplanCloudReady = true;
     console.log('[cloud-sync] pulled', pulled, 'keys');
+    // PULL 후 — 클라우드에 없지만 로컬에는 있는 키는 첫 PUSH 트리거 (예: 동기화 키가 새로 추가된 경우)
+    for (const key of GPLAN_SYNC_KEYS) {
+      if (pulledKeys.has(key)) continue;
+      const localRaw = localStorage.getItem(key);
+      if (localRaw == null) continue;
+      // 빈 배열/객체는 무의미하므로 skip
+      try {
+        const p = JSON.parse(localRaw);
+        if (Array.isArray(p) && p.length === 0) continue;
+        if (p && typeof p === 'object' && Object.keys(p).length === 0) continue;
+      } catch (_) {}
+      console.log('[cloud-sync] cloud missing', key, '— initial PUSH');
+      _gplanCloudPushKey(key);
+    }
     // PULL 완료 후 매출장부가 이미 열려있다면 활성 탭 재렌더링 (광고비 포함 모든 데이터 반영)
     try { if (typeof _refreshActiveLedgerTab === 'function') _refreshActiveLedgerTab(); } catch (_) {}
     // 계정 보관함도 PULL 받은 데이터로 다시 렌더 (다른 PC 에서 추가한 계정 반영)
