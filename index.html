@@ -2233,6 +2233,10 @@ tailwind.config = {
     <!-- Footer -->
     <div class="p-6 pt-4 border-t border-brand-border flex gap-3 shrink-0">
       <button onclick="closeAddTodoModal()" class="flex-1 py-3.5 rounded-full border border-brand-border font-semibold text-sm hover:bg-brand-bg transition-colors">취소</button>
+      <button id="todo-modal-complete" onclick="completeTodoFromModal()" class="hidden flex-1 py-3.5 rounded-full bg-brand-green text-white font-bold text-sm hover:opacity-90 transition-all shadow-md flex items-center justify-center gap-1.5">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        완료 처리
+      </button>
       <button onclick="submitTodoModal()" class="flex-1 py-3.5 rounded-full bg-brand-black text-white font-bold text-sm hover:bg-[#333] hover:-translate-y-0.5 transition-all shadow-md">업무 추가</button>
     </div>
   </div>
@@ -10678,13 +10682,30 @@ let _repeatDows    = new Set([1]);  // 매주: 선택된 요일 (0=일 ~ 6=토)
 function _setModalMode(mode) {
   const h2  = document.querySelector('#todo-modal-backdrop h2');
   const sub = document.querySelector('#todo-modal-backdrop [onclick="submitTodoModal()"]');
+  const completeBtn = document.getElementById('todo-modal-complete');
   if (mode === 'edit') {
     if (h2)  { h2.textContent = '업무 수정'; }
     if (sub) sub.textContent = '수정 완료';
+    if (completeBtn) {
+      // 이미 완료된 업무면 완료 버튼 숨김
+      const item = _editingTodoId ? todos.find(t => t.id === _editingTodoId) : null;
+      if (item && !item.completed) completeBtn.classList.remove('hidden');
+      else completeBtn.classList.add('hidden');
+    }
   } else {
     if (h2)  { h2.textContent = '업무 추가 📋'; }
     if (sub) sub.textContent = '업무 추가';
+    if (completeBtn) completeBtn.classList.add('hidden');
   }
+}
+
+// 모달에서 '완료 처리' 클릭 — 현재 편집 중인 업무를 완료 상태로 전환
+function completeTodoFromModal() {
+  if (!_editingTodoId) return;
+  const id = _editingTodoId;
+  closeAddTodoModal();
+  // 약간의 지연 후 완료 처리 (모달 닫힘 애니메이션 후 confetti 표시)
+  setTimeout(() => { todoComplete(id); }, 50);
 }
 
 function openAddTodoModal(prefillDate) {
