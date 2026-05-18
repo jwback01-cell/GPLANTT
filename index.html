@@ -5459,6 +5459,7 @@ const GPLAN_SYNC_KEYS = [
   'gplan_naver_searchad_keys',      // 네이버 검색광고 API 키
   'gplan_playauto_key',             // 플레이오토 키
   'gplan_pa_auth',                  // 플레이오토 인증
+  'gplan_accounts_v1',              // 계정 보관함 (사이트별 ID·PW)
 ];
 let _gplanCloudReady = false;     // PULL 완료 전에는 PUSH 금지(다른 PC 데이터 덮어쓰기 방지)
 const _gplanPushTimers = {};
@@ -5490,6 +5491,14 @@ async function gplanCloudPullAll() {
     console.log('[cloud-sync] pulled', pulled, 'keys');
     // PULL 완료 후 매출장부가 이미 열려있다면 활성 탭 재렌더링 (광고비 포함 모든 데이터 반영)
     try { if (typeof _refreshActiveLedgerTab === 'function') _refreshActiveLedgerTab(); } catch (_) {}
+    // 계정 보관함도 PULL 받은 데이터로 다시 렌더 (다른 PC 에서 추가한 계정 반영)
+    try {
+      const list = document.getElementById('account-list');
+      if (list && typeof _loadAccountsFromStorage === 'function') {
+        list.innerHTML = '';
+        _loadAccountsFromStorage();
+      }
+    } catch (_) {}
     return pulled;
   } catch (e) { console.warn('[cloud-pull] failed', e); return 0; }
 }
