@@ -2087,9 +2087,8 @@ tailwind.config = {
           <div id="account-cat-btns" class="flex gap-2 overflow-x-auto pb-1 shrink-0">
             <button onclick="setAccountFilter('전체')"     class="account-cat-btn px-4 py-2.5 rounded-xl bg-brand-black text-white text-sm font-semibold whitespace-nowrap" data-cat="전체">전체</button>
             <button onclick="setAccountFilter('쇼핑몰')"   class="account-cat-btn px-4 py-2.5 rounded-xl bg-brand-bg text-brand-gray hover:text-brand-black text-sm font-semibold whitespace-nowrap" data-cat="쇼핑몰">쇼핑몰</button>
-            <button onclick="setAccountFilter('결제/정산')" class="account-cat-btn px-4 py-2.5 rounded-xl bg-brand-bg text-brand-gray hover:text-brand-black text-sm font-semibold whitespace-nowrap" data-cat="결제/정산">결제/정산</button>
-            <button onclick="setAccountFilter('광고/마케팅')" class="account-cat-btn px-4 py-2.5 rounded-xl bg-brand-bg text-brand-gray hover:text-brand-black text-sm font-semibold whitespace-nowrap hidden md:block" data-cat="광고/마케팅">광고/마케팅</button>
-            <button onclick="setAccountFilter('SNS')"      class="account-cat-btn px-4 py-2.5 rounded-xl bg-brand-bg text-brand-gray hover:text-brand-black text-sm font-semibold whitespace-nowrap hidden md:block" data-cat="SNS">SNS</button>
+            <button onclick="setAccountFilter('유틸사이트')" class="account-cat-btn px-4 py-2.5 rounded-xl bg-brand-bg text-brand-gray hover:text-brand-black text-sm font-semibold whitespace-nowrap" data-cat="유틸사이트">유틸사이트</button>
+            <button onclick="setAccountFilter('판매처')"   class="account-cat-btn px-4 py-2.5 rounded-xl bg-brand-bg text-brand-gray hover:text-brand-black text-sm font-semibold whitespace-nowrap" data-cat="판매처">판매처</button>
             <button onclick="setAccountFilter('기타')"     class="account-cat-btn px-4 py-2.5 rounded-xl bg-brand-bg text-brand-gray hover:text-brand-black text-sm font-semibold whitespace-nowrap hidden md:block" data-cat="기타">기타</button>
           </div>
         </div>
@@ -2577,9 +2576,8 @@ tailwind.config = {
         <label class="text-sm font-bold">카테고리</label>
         <select id="new-account-category" class="drawer-input cursor-pointer">
           <option value="쇼핑몰">쇼핑몰</option>
-          <option value="결제/정산">결제/정산</option>
-          <option value="광고/마케팅">광고/마케팅</option>
-          <option value="SNS">SNS</option>
+          <option value="유틸사이트">유틸사이트</option>
+          <option value="판매처">판매처</option>
           <option value="기타">기타</option>
         </select>
       </div>
@@ -12850,10 +12848,13 @@ function submitAccountDrawer() {
   // 카테고리별 배지 색상 (노션 스타일 컬러)
   const _ACCOUNT_CAT_COLORS = {
     '쇼핑몰':     { bg: '#DBEAFE', fg: '#1E40AF' },
+    '유틸사이트':  { bg: '#FED7AA', fg: '#9A3412' },
+    '판매처':     { bg: '#D1FAE5', fg: '#065F46' },
+    '기타':      { bg: '#F3F4F6', fg: '#374151' },
+    // 구 카테고리 호환 (기존 데이터 표시용)
     '결제/정산':  { bg: '#D1FAE5', fg: '#065F46' },
     '광고/마케팅': { bg: '#FED7AA', fg: '#9A3412' },
     'SNS':       { bg: '#FCE7F3', fg: '#9D174D' },
-    '기타':      { bg: '#F3F4F6', fg: '#374151' },
   };
   const cc = _ACCOUNT_CAT_COLORS[cat] || _ACCOUNT_CAT_COLORS['기타'];
 
@@ -12919,10 +12920,13 @@ function _loadAccountsFromStorage() {
     if (!list) return;
     const _CAT_COLORS = {
       '쇼핑몰':     { bg: '#DBEAFE', fg: '#1E40AF' },
+      '유틸사이트':  { bg: '#FED7AA', fg: '#9A3412' },
+      '판매처':     { bg: '#D1FAE5', fg: '#065F46' },
+      '기타':      { bg: '#F3F4F6', fg: '#374151' },
+      // 구 카테고리 호환
       '결제/정산':  { bg: '#D1FAE5', fg: '#065F46' },
       '광고/마케팅': { bg: '#FED7AA', fg: '#9A3412' },
       'SNS':       { bg: '#FCE7F3', fg: '#9D174D' },
-      '기타':      { bg: '#F3F4F6', fg: '#374151' },
     };
     rows.forEach(r => {
       const cc = _CAT_COLORS[r.cat] || _CAT_COLORS['기타'];
@@ -13110,10 +13114,13 @@ function confirmAccountImport() {
   if (!accountImportedRows.length) return;
   const _ACCOUNT_CAT_COLORS = {
     '쇼핑몰':     { bg: '#DBEAFE', fg: '#1E40AF' },
+    '유틸사이트':  { bg: '#FED7AA', fg: '#9A3412' },
+    '판매처':     { bg: '#D1FAE5', fg: '#065F46' },
+    '기타':      { bg: '#F3F4F6', fg: '#374151' },
+    // 구 카테고리 호환 (기존 데이터 표시용)
     '결제/정산':  { bg: '#D1FAE5', fg: '#065F46' },
     '광고/마케팅': { bg: '#FED7AA', fg: '#9A3412' },
     'SNS':       { bg: '#FCE7F3', fg: '#9D174D' },
-    '기타':      { bg: '#F3F4F6', fg: '#374151' },
   };
   const list = document.getElementById('account-list');
   accountImportedRows.forEach(r => {
