@@ -12717,6 +12717,7 @@ function deleteSelectedAccounts() {
   if (!confirm(`선택한 ${selected.length}개 계정을 삭제하시겠습니까?`)) return;
   selected.forEach(item => item.remove());
   updateAccountSelectLabel();
+  _saveAccountsToStorage();
 }
 
 // 각 행 체크박스 변경 시 전체 선택 상태 동기화
@@ -12861,7 +12862,67 @@ function submitAccountDrawer() {
   }
   closeAddAccountDrawer();
   if (typeof filterAccounts === 'function') filterAccounts();
+  _saveAccountsToStorage();
 }
+
+// ── localStorage 자동 저장/복원 ──────────────
+const ACCOUNTS_LS_KEY = 'gplan_accounts_v1';
+
+function _saveAccountsToStorage() {
+  try {
+    const rows = [...document.querySelectorAll('#account-list > .account-row')].map(item => ({
+      site: item.dataset.name || '',
+      id:   item.dataset.idval || '',
+      pw:   item.dataset.pw || '',
+      url:  item.dataset.url || '',
+      memo: item.dataset.memo || '',
+      cat:  item.dataset.cat || '기타',
+    }));
+    localStorage.setItem(ACCOUNTS_LS_KEY, JSON.stringify(rows));
+  } catch (e) {
+    console.warn('[accounts] 저장 실패:', e);
+  }
+}
+
+function _loadAccountsFromStorage() {
+  try {
+    const raw = localStorage.getItem(ACCOUNTS_LS_KEY);
+    if (!raw) return;
+    const rows = JSON.parse(raw);
+    if (!Array.isArray(rows) || rows.length === 0) return;
+    const list = document.getElementById('account-list');
+    if (!list) return;
+    const _CAT_COLORS = {
+      '쇼핑몰':     { bg: '#DBEAFE', fg: '#1E40AF' },
+      '결제/정산':  { bg: '#D1FAE5', fg: '#065F46' },
+      '광고/마케팅': { bg: '#FED7AA', fg: '#9A3412' },
+      'SNS':       { bg: '#FCE7F3', fg: '#9D174D' },
+      '기타':      { bg: '#F3F4F6', fg: '#374151' },
+    };
+    rows.forEach(r => {
+      const cc = _CAT_COLORS[r.cat] || _CAT_COLORS['기타'];
+      const item = document.createElement('div');
+      item.className = 'account-row grid items-center gap-3 px-3 py-2.5 border-b border-brand-border hover:bg-brand-bg transition-colors';
+      item.style.gridTemplateColumns = '24px 95px 1fr 1.2fr 1.3fr 1fr 60px';
+      item.dataset.cat   = r.cat || '기타';
+      item.dataset.name  = r.site || '';
+      item.dataset.idval = r.id || '';
+      item.dataset.pw    = r.pw || '';
+      item.dataset.url   = r.url || '';
+      item.dataset.memo  = r.memo || '';
+      item.innerHTML = _accountRowInnerHtml({ site: r.site, id: r.id, pw: r.pw, url: r.url, memo: r.memo, cat: r.cat || '기타', cc });
+      item.querySelector('input[type="checkbox"]')?.addEventListener('change', updateAccountSelectLabel);
+      list.appendChild(item);
+    });
+    if (typeof updateAccountSelectLabel === 'function') updateAccountSelectLabel();
+    if (typeof filterAccounts === 'function') filterAccounts();
+  } catch (e) {
+    console.warn('[accounts] 복원 실패:', e);
+  }
+}
+
+// 페이지 로드 시 자동 복원
+document.addEventListener('DOMContentLoaded', _loadAccountsFromStorage);
 
 // 한 행의 inner HTML 생성 (재사용용)
 function _accountRowInnerHtml({ site, id, pw, url, memo, cat, cc }) {
@@ -13048,6 +13109,7 @@ function confirmAccountImport() {
   closeAccountImportModal();
   updateAccountSelectLabel();
   if (typeof filterAccounts === 'function') filterAccounts();
+  _saveAccountsToStorage();
 }
 
 function exportAccountsExcel() {
