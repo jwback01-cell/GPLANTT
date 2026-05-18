@@ -12620,7 +12620,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // ── Account Category Filter & Pagination ─────
 let activeAccountCat = '전체';
 let _accountPage = 1;
-const _accountsPerPage = Infinity;  // 전체 한 페이지 표시 (사용자 요청)
+const _accountsPerPage = 9999;  // 사실상 무제한 — 전체 한 페이지 표시
 
 function setAccountFilter(cat) {
   activeAccountCat = cat;
