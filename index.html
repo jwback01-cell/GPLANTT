@@ -24253,9 +24253,17 @@ async function fetchSaveAndSendToEcount() {
       const reason = r.aborted
         ? `이카운트 전송 중단 (사유: ${r.abortReason || (r.prevalidationFailed ? '미등록 품목코드 발견' : '알 수 없음')})`
         : `이카운트 전송 실패 ${r.fail}건 발생`;
+      // 미등록 품목코드 상세 — 사전검증 단계에서 잡힌 코드 목록 노출
+      let missingDetail = '';
+      if (Array.isArray(r.missingItemCodes) && r.missingItemCodes.length) {
+        const codes = r.missingItemCodes;
+        const shown = codes.slice(0, 50);
+        const more = codes.length > shown.length ? `\n... 외 ${codes.length - shown.length}개` : '';
+        missingDetail = `\n\n미등록 품목코드 ${codes.length}개:\n${shown.join(', ')}${more}`;
+      }
       showAppAlert(
         '⏪ 매출 장부 저장 롤백 완료',
-        `${reason}.\n\n원자적 처리 정책에 따라 방금 저장한 매출 장부 행 ${ledgerSavedCount}건도 모두 취소했습니다.\n\n` +
+        `${reason}.\n\n원자적 처리 정책에 따라 방금 저장한 매출 장부 행 ${ledgerSavedCount}건도 모두 취소했습니다.${missingDetail}\n\n` +
         `해결 후 [수집 + 장부 저장 + 이카운트 전송] 다시 실행하세요.`,
         'warn'
       );
