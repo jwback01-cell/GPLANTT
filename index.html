@@ -2107,10 +2107,11 @@ tailwind.config = {
         </div>
 
         <!-- Column header (table 식 헤더) -->
-        <div class="hidden md:grid items-center gap-3 px-3 py-2 border-y border-brand-border bg-brand-bg text-[11px] font-bold text-brand-gray uppercase tracking-wider" style="grid-template-columns: 24px 95px 1.2fr 1.4fr 1fr 60px;">
+        <div class="hidden md:grid items-center gap-3 px-3 py-2 border-y border-brand-border bg-brand-bg text-[11px] font-bold text-brand-gray uppercase tracking-wider" style="grid-template-columns: 24px 95px 1fr 1.2fr 1.3fr 1fr 60px;">
           <div></div>
           <div>분류</div>
-          <div>계정명 / ID</div>
+          <div>계정명</div>
+          <div>아이디</div>
           <div>비밀번호</div>
           <div>URL</div>
           <div></div>
@@ -12619,10 +12620,10 @@ function filterAccounts() {
 
   const allItems = [...document.querySelectorAll('#account-list > .account-row')];
 
-  // 필터링 — data 속성 우선 사용 (구버전 호환을 위해 fallback)
+  // 필터링 — data 속성 우선 사용
   const matched = allItems.filter(item => {
-    const name    = item.dataset.name || (item.querySelector('.font-bold')?.textContent || '').trim().toLowerCase();
-    const id      = item.dataset.idval || '';
+    const name    = (item.dataset.name || '').toLowerCase();
+    const id      = (item.dataset.idval || '').toLowerCase();
     const itemCat = item.dataset.cat || '';
     const matchQuery = !query || name.includes(query) || id.includes(query);
     const matchCat   = catAll || itemCat === activeAccountCat;
@@ -12755,12 +12756,12 @@ function openEditAccountDrawer(btn) {
   editingAccountItem = item;
   accountDrawerMode  = 'edit';
 
-  // 새 구조: data 속성에서 직접 / 구버전 fallback
+  // data 속성에서 직접 가져옴 (행 갱신 시 data 속성 유지)
   const site = (item.querySelector('.font-bold')?.textContent || '').trim();
   const cat  = item.dataset.cat || '쇼핑몰';
-  const id   = (item.querySelector('.text-brand-gray.text-xs')?.textContent || item.dataset.idval || '').trim();
+  const id   = item.dataset.idval || '';
   const url  = item.dataset.url || '';
-  const pw   = item.dataset.pw  || (item.querySelector('.js-pw-display, .font-mono')?.dataset?.pw || '');
+  const pw   = item.dataset.pw  || '';
   const memo = item.dataset.memo || '';
 
   document.getElementById('account-drawer-title').textContent  = '계정 수정 ✏️';
@@ -12832,10 +12833,10 @@ function submitAccountDrawer() {
 
   const item = document.createElement('div');
   item.className = 'account-row grid items-center gap-3 px-3 py-2.5 border-b border-brand-border hover:bg-brand-bg transition-colors fade-in';
-  item.style.gridTemplateColumns = '24px 95px 1.2fr 1.4fr 1fr 60px';
+  item.style.gridTemplateColumns = '24px 95px 1fr 1.2fr 1.3fr 1fr 60px';
   item.dataset.cat   = cat;
-  item.dataset.name  = (site || '').toLowerCase();
-  item.dataset.idval = (id || '').toLowerCase();
+  item.dataset.name  = site || '';
+  item.dataset.idval = id || '';
   item.dataset.pw    = pw;
   item.dataset.url   = url;
   item.dataset.memo  = memo;
@@ -12846,8 +12847,8 @@ function submitAccountDrawer() {
   if (accountDrawerMode === 'edit' && editingAccountItem) {
     // 기존 항목을 새 템플릿으로 in-place 갱신 (DOM 교체)
     editingAccountItem.dataset.cat   = cat;
-    editingAccountItem.dataset.name  = (site || '').toLowerCase();
-    editingAccountItem.dataset.idval = (id || '').toLowerCase();
+    editingAccountItem.dataset.name  = site || '';
+    editingAccountItem.dataset.idval = id || '';
     editingAccountItem.dataset.pw    = pw;
     editingAccountItem.dataset.url   = url;
     editingAccountItem.dataset.memo  = memo;
@@ -12881,8 +12882,13 @@ function _accountRowInnerHtml({ site, id, pw, url, memo, cat, cc }) {
     <span class="text-[10px] font-bold px-2 py-1 rounded-md text-center inline-block truncate" style="background:${cc.bg};color:${cc.fg};">${safeCat}</span>
     <div class="min-w-0">
       <div class="font-bold text-sm truncate">${safeSite}</div>
-      <div class="text-brand-gray text-xs truncate">${safeId}</div>
       ${memoHtml}
+    </div>
+    <div class="flex items-center gap-1.5 min-w-0">
+      <code class="bg-brand-bg px-2.5 py-1.5 rounded font-mono text-xs text-brand-black flex-1 truncate" title="${safeId}">${safeId || '—'}</code>
+      <button class="p-1 hover:bg-white rounded shrink-0" title="아이디 복사" onclick="copyAccountId(this, '${idAttr}')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+      </button>
     </div>
     <div class="flex items-center gap-1.5 min-w-0">
       <code class="bg-brand-bg px-2.5 py-1.5 rounded font-mono text-xs text-brand-gray flex-1 truncate js-pw-display" data-pw="${pwAttr}">••••••••</code>
@@ -13028,10 +13034,10 @@ function confirmAccountImport() {
     const cc = _ACCOUNT_CAT_COLORS[r.cat] || _ACCOUNT_CAT_COLORS['기타'];
     const item = document.createElement('div');
     item.className = 'account-row grid items-center gap-3 px-3 py-2.5 border-b border-brand-border hover:bg-brand-bg transition-colors fade-in';
-    item.style.gridTemplateColumns = '24px 95px 1.2fr 1.4fr 1fr 60px';
+    item.style.gridTemplateColumns = '24px 95px 1fr 1.2fr 1.3fr 1fr 60px';
     item.dataset.cat   = r.cat;
-    item.dataset.name  = (r.site || '').toLowerCase();
-    item.dataset.idval = (r.id || '').toLowerCase();
+    item.dataset.name  = r.site || '';
+    item.dataset.idval = r.id || '';
     item.dataset.pw    = r.pw;
     item.dataset.url   = r.url;
     item.dataset.memo  = r.memo;
