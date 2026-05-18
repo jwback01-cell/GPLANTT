@@ -2106,51 +2106,17 @@ tailwind.config = {
           </div>
         </div>
 
-        <!-- Account list -->
-        <div id="account-list" class="flex flex-col border-t border-brand-border">
-          <div class="flex items-center gap-3 md:gap-4 py-5 md:py-6 border-b border-brand-border hover:bg-brand-bg px-1 md:px-2 transition-colors">
-            <input type="checkbox" class="w-4 h-4 rounded border-brand-border shrink-0">
-            <div class="w-10 md:w-12 h-10 md:h-12 rounded-xl bg-brand-blue-light flex items-center justify-center shrink-0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2196F3" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 mb-0.5 flex-wrap"><span class="font-bold text-[0.95rem] md:text-[1rem]">스마트스토어 관리자</span><span class="text-[11px] px-1.5 py-0.5 rounded-md bg-brand-border text-brand-gray font-bold">쇼핑몰</span></div>
-              <div class="text-brand-gray text-sm">ID: shop_admin_01</div>
-            </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <div class="bg-brand-bg px-3 md:px-4 py-2 rounded-xl text-sm font-mono tracking-widest text-brand-gray hidden sm:block" data-pw="SmartStore#24">••••••••</div>
-              <button onclick="toggleAccountRowPw(this)" class="p-2 hover:bg-white rounded-lg transition-colors" title="비밀번호 보기"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
-              <button onclick="copyAccountId(this, 'shop_admin_01')" class="p-2 hover:bg-white rounded-lg transition-colors" title="복사"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
-              <button onclick="openEditAccountDrawer(this)" class="px-3 py-2 text-xs font-bold text-brand-gray hover:text-brand-black hover:bg-white rounded-lg transition-all border border-transparent hover:border-brand-border hidden md:block">수정</button>
-            </div>
-          </div>
-          <div class="flex items-center gap-3 md:gap-4 py-5 md:py-6 border-b border-brand-border hover:bg-brand-bg px-1 md:px-2 transition-colors">
-            <input type="checkbox" class="w-4 h-4 rounded border-brand-border shrink-0">
-            <div class="w-10 md:w-12 h-10 md:h-12 rounded-xl bg-brand-orange-light flex items-center justify-center shrink-0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF9800" stroke-width="2"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg></div>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 mb-0.5 flex-wrap"><span class="font-bold text-[0.95rem] md:text-[1rem]">카카오 비즈니스</span><span class="text-[11px] px-1.5 py-0.5 rounded-md bg-brand-border text-brand-gray font-bold">광고/마케팅</span></div>
-              <div class="text-brand-gray text-sm">ID: manager_kakao</div>
-            </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <div class="bg-brand-bg px-3 md:px-4 py-2 rounded-xl text-sm font-mono tracking-widest text-brand-gray hidden sm:block" data-pw="KakaoMgr2024!">••••••••</div>
-              <button onclick="toggleAccountRowPw(this)" class="p-2 hover:bg-white rounded-lg transition-colors"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
-              <button onclick="copyAccountId(this, 'manager_kakao')" class="p-2 hover:bg-white rounded-lg transition-colors"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
-              <button onclick="openEditAccountDrawer(this)" class="px-3 py-2 text-xs font-bold text-brand-gray hover:text-brand-black hover:bg-white rounded-lg border border-transparent hover:border-brand-border hidden md:block">수정</button>
-            </div>
-          </div>
-          <div class="flex items-center gap-3 md:gap-4 py-5 md:py-6 border-b border-brand-border hover:bg-brand-bg px-1 md:px-2 transition-colors">
-            <input type="checkbox" class="w-4 h-4 rounded border-brand-border shrink-0">
-            <div class="w-10 md:w-12 h-10 md:h-12 rounded-xl bg-brand-pink-light flex items-center justify-center shrink-0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E91E63" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 mb-0.5 flex-wrap"><span class="font-bold text-[0.95rem] md:text-[1rem]">인스타그램 공식계정</span><span class="text-[11px] px-1.5 py-0.5 rounded-md bg-brand-border text-brand-gray font-bold">SNS</span></div>
-              <div class="text-brand-gray text-sm">ID: brand_official_kr</div>
-            </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <div class="bg-brand-bg px-3 md:px-4 py-2 rounded-xl text-sm font-mono tracking-widest text-brand-gray hidden sm:block" data-pw="Official_IG@KR">••••••••</div>
-              <button onclick="toggleAccountRowPw(this)" class="p-2 hover:bg-white rounded-lg transition-colors"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
-              <button onclick="copyAccountId(this, 'brand_official_kr')" class="p-2 hover:bg-white rounded-lg transition-colors"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
-              <button onclick="openEditAccountDrawer(this)" class="px-3 py-2 text-xs font-bold text-brand-gray hover:text-brand-black hover:bg-white rounded-lg border border-transparent hover:border-brand-border hidden md:block">수정</button>
-            </div>
-          </div>
+        <!-- Column header (table 식 헤더) -->
+        <div class="hidden md:grid items-center gap-3 px-3 py-2 border-y border-brand-border bg-brand-bg text-[11px] font-bold text-brand-gray uppercase tracking-wider" style="grid-template-columns: 24px 95px 1.2fr 1.4fr 1fr 60px;">
+          <div></div>
+          <div>분류</div>
+          <div>계정명 / ID</div>
+          <div>비밀번호</div>
+          <div>URL</div>
+          <div></div>
         </div>
+        <!-- Account list -->
+        <div id="account-list" class="flex flex-col"></div>
         <!-- 검색 결과 없음 -->
         <div id="account-no-result" class="hidden flex-col items-center justify-center py-14 gap-3 text-center">
           <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#C7C7CC" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -12630,17 +12596,13 @@ function filterAccounts() {
   const query  = (document.getElementById('account-search')?.value || '').trim().toLowerCase();
   const catAll = activeAccountCat === '전체';
 
-  const allItems = [...document.querySelectorAll('#account-list > div')];
+  const allItems = [...document.querySelectorAll('#account-list > .account-row')];
 
-  // 필터링
+  // 필터링 — data 속성 우선 사용 (구버전 호환을 위해 fallback)
   const matched = allItems.filter(item => {
-    const nameEl  = item.querySelector('.font-bold');
-    const idEl    = item.querySelector('.text-brand-gray.text-sm');
-    const badge   = item.querySelector('.rounded-md.bg-brand-border');
-    const name    = nameEl  ? nameEl.textContent.trim().toLowerCase()  : '';
-    const id      = idEl    ? idEl.textContent.replace('ID:', '').trim().toLowerCase() : '';
-    const itemCat = badge   ? badge.textContent.trim() : '';
-
+    const name    = item.dataset.name || (item.querySelector('.font-bold')?.textContent || '').trim().toLowerCase();
+    const id      = item.dataset.idval || '';
+    const itemCat = item.dataset.cat || '';
     const matchQuery = !query || name.includes(query) || id.includes(query);
     const matchCat   = catAll || itemCat === activeAccountCat;
     return matchQuery && matchCat;
@@ -12767,23 +12729,18 @@ function openAddAccountDrawer() {
 }
 
 function openEditAccountDrawer(btn) {
-  const item = btn.closest('#account-list > div');
+  const item = btn.closest('.account-row') || btn.closest('#account-list > div');
   if (!item) return;
   editingAccountItem = item;
   accountDrawerMode  = 'edit';
 
-  const nameEl  = item.querySelector('.font-bold');
-  const badgeEl = item.querySelector('.rounded-md.bg-brand-border');
-  const idEl    = item.querySelector('.text-brand-gray.text-sm');
-  const dotsEl  = item.querySelector('.font-mono');
-  const memoEls = item.querySelectorAll('.flex-1 .text-brand-gray');
-
-  const site = nameEl  ? nameEl.textContent.trim() : '';
-  const cat  = badgeEl ? badgeEl.textContent.trim() : '쇼핑몰';
-  const id   = idEl    ? idEl.textContent.replace('ID:', '').trim() : '';
-  const url  = nameEl?.dataset?.accountUrl || (nameEl?.tagName === 'A' ? nameEl.href : '') || '';
-  const pw   = dotsEl  ? (dotsEl.dataset.pw || '') : '';
-  const memo = memoEls.length > 1 ? memoEls[memoEls.length - 1].textContent.trim() : '';
+  // 새 구조: data 속성에서 직접 / 구버전 fallback
+  const site = (item.querySelector('.font-bold')?.textContent || '').trim();
+  const cat  = item.dataset.cat || '쇼핑몰';
+  const id   = (item.querySelector('.text-brand-gray.text-xs')?.textContent || item.dataset.idval || '').trim();
+  const url  = item.dataset.url || '';
+  const pw   = item.dataset.pw  || (item.querySelector('.js-pw-display, .font-mono')?.dataset?.pw || '');
+  const memo = item.dataset.memo || '';
 
   document.getElementById('account-drawer-title').textContent  = '계정 수정 ✏️';
   document.getElementById('account-drawer-desc').textContent   = '계정 정보를 수정해주세요.';
@@ -12842,116 +12799,81 @@ function submitAccountDrawer() {
     return;
   }
 
-  // 아이콘 색상
-  const palettes = [
-    { bg: 'bg-brand-blue-light',   stroke: '#2196F3' },
-    { bg: 'bg-brand-pink-light',   stroke: '#E91E63' },
-    { bg: 'bg-brand-orange-light', stroke: '#FF9800' },
-    { bg: 'bg-brand-green-light',  stroke: '#00C853' },
-    { bg: 'bg-brand-border',       stroke: '#8E8E93' },
-  ];
-  const p = palettes[Math.floor(Math.random() * palettes.length)];
-
-  const siteNameHtml = url
-    ? `<a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer" class="font-bold text-[0.95rem] md:text-[1rem] hover:underline" data-account-url="${escHtml(url)}">${escHtml(site)}</a>`
-    : `<span class="font-bold text-[0.95rem] md:text-[1rem]">${escHtml(site)}</span>`;
-  const memoHtml = memo
-    ? `<div class="text-brand-gray text-xs mt-0.5">${escHtml(memo)}</div>` : '';
+  // 카테고리별 배지 색상 (노션 스타일 컬러)
+  const _ACCOUNT_CAT_COLORS = {
+    '쇼핑몰':     { bg: '#DBEAFE', fg: '#1E40AF' },
+    '결제/정산':  { bg: '#D1FAE5', fg: '#065F46' },
+    '광고/마케팅': { bg: '#FED7AA', fg: '#9A3412' },
+    'SNS':       { bg: '#FCE7F3', fg: '#9D174D' },
+    '기타':      { bg: '#F3F4F6', fg: '#374151' },
+  };
+  const cc = _ACCOUNT_CAT_COLORS[cat] || _ACCOUNT_CAT_COLORS['기타'];
 
   const item = document.createElement('div');
-  item.className = 'flex items-center gap-3 md:gap-4 py-5 md:py-6 border-b border-brand-border hover:bg-brand-bg px-1 md:px-2 transition-colors fade-in';
-  item.innerHTML = `
-    <input type="checkbox" class="w-4 h-4 rounded border-brand-border shrink-0">
-    <div class="w-10 md:w-12 h-10 md:h-12 rounded-xl ${p.bg} flex items-center justify-center shrink-0">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${p.stroke}" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-    </div>
-    <div class="flex-1 min-w-0">
-      <div class="flex items-center gap-2 mb-0.5 flex-wrap">
-        ${siteNameHtml}
-        <span class="text-[11px] px-1.5 py-0.5 rounded-md bg-brand-border text-brand-gray font-bold">${escHtml(cat)}</span>
-      </div>
-      <div class="text-brand-gray text-sm">ID: ${escHtml(id)}</div>
-      ${memoHtml}
-    </div>
-    <div class="flex items-center gap-2 shrink-0">
-      <div class="bg-brand-bg px-3 md:px-4 py-2 rounded-xl text-sm font-mono tracking-widest text-brand-gray hidden sm:block">••••••••</div>
-      <button class="p-2 hover:bg-white rounded-lg transition-colors" title="비밀번호 보기" onclick="toggleAccountRowPw(this, '${escHtml(pw).replace(/'/g,'&#39;')}')">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-      </button>
-      <button class="p-2 hover:bg-white rounded-lg transition-colors" title="복사" onclick="copyAccountId(this, '${escHtml(id).replace(/'/g,'&#39;')}')">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-      </button>
-      <button onclick="openEditAccountDrawer(this)" class="px-3 py-2 text-xs font-bold text-brand-gray hover:text-brand-black hover:bg-white rounded-lg transition-all border border-transparent hover:border-brand-border hidden md:block">수정</button>
-    </div>`;
+  item.className = 'account-row grid items-center gap-3 px-3 py-2.5 border-b border-brand-border hover:bg-brand-bg transition-colors fade-in';
+  item.style.gridTemplateColumns = '24px 95px 1.2fr 1.4fr 1fr 60px';
+  item.dataset.cat   = cat;
+  item.dataset.name  = (site || '').toLowerCase();
+  item.dataset.idval = (id || '').toLowerCase();
+  item.dataset.pw    = pw;
+  item.dataset.url   = url;
+  item.dataset.memo  = memo;
+  item.innerHTML = _accountRowInnerHtml({ site, id, pw, url, memo, cat, cc });
 
   item.querySelector('input[type="checkbox"]')?.addEventListener('change', updateAccountSelectLabel);
 
   if (accountDrawerMode === 'edit' && editingAccountItem) {
-    // 기존 항목 업데이트
-    const nameEl  = editingAccountItem.querySelector('.font-bold');
-    const badgeEl = editingAccountItem.querySelector('.rounded-md.bg-brand-border');
-    const idEl    = editingAccountItem.querySelector('.text-brand-gray.text-sm');
-    const dotsEl  = editingAccountItem.querySelector('.font-mono');
-    const memoEls = editingAccountItem.querySelectorAll('.flex-1 .text-brand-gray');
-
-    if (badgeEl) badgeEl.textContent = cat;
-    if (idEl)    idEl.textContent    = 'ID: ' + id;
-
-    // 사이트명 + URL 처리
-    if (nameEl) {
-      if (url) {
-        // span을 a로 교체하거나 기존 a를 업데이트
-        if (nameEl.tagName === 'A') {
-          nameEl.href = url;
-          nameEl.dataset.accountUrl = url;
-          nameEl.textContent = site;
-        } else {
-          const a = document.createElement('a');
-          a.href = url;
-          a.target = '_blank';
-          a.rel = 'noopener noreferrer';
-          a.className = 'font-bold text-[0.95rem] md:text-[1rem] hover:underline';
-          a.dataset.accountUrl = url;
-          a.textContent = site;
-          nameEl.replaceWith(a);
-        }
-      } else {
-        // a를 span으로 교체하거나 기존 span 업데이트
-        if (nameEl.tagName === 'A') {
-          const span = document.createElement('span');
-          span.className = 'font-bold text-[0.95rem] md:text-[1rem]';
-          span.textContent = site;
-          nameEl.replaceWith(span);
-        } else {
-          nameEl.textContent = site;
-        }
-      }
-    }
-
-    if (dotsEl) {
-      dotsEl.dataset.pw    = pw;
-      dotsEl.textContent   = '••••••••';
-      dotsEl.dataset.showing = '0';
-    }
-    const copyBtn = editingAccountItem.querySelector('button[onclick*="copyAccountId"]');
-    if (copyBtn) copyBtn.setAttribute('onclick', `copyAccountId(this, '${escHtml(id).replace(/'/g,"&#39;")}')`);
-    const eyeBtn = editingAccountItem.querySelector('button[onclick*="toggleAccountRowPw"]');
-    // 메모 처리
-    const editMemoEls = editingAccountItem.querySelectorAll('.flex-1 .text-brand-gray:not(.account-url-link)');
-    if (editMemoEls.length > 1) {
-      editMemoEls[editMemoEls.length - 1].textContent = memo;
-    } else if (memo) {
-      const memoDiv = document.createElement('div');
-      memoDiv.className = 'text-brand-gray text-xs mt-0.5';
-      memoDiv.textContent = memo;
-      idEl?.parentNode?.appendChild(memoDiv);
-    }
+    // 기존 항목을 새 템플릿으로 in-place 갱신 (DOM 교체)
+    editingAccountItem.dataset.cat   = cat;
+    editingAccountItem.dataset.name  = (site || '').toLowerCase();
+    editingAccountItem.dataset.idval = (id || '').toLowerCase();
+    editingAccountItem.dataset.pw    = pw;
+    editingAccountItem.dataset.url   = url;
+    editingAccountItem.dataset.memo  = memo;
+    editingAccountItem.innerHTML = _accountRowInnerHtml({ site, id, pw, url, memo, cat, cc });
+    editingAccountItem.querySelector('input[type="checkbox"]')?.addEventListener('change', updateAccountSelectLabel);
     editingAccountItem.classList.add('fade-in');
     setTimeout(() => editingAccountItem.classList.remove('fade-in'), 400);
   } else {
     document.getElementById('account-list').prepend(item);
   }
   closeAddAccountDrawer();
+  if (typeof filterAccounts === 'function') filterAccounts();
+}
+
+// 한 행의 inner HTML 생성 (재사용용)
+function _accountRowInnerHtml({ site, id, pw, url, memo, cat, cc }) {
+  const safeSite = escHtml(site || '');
+  const safeId   = escHtml(id || '');
+  const safePw   = escHtml(pw || '');
+  const safeUrl  = escHtml(url || '');
+  const safeMemo = escHtml(memo || '');
+  const safeCat  = escHtml(cat || '기타');
+  const pwAttr   = safePw.replace(/'/g, '&#39;');
+  const idAttr   = safeId.replace(/'/g, '&#39;');
+  const memoHtml = safeMemo ? `<div class="text-[10px] text-brand-gray truncate mt-0.5">${safeMemo}</div>` : '';
+  const urlHtml  = url
+    ? `<a href="${safeUrl}" target="_blank" rel="noopener" class="text-brand-blue hover:underline truncate block" title="${safeUrl}">${safeUrl}</a>`
+    : '<span class="text-brand-gray">—</span>';
+  return `
+    <input type="checkbox" class="w-4 h-4 rounded border-brand-border">
+    <span class="text-[10px] font-bold px-2 py-1 rounded-md text-center inline-block truncate" style="background:${cc.bg};color:${cc.fg};">${safeCat}</span>
+    <div class="min-w-0">
+      <div class="font-bold text-sm truncate">${safeSite}</div>
+      <div class="text-brand-gray text-xs truncate">${safeId}</div>
+      ${memoHtml}
+    </div>
+    <div class="flex items-center gap-1.5 min-w-0">
+      <code class="bg-brand-bg px-2.5 py-1.5 rounded font-mono text-xs text-brand-gray flex-1 truncate js-pw-display" data-pw="${pwAttr}">••••••••</code>
+      <button class="p-1 hover:bg-white rounded shrink-0" title="비밀번호 보기" onclick="toggleAccountRowPw(this, '${pwAttr}')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+      <button class="p-1 hover:bg-white rounded shrink-0" title="비밀번호 복사" onclick="copyAccountId(this, '${pwAttr}')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+      </button>
+    </div>
+    <div class="text-xs min-w-0 truncate">${urlHtml}</div>
+    <button onclick="openEditAccountDrawer(this)" class="text-xs font-semibold text-brand-gray hover:text-brand-black hover:bg-white rounded-lg px-2 py-1 transition-colors">수정</button>`;
 }
 
 // ── Account Excel Import / Export ────────────
@@ -13073,56 +12995,36 @@ function showAccountImportPreview(filename, rows) {
 
 function confirmAccountImport() {
   if (!accountImportedRows.length) return;
-
-  const palettes = [
-    { bg: 'bg-brand-blue-light',   stroke: '#2196F3' },
-    { bg: 'bg-brand-pink-light',   stroke: '#E91E63' },
-    { bg: 'bg-brand-orange-light', stroke: '#FF9800' },
-    { bg: 'bg-brand-green-light',  stroke: '#00C853' },
-    { bg: 'bg-brand-border',       stroke: '#8E8E93' },
-  ];
-
+  const _ACCOUNT_CAT_COLORS = {
+    '쇼핑몰':     { bg: '#DBEAFE', fg: '#1E40AF' },
+    '결제/정산':  { bg: '#D1FAE5', fg: '#065F46' },
+    '광고/마케팅': { bg: '#FED7AA', fg: '#9A3412' },
+    'SNS':       { bg: '#FCE7F3', fg: '#9D174D' },
+    '기타':      { bg: '#F3F4F6', fg: '#374151' },
+  };
   const list = document.getElementById('account-list');
   accountImportedRows.forEach(r => {
-    const p = palettes[Math.floor(Math.random() * palettes.length)];
-    const importSiteHtml = r.url
-      ? `<a href="${escHtml(r.url)}" target="_blank" rel="noopener noreferrer" class="font-bold text-[0.95rem] md:text-[1rem] hover:underline" data-account-url="${escHtml(r.url)}">${escHtml(r.site)}</a>`
-      : `<span class="font-bold text-[0.95rem] md:text-[1rem]">${escHtml(r.site)}</span>`;
-    const memoHtml = r.memo ? `<div class="text-brand-gray text-xs mt-0.5">${escHtml(r.memo)}</div>` : '';
+    const cc = _ACCOUNT_CAT_COLORS[r.cat] || _ACCOUNT_CAT_COLORS['기타'];
     const item = document.createElement('div');
-    item.className = 'flex items-center gap-3 md:gap-4 py-5 md:py-6 border-b border-brand-border hover:bg-brand-bg px-1 md:px-2 transition-colors fade-in';
-    item.innerHTML = `
-      <input type="checkbox" class="w-4 h-4 rounded border-brand-border shrink-0">
-      <div class="w-10 md:w-12 h-10 md:h-12 rounded-xl ${p.bg} flex items-center justify-center shrink-0">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${p.stroke}" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-      </div>
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-2 mb-0.5 flex-wrap">
-          ${importSiteHtml}
-          <span class="text-[11px] px-1.5 py-0.5 rounded-md bg-brand-border text-brand-gray font-bold">${escHtml(r.cat)}</span>
-        </div>
-        <div class="text-brand-gray text-sm">ID: ${escHtml(r.id)}</div>
-        ${memoHtml}
-      </div>
-      <div class="flex items-center gap-2 shrink-0">
-        <div class="bg-brand-bg px-3 md:px-4 py-2 rounded-xl text-sm font-mono tracking-widest text-brand-gray hidden sm:block" data-pw="${escHtml(r.pw)}">••••••••</div>
-        <button class="p-2 hover:bg-white rounded-lg transition-colors" title="비밀번호 보기" onclick="toggleAccountRowPw(this, '${escHtml(r.pw).replace(/'/g,'&#39;')}')">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-        </button>
-        <button class="p-2 hover:bg-white rounded-lg transition-colors" title="복사" onclick="copyAccountId(this, '${escHtml(r.id).replace(/'/g,'&#39;')}')">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-        </button>
-        <button onclick="openEditAccountDrawer(this)" class="px-3 py-2 text-xs font-bold text-brand-gray hover:text-brand-black hover:bg-white rounded-lg transition-all border border-transparent hover:border-brand-border hidden md:block">수정</button>
-      </div>`;
+    item.className = 'account-row grid items-center gap-3 px-3 py-2.5 border-b border-brand-border hover:bg-brand-bg transition-colors fade-in';
+    item.style.gridTemplateColumns = '24px 95px 1.2fr 1.4fr 1fr 60px';
+    item.dataset.cat   = r.cat;
+    item.dataset.name  = (r.site || '').toLowerCase();
+    item.dataset.idval = (r.id || '').toLowerCase();
+    item.dataset.pw    = r.pw;
+    item.dataset.url   = r.url;
+    item.dataset.memo  = r.memo;
+    item.innerHTML = _accountRowInnerHtml({ site: r.site, id: r.id, pw: r.pw, url: r.url, memo: r.memo, cat: r.cat, cc });
+    item.querySelector('input[type="checkbox"]')?.addEventListener('change', updateAccountSelectLabel);
     list.appendChild(item);
   });
-
   closeAccountImportModal();
   updateAccountSelectLabel();
+  if (typeof filterAccounts === 'function') filterAccounts();
 }
 
 function exportAccountsExcel() {
-  const items = document.querySelectorAll('#account-list > div');
+  const items = document.querySelectorAll('#account-list > .account-row, #account-list > div');
   if (!items.length) { alert('내보낼 계정이 없습니다.'); return; }
 
   const headers = ['사이트명', '아이디', '사이트 URL', '비밀번호', '카테고리', '메모'];
@@ -13130,19 +13032,13 @@ function exportAccountsExcel() {
 
   items.forEach(item => {
     if (item.style.display === 'none') return;
-    const nameEl  = item.querySelector('.font-bold');
-    const badgeEl = item.querySelector('.rounded-md.bg-brand-border');
-    const idEl    = item.querySelector('.text-brand-gray.text-sm');
-    const pwEl    = item.querySelector('.font-mono');
-    const memoEls = item.querySelectorAll('.flex-1 .text-brand-gray');
-
-    const site = nameEl  ? nameEl.textContent.trim()  : '';
-    const cat  = badgeEl ? badgeEl.textContent.trim() : '';
-    const id   = idEl    ? idEl.textContent.replace('ID:', '').trim() : '';
-    const url  = nameEl?.dataset?.accountUrl || (nameEl?.tagName === 'A' ? nameEl.href : '') || '';
-    const pw   = pwEl    ? (pwEl.dataset.pw || '') : '';
-    const memo = memoEls.length > 1 ? memoEls[memoEls.length - 1].textContent.trim() : '';
-
+    // 새 구조: data 속성에서 직접 가져옴 / 구버전 fallback
+    const site = (item.querySelector('.font-bold')?.textContent || '').trim();
+    const cat  = item.dataset.cat || (item.querySelector('span[style*="background"]')?.textContent || '').trim();
+    const id   = (item.querySelector('.text-brand-gray.text-xs')?.textContent || '').trim();
+    const url  = item.dataset.url || '';
+    const pw   = item.dataset.pw  || (item.querySelector('.font-mono')?.dataset?.pw || '');
+    const memo = item.dataset.memo || '';
     data.push([site, id, url, pw, cat, memo]);
   });
 
@@ -13179,13 +13075,14 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function toggleAccountRowPw(btn, pw) {
-  const wrap = btn.closest('.flex.items-center.gap-2');
-  const dots = wrap ? wrap.querySelector('.font-mono') : null;
+  // 새 구조 (.account-row 행) 우선, 옛 구조도 호환
+  const row = btn.closest('.account-row') || btn.closest('#account-list > div');
+  const dots = row ? row.querySelector('.js-pw-display, .font-mono') : null;
   if (!dots) return;
   const password = pw !== undefined ? pw : (dots.dataset.pw || '');
   const showing  = dots.dataset.showing === '1';
-  dots.textContent       = showing ? '••••••••' : password;
-  dots.dataset.showing   = showing ? '0' : '1';
+  dots.textContent     = showing ? '••••••••' : password;
+  dots.dataset.showing = showing ? '0' : '1';
 }
 
 function copyAccountId(btn, text) {
