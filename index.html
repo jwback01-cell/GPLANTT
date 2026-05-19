@@ -34510,12 +34510,14 @@ function _prodsrcRenderFolders() {
     if ((r.totalSearchDiff || 0) > 0) c.upCount++;
     else if ((r.totalSearchDiff || 0) < 0) c.downCount++;
   });
-  countEl.textContent = `(${cats.size}개)`;
   if (lastEl) {
     const d = _prodsrcState.lastUploadedAt ? new Date(_prodsrcState.lastUploadedAt).toLocaleString('ko-KR') : '';
     lastEl.textContent = d ? `최근 업로드: ${d}` : '';
   }
-  const entries = [...cats.entries()].sort((a, b) => b[1].count - a[1].count);
+  // 카테고리 폴더는 가장 키워드가 많은 1개만 표시 — 사용자 요청
+  const sortedEntries = [...cats.entries()].sort((a, b) => b[1].count - a[1].count);
+  const entries = sortedEntries.slice(0, 1);
+  countEl.textContent = entries.length ? `(대표 1개 · 전체 ${cats.size}개)` : '(0개)';
   wrap.innerHTML = entries.map(([name, c]) => {
     const badges = [];
     if (c.newCount) badges.push(`<span class="text-[10px] font-bold bg-brand-green-light text-brand-green px-1.5 py-0.5 rounded-full">신규 ${c.newCount}</span>`);
