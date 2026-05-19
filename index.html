@@ -3428,6 +3428,34 @@ tailwind.config = {
                 마이너스 확인 실행
               </button>
             </div>
+            <!-- 인라인 마이너스 결과 — 주문수집 탭에서 즉시 확인 -->
+            <div id="pa-order-minus-inline" class="hidden bg-white rounded-2xl border border-brand-pink/30 overflow-hidden">
+              <div class="px-4 py-3 border-b border-brand-border bg-brand-pink-light/40 flex items-center justify-between flex-wrap gap-2">
+                <div class="font-bold text-sm text-brand-pink flex items-center gap-2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  마이너스 주문 <span id="pa-order-minus-inline-count">0</span>건
+                </div>
+                <div class="text-[11px] text-brand-gray" id="pa-order-minus-inline-summary"></div>
+              </div>
+              <div class="overflow-x-auto max-h-[420px] overflow-y-auto">
+                <table class="w-full text-sm text-left border-collapse min-w-[900px]">
+                  <thead class="bg-brand-bg sticky top-0 z-10">
+                    <tr class="text-brand-gray text-xs">
+                      <th class="p-3 pl-4 font-semibold">쇼핑몰</th>
+                      <th class="p-3 font-semibold">주문일</th>
+                      <th class="p-3 font-semibold">SKU코드</th>
+                      <th class="p-3 font-semibold">SKU상품명</th>
+                      <th class="p-3 text-right font-semibold">수량</th>
+                      <th class="p-3 text-right font-semibold">공급가</th>
+                      <th class="p-3 text-right font-semibold">원가</th>
+                      <th class="p-3 text-right font-semibold">마진</th>
+                      <th class="p-3 pr-4 font-semibold">수령자</th>
+                    </tr>
+                  </thead>
+                  <tbody id="pa-order-minus-inline-tbody"></tbody>
+                </table>
+              </div>
+            </div>
             <!-- 주문 결과 테이블 -->
             <div id="pa-order-result" class="hidden overflow-x-auto border border-brand-border rounded-2xl">
               <table class="w-full text-sm text-left border-collapse min-w-[800px]">
@@ -20129,11 +20157,46 @@ function _paExtractOrderRow(o) {
   };
 }
 
-// 주문수집 탭에서 호출 — 마이너스 확인 실행 후 결과 탭으로 자동 전환
+// 주문수집 탭에서 호출 — 마이너스 확인 실행 후 같은 탭에 인라인으로 결과 표시
 async function runMinusFromOrderTab() {
   await runPaMinusCheck();
-  // _paMinusRows 가 채워졌으면 마이너스 확인 탭으로 자동 이동
-  if (typeof switchPlayautoSubTab === 'function') switchPlayautoSubTab('minus');
+  _renderInlineMinus();
+}
+
+// 주문수집 탭 인라인 마이너스 결과 렌더링 — 마이너스 행만 간단히 표시
+function _renderInlineMinus() {
+  const wrap = document.getElementById('pa-order-minus-inline');
+  const tbody = document.getElementById('pa-order-minus-inline-tbody');
+  const countEl = document.getElementById('pa-order-minus-inline-count');
+  const sumEl = document.getElementById('pa-order-minus-inline-summary');
+  if (!wrap || !tbody) return;
+  const rows = (Array.isArray(_paMinusRows) ? _paMinusRows : []).filter(r => r.isMinus);
+  if (countEl) countEl.textContent = rows.length;
+  const fmt = v => Number(v || 0).toLocaleString('ko-KR');
+  const money = v => v == null ? '<span class="text-brand-gray">-</span>' : fmt(v) + '원';
+  const marginCell = v => {
+    if (v == null) return '<span class="text-brand-gray">-</span>';
+    return `<span class="text-brand-pink font-bold">${fmt(v)}원</span>`;
+  };
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-brand-gray text-sm">마이너스 주문이 없습니다 — 모든 주문 정상</td></tr>';
+    if (sumEl) sumEl.textContent = '';
+  } else {
+    tbody.innerHTML = rows.map(r => `<tr class="bg-brand-pink-light/20 border-b border-brand-border">
+      <td class="p-3 pl-4 text-xs">${_escapeHtml(r.shop || '')}</td>
+      <td class="p-3 text-xs">${_escapeHtml(String(r.date || '').slice(0, 10))}</td>
+      <td class="p-3 text-xs font-mono text-brand-gray">${r.skuCode ? _escapeHtml(r.skuCode) : '<span class="text-brand-gray">-</span>'}</td>
+      <td class="p-3 text-xs truncate max-w-[260px]" title="${_escapeHtml(r.name || '')}">${_escapeHtml(r.name || '')}</td>
+      <td class="p-3 text-right text-xs">${fmt(r.qty)}</td>
+      <td class="p-3 text-right text-xs">${money(r.supply)}</td>
+      <td class="p-3 text-right text-xs">${money(r.cost)}</td>
+      <td class="p-3 text-right text-xs">${marginCell(r.margin)}</td>
+      <td class="p-3 pr-4 text-xs">${_escapeHtml(r.receiver || '')}</td>
+    </tr>`).join('');
+    const totalLoss = rows.reduce((a, r) => a + (Number(r.margin) || 0), 0);
+    if (sumEl) sumEl.textContent = `총 손실 합계: ${fmt(totalLoss)}원`;
+  }
+  wrap.classList.remove('hidden');
 }
 
 async function runPaMinusCheck() {
@@ -25473,6 +25536,7 @@ async function fetchPlayautoOrders() {
       document.getElementById('pa-order-save-btn').classList.add('hidden');
       { const _b = document.getElementById('pa-order-export-btn'); if (_b) _b.classList.add('hidden'); }
       { const _mb = document.getElementById('pa-order-minus-bar'); if (_mb) _mb.classList.add('hidden'); }
+      { const _mi = document.getElementById('pa-order-minus-inline'); if (_mi) _mi.classList.add('hidden'); }
     } else {
       const extra = usedFallback ? ` (선택한 "${status}" 상태에 해당하는 주문이 없어 기간 내 전체 주문을 표시합니다)` : '';
       msg.textContent = `${orders.length}건의 주문이 조회되었습니다.${extra}`;
@@ -25483,6 +25547,7 @@ async function fetchPlayautoOrders() {
       document.getElementById('pa-order-save-btn').classList.remove('hidden');
       { const _b = document.getElementById('pa-order-export-btn'); if (_b) _b.classList.remove('hidden'); }
       { const _mb = document.getElementById('pa-order-minus-bar'); if (_mb) _mb.classList.remove('hidden'); }
+      { const _mi = document.getElementById('pa-order-minus-inline'); if (_mi) _mi.classList.add('hidden'); }
     }
   } catch (e) {
     msg.textContent = '주문 수집 실패: ' + e.message;
