@@ -3433,26 +3433,33 @@ tailwind.config = {
               <div class="px-4 py-3 border-b border-brand-border bg-brand-pink-light/40 flex items-center justify-between flex-wrap gap-2">
                 <div class="font-bold text-sm text-brand-pink flex items-center gap-2">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                  마이너스 주문 <span id="pa-order-minus-inline-count">0</span>건
+                  마이너스 확인 결과
+                  <span class="text-brand-gray font-semibold ml-1 text-xs">전체 <span id="pa-order-minus-inline-total">0</span>건 중 마이너스 <span id="pa-order-minus-inline-count" class="text-brand-pink">0</span>건</span>
                 </div>
                 <div class="text-[11px] text-brand-gray" id="pa-order-minus-inline-summary"></div>
               </div>
-              <div class="overflow-x-auto max-h-[420px] overflow-y-auto">
-                <table class="w-full text-sm text-left border-collapse min-w-[900px]">
+              <div class="overflow-x-auto max-h-[480px] overflow-y-auto">
+                <table class="w-full text-sm text-left border-collapse min-w-[1300px]">
                   <thead class="bg-brand-bg sticky top-0 z-10">
                     <tr class="text-brand-gray text-xs">
                       <th class="p-3 pl-4 font-semibold">쇼핑몰</th>
                       <th class="p-3 font-semibold">주문일</th>
                       <th class="p-3 font-semibold">SKU코드</th>
                       <th class="p-3 font-semibold">SKU상품명</th>
+                      <th class="p-3 font-semibold">온라인 상품명</th>
                       <th class="p-3 text-right font-semibold">수량</th>
+                      <th class="p-3 text-right font-semibold">판매가</th>
                       <th class="p-3 text-right font-semibold">공급가</th>
+                      <th class="p-3 text-right font-semibold">택배비</th>
                       <th class="p-3 text-right font-semibold">원가</th>
-                      <th class="p-3 text-right font-semibold">마진</th>
+                      <th class="p-3 text-right font-semibold">택배비용</th>
+                      <th class="p-3 text-right font-semibold">운영비</th>
+                      <th class="p-3 text-right font-semibold">마진(공급가+택배비−원가−택배비용−운영비)</th>
                       <th class="p-3 pr-4 font-semibold">수령자</th>
                     </tr>
                   </thead>
                   <tbody id="pa-order-minus-inline-tbody"></tbody>
+                  <tfoot id="pa-order-minus-inline-tfoot" class="bg-brand-bg/80 sticky bottom-0"></tfoot>
                 </table>
               </div>
             </div>
@@ -20163,38 +20170,81 @@ async function runMinusFromOrderTab() {
   _renderInlineMinus();
 }
 
-// 주문수집 탭 인라인 마이너스 결과 렌더링 — 마이너스 행만 간단히 표시
+// 주문수집 탭 인라인 마이너스 결과 렌더링 — 전체 주문 + 마진 (마이너스 확인 탭과 동일 산식)
 function _renderInlineMinus() {
   const wrap = document.getElementById('pa-order-minus-inline');
   const tbody = document.getElementById('pa-order-minus-inline-tbody');
+  const tfoot = document.getElementById('pa-order-minus-inline-tfoot');
   const countEl = document.getElementById('pa-order-minus-inline-count');
+  const totalEl = document.getElementById('pa-order-minus-inline-total');
   const sumEl = document.getElementById('pa-order-minus-inline-summary');
   if (!wrap || !tbody) return;
-  const rows = (Array.isArray(_paMinusRows) ? _paMinusRows : []).filter(r => r.isMinus);
-  if (countEl) countEl.textContent = rows.length;
+  const all = Array.isArray(_paMinusRows) ? _paMinusRows : [];
+  const minusCount = all.filter(r => r.isMinus).length;
+  if (totalEl) totalEl.textContent = all.length;
+  if (countEl) countEl.textContent = minusCount;
   const fmt = v => Number(v || 0).toLocaleString('ko-KR');
   const money = v => v == null ? '<span class="text-brand-gray">-</span>' : fmt(v) + '원';
   const marginCell = v => {
     if (v == null) return '<span class="text-brand-gray">-</span>';
-    return `<span class="text-brand-pink font-bold">${fmt(v)}원</span>`;
+    const cls = v < 0 ? 'text-brand-pink font-bold' : (v > 0 ? 'text-brand-green font-semibold' : 'text-brand-gray');
+    return `<span class="${cls}">${fmt(v)}원</span>`;
   };
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-brand-gray text-sm">마이너스 주문이 없습니다 — 모든 주문 정상</td></tr>';
+  if (!all.length) {
+    tbody.innerHTML = '<tr><td colspan="14" class="p-8 text-center text-brand-gray text-sm">분석할 주문이 없습니다</td></tr>';
+    if (tfoot) tfoot.innerHTML = '';
     if (sumEl) sumEl.textContent = '';
   } else {
-    tbody.innerHTML = rows.map(r => `<tr class="bg-brand-pink-light/20 border-b border-brand-border">
-      <td class="p-3 pl-4 text-xs">${_escapeHtml(r.shop || '')}</td>
-      <td class="p-3 text-xs">${_escapeHtml(String(r.date || '').slice(0, 10))}</td>
-      <td class="p-3 text-xs font-mono text-brand-gray">${r.skuCode ? _escapeHtml(r.skuCode) : '<span class="text-brand-gray">-</span>'}</td>
-      <td class="p-3 text-xs truncate max-w-[260px]" title="${_escapeHtml(r.name || '')}">${_escapeHtml(r.name || '')}</td>
-      <td class="p-3 text-right text-xs">${fmt(r.qty)}</td>
-      <td class="p-3 text-right text-xs">${money(r.supply)}</td>
-      <td class="p-3 text-right text-xs">${money(r.cost)}</td>
-      <td class="p-3 text-right text-xs">${marginCell(r.margin)}</td>
-      <td class="p-3 pr-4 text-xs">${_escapeHtml(r.receiver || '')}</td>
-    </tr>`).join('');
-    const totalLoss = rows.reduce((a, r) => a + (Number(r.margin) || 0), 0);
-    if (sumEl) sumEl.textContent = `총 손실 합계: ${fmt(totalLoss)}원`;
+    tbody.innerHTML = all.map(r => {
+      const rowCls = r.isMinus ? 'bg-brand-pink-light/30 border-b border-brand-border' : 'border-b border-brand-border hover:bg-brand-bg/40';
+      return `<tr class="${rowCls}">
+        <td class="p-3 pl-4 text-xs">${_escapeHtml(r.shop || '')}</td>
+        <td class="p-3 text-xs">${_escapeHtml(String(r.date || '').slice(0, 10))}</td>
+        <td class="p-3 text-xs font-mono text-brand-gray" title="${_escapeHtml(r.skuCode || '')}">${r.skuCode ? _escapeHtml(r.skuCode) : '<span class="text-brand-gray">-</span>'}</td>
+        <td class="p-3 text-xs truncate max-w-[220px]" title="${_escapeHtml(r.name || '')}">${_escapeHtml(r.name || '')}</td>
+        <td class="p-3 text-xs truncate max-w-[260px] text-brand-gray" title="${_escapeHtml(r.onlineName || '')}">${r.onlineName ? _escapeHtml(r.onlineName) : '<span class="text-brand-gray">-</span>'}</td>
+        <td class="p-3 text-right text-xs">${fmt(r.qty)}</td>
+        <td class="p-3 text-right text-xs font-semibold">${money(r.price)}</td>
+        <td class="p-3 text-right text-xs">${money(r.supply)}</td>
+        <td class="p-3 text-right text-xs">${money(r.shipFee)}</td>
+        <td class="p-3 text-right text-xs">${money(r.cost)}</td>
+        <td class="p-3 text-right text-xs">${money(r.shipCost)}</td>
+        <td class="p-3 text-right text-xs ${(Number(r.opsCost)||0) > 0 ? 'text-brand-orange font-semibold' : 'text-brand-gray'}">${(Number(r.opsCost)||0) > 0 ? fmt(r.opsCost) + '원' : '-'}</td>
+        <td class="p-3 text-right text-xs">${marginCell(r.margin)}</td>
+        <td class="p-3 pr-4 text-xs">${_escapeHtml(r.receiver || '')}</td>
+      </tr>`;
+    }).join('');
+    // 합계 행
+    if (tfoot) {
+      const sum = all.reduce((a, r) => {
+        a.qty += Number(r.qty) || 0;
+        a.price += Number(r.price) || 0;
+        a.supply += Number(r.supply) || 0;
+        a.shipFee += Number(r.shipFee) || 0;
+        if (r.cost != null) a.cost += Number(r.cost) || 0;
+        a.shipCost += Number(r.shipCost) || 0;
+        a.opsCost += Number(r.opsCost) || 0;
+        if (r.margin != null) a.margin += Number(r.margin) || 0;
+        return a;
+      }, { qty:0, price:0, supply:0, shipFee:0, cost:0, shipCost:0, opsCost:0, margin:0 });
+      tfoot.innerHTML = `<tr class="font-bold text-xs">
+        <td class="p-3 pl-4" colspan="5">합계 (${all.length}건)</td>
+        <td class="p-3 text-right">${fmt(sum.qty)}</td>
+        <td class="p-3 text-right">${fmt(sum.price)}원</td>
+        <td class="p-3 text-right">${fmt(sum.supply)}원</td>
+        <td class="p-3 text-right">${fmt(sum.shipFee)}원</td>
+        <td class="p-3 text-right">${fmt(sum.cost)}원</td>
+        <td class="p-3 text-right">${fmt(sum.shipCost)}원</td>
+        <td class="p-3 text-right">${sum.opsCost > 0 ? fmt(sum.opsCost) + '원' : '-'}</td>
+        <td class="p-3 text-right">${marginCell(sum.margin)}</td>
+        <td class="p-3 pr-4"></td>
+      </tr>`;
+    }
+    if (sumEl) {
+      const totalMargin = all.reduce((a, r) => a + (Number(r.margin) || 0), 0);
+      const cls = totalMargin < 0 ? 'text-brand-pink' : 'text-brand-green';
+      sumEl.innerHTML = `총 마진 합계: <span class="${cls} font-bold">${fmt(totalMargin)}원</span>`;
+    }
   }
   wrap.classList.remove('hidden');
 }
