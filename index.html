@@ -5680,6 +5680,10 @@ const PAGES = ['login','dashboard','todo','ledger','products','accounts','upload
 const currentPage = { value: 'login' };
 
 function navigate(page) {
+  // 좌측 메뉴 이동 시 — 외부업체 주문 데이터 비움 (휘발성)
+  if (page !== 'playauto' && page !== 'upload') {
+    try { localStorage.removeItem('gplan_ext_order_upload_v1'); } catch(_) {}
+  }
   // 가상 페이지: 플레이오토 연동 — 실제로는 upload 페이지 + playauto 탭. 사이드바 활성표시는 'playauto' 로.
   if (page === 'playauto') {
     PAGES.forEach(p => {
@@ -21361,6 +21365,8 @@ async function _moveSeoulLivingToShipManagement(orders, targetDepotLabel, _msg) 
 // 양식 컬럼 (이미지 기준 순서 + 공급가)
 const EXT_UPLOAD_COLS = ['받는분성명','송장번호','받는분연락처','업체명(필수기입)','받는분기타연락처','우편번호','받는분주소','수량','공급가','품목명','운임TYPE','지불조건','출고번호','배송메세지'];
 const EXT_UPLOAD_KEY = 'gplan_ext_order_upload_v1';
+// 외부업체 주문 데이터는 휘발성 — 페이지 로드 시 즉시 비움 (새로고침/재방문/탭재오픈 모두 깨끗한 상태)
+try { localStorage.removeItem(EXT_UPLOAD_KEY); } catch(_) {}
 
 function _extUploadMsg(text, tone) {
   const el = document.getElementById('ext-upload-msg');
@@ -22958,6 +22964,10 @@ function switchPlayautoSubTab(sub) {
   });
   if (sub === 'invoice') { try { _initInvoiceSubTab(); } catch(_) {} }
   if (sub === 'external') { try { _renderExternalOrderUpload(_loadExternalOrderUpload()); } catch(_) {} }
+  // 외부업체 서브탭에서 다른 서브탭으로 이동 시 데이터 비움 (휘발성)
+  if (sub !== 'external') {
+    try { localStorage.removeItem(EXT_UPLOAD_KEY); _renderExternalOrderUpload(null); } catch(_) {}
+  }
   if (sub === 'claim') { try { _initClaimSubTab(); } catch(_) {} }
 }
 
