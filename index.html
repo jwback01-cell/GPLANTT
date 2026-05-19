@@ -21385,19 +21385,24 @@ async function fetchExternalOrderFromMail() {
   const btn = document.getElementById('ext-upload-fetch-mail-btn');
   const origHtml = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="animate-pulse">메일 조회 중...</span>'; }
-  _extUploadMsg('메일함에서 발주서 첨부파일을 조회하고 있습니다...', 'info');
+  // 이전 업로드 데이터 먼저 비우기 — 새 조회 결과가 명확히 보이도록
+  try { if (typeof clearExternalOrderUpload === 'function') clearExternalOrderUpload(); } catch(_) {}
+  _extUploadMsg('메일함에서 "다올 버즈에어팟류" 첨부파일을 조회하고 있습니다...', 'info');
   try {
-    // 발신자 필터 없이 최근 14일, 파일명에 '다올 버즈에어팟류' 포함된 첨부를 검색
-    const res = await fetch('/api/naver-mail-fetch?days=14&limit=30&sender=&filenamePattern=' + encodeURIComponent('다올 버즈에어팟류'));
+    // 발신자 필터 없이 최근 14일, 파일명에 '다올 버즈에어팟류' 포함된 첨부를 검색 (limit=50: 메일이 많을 경우 누락 방지)
+    const apiUrl = '/api/naver-mail-fetch?days=14&limit=50&sender=&filenamePattern=' + encodeURIComponent('다올 버즈에어팟류');
+    console.log('[외부업체 발주 메일 가져오기] 요청 URL:', apiUrl);
+    const res = await fetch(apiUrl);
     const data = await res.json().catch(() => ({}));
+    console.log('[외부업체 발주 메일 가져오기] 응답:', data);
     if (!res.ok) {
       const err = data.error || ('HTTP ' + res.status);
       const hint = data.hint ? '\n\n' + data.hint : '';
       throw new Error(err + hint);
     }
     if (!data.items || data.items.length === 0) {
-      _extUploadMsg('파일명에 "다올 버즈에어팟류" 가 포함된 첨부가 최근 14일 메일에 없습니다.', 'warn');
-      showAppAlert('가져올 메일 없음', '파일명에 "다올 버즈에어팟류" 가 포함된 엑셀 첨부 메일이 최근 14일 내에 없습니다.', 'info');
+      _extUploadMsg('❌ 파일명에 "다올 버즈에어팟류" 가 포함된 첨부가 최근 14일 메일에 없습니다.', 'error');
+      showAppAlert('가져올 메일 없음', '파일명에 "다올 버즈에어팟류" 가 포함된 엑셀 첨부 메일이 최근 14일 내에 없습니다.\n\n메일 제목/파일명을 확인해 주세요.', 'info');
       return;
     }
     const items = data.items;
