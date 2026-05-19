@@ -5873,7 +5873,7 @@ function navigate(page) {
   if (page === 'accounts') filterAccounts();
   if (page === 'keywords') { _loadKwExtras(); _migrateKwManageProductKeys(); _cleanupOrphanKwSeries(); renderKwProductSelect(); _fillNaverApiInputs(); renderKwManageList(); _bindKwTrendPeriodButtons(); renderKwTrend(); renderKwAutoStatus(); _scheduleKwAutoTick(); if (typeof _populateSaInputs === 'function') _populateSaInputs(); if (typeof _updateSaBadge === 'function') _updateSaBadge(); }
   if (page === 'sourcing') initSourcingPage();
-  if (page === 'prodsrc') { try { _prodsrcState = _prodsrcLoad(); _prodsrcRender(); } catch(_) {} }
+  if (page === 'prodsrc') { try { _prodsrcState = _prodsrcLoad(); _prodsrcCurrentCategory = null; _prodsrcRender(); } catch(_) {} }
 }
 
 // ── Keywords: 조회할 상품 관리 ───────────────
