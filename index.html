@@ -5386,28 +5386,6 @@ PBT키캡	1180
         <div id="prodsrc-upload-msg" class="hidden text-sm font-semibold px-1"></div>
       </section>
 
-      <!-- 변동 요약 — 재업로드 후만 표시 -->
-      <section id="prodsrc-diff-card" class="hidden bg-white rounded-4xl panel p-6">
-        <div class="flex items-center gap-2 mb-4">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF8A00" stroke-width="2.5"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-          <h3 class="font-bold text-base">변동 요약</h3>
-          <span class="text-xs text-brand-gray ml-2" id="prodsrc-diff-meta"></span>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div class="bg-brand-green-light/50 rounded-2xl p-4 border border-brand-green/20">
-            <div class="text-xs text-brand-gray mb-1">신규 추가 키워드</div>
-            <div class="text-2xl font-bold text-brand-green" id="prodsrc-diff-new">0</div>
-          </div>
-          <div class="bg-brand-blue-light/50 rounded-2xl p-4 border border-brand-blue/20">
-            <div class="text-xs text-brand-gray mb-1">총검색수 증가</div>
-            <div class="text-2xl font-bold text-brand-blue" id="prodsrc-diff-up">0</div>
-          </div>
-          <div class="bg-brand-pink-light/50 rounded-2xl p-4 border border-brand-pink/20">
-            <div class="text-xs text-brand-gray mb-1">총검색수 감소</div>
-            <div class="text-2xl font-bold text-brand-pink" id="prodsrc-diff-down">0</div>
-          </div>
-        </div>
-      </section>
 
       <!-- 카테고리 폴더 그리드 -->
       <section id="prodsrc-folder-section" class="hidden bg-white rounded-4xl panel p-6">
@@ -5430,6 +5408,28 @@ PBT키캡	1180
             <span class="text-xs text-brand-gray" id="prodsrc-detail-meta"></span>
           </div>
           <input id="prodsrc-detail-search" type="text" placeholder="키워드 검색..." oninput="prodsrcRenderDetail()" class="px-3 py-1.5 bg-brand-bg rounded-full text-xs focus:outline-none focus:bg-white focus:ring-1 focus:ring-brand-border w-[200px]">
+        </div>
+        <!-- 카테고리별 변동 요약 — 재업로드 후만 표시 -->
+        <div id="prodsrc-detail-diff" class="hidden px-5 py-4 border-b border-brand-border bg-brand-bg/40">
+          <div class="flex items-center gap-2 mb-3">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF8A00" stroke-width="2.5"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            <span class="font-bold text-sm">변동 요약</span>
+            <span class="text-[11px] text-brand-gray ml-2" id="prodsrc-detail-diff-meta"></span>
+          </div>
+          <div class="grid grid-cols-3 gap-2">
+            <div class="bg-brand-green-light/50 rounded-xl p-3 border border-brand-green/20">
+              <div class="text-[11px] text-brand-gray mb-0.5">신규 추가 키워드</div>
+              <div class="text-xl font-bold text-brand-green" id="prodsrc-detail-diff-new">0</div>
+            </div>
+            <div class="bg-brand-blue-light/50 rounded-xl p-3 border border-brand-blue/20">
+              <div class="text-[11px] text-brand-gray mb-0.5">총검색수 증가</div>
+              <div class="text-xl font-bold text-brand-blue" id="prodsrc-detail-diff-up">0</div>
+            </div>
+            <div class="bg-brand-pink-light/50 rounded-xl p-3 border border-brand-pink/20">
+              <div class="text-[11px] text-brand-gray mb-0.5">총검색수 감소</div>
+              <div class="text-xl font-bold text-brand-pink" id="prodsrc-detail-diff-down">0</div>
+            </div>
+          </div>
         </div>
         <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
           <table class="w-full text-xs text-left border-collapse min-w-[1100px]">
@@ -34453,24 +34453,8 @@ function _prodsrcRender() {
   const folderSec  = document.getElementById('prodsrc-folder-section');
   const detailSec  = document.getElementById('prodsrc-detail');
   const emptySec   = document.getElementById('prodsrc-empty');
-  const diffCard   = document.getElementById('prodsrc-diff-card');
   const clearBtn   = document.getElementById('prodsrc-clear-btn');
   const rows = _prodsrcState.rows || [];
-
-  // 변동 요약
-  if (_prodsrcState.diff && rows.length) {
-    diffCard.classList.remove('hidden');
-    document.getElementById('prodsrc-diff-new').textContent  = _prodsrcState.diff.newCount.toLocaleString('ko-KR');
-    document.getElementById('prodsrc-diff-up').textContent   = _prodsrcState.diff.upCount.toLocaleString('ko-KR');
-    document.getElementById('prodsrc-diff-down').textContent = _prodsrcState.diff.downCount.toLocaleString('ko-KR');
-    const meta = document.getElementById('prodsrc-diff-meta');
-    if (meta) {
-      const prevDt = _prodsrcState.diff.prevUploadedAt ? new Date(_prodsrcState.diff.prevUploadedAt).toLocaleString('ko-KR') : '(이전 업로드)';
-      meta.textContent = `이전 업로드: ${prevDt}`;
-    }
-  } else {
-    diffCard.classList.add('hidden');
-  }
 
   if (!rows.length) {
     folderSec.classList.add('hidden');
@@ -34550,6 +34534,31 @@ function prodsrcRenderDetail() {
   if (!tbody) return;
   const search = (document.getElementById('prodsrc-detail-search')?.value || '').trim().toLowerCase();
   let rows = (_prodsrcState.rows || []).filter(r => r.category === cat);
+
+  // 카테고리별 변동 요약 계산 + 표시 (검색 필터 무관)
+  const diffBox = document.getElementById('prodsrc-detail-diff');
+  if (diffBox) {
+    if (_prodsrcState.diff && rows.length) {
+      let newC = 0, upC = 0, downC = 0;
+      rows.forEach(r => {
+        if (r.isNew) newC++;
+        else if ((r.totalSearchDiff || 0) > 0) upC++;
+        else if ((r.totalSearchDiff || 0) < 0) downC++;
+      });
+      document.getElementById('prodsrc-detail-diff-new').textContent  = newC.toLocaleString('ko-KR');
+      document.getElementById('prodsrc-detail-diff-up').textContent   = upC.toLocaleString('ko-KR');
+      document.getElementById('prodsrc-detail-diff-down').textContent = downC.toLocaleString('ko-KR');
+      const meta = document.getElementById('prodsrc-detail-diff-meta');
+      if (meta) {
+        const prevDt = _prodsrcState.diff.prevUploadedAt ? new Date(_prodsrcState.diff.prevUploadedAt).toLocaleString('ko-KR') : '(이전 업로드)';
+        meta.textContent = `이전 업로드: ${prevDt}`;
+      }
+      diffBox.classList.remove('hidden');
+    } else {
+      diffBox.classList.add('hidden');
+    }
+  }
+
   if (search) rows = rows.filter(r => (r.keyword || '').toLowerCase().includes(search));
   // 총검색수 내림차순 (값이 null/없으면 맨 아래로)
   rows.sort((a, b) => {
