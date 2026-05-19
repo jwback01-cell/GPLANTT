@@ -25581,7 +25581,8 @@ async function fetchPlayautoOrders() {
       msg.className = 'text-sm font-semibold px-1 ' + (usedFallback ? 'text-brand-orange' : 'text-brand-green');
       msg.classList.remove('hidden');
       _renderPaOrders(orders);
-      document.getElementById('pa-order-result').classList.remove('hidden');
+      // 기본 주문 결과 테이블은 숨김 — 마이너스 확인 결과(인라인)로 대체됨
+      document.getElementById('pa-order-result').classList.add('hidden');
       document.getElementById('pa-order-save-btn').classList.remove('hidden');
       { const _b = document.getElementById('pa-order-export-btn'); if (_b) _b.classList.remove('hidden'); }
       // 주문 수집 직후 자동으로 마이너스 확인 결과까지 인라인 표시
