@@ -21406,16 +21406,20 @@ async function fetchExternalOrderFromMail() {
       return;
     }
     // 클라이언트 측 안전망 필터링 — API가 패턴 필터를 적용하지 않은 경우 대비
-    const PATTERN = '다올버즈에어팟류'; // 공백 무시 비교용
+    // '다올 버즈에어팟류' 포함, 단 'CS' 가 포함된 파일은 제외
+    const PATTERN  = '다올버즈에어팟류';
+    const EXCLUDE  = 'cs';
     const items = data.items.filter(it => {
       const fn = String(it.fileName || '').toLowerCase().replace(/\s+/g, '');
-      return fn.indexOf(PATTERN) !== -1;
+      if (fn.indexOf(PATTERN) === -1) return false;
+      if (fn.indexOf(EXCLUDE) !== -1) return false; // 'CS' 가 들어간 파일 제외
+      return true;
     });
     console.log('[외부업체 발주 메일 가져오기] 클라이언트 필터 후:', items.length + '건', items.map(it => it.fileName));
     if (items.length === 0) {
-      _extUploadMsg('❌ 파일명에 "다올 버즈에어팟류" 가 포함된 첨부를 찾지 못했습니다.', 'error');
+      _extUploadMsg('❌ 파일명에 "다올 버즈에어팟류" 가 포함되고 "CS" 가 없는 첨부를 찾지 못했습니다.', 'error');
       const sampleNames = data.items.slice(0, 5).map(it => '· ' + (it.fileName || '(이름없음)')).join('\n');
-      showAppAlert('가져올 메일 없음', `파일명에 "다올 버즈에어팟류" 가 포함된 메일이 없습니다.\n\n조회된 최근 메일 첨부 (예시):\n${sampleNames}`, 'info');
+      showAppAlert('가져올 메일 없음', `파일명에 "다올 버즈에어팟류" 가 포함되고 "CS" 가 없는 메일이 없습니다.\n\n조회된 최근 메일 첨부 (예시):\n${sampleNames}`, 'info');
       return;
     }
     if (items.length > 1) {
