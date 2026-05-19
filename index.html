@@ -5397,7 +5397,7 @@ PBT키캡	1180
           </h3>
           <div class="flex items-center gap-2">
             <label class="text-xs text-brand-gray">카테고리에서 추가:</label>
-            <select id="prodsrc-fav-add-select" onchange="prodsrcAddFavorite(this.value); this.value='';"
+            <select id="prodsrc-fav-add-select"
               class="px-3 py-1.5 bg-brand-bg rounded-full text-xs font-semibold border border-brand-border focus:outline-none focus:bg-white focus:ring-1 focus:ring-brand-border min-w-[220px]">
               <option value="">주요 폴더로 옮길 카테고리 선택...</option>
             </select>
@@ -34602,14 +34602,25 @@ function _prodsrcRenderFavorites() {
     _prodsrcSave();
   }
   countEl.textContent = `(${validFavs.length}개)`;
-  // 드롭다운 — 주요 폴더에 없는 카테고리만 옵션으로
+  // 드롭다운 — 주요 폴더에 없는 카테고리만 옵션으로 (값 충돌 방지를 위해 인덱스 사용)
   if (select) {
     const nonFav = [...cats.entries()]
       .filter(([name]) => !validFavs.includes(name))
       .sort((a, b) => b[1].count - a[1].count);
+    // 옵션 값에 인덱스를 사용하고, 실제 폴더명은 data-name 속성에 저장
     select.innerHTML = '<option value="">주요 폴더로 옮길 카테고리 선택...</option>'
-      + nonFav.map(([name, c]) => `<option value="${_prodsrcEsc(name)}">${_prodsrcEsc(name)} (${c.count}개)</option>`).join('');
+      + nonFav.map(([name, c], i) => `<option value="${i}" data-name="${_prodsrcEsc(name)}">${_prodsrcEsc(name)} (${c.count}개)</option>`).join('');
     select.disabled = nonFav.length === 0;
+    // 매 렌더링마다 onchange 핸들러 재등록 (인라인 onchange 의존 X)
+    select.onchange = function() {
+      const idx = parseInt(this.value, 10);
+      console.log('[주요 폴더] 드롭다운 선택 인덱스:', this.value);
+      this.value = '';
+      if (isNaN(idx) || idx < 0 || idx >= nonFav.length) return;
+      const [pickedName] = nonFav[idx];
+      console.log('[주요 폴더] 추가 대상:', pickedName);
+      prodsrcAddFavorite(pickedName);
+    };
   }
   // 즐겨찾기 카드 렌더링
   if (!validFavs.length) {
@@ -34634,11 +34645,13 @@ function _prodsrcRenderFavorites() {
 }
 
 function prodsrcAddFavorite(name) {
+  console.log('[주요 폴더] prodsrcAddFavorite 호출:', name);
   if (!name) return;
   if (!Array.isArray(_prodsrcState.favorites)) _prodsrcState.favorites = [];
-  if (_prodsrcState.favorites.includes(name)) return;
+  if (_prodsrcState.favorites.includes(name)) { console.log('[주요 폴더] 이미 존재함'); return; }
   _prodsrcState.favorites.push(name);
   _prodsrcSave();
+  console.log('[주요 폴더] 추가 완료. 현재 favorites:', _prodsrcState.favorites);
   _prodsrcRender();
 }
 
