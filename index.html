@@ -5387,6 +5387,25 @@ PBT키캡	1180
       </section>
 
 
+      <!-- 주요 폴더 — 카테고리 폴더에서 드롭다운으로 옮길 수 있음 -->
+      <section id="prodsrc-fav-section" class="hidden bg-white rounded-4xl panel p-6">
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <h3 class="font-bold text-base flex items-center gap-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#FBBF24" stroke="#F59E0B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            주요 폴더
+            <span id="prodsrc-fav-count" class="text-brand-gray font-normal text-sm ml-1">(0개)</span>
+          </h3>
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-brand-gray">카테고리에서 추가:</label>
+            <select id="prodsrc-fav-add-select" onchange="prodsrcAddFavorite(this.value); this.value='';"
+              class="px-3 py-1.5 bg-brand-bg rounded-full text-xs font-semibold border border-brand-border focus:outline-none focus:bg-white focus:ring-1 focus:ring-brand-border min-w-[220px]">
+              <option value="">주요 폴더로 옮길 카테고리 선택...</option>
+            </select>
+          </div>
+        </div>
+        <div id="prodsrc-favorites" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
+      </section>
+
       <!-- 카테고리 폴더 그리드 -->
       <section id="prodsrc-folder-section" class="hidden bg-white rounded-4xl panel p-6">
         <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -34272,16 +34291,21 @@ async function confirmPaImport() {
 // 상품 소싱 — 키워드 엑셀 업로드 + 카테고리 폴더 + 총검색수 변동 추적
 // ════════════════════════════════════════════════════════
 const PRODSRC_KEY = 'gplan_prodsrc_v1';
-let _prodsrcState = { rows: [], lastUploadedAt: '', prevUploadedAt: '' };
+let _prodsrcState = { rows: [], lastUploadedAt: '', prevUploadedAt: '', favorites: [] };
 let _prodsrcCurrentCategory = null;
 
 function _prodsrcLoad() {
   try {
     const raw = localStorage.getItem(PRODSRC_KEY);
-    if (!raw) return { rows: [], lastUploadedAt: '', prevUploadedAt: '' };
+    if (!raw) return { rows: [], lastUploadedAt: '', prevUploadedAt: '', favorites: [] };
     const obj = JSON.parse(raw);
-    return { rows: obj.rows || [], lastUploadedAt: obj.lastUploadedAt || '', prevUploadedAt: obj.prevUploadedAt || '' };
-  } catch (_) { return { rows: [], lastUploadedAt: '', prevUploadedAt: '' }; }
+    return {
+      rows: obj.rows || [],
+      lastUploadedAt: obj.lastUploadedAt || '',
+      prevUploadedAt: obj.prevUploadedAt || '',
+      favorites: Array.isArray(obj.favorites) ? obj.favorites : [],
+    };
+  } catch (_) { return { rows: [], lastUploadedAt: '', prevUploadedAt: '', favorites: [] }; }
 }
 function _prodsrcSave() {
   try { localStorage.setItem(PRODSRC_KEY, JSON.stringify(_prodsrcState)); } catch(_) {}
@@ -34467,6 +34491,7 @@ function _prodsrcProcessFile(file) {
         rows: mergedRows,
         lastUploadedAt: new Date().toISOString(),
         prevUploadedAt: _prodsrcState.lastUploadedAt || '',
+        favorites: Array.isArray(_prodsrcState.favorites) ? _prodsrcState.favorites.slice() : [],
       };
       _prodsrcSave();
       _prodsrcCurrentCategory = null;
@@ -34486,6 +34511,7 @@ function _prodsrcProcessFile(file) {
 
 function _prodsrcRender() {
   const folderSec  = document.getElementById('prodsrc-folder-section');
+  const favSec     = document.getElementById('prodsrc-fav-section');
   const detailSec  = document.getElementById('prodsrc-detail');
   const emptySec   = document.getElementById('prodsrc-empty');
   const clearBtn   = document.getElementById('prodsrc-clear-btn');
@@ -34493,6 +34519,7 @@ function _prodsrcRender() {
 
   if (!rows.length) {
     folderSec.classList.add('hidden');
+    if (favSec) favSec.classList.add('hidden');
     detailSec.classList.add('hidden');
     emptySec.classList.remove('hidden');
     clearBtn.classList.add('hidden');
@@ -34503,11 +34530,14 @@ function _prodsrcRender() {
 
   if (_prodsrcCurrentCategory) {
     folderSec.classList.add('hidden');
+    if (favSec) favSec.classList.add('hidden');
     detailSec.classList.remove('hidden');
     prodsrcRenderDetail();
   } else {
     detailSec.classList.add('hidden');
     folderSec.classList.remove('hidden');
+    if (favSec) favSec.classList.remove('hidden');
+    _prodsrcRenderFavorites();
     _prodsrcRenderFolders();
   }
 }
@@ -34517,10 +34547,13 @@ function _prodsrcRenderFolders() {
   const countEl = document.getElementById('prodsrc-cat-count');
   const lastEl = document.getElementById('prodsrc-last-uploaded');
   if (!wrap) return;
+  // 주요 폴더에 포함된 항목은 카테고리 폴더에서 제외
+  const favs = new Set(_prodsrcState.favorites || []);
   // 폴더(=각 업로드의 대표 카테고리) 별로 그룹화
   const cats = new Map();
   (_prodsrcState.rows || []).forEach(r => {
     const k = r.folderName || r.category || '(미분류)';
+    if (favs.has(k)) return; // 주요 폴더에 있으면 카테고리 폴더에서 숨김
     if (!cats.has(k)) cats.set(k, { count: 0, totalSearch: 0 });
     const c = cats.get(k);
     c.count++;
@@ -34542,6 +34575,76 @@ function _prodsrcRenderFolders() {
       <div class="text-[11px] text-brand-gray">키워드 ${c.count}개 · 총검색합 ${_prodsrcFmt(c.totalSearch)}</div>
     </div>`;
   }).join('') || '<div class="col-span-full text-center text-sm text-brand-gray py-6">폴더가 없습니다</div>';
+}
+
+// 주요 폴더 렌더링 — 카테고리 폴더 위에 별도로 표시
+function _prodsrcRenderFavorites() {
+  const wrap = document.getElementById('prodsrc-favorites');
+  const countEl = document.getElementById('prodsrc-fav-count');
+  const select = document.getElementById('prodsrc-fav-add-select');
+  if (!wrap) return;
+  const favs = Array.isArray(_prodsrcState.favorites) ? _prodsrcState.favorites : [];
+  // 폴더별 통계 (전체 폴더 — 주요 / 비주요 모두 집계)
+  const cats = new Map();
+  (_prodsrcState.rows || []).forEach(r => {
+    const k = r.folderName || r.category || '(미분류)';
+    if (!cats.has(k)) cats.set(k, { count: 0, totalSearch: 0 });
+    const c = cats.get(k);
+    c.count++;
+    if (r.totalSearch != null) c.totalSearch += Number(r.totalSearch) || 0;
+  });
+  // 무효한(데이터 없음) 즐겨찾기 자동 정리
+  const validFavs = favs.filter(name => cats.has(name));
+  if (validFavs.length !== favs.length) {
+    _prodsrcState.favorites = validFavs;
+    _prodsrcSave();
+  }
+  countEl.textContent = `(${validFavs.length}개)`;
+  // 드롭다운 — 주요 폴더에 없는 카테고리만 옵션으로
+  if (select) {
+    const nonFav = [...cats.entries()]
+      .filter(([name]) => !validFavs.includes(name))
+      .sort((a, b) => b[1].count - a[1].count);
+    select.innerHTML = '<option value="">주요 폴더로 옮길 카테고리 선택...</option>'
+      + nonFav.map(([name, c]) => `<option value="${_prodsrcEsc(name)}">${_prodsrcEsc(name)} (${c.count}개)</option>`).join('');
+    select.disabled = nonFav.length === 0;
+  }
+  // 즐겨찾기 카드 렌더링
+  if (!validFavs.length) {
+    wrap.innerHTML = '<div class="col-span-full text-center text-xs text-brand-gray py-4">⭐ 아직 주요 폴더가 없습니다. 위 드롭다운에서 카테고리를 선택해 추가하세요.</div>';
+    return;
+  }
+  wrap.innerHTML = validFavs.map(name => {
+    const c = cats.get(name) || { count: 0, totalSearch: 0 };
+    const safeName = _prodsrcEsc(name).replace(/'/g, "\\'");
+    return `<div class="relative bg-amber-50 hover:bg-white border border-amber-300 hover:border-amber-500 rounded-2xl p-4 transition-all">
+      <button onclick="event.stopPropagation(); prodsrcRemoveFavorite('${safeName}')" title="주요 폴더에서 제거" class="absolute top-2 right-2 w-6 h-6 rounded-full bg-white border border-brand-border text-brand-gray hover:text-brand-pink hover:border-brand-pink flex items-center justify-center text-xs">×</button>
+      <div onclick="prodsrcOpenCategory('${safeName}')" class="cursor-pointer">
+        <div class="mb-2 flex items-center gap-1.5">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="#FBBF24" stroke="#F59E0B" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="#FFCB52" stroke="#E5A93B" stroke-width="1"><path d="M4 14 C4 9.6 7.6 6 12 6 L30 6 L36 12 L68 12 C72.4 12 76 15.6 76 20 L76 54 C76 58.4 72.4 62 68 62 L12 62 C7.6 62 4 58.4 4 54 Z" transform="scale(0.3)"/></svg>
+        </div>
+        <div class="font-bold text-sm leading-tight mb-1 break-words pr-6" title="${_prodsrcEsc(name)}">${_prodsrcEsc(name)}</div>
+        <div class="text-[11px] text-brand-gray">키워드 ${c.count}개 · 총검색합 ${_prodsrcFmt(c.totalSearch)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function prodsrcAddFavorite(name) {
+  if (!name) return;
+  if (!Array.isArray(_prodsrcState.favorites)) _prodsrcState.favorites = [];
+  if (_prodsrcState.favorites.includes(name)) return;
+  _prodsrcState.favorites.push(name);
+  _prodsrcSave();
+  _prodsrcRender();
+}
+
+function prodsrcRemoveFavorite(name) {
+  if (!Array.isArray(_prodsrcState.favorites)) return;
+  _prodsrcState.favorites = _prodsrcState.favorites.filter(n => n !== name);
+  _prodsrcSave();
+  _prodsrcRender();
 }
 
 function prodsrcOpenCategory(name) {
@@ -34597,7 +34700,7 @@ function prodsrcClearAll() {
       '업로드한 모든 키워드 데이터가 삭제됩니다.\n이 작업은 되돌릴 수 없습니다.',
       () => {
         try { localStorage.removeItem(PRODSRC_KEY); } catch(_) {}
-        _prodsrcState = { rows: [], lastUploadedAt: '', prevUploadedAt: '' };
+        _prodsrcState = { rows: [], lastUploadedAt: '', prevUploadedAt: '', favorites: [] };
         _prodsrcCurrentCategory = null;
         _prodsrcMsg('데이터를 모두 삭제했습니다.', 'warn');
         _prodsrcRender();
