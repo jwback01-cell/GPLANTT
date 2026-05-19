@@ -34674,7 +34674,7 @@ function prodsrcCatDragEnd(e) {
   if (e.currentTarget) e.currentTarget.style.opacity = '';
   // 드롭존 강조 효과 제거
   const favSec = document.getElementById('prodsrc-fav-section');
-  if (favSec) favSec.classList.remove('ring-2','ring-amber-400','bg-amber-50/30');
+  if (favSec) favSec.classList.remove('ring-2','ring-inset','ring-amber-400','bg-amber-50/30');
 }
 function prodsrcFavDragOver(e) {
   // 드래그 중인 항목이 카테고리 폴더에서 온 경우에만 허용
@@ -34682,7 +34682,7 @@ function prodsrcFavDragOver(e) {
   e.preventDefault();
   try { e.dataTransfer.dropEffect = 'move'; } catch(_){}
   const favSec = document.getElementById('prodsrc-fav-section');
-  if (favSec) favSec.classList.add('ring-2','ring-amber-400','bg-amber-50/30');
+  if (favSec) favSec.classList.add('ring-2','ring-inset','ring-amber-400','bg-amber-50/30');
 }
 function prodsrcFavDragLeave(e) {
   // 자식 요소 진입 시에도 leave 가 호출되므로 — 진짜 영역 밖일 때만 강조 해제
@@ -34690,13 +34690,13 @@ function prodsrcFavDragLeave(e) {
   if (!favSec) return;
   const rect = favSec.getBoundingClientRect();
   if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
-    favSec.classList.remove('ring-2','ring-amber-400','bg-amber-50/30');
+    favSec.classList.remove('ring-2','ring-inset','ring-amber-400','bg-amber-50/30');
   }
 }
 function prodsrcFavDrop(e) {
   e.preventDefault();
   const favSec = document.getElementById('prodsrc-fav-section');
-  if (favSec) favSec.classList.remove('ring-2','ring-amber-400','bg-amber-50/30');
+  if (favSec) favSec.classList.remove('ring-2','ring-inset','ring-amber-400','bg-amber-50/30');
   let name = _prodsrcDragging;
   if (!name) {
     try { name = e.dataTransfer.getData('text/plain'); } catch(_){}
