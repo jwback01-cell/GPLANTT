@@ -3834,14 +3834,17 @@ tailwind.config = {
               </div>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
-              <button id="pa-inv-fetch-btn" type="button" onclick="fetchInvoiceShipManagementOrders()" class="px-5 py-2.5 rounded-full text-xs font-bold bg-brand-blue text-white hover:opacity-90 flex items-center gap-1.5">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-                플레이오토 출고관리 탭 가져오기
+              <!-- 원클릭 송장 처리 — 출고관리 수집 → 메일 가져오기 → 매칭 한 번에 -->
+              <button id="inv-one-click-btn" type="button" onclick="runInvoiceOneClick()" class="px-6 py-3 rounded-full text-sm font-bold text-white flex items-center gap-2 shadow-md hover:opacity-95" style="background: linear-gradient(90deg,#FF8A00,#FF3D7F);" title="플레이오토 출고관리 수집 + 메일에서 송장 엑셀 가져오기 + 매칭까지 한 번에 실행">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                원클릭 송장 처리
               </button>
               <button id="pa-inv-send-btn" type="button" onclick="sendInvoicesToPlayauto()" class="px-5 py-2.5 rounded-full text-xs font-bold bg-brand-black text-white hover:bg-[#333] flex items-center gap-1.5" title="송장번호 + 택배사 정보를 PA에 전송하여 출고완료 상태로 변경">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                 송장 전송
               </button>
+              <!-- 개별 단계 버튼 — 원클릭 버튼에 통합되어 숨김 -->
+              <button id="pa-inv-fetch-btn" type="button" onclick="fetchInvoiceShipManagementOrders()" class="hidden">플레이오토 출고관리 탭 가져오기</button>
               <div id="pa-inv-fetch-status" class="text-xs font-semibold text-brand-gray ml-2"></div>
             </div>
 
@@ -3901,22 +3904,12 @@ tailwind.config = {
                 </label>
                 <input id="invoice-file-input" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleInvoiceFileSelect(event)">
               </div>
-              <div class="flex gap-2 flex-wrap">
-                <button onclick="uploadInvoiceFile()" class="bg-brand-black text-white px-5 py-2.5 rounded-full font-bold text-xs hover:bg-[#333] flex items-center gap-1.5">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                  송장 업로드 실행
-                </button>
-                <button id="invoice-fetch-mail-btn" onclick="fetchInvoiceFromMail()" class="bg-brand-blue text-white px-5 py-2.5 rounded-full font-bold text-xs hover:opacity-90 flex items-center gap-1.5" title="seoulbjs@naver.com 발신 최신 메일의 송장 엑셀 첨부파일을 자동으로 가져옵니다">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                  📥 메일에서 자동 가져오기
-                </button>
-                <button onclick="downloadInvoiceTemplate()" class="bg-white border border-brand-border text-brand-black px-5 py-2.5 rounded-full font-bold text-xs hover:bg-brand-bg flex items-center gap-1.5">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  양식 다운로드
-                </button>
-                <button onclick="document.getElementById('invoice-file-input').value=''; document.getElementById('invoice-file-name').textContent='엑셀 파일을 선택하거나 여기로 끌어다 놓으세요';" class="bg-white border border-brand-border text-brand-black px-5 py-2.5 rounded-full font-bold text-xs hover:bg-brand-bg">
-                  초기화
-                </button>
+              <!-- 송장 업로드 / 메일 가져오기 / 양식 다운로드 / 초기화 — 원클릭 버튼에 통합되어 숨김 -->
+              <div class="hidden flex gap-2 flex-wrap">
+                <button onclick="uploadInvoiceFile()">송장 업로드 실행</button>
+                <button id="invoice-fetch-mail-btn" onclick="fetchInvoiceFromMail()">📥 메일에서 자동 가져오기</button>
+                <button onclick="downloadInvoiceTemplate()">양식 다운로드</button>
+                <button onclick="document.getElementById('invoice-file-input').value=''; document.getElementById('invoice-file-name').textContent='엑셀 파일을 선택하거나 여기로 끌어다 놓으세요';">초기화</button>
               </div>
               <div id="invoice-status-msg" class="hidden text-sm font-semibold px-1"></div>
             </div>
@@ -22779,6 +22772,42 @@ function handleInvoiceFileSelect(e) {
 }
 
 // 📥 송장 — 네이버 메일 답장 첨부파일을 자동으로 가져와 송장 업로드 입력란에 채움
+// 원클릭 송장 처리 — 출고관리 수집 → 메일 가져오기 → 매칭 한 번에 실행
+async function runInvoiceOneClick() {
+  const btn = document.getElementById('inv-one-click-btn');
+  const origLabel = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="animate-pulse">처리 중...</span>';
+  }
+  try {
+    // 1) 플레이오토 출고관리 주문 수집
+    _invoiceStatus('① 플레이오토 출고관리 주문 수집 중...', 'info');
+    await fetchInvoiceShipManagementOrders();
+    // 2) 메일에서 송장 엑셀 자동 가져오기
+    _invoiceStatus('② 메일에서 송장 엑셀 가져오는 중...', 'info');
+    await fetchInvoiceFromMail();
+    // 파일이 input 에 주입되었는지 확인
+    const input = document.getElementById('invoice-file-input');
+    if (!input || !input.files || !input.files[0]) {
+      _invoiceStatus('메일에서 송장 파일을 가져오지 못했습니다 — 처리 중단.', 'error');
+      return;
+    }
+    // 3) 송장 업로드 실행 (매칭)
+    _invoiceStatus('③ 송장 파일과 주문 매칭 중...', 'info');
+    await uploadInvoiceFile();
+    _invoiceStatus('✅ 원클릭 송장 처리 완료', 'ok');
+  } catch (e) {
+    console.error('[원클릭 송장 처리] 실패:', e);
+    _invoiceStatus('처리 실패: ' + (e.message || e), 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origLabel;
+    }
+  }
+}
+
 async function fetchInvoiceFromMail() {
   const btn = document.getElementById('invoice-fetch-mail-btn');
   const origLabel = btn ? btn.innerHTML : '';
