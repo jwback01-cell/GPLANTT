@@ -34549,10 +34549,12 @@ function _prodsrcRenderFolders() {
   if (!wrap) return;
   // 주요 폴더에 포함된 항목은 카테고리 폴더에서 제외
   const favs = new Set(_prodsrcState.favorites || []);
-  // 폴더(=각 업로드의 대표 카테고리) 별로 그룹화
+  // 폴더(=각 업로드의 대표 카테고리) 별로 그룹화 + 업로드 순서(=rows 배열 첫 등장 인덱스) 기록
   const cats = new Map();
-  (_prodsrcState.rows || []).forEach(r => {
+  const firstIdx = new Map();
+  (_prodsrcState.rows || []).forEach((r, idx) => {
     const k = r.folderName || r.category || '(미분류)';
+    if (!firstIdx.has(k)) firstIdx.set(k, idx);
     if (favs.has(k)) return; // 주요 폴더에 있으면 카테고리 폴더에서 숨김
     if (!cats.has(k)) cats.set(k, { count: 0, totalSearch: 0 });
     const c = cats.get(k);
@@ -34563,8 +34565,8 @@ function _prodsrcRenderFolders() {
     const d = _prodsrcState.lastUploadedAt ? new Date(_prodsrcState.lastUploadedAt).toLocaleString('ko-KR') : '';
     lastEl.textContent = d ? `최근 업로드: ${d}` : '';
   }
-  // 모든 카테고리 폴더 표시 (누적) — 키워드 수 내림차순
-  const entries = [...cats.entries()].sort((a, b) => b[1].count - a[1].count);
+  // 엑셀 업로드 순서대로 정렬 (먼저 추가된 폴더가 앞)
+  const entries = [...cats.entries()].sort((a, b) => (firstIdx.get(a[0]) ?? 0) - (firstIdx.get(b[0]) ?? 0));
   countEl.textContent = `(${cats.size}개)`;
   wrap.innerHTML = entries.map(([name, c]) => {
     return `<div onclick="prodsrcOpenCategory('${_prodsrcEsc(name).replace(/'/g, "\\'")}')" class="bg-brand-bg hover:bg-white border border-brand-border hover:border-brand-black rounded-2xl p-4 cursor-pointer transition-all">
