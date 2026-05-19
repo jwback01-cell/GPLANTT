@@ -3833,16 +3833,34 @@ tailwind.config = {
                 <div class="text-xs text-brand-gray mt-1">플레이오토 "출고관리" 상태의 주문을 가져옵니다. 가져온 주문과 업로드한 송장을 매칭해 K열의 송장번호를 저장합니다.</div>
               </div>
             </div>
-            <div class="flex items-center gap-2 flex-wrap">
-              <!-- 원클릭 송장 처리 — 출고관리 수집 → 메일 가져오기 → 매칭 한 번에 -->
-              <button id="inv-one-click-btn" type="button" onclick="runInvoiceOneClick()" class="px-6 py-3 rounded-full text-sm font-bold text-white flex items-center gap-2 shadow-md hover:opacity-95" style="background: linear-gradient(90deg,#FF8A00,#FF3D7F);" title="플레이오토 출고관리 수집 + 메일에서 송장 엑셀 가져오기 + 매칭까지 한 번에 실행">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                원클릭 송장 처리
-              </button>
-              <!-- 개별 단계 버튼 — 원클릭 버튼에 통합되어 숨김 -->
-              <button id="pa-inv-send-btn" type="button" onclick="sendInvoicesToPlayauto()" class="hidden">송장 전송</button>
-              <button id="pa-inv-fetch-btn" type="button" onclick="fetchInvoiceShipManagementOrders()" class="hidden">플레이오토 출고관리 탭 가져오기</button>
-              <div id="pa-inv-fetch-status" class="text-xs font-semibold text-brand-gray ml-2"></div>
+            <div class="flex flex-col gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
+                <!-- 원클릭 송장 처리 — 출고관리 수집 → 메일 가져오기 → 매칭 한 번에 -->
+                <button id="inv-one-click-btn" type="button" onclick="runInvoiceOneClick()" class="px-6 py-3 rounded-full text-sm font-bold text-white flex items-center gap-2 shadow-md hover:opacity-95" style="background: linear-gradient(90deg,#FF8A00,#FF3D7F);" title="플레이오토 출고관리 수집 + 메일에서 송장 엑셀 가져오기 + 매칭까지 한 번에 실행">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  원클릭 송장 처리
+                </button>
+                <!-- 개별 단계 버튼 — 원클릭 버튼에 통합되어 숨김 -->
+                <button id="pa-inv-send-btn" type="button" onclick="sendInvoicesToPlayauto()" class="hidden">송장 전송</button>
+                <button id="pa-inv-fetch-btn" type="button" onclick="fetchInvoiceShipManagementOrders()" class="hidden">플레이오토 출고관리 탭 가져오기</button>
+                <div id="pa-inv-fetch-status" class="text-xs font-semibold text-brand-gray ml-2"></div>
+              </div>
+              <!-- 파일 종류별 개별 처리 — 메일 첨부 1개씩만 골라서 처리 -->
+              <div class="flex items-center gap-2 flex-wrap pl-1">
+                <span class="text-[11px] font-semibold text-brand-gray">개별 파일 처리:</span>
+                <button id="inv-variant-base-btn" type="button" onclick="runInvoiceOneClickFor('base')" class="px-3 py-1.5 rounded-full text-[11px] font-bold bg-white border border-brand-border hover:bg-brand-bg flex items-center gap-1" title="파일명에 '리빙컴퍼니 발주양식' 포함, '그외'·'의류'·'CS' 없는 첨부만 처리">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  리빙컴퍼니 발주양식
+                </button>
+                <button id="inv-variant-etc-btn" type="button" onclick="runInvoiceOneClickFor('etc')" class="px-3 py-1.5 rounded-full text-[11px] font-bold bg-white border border-brand-border hover:bg-brand-bg flex items-center gap-1" title="파일명에 '그외' 포함, 'CS' 없는 첨부만 처리">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  그외
+                </button>
+                <button id="inv-variant-clothes-btn" type="button" onclick="runInvoiceOneClickFor('clothes')" class="px-3 py-1.5 rounded-full text-[11px] font-bold bg-white border border-brand-border hover:bg-brand-bg flex items-center gap-1" title="파일명에 '의류' 포함, 'CS' 없는 첨부만 처리">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  의류
+                </button>
+              </div>
             </div>
 
             <!-- 수집된 주문 목록 -->
@@ -22989,6 +23007,42 @@ function handleInvoiceFileSelect(e) {
 }
 
 // 📥 송장 — 네이버 메일 답장 첨부파일을 자동으로 가져와 송장 업로드 입력란에 채움
+// 파일 종류별 원클릭 송장 처리 — variant 별 메일 첨부 1개만 골라 처리
+// variant: 'base'(리빙컴퍼니 발주양식만) | 'etc'(그외) | 'clothes'(의류)
+async function runInvoiceOneClickFor(variant) {
+  const VARIANTS = {
+    base:    { btnId: 'inv-variant-base-btn',    includes: ['리빙컴퍼니 발주양식'], excludes: ['그외', '의류', 'cs'], label: '리빙컴퍼니 발주양식' },
+    etc:     { btnId: 'inv-variant-etc-btn',     includes: ['리빙컴퍼니 발주양식', '그외'], excludes: ['cs'],          label: '그외' },
+    clothes: { btnId: 'inv-variant-clothes-btn', includes: ['리빙컴퍼니 발주양식', '의류'], excludes: ['cs'],          label: '의류' },
+  };
+  const cfg = VARIANTS[variant];
+  if (!cfg) { showAppAlert('잘못된 변형', '지원하지 않는 파일 변형: ' + variant, 'error'); return; }
+  const btn = document.getElementById(cfg.btnId);
+  const origHtml = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="animate-pulse">처리 중...</span>'; }
+  try {
+    _invoiceStatus('① 플레이오토 출고관리 주문 수집 중... (' + cfg.label + ')', 'info');
+    await fetchInvoiceShipManagementOrders();
+    _invoiceStatus('② 메일에서 송장 엑셀 가져오는 중... (' + cfg.label + ')', 'info');
+    await fetchInvoiceFromMail({ includes: cfg.includes, excludes: cfg.excludes });
+    const input = document.getElementById('invoice-file-input');
+    if (!input || !input.files || !input.files[0]) {
+      _invoiceStatus('메일에서 송장 파일을 가져오지 못했습니다 — 처리 중단.', 'error');
+      return;
+    }
+    _invoiceStatus('③ 송장 파일과 주문 매칭 중... (' + cfg.label + ')', 'info');
+    await uploadInvoiceFile();
+    _invoiceStatus('④ 플레이오토로 송장 전송 중... (' + cfg.label + ')', 'info');
+    await sendInvoicesToPlayauto({ skipConfirm: true });
+    _invoiceStatus('✅ ' + cfg.label + ' 송장 처리 완료', 'ok');
+  } catch (e) {
+    console.error('[' + cfg.label + ' 송장 처리] 실패:', e);
+    _invoiceStatus(cfg.label + ' 처리 실패: ' + (e.message || e), 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+  }
+}
+
 // 원클릭 송장 처리 — 출고관리 수집 → 메일 가져오기 → 매칭 한 번에 실행
 async function runInvoiceOneClick() {
   const btn = document.getElementById('inv-one-click-btn');
@@ -23028,7 +23082,11 @@ async function runInvoiceOneClick() {
   }
 }
 
-async function fetchInvoiceFromMail() {
+async function fetchInvoiceFromMail(opts) {
+  // opts.includes: 파일명에 모두 포함되어야 할 부분문자열 배열 (공백 무시, 대소문자 무시)
+  // opts.excludes: 파일명에 하나라도 포함되면 제외 (공백 무시, 대소문자 무시)
+  const includes = (opts && Array.isArray(opts.includes)) ? opts.includes.map(s => String(s).toLowerCase().replace(/\s+/g, '')) : [];
+  const excludes = (opts && Array.isArray(opts.excludes)) ? opts.excludes.map(s => String(s).toLowerCase().replace(/\s+/g, '')) : [];
   const btn = document.getElementById('invoice-fetch-mail-btn');
   const origLabel = btn ? btn.innerHTML : '';
   if (btn) {
@@ -23037,7 +23095,7 @@ async function fetchInvoiceFromMail() {
   }
   _invoiceStatus('메일함에서 송장 첨부파일을 조회하고 있습니다...', 'info');
   try {
-    const res = await fetch('/api/naver-mail-fetch?sender=seoulbjs@naver.com&days=7&limit=10');
+    const res = await fetch('/api/naver-mail-fetch?sender=seoulbjs@naver.com&days=7&limit=30');
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const err = data.error || ('HTTP ' + res.status);
@@ -23050,7 +23108,23 @@ async function fetchInvoiceFromMail() {
       return;
     }
 
-    const items = data.items;
+    // 클라이언트 측 includes/excludes 필터 (파일 변형 처리용)
+    let items = data.items;
+    if (includes.length || excludes.length) {
+      items = items.filter(it => {
+        const fn = String(it.fileName || '').toLowerCase().replace(/\s+/g, '');
+        for (const inc of includes) { if (fn.indexOf(inc) === -1) return false; }
+        for (const ex of excludes) { if (fn.indexOf(ex) !== -1) return false; }
+        return true;
+      });
+      console.log('[송장 메일 가져오기] 필터 후:', items.length + '건', items.map(it => it.fileName));
+      if (items.length === 0) {
+        const hint = `포함 조건: ${includes.join(', ') || '(없음)'} / 제외: ${excludes.join(', ') || '(없음)'}`;
+        _invoiceStatus(`❌ 조건에 맞는 메일 첨부가 없습니다. (${hint})`, 'error');
+        showAppAlert('가져올 메일 없음', `조건에 맞는 송장 엑셀 메일이 없습니다.\n\n${hint}`, 'info');
+        return;
+      }
+    }
     if (items.length > 1) {
       console.log('[송장 메일 가져오기] 최근 ' + items.length + '건 중 가장 최신 1건만 처리합니다:',
         items.map(it => ({ date: it.date, subject: it.subject, fileName: it.fileName })));
