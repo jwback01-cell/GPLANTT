@@ -3396,27 +3396,6 @@ tailwind.config = {
                 엑셀 다운로드
               </button>
             </div>
-            <!-- 원클릭 전송 기간 설정 -->
-            <div class="flex flex-col gap-2 bg-brand-bg rounded-2xl p-3 border border-brand-border">
-              <div class="flex items-center justify-between flex-wrap gap-2">
-                <span class="text-xs font-bold text-brand-gray">원클릭 전송 기간</span>
-                <div class="flex gap-1">
-                  <button type="button" onclick="setPaOneClickDate('today')" class="px-3 py-1 rounded-full text-xs font-bold bg-white border border-brand-border hover:bg-brand-bg">오늘</button>
-                  <button type="button" onclick="setPaOneClickDate('yesterday')" class="px-3 py-1 rounded-full text-xs font-bold bg-white border border-brand-border hover:bg-brand-bg">어제</button>
-                  <button type="button" onclick="setPaOneClickDate('7days')" class="px-3 py-1 rounded-full text-xs font-bold bg-white border border-brand-border hover:bg-brand-bg">최근 7일</button>
-                  <button type="button" onclick="setPaOneClickDate('month')" class="px-3 py-1 rounded-full text-xs font-bold bg-white border border-brand-border hover:bg-brand-bg">이번 달</button>
-                </div>
-              </div>
-              <div class="flex items-center gap-2 flex-wrap">
-                <input id="pa-one-click-start" type="date" class="flex-1 min-w-[140px] bg-white border border-brand-border rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:border-brand-black">
-                <span class="text-brand-gray font-bold">~</span>
-                <input id="pa-one-click-end" type="date" class="flex-1 min-w-[140px] bg-white border border-brand-border rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:border-brand-black">
-              </div>
-            </div>
-            <button onclick="fetchSaveAndSendToEcount()" id="pa-one-click-btn" class="w-full bg-gradient-to-r from-brand-orange to-brand-pink text-white py-3 rounded-full font-bold text-sm hover:opacity-90 flex items-center justify-center gap-2">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-              수집 + 장부 저장 + 이카운트 전송
-            </button>
             <div id="pa-order-status-msg" class="hidden text-sm font-semibold px-1"></div>
             <!-- 인라인 마이너스 결과 — 주문 수집 시 자동 렌더링 -->
             <div id="pa-order-minus-inline" class="hidden bg-white rounded-2xl border border-brand-pink/30 overflow-hidden">
@@ -3975,6 +3954,36 @@ tailwind.config = {
 
         <!-- Sub-panel: 플레이오토연동 (API 설정) -->
         <div id="pa-sub-panel-config" class="hidden flex flex-col gap-6">
+
+          <!-- 원클릭 전송 — 주문수집 탭에서 이동 (최상단 배치) -->
+          <div class="bg-white rounded-3xl panel p-5 flex flex-col gap-3">
+            <div class="flex items-center gap-2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF8A00" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <span class="font-bold text-[15px]">원클릭 전송</span>
+              <span class="text-xs text-brand-gray">— 기간 내 신규주문을 한 번에 수집 → 장부 저장 → 이카운트 전송</span>
+            </div>
+            <div class="flex flex-col gap-2 bg-brand-bg rounded-2xl p-3 border border-brand-border">
+              <div class="flex items-center justify-between flex-wrap gap-2">
+                <span class="text-xs font-bold text-brand-gray">원클릭 전송 기간</span>
+                <div class="flex gap-1">
+                  <button type="button" onclick="setPaOneClickDate('today')" class="px-3 py-1 rounded-full text-xs font-bold bg-white border border-brand-border hover:bg-brand-bg">오늘</button>
+                  <button type="button" onclick="setPaOneClickDate('yesterday')" class="px-3 py-1 rounded-full text-xs font-bold bg-white border border-brand-border hover:bg-brand-bg">어제</button>
+                  <button type="button" onclick="setPaOneClickDate('7days')" class="px-3 py-1 rounded-full text-xs font-bold bg-white border border-brand-border hover:bg-brand-bg">최근 7일</button>
+                  <button type="button" onclick="setPaOneClickDate('month')" class="px-3 py-1 rounded-full text-xs font-bold bg-white border border-brand-border hover:bg-brand-bg">이번 달</button>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <input id="pa-one-click-start" type="date" class="flex-1 min-w-[140px] bg-white border border-brand-border rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:border-brand-black">
+                <span class="text-brand-gray font-bold">~</span>
+                <input id="pa-one-click-end" type="date" class="flex-1 min-w-[140px] bg-white border border-brand-border rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:border-brand-black">
+              </div>
+            </div>
+            <button onclick="fetchSaveAndSendToEcount()" id="pa-one-click-btn" class="w-full bg-gradient-to-r from-brand-orange to-brand-pink text-white py-3 rounded-full font-bold text-sm hover:opacity-90 flex items-center justify-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              수집 + 장부 저장 + 이카운트 전송
+            </button>
+          </div>
+
           <div class="bg-white rounded-3xl panel overflow-hidden">
             <div class="px-6 py-4 border-b border-brand-border flex items-center justify-between">
               <div>
