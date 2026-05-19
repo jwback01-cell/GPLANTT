@@ -3441,21 +3441,6 @@ tailwind.config = {
           </div>
         </div>
 
-        <!-- 쇼핑몰/택배사 정보 -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="bg-white rounded-3xl panel p-5">
-            <div class="flex items-center gap-2 mb-3"><div class="w-1.5 h-5 bg-brand-blue-light rounded-full"></div><span class="font-bold text-sm">연동 쇼핑몰</span><span id="pa-shop-count" class="text-xs font-bold text-brand-gray bg-brand-bg px-2 py-0.5 rounded-full">0</span></div>
-            <div id="pa-shop-list" class="flex flex-wrap gap-2">
-              <span class="text-brand-gray text-sm">API를 연결하면 쇼핑몰 목록이 표시됩니다.</span>
-            </div>
-          </div>
-          <div class="bg-white rounded-3xl panel p-5">
-            <div class="flex items-center gap-2 mb-3"><div class="w-1.5 h-5 bg-brand-orange-light rounded-full"></div><span class="font-bold text-sm">택배사</span><span id="pa-carrier-count" class="text-xs font-bold text-brand-gray bg-brand-bg px-2 py-0.5 rounded-full">0</span></div>
-            <div id="pa-carrier-list" class="flex flex-wrap gap-2">
-              <span class="text-brand-gray text-sm">API를 연결하면 택배사 목록이 표시됩니다.</span>
-            </div>
-          </div>
-        </div>
         </div>
         <!-- /Sub-panel: 주문수집 -->
 
@@ -3978,6 +3963,22 @@ tailwind.config = {
                 <button onclick="testPlayautoConn()" class="flex-1 px-5 py-2.5 rounded-full bg-white border border-brand-border text-sm font-bold hover:bg-brand-bg">연결 테스트</button>
                 <button onclick="capturePlayautoTranscript()" class="flex-1 px-5 py-2.5 rounded-full bg-white border border-brand-border text-sm font-bold hover:bg-brand-bg" title="플레이오토 1:1 문의에 보낼 request/response 전문(헤더포함)을 캡처합니다">📋 진단전문 캡처</button>
                 <button onclick="savePlayautoKey()" class="flex-1 px-5 py-2.5 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333]">설정 저장</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 쇼핑몰/택배사 정보 — 주문수집 탭에서 이동됨 -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-white rounded-3xl panel p-5">
+              <div class="flex items-center gap-2 mb-3"><div class="w-1.5 h-5 bg-brand-blue-light rounded-full"></div><span class="font-bold text-sm">연동 쇼핑몰</span><span id="pa-shop-count" class="text-xs font-bold text-brand-gray bg-brand-bg px-2 py-0.5 rounded-full">0</span></div>
+              <div id="pa-shop-list" class="flex flex-wrap gap-2">
+                <span class="text-brand-gray text-sm">API를 연결하면 쇼핑몰 목록이 표시됩니다.</span>
+              </div>
+            </div>
+            <div class="bg-white rounded-3xl panel p-5">
+              <div class="flex items-center gap-2 mb-3"><div class="w-1.5 h-5 bg-brand-orange-light rounded-full"></div><span class="font-bold text-sm">택배사</span><span id="pa-carrier-count" class="text-xs font-bold text-brand-gray bg-brand-bg px-2 py-0.5 rounded-full">0</span></div>
+              <div id="pa-carrier-list" class="flex flex-wrap gap-2">
+                <span class="text-brand-gray text-sm">API를 연결하면 택배사 목록이 표시됩니다.</span>
               </div>
             </div>
           </div>
