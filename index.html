@@ -34274,16 +34274,16 @@ async function confirmPaImport() {
 // 상품 소싱 — 키워드 엑셀 업로드 + 카테고리 폴더 + 총검색수 변동 추적
 // ════════════════════════════════════════════════════════
 const PRODSRC_KEY = 'gplan_prodsrc_v1';
-let _prodsrcState = { rows: [], lastUploadedAt: '', diff: null };
+let _prodsrcState = { rows: [], lastUploadedAt: '', prevUploadedAt: '' };
 let _prodsrcCurrentCategory = null;
 
 function _prodsrcLoad() {
   try {
     const raw = localStorage.getItem(PRODSRC_KEY);
-    if (!raw) return { rows: [], lastUploadedAt: '', diff: null };
+    if (!raw) return { rows: [], lastUploadedAt: '', prevUploadedAt: '' };
     const obj = JSON.parse(raw);
-    return { rows: obj.rows || [], lastUploadedAt: obj.lastUploadedAt || '', diff: obj.diff || null };
-  } catch (_) { return { rows: [], lastUploadedAt: '', diff: null }; }
+    return { rows: obj.rows || [], lastUploadedAt: obj.lastUploadedAt || '', prevUploadedAt: obj.prevUploadedAt || '' };
+  } catch (_) { return { rows: [], lastUploadedAt: '', prevUploadedAt: '' }; }
 }
 function _prodsrcSave() {
   try { localStorage.setItem(PRODSRC_KEY, JSON.stringify(_prodsrcState)); } catch(_) {}
@@ -34411,35 +34411,40 @@ function _prodsrcProcessFile(file) {
       }
       if (!newRows.length) { _prodsrcMsg('데이터 행이 없습니다.', 'error'); return; }
 
-      // 기존 데이터와 비교해서 diff 계산
+      // 누적(append) 모드 — 새 업로드는 폴더를 추가함. 같은 카테고리는 새 데이터로 갱신되며 그 안에서만 변동값 계산.
       const existing = (_prodsrcState && _prodsrcState.rows) || [];
       const existingMap = new Map();
       existing.forEach(r => existingMap.set(_prodsrcKey(r), r));
-      let newCount = 0, upCount = 0, downCount = 0;
+      const newCategories = new Set(newRows.map(r => r.category));
+
+      // 각 새 행: 동일 키(카테고리|키워드) 가 기존에 있으면 → 총검색수 변동 계산. 없으면 → 해당 카테고리에 이전 데이터가 있었는지에 따라 신규 여부 결정.
+      let touchedCatExisted = new Set();
+      existing.forEach(r => { if (newCategories.has(r.category)) touchedCatExisted.add(r.category); });
       newRows.forEach(r => {
         const k = _prodsrcKey(r);
         const old = existingMap.get(k);
         if (!old) {
-          r.isNew = existing.length > 0; // 첫 업로드는 신규로 표시 안 함
-          if (r.isNew) newCount++;
+          r.isNew = touchedCatExisted.has(r.category); // 이 카테고리가 이전에도 있었다면 → 신규 키워드. 처음 추가되는 카테고리면 신규 표시 안 함
         } else {
           r.totalSearchPrev = old.totalSearch != null ? old.totalSearch : null;
           if (r.totalSearch != null && r.totalSearchPrev != null) {
             r.totalSearchDiff = r.totalSearch - r.totalSearchPrev;
-            if (r.totalSearchDiff > 0) upCount++;
-            else if (r.totalSearchDiff < 0) downCount++;
           }
         }
       });
 
+      // 새 업로드에 포함된 카테고리만 새 데이터로 교체. 나머지 카테고리는 그대로 유지.
+      const untouched = existing.filter(r => !newCategories.has(r.category));
+      const mergedRows = [...untouched, ...newRows];
+
       _prodsrcState = {
-        rows: newRows,
+        rows: mergedRows,
         lastUploadedAt: new Date().toISOString(),
-        diff: existing.length > 0 ? { newCount, upCount, downCount, prevUploadedAt: _prodsrcState.lastUploadedAt || '' } : null,
+        prevUploadedAt: _prodsrcState.lastUploadedAt || '',
       };
       _prodsrcSave();
       _prodsrcCurrentCategory = null;
-      _prodsrcMsg(`✅ ${newRows.length}개 키워드 업로드 완료${existing.length ? ` · 신규 ${newCount} · 증가 ${upCount} · 감소 ${downCount}` : ''}`, 'ok');
+      _prodsrcMsg(`✅ ${newRows.length}개 키워드 업로드 — 카테고리 ${newCategories.size}개 추가/갱신 (전체 ${new Set(mergedRows.map(r => r.category)).size}개 폴더)`, 'ok');
       _prodsrcRender();
     } catch (e) {
       console.error('[상품 소싱 업로드] 실패:', e);
@@ -34498,10 +34503,9 @@ function _prodsrcRenderFolders() {
     const d = _prodsrcState.lastUploadedAt ? new Date(_prodsrcState.lastUploadedAt).toLocaleString('ko-KR') : '';
     lastEl.textContent = d ? `최근 업로드: ${d}` : '';
   }
-  // 카테고리 폴더는 가장 키워드가 많은 1개만 표시 — 사용자 요청
-  const sortedEntries = [...cats.entries()].sort((a, b) => b[1].count - a[1].count);
-  const entries = sortedEntries.slice(0, 1);
-  countEl.textContent = entries.length ? `(대표 1개 · 전체 ${cats.size}개)` : '(0개)';
+  // 모든 카테고리 폴더 표시 (누적) — 키워드 수 내림차순
+  const entries = [...cats.entries()].sort((a, b) => b[1].count - a[1].count);
+  countEl.textContent = `(${cats.size}개)`;
   wrap.innerHTML = entries.map(([name, c]) => {
     const badges = [];
     if (c.newCount) badges.push(`<span class="text-[10px] font-bold bg-brand-green-light text-brand-green px-1.5 py-0.5 rounded-full">신규 ${c.newCount}</span>`);
@@ -34535,23 +34539,23 @@ function prodsrcRenderDetail() {
   const search = (document.getElementById('prodsrc-detail-search')?.value || '').trim().toLowerCase();
   let rows = (_prodsrcState.rows || []).filter(r => r.category === cat);
 
-  // 카테고리별 변동 요약 계산 + 표시 (검색 필터 무관)
+  // 카테고리별 변동 요약 — 해당 카테고리에 실제 변동(신규/증가/감소) 행이 있을 때만 표시
   const diffBox = document.getElementById('prodsrc-detail-diff');
   if (diffBox) {
-    if (_prodsrcState.diff && rows.length) {
-      let newC = 0, upC = 0, downC = 0;
-      rows.forEach(r => {
-        if (r.isNew) newC++;
-        else if ((r.totalSearchDiff || 0) > 0) upC++;
-        else if ((r.totalSearchDiff || 0) < 0) downC++;
-      });
+    let newC = 0, upC = 0, downC = 0;
+    rows.forEach(r => {
+      if (r.isNew) newC++;
+      else if ((r.totalSearchDiff || 0) > 0) upC++;
+      else if ((r.totalSearchDiff || 0) < 0) downC++;
+    });
+    if (newC + upC + downC > 0) {
       document.getElementById('prodsrc-detail-diff-new').textContent  = newC.toLocaleString('ko-KR');
       document.getElementById('prodsrc-detail-diff-up').textContent   = upC.toLocaleString('ko-KR');
       document.getElementById('prodsrc-detail-diff-down').textContent = downC.toLocaleString('ko-KR');
       const meta = document.getElementById('prodsrc-detail-diff-meta');
       if (meta) {
-        const prevDt = _prodsrcState.diff.prevUploadedAt ? new Date(_prodsrcState.diff.prevUploadedAt).toLocaleString('ko-KR') : '(이전 업로드)';
-        meta.textContent = `이전 업로드: ${prevDt}`;
+        const prevDt = _prodsrcState.prevUploadedAt ? new Date(_prodsrcState.prevUploadedAt).toLocaleString('ko-KR') : '';
+        meta.textContent = prevDt ? `이전 업로드: ${prevDt}` : '';
       }
       diffBox.classList.remove('hidden');
     } else {
@@ -34605,7 +34609,7 @@ function prodsrcClearAll() {
       '업로드한 모든 키워드 데이터가 삭제됩니다.\n이 작업은 되돌릴 수 없습니다.',
       () => {
         try { localStorage.removeItem(PRODSRC_KEY); } catch(_) {}
-        _prodsrcState = { rows: [], lastUploadedAt: '', diff: null };
+        _prodsrcState = { rows: [], lastUploadedAt: '', prevUploadedAt: '' };
         _prodsrcCurrentCategory = null;
         _prodsrcMsg('데이터를 모두 삭제했습니다.', 'warn');
         _prodsrcRender();
