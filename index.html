@@ -3755,7 +3755,7 @@ tailwind.config = {
             </div>
 
             <div class="flex items-center gap-2 mb-4 flex-wrap">
-              <button id="ext-upload-fetch-mail-btn" onclick="fetchExternalOrderFromMail()" class="px-4 py-2 rounded-full bg-brand-blue text-white text-xs font-bold hover:opacity-90 flex items-center gap-1.5" title="네이버 메일에서 '발주양식' 이 포함된 엑셀 첨부파일을 자동으로 가져옵니다">
+              <button id="ext-upload-fetch-mail-btn" onclick="fetchExternalOrderFromMail()" class="px-4 py-2 rounded-full bg-brand-blue text-white text-xs font-bold hover:opacity-90 flex items-center gap-1.5" title="네이버 메일에서 '다올 버즈에어팟류' 가 포함된 엑셀 첨부파일을 자동으로 가져옵니다">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                 📥 메일에서 자동 가져오기
               </button>
@@ -21380,15 +21380,15 @@ function downloadExternalUploadTemplate() {
   XLSX.writeFile(wb, '외부업체_주문_업로드_양식.xlsx');
 }
 
-// 네이버 메일에서 외부업체 발주서 자동 가져오기 — '발주양식' 키워드가 들어간 첨부 엑셀
+// 네이버 메일에서 외부업체 발주서 자동 가져오기 — '다올 버즈에어팟류' 키워드가 들어간 첨부 엑셀
 async function fetchExternalOrderFromMail() {
   const btn = document.getElementById('ext-upload-fetch-mail-btn');
   const origHtml = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="animate-pulse">메일 조회 중...</span>'; }
   _extUploadMsg('메일함에서 발주서 첨부파일을 조회하고 있습니다...', 'info');
   try {
-    // 발신자 필터 없이 최근 14일, 파일명에 '발주양식' 포함된 첨부를 검색
-    const res = await fetch('/api/naver-mail-fetch?days=14&limit=30&sender=&filenamePattern=' + encodeURIComponent('발주양식'));
+    // 발신자 필터 없이 최근 14일, 파일명에 '다올 버즈에어팟류' 포함된 첨부를 검색
+    const res = await fetch('/api/naver-mail-fetch?days=14&limit=30&sender=&filenamePattern=' + encodeURIComponent('다올 버즈에어팟류'));
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const err = data.error || ('HTTP ' + res.status);
@@ -21396,8 +21396,8 @@ async function fetchExternalOrderFromMail() {
       throw new Error(err + hint);
     }
     if (!data.items || data.items.length === 0) {
-      _extUploadMsg('파일명에 "발주양식" 이 포함된 첨부가 최근 14일 메일에 없습니다.', 'warn');
-      showAppAlert('가져올 메일 없음', '파일명에 "발주양식" 이 포함된 엑셀 첨부 메일이 최근 14일 내에 없습니다.', 'info');
+      _extUploadMsg('파일명에 "다올 버즈에어팟류" 가 포함된 첨부가 최근 14일 메일에 없습니다.', 'warn');
+      showAppAlert('가져올 메일 없음', '파일명에 "다올 버즈에어팟류" 가 포함된 엑셀 첨부 메일이 최근 14일 내에 없습니다.', 'info');
       return;
     }
     const items = data.items;
