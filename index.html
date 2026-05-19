@@ -21391,8 +21391,11 @@ async function fetchExternalOrderFromMail() {
   const btn = document.getElementById('ext-upload-fetch-mail-btn');
   const origHtml = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="animate-pulse">메일 조회 중...</span>'; }
-  // 이전 업로드 데이터 먼저 비우기 — 새 조회 결과가 명확히 보이도록
-  try { if (typeof clearExternalOrderUpload === 'function') clearExternalOrderUpload(); } catch(_) {}
+  // 이전 업로드 데이터 먼저 비우기 — 확인창 없이 조용히 (showAppConfirm 없이)
+  try {
+    localStorage.removeItem(EXT_UPLOAD_KEY);
+    if (typeof _renderExternalOrderUpload === 'function') _renderExternalOrderUpload(null);
+  } catch(_) {}
   _extUploadMsg('메일함에서 "다올 버즈에어팟류" 첨부파일을 조회하고 있습니다...', 'info');
   try {
     // 발신자 필터 없이 최근 14일, 파일명에 '다올 버즈에어팟류' 포함된 첨부를 검색 (limit=50: 메일이 많을 경우 누락 방지)
