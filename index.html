@@ -3321,7 +3321,8 @@ tailwind.config = {
         <div class="flex gap-1 p-1 bg-brand-bg rounded-full border border-brand-border w-fit flex-wrap">
           <button id="pa-sub-tab-order" class="pa-sub-btn px-4 py-2 rounded-full text-xs font-bold bg-brand-black text-white" onclick="switchPlayautoSubTab('order')">주문수집</button>
           <button id="pa-sub-tab-claim" class="pa-sub-btn px-4 py-2 rounded-full text-xs font-bold text-brand-gray hover:text-brand-black" onclick="switchPlayautoSubTab('claim')">클레임 관리</button>
-          <button id="pa-sub-tab-minus" class="pa-sub-btn px-4 py-2 rounded-full text-xs font-bold text-brand-gray hover:text-brand-black" onclick="switchPlayautoSubTab('minus')">마이너스 확인</button>
+          <!-- 마이너스 확인 탭 — 주문수집 인라인 결과로 대체되어 숨김 -->
+          <button id="pa-sub-tab-minus" class="hidden" onclick="switchPlayautoSubTab('minus')">마이너스 확인</button>
           <button id="pa-sub-tab-external" class="pa-sub-btn px-4 py-2 rounded-full text-xs font-bold text-brand-gray hover:text-brand-black" onclick="switchPlayautoSubTab('external')">외부업체 주문</button>
           <button id="pa-sub-tab-invoice" class="pa-sub-btn px-4 py-2 rounded-full text-xs font-bold text-brand-gray hover:text-brand-black" onclick="switchPlayautoSubTab('invoice')">송장 업로드</button>
           <button id="pa-sub-tab-config" class="pa-sub-btn px-4 py-2 rounded-full text-xs font-bold text-brand-gray hover:text-brand-black" onclick="switchPlayautoSubTab('config')">플레이오토연동</button>
@@ -22858,7 +22859,8 @@ function _paDownloadUploadResults() {
 
 // 플레이오토 연동 내부 서브탭 전환
 function switchPlayautoSubTab(sub) {
-  const subs = ['order', 'claim', 'minus', 'external', 'invoice', 'config'];
+  // 'minus' 탭은 주문수집 인라인 결과로 대체되어 제거됨 — 패널/버튼은 항상 숨김 유지
+  const subs = ['order', 'claim', 'external', 'invoice', 'config'];
   if (subs.indexOf(sub) === -1) sub = 'order';
   subs.forEach(s => {
     const btn = document.getElementById('pa-sub-tab-' + s);
