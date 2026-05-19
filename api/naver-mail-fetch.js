@@ -88,8 +88,12 @@ export default async function handler(req, res) {
           const attachments = (parsed.attachments || []).filter(a => {
             if (!a || !a.filename) return false;
             if (!/\.(xlsx|xls|csv)$/i.test(a.filename)) return false;
-            // 파일명 패턴 필터 (대소문자 무시 부분문자열)
-            if (filenamePattern && a.filename.toLowerCase().indexOf(filenamePattern) === -1) return false;
+            // 파일명 패턴 필터 (대소문자 무시 + 공백 무시 부분문자열)
+            if (filenamePattern) {
+              const fn = a.filename.toLowerCase().replace(/\s+/g, '');
+              const pat = filenamePattern.replace(/\s+/g, '');
+              if (fn.indexOf(pat) === -1) return false;
+            }
             return true;
           });
           if (!attachments.length) continue;
