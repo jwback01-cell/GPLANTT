@@ -3839,11 +3839,8 @@ tailwind.config = {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                 원클릭 송장 처리
               </button>
-              <button id="pa-inv-send-btn" type="button" onclick="sendInvoicesToPlayauto()" class="px-5 py-2.5 rounded-full text-xs font-bold bg-brand-black text-white hover:bg-[#333] flex items-center gap-1.5" title="송장번호 + 택배사 정보를 PA에 전송하여 출고완료 상태로 변경">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                송장 전송
-              </button>
               <!-- 개별 단계 버튼 — 원클릭 버튼에 통합되어 숨김 -->
+              <button id="pa-inv-send-btn" type="button" onclick="sendInvoicesToPlayauto()" class="hidden">송장 전송</button>
               <button id="pa-inv-fetch-btn" type="button" onclick="fetchInvoiceShipManagementOrders()" class="hidden">플레이오토 출고관리 탭 가져오기</button>
               <div id="pa-inv-fetch-status" class="text-xs font-semibold text-brand-gray ml-2"></div>
             </div>
@@ -22796,7 +22793,10 @@ async function runInvoiceOneClick() {
     // 3) 송장 업로드 실행 (매칭)
     _invoiceStatus('③ 송장 파일과 주문 매칭 중...', 'info');
     await uploadInvoiceFile();
-    _invoiceStatus('✅ 원클릭 송장 처리 완료', 'ok');
+    // 4) 플레이오토로 송장 전송 (확인창 생략)
+    _invoiceStatus('④ 플레이오토로 송장 전송 중...', 'info');
+    await sendInvoicesToPlayauto({ skipConfirm: true });
+    _invoiceStatus('✅ 원클릭 송장 처리 완료 (수집 → 메일 → 매칭 → 전송)', 'ok');
   } catch (e) {
     console.error('[원클릭 송장 처리] 실패:', e);
     _invoiceStatus('처리 실패: ' + (e.message || e), 'error');
@@ -23569,8 +23569,9 @@ async function _tryInvoiceEndpoint(spec, payload, opts) {
   throw lastErr;
 }
 
-async function sendInvoicesToPlayauto() {
-  console.log('[INV-SEND] sendInvoicesToPlayauto() 호출됨');
+async function sendInvoicesToPlayauto(opts) {
+  const skipConfirm = !!(opts && opts.skipConfirm);
+  console.log('[INV-SEND] sendInvoicesToPlayauto() 호출됨', { skipConfirm });
   const btn = document.getElementById('pa-inv-send-btn');
   const carrierSel = document.getElementById('pa-inv-carrier');
   const endpointEl = document.getElementById('pa-inv-endpoint');
@@ -23629,6 +23630,10 @@ async function sendInvoicesToPlayauto() {
   });
   const summaryStr = Object.keys(summary).map(k => k + ' ' + summary[k] + '건').join(' / ');
   const codeWarn = noCodeCount > 0 ? '\n\n⚠️ 택배사 코드(carr_no)를 찾지 못한 주문 ' + noCodeCount + '건 — 이름만 함께 전송합니다. (PA가 이름만으로도 매칭해주길 기대)' : '';
+  // skipConfirm=true 일 때(원클릭 송장 처리 흐름) 확인창 없이 바로 전송
+  if (skipConfirm) {
+    return _doSendInvoicesToPlayauto(btn, targets, userEndpoint, fallbackCarrNo, summaryStr, true);
+  }
   showAppConfirm(
     '플레이오토로 송장 전송',
     '총 ' + targets.length + '건의 주문에 대해 플레이오토로 송장을 전송합니다.\n택배사 분포: ' + summaryStr + codeWarn,
