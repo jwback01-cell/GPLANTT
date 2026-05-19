@@ -3417,18 +3417,7 @@ tailwind.config = {
               수집 + 장부 저장 + 이카운트 전송
             </button>
             <div id="pa-order-status-msg" class="hidden text-sm font-semibold px-1"></div>
-            <!-- 수집된 주문에서 바로 마이너스 확인 — 결과가 있을 때만 표시 -->
-            <div id="pa-order-minus-bar" class="hidden flex items-center justify-between flex-wrap gap-2 bg-brand-pink-light/40 border border-brand-pink/30 rounded-2xl px-4 py-3">
-              <div class="flex items-center gap-2 text-xs">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E91E63" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                <span class="font-bold text-brand-pink">위 수집된 주문에서 마이너스(공급가 − 원가 &lt; 0) 주문을 바로 확인할 수 있어요.</span>
-              </div>
-              <button type="button" onclick="runMinusFromOrderTab()" class="bg-brand-pink text-white px-4 py-2 rounded-full font-bold text-xs hover:opacity-90 flex items-center gap-1.5">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                마이너스 확인 실행
-              </button>
-            </div>
-            <!-- 인라인 마이너스 결과 — 주문수집 탭에서 즉시 확인 -->
+            <!-- 인라인 마이너스 결과 — 주문 수집 시 자동 렌더링 -->
             <div id="pa-order-minus-inline" class="hidden bg-white rounded-2xl border border-brand-pink/30 overflow-hidden">
               <div class="px-4 py-3 border-b border-brand-border bg-brand-pink-light/40 flex items-center justify-between flex-wrap gap-2">
                 <div class="font-bold text-sm text-brand-pink flex items-center gap-2">
@@ -25585,7 +25574,6 @@ async function fetchPlayautoOrders() {
       document.getElementById('pa-order-result').classList.add('hidden');
       document.getElementById('pa-order-save-btn').classList.add('hidden');
       { const _b = document.getElementById('pa-order-export-btn'); if (_b) _b.classList.add('hidden'); }
-      { const _mb = document.getElementById('pa-order-minus-bar'); if (_mb) _mb.classList.add('hidden'); }
       { const _mi = document.getElementById('pa-order-minus-inline'); if (_mi) _mi.classList.add('hidden'); }
     } else {
       const extra = usedFallback ? ` (선택한 "${status}" 상태에 해당하는 주문이 없어 기간 내 전체 주문을 표시합니다)` : '';
@@ -25596,8 +25584,8 @@ async function fetchPlayautoOrders() {
       document.getElementById('pa-order-result').classList.remove('hidden');
       document.getElementById('pa-order-save-btn').classList.remove('hidden');
       { const _b = document.getElementById('pa-order-export-btn'); if (_b) _b.classList.remove('hidden'); }
-      { const _mb = document.getElementById('pa-order-minus-bar'); if (_mb) _mb.classList.remove('hidden'); }
-      { const _mi = document.getElementById('pa-order-minus-inline'); if (_mi) _mi.classList.add('hidden'); }
+      // 주문 수집 직후 자동으로 마이너스 확인 결과까지 인라인 표시
+      try { await runMinusFromOrderTab(); } catch (e) { console.warn('[자동 마이너스 확인 실패]', e); }
     }
   } catch (e) {
     msg.textContent = '주문 수집 실패: ' + e.message;
