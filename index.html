@@ -5395,12 +5395,14 @@ PBT키캡	1180
             주요 폴더
             <span id="prodsrc-fav-count" class="text-brand-gray font-normal text-sm ml-1">(0개)</span>
           </h3>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 relative">
             <label class="text-xs text-brand-gray">카테고리에서 추가:</label>
-            <select id="prodsrc-fav-add-select"
-              class="px-3 py-1.5 bg-brand-bg rounded-full text-xs font-semibold border border-brand-border focus:outline-none focus:bg-white focus:ring-1 focus:ring-brand-border min-w-[220px]">
-              <option value="">주요 폴더로 옮길 카테고리 선택...</option>
-            </select>
+            <button type="button" id="prodsrc-fav-add-btn" onclick="prodsrcToggleFavMenu(event)"
+              class="px-3 py-1.5 bg-brand-bg rounded-full text-xs font-semibold border border-brand-border hover:bg-white hover:ring-1 hover:ring-brand-border flex items-center gap-2 min-w-[260px] justify-between">
+              <span id="prodsrc-fav-add-label">주요 폴더로 옮길 카테고리 선택...</span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div id="prodsrc-fav-add-menu" class="hidden absolute right-0 top-full mt-1 bg-white border border-brand-border rounded-2xl shadow-lg max-h-[400px] overflow-y-auto z-20 min-w-[280px]"></div>
           </div>
         </div>
         <div id="prodsrc-favorites" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
@@ -34580,13 +34582,15 @@ function _prodsrcRenderFolders() {
 }
 
 // 주요 폴더 렌더링 — 카테고리 폴더 위에 별도로 표시
+let _prodsrcNonFavCache = [];
 function _prodsrcRenderFavorites() {
   const wrap = document.getElementById('prodsrc-favorites');
   const countEl = document.getElementById('prodsrc-fav-count');
-  const select = document.getElementById('prodsrc-fav-add-select');
+  const menu = document.getElementById('prodsrc-fav-add-menu');
+  const btn = document.getElementById('prodsrc-fav-add-btn');
   if (!wrap) return;
   const favs = Array.isArray(_prodsrcState.favorites) ? _prodsrcState.favorites : [];
-  // 폴더별 통계 (전체 폴더 — 주요 / 비주요 모두 집계)
+  // 폴더별 통계
   const cats = new Map();
   (_prodsrcState.rows || []).forEach(r => {
     const k = r.folderName || r.category || '(미분류)';
@@ -34595,33 +34599,29 @@ function _prodsrcRenderFavorites() {
     c.count++;
     if (r.totalSearch != null) c.totalSearch += Number(r.totalSearch) || 0;
   });
-  // 무효한(데이터 없음) 즐겨찾기 자동 정리
+  // 무효한 즐겨찾기 자동 정리
   const validFavs = favs.filter(name => cats.has(name));
   if (validFavs.length !== favs.length) {
     _prodsrcState.favorites = validFavs;
     _prodsrcSave();
   }
   countEl.textContent = `(${validFavs.length}개)`;
-  // 드롭다운 — 주요 폴더에 없는 카테고리만 옵션으로 (값 충돌 방지를 위해 인덱스 사용)
-  if (select) {
-    const nonFav = [...cats.entries()]
-      .filter(([name]) => !validFavs.includes(name))
-      .sort((a, b) => b[1].count - a[1].count);
-    // 옵션 값에 인덱스를 사용하고, 실제 폴더명은 data-name 속성에 저장
-    select.innerHTML = '<option value="">주요 폴더로 옮길 카테고리 선택...</option>'
-      + nonFav.map(([name, c], i) => `<option value="${i}" data-name="${_prodsrcEsc(name)}">${_prodsrcEsc(name)} (${c.count}개)</option>`).join('');
-    select.disabled = nonFav.length === 0;
-    // 매 렌더링마다 onchange 핸들러 재등록 (인라인 onchange 의존 X)
-    select.onchange = function() {
-      const idx = parseInt(this.value, 10);
-      console.log('[주요 폴더] 드롭다운 선택 인덱스:', this.value);
-      this.value = '';
-      if (isNaN(idx) || idx < 0 || idx >= nonFav.length) return;
-      const [pickedName] = nonFav[idx];
-      console.log('[주요 폴더] 추가 대상:', pickedName);
-      prodsrcAddFavorite(pickedName);
-    };
+  // 커스텀 드롭다운 메뉴 옵션 채우기
+  const nonFav = [...cats.entries()]
+    .filter(([name]) => !validFavs.includes(name))
+    .sort((a, b) => b[1].count - a[1].count);
+  _prodsrcNonFavCache = nonFav; // 클릭 시 인덱스로 조회
+  if (menu) {
+    if (nonFav.length === 0) {
+      menu.innerHTML = '<div class="px-4 py-3 text-xs text-brand-gray text-center">모든 카테고리가 주요 폴더에 있습니다</div>';
+    } else {
+      menu.innerHTML = nonFav.map(([name, c], i) => `<button type="button" onclick="prodsrcPickFavorite(${i})" class="w-full text-left px-4 py-2.5 text-xs font-semibold hover:bg-brand-bg flex items-center justify-between gap-2 border-b border-brand-border last:border-b-0">
+        <span class="truncate" title="${_prodsrcEsc(name)}">${_prodsrcEsc(name)}</span>
+        <span class="text-brand-gray text-[10px] shrink-0">${c.count}개</span>
+      </button>`).join('');
+    }
   }
+  if (btn) btn.disabled = nonFav.length === 0;
   // 즐겨찾기 카드 렌더링
   if (!validFavs.length) {
     wrap.innerHTML = '<div class="col-span-full text-center text-xs text-brand-gray py-4">⭐ 아직 주요 폴더가 없습니다. 위 드롭다운에서 카테고리를 선택해 추가하세요.</div>';
@@ -34645,15 +34645,38 @@ function _prodsrcRenderFavorites() {
 }
 
 function prodsrcAddFavorite(name) {
-  console.log('[주요 폴더] prodsrcAddFavorite 호출:', name);
   if (!name) return;
   if (!Array.isArray(_prodsrcState.favorites)) _prodsrcState.favorites = [];
-  if (_prodsrcState.favorites.includes(name)) { console.log('[주요 폴더] 이미 존재함'); return; }
+  if (_prodsrcState.favorites.includes(name)) return;
   _prodsrcState.favorites.push(name);
   _prodsrcSave();
-  console.log('[주요 폴더] 추가 완료. 현재 favorites:', _prodsrcState.favorites);
   _prodsrcRender();
 }
+
+// 커스텀 드롭다운 토글 + 항목 선택
+function prodsrcToggleFavMenu(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById('prodsrc-fav-add-menu');
+  if (!menu) return;
+  menu.classList.toggle('hidden');
+}
+function prodsrcPickFavorite(idx) {
+  const menu = document.getElementById('prodsrc-fav-add-menu');
+  if (menu) menu.classList.add('hidden');
+  if (!Array.isArray(_prodsrcNonFavCache)) return;
+  const entry = _prodsrcNonFavCache[idx];
+  if (!entry) return;
+  prodsrcAddFavorite(entry[0]);
+}
+// 메뉴 외부 클릭 시 닫기
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('prodsrc-fav-add-menu');
+  const btn = document.getElementById('prodsrc-fav-add-btn');
+  if (!menu || menu.classList.contains('hidden')) return;
+  if (e.target === btn || (btn && btn.contains(e.target))) return;
+  if (menu.contains(e.target)) return;
+  menu.classList.add('hidden');
+});
 
 function prodsrcRemoveFavorite(name) {
   if (!Array.isArray(_prodsrcState.favorites)) return;
