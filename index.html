@@ -5376,7 +5376,7 @@ PBT키캡	1180
         </div>
         <label id="prodsrc-dropzone" class="block border-2 border-dashed border-brand-border rounded-2xl p-6 text-center cursor-pointer hover:bg-brand-bg transition-colors"
           ondragover="prodsrcDragOver(event)" ondragleave="prodsrcDragLeave(event)" ondrop="prodsrcDrop(event)">
-          <input type="file" accept=".xlsx,.xls,.csv" class="hidden" id="prodsrc-file-input" onchange="prodsrcFileSelected(event)">
+          <input type="file" multiple accept=".xlsx,.xls,.csv" class="hidden" id="prodsrc-file-input" onchange="prodsrcFileSelected(event)">
           <div class="flex flex-col items-center gap-2">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <div class="font-semibold text-sm">엑셀 파일 업로드</div>
@@ -34314,25 +34314,47 @@ function prodsrcDrop(e) {
   e.preventDefault();
   const zone = document.getElementById('prodsrc-dropzone');
   if (zone) zone.classList.remove('bg-brand-bg','border-brand-black');
-  const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-  if (file) _prodsrcProcessFile(file);
+  const files = e.dataTransfer && e.dataTransfer.files ? Array.from(e.dataTransfer.files) : [];
+  if (files.length) _prodsrcProcessFiles(files);
 }
 function prodsrcFileSelected(e) {
-  const file = e.target && e.target.files && e.target.files[0];
-  if (file) _prodsrcProcessFile(file);
+  const files = e.target && e.target.files ? Array.from(e.target.files) : [];
+  if (files.length) _prodsrcProcessFiles(files);
   if (e.target) e.target.value = '';
 }
 
+// 여러 파일을 순차적으로 처리 — 중복 폴더 체크가 매 단계 누적 상태 기준으로 동작하도록
+async function _prodsrcProcessFiles(files) {
+  let ok = 0, skipped = 0;
+  const isMulti = files.length > 1;
+  if (isMulti) window._prodsrcSuppressAlerts = true; // 다중 업로드 시 중복 alert 모달 억제
+  try {
+    for (const f of files) {
+      try {
+        const result = await _prodsrcProcessFile(f);
+        if (result === 'ok') ok++;
+        else if (result === 'duplicate') skipped++;
+      } catch (e) { console.warn('[상품 소싱 다중 업로드] 실패:', f.name, e); }
+    }
+  } finally {
+    if (isMulti) window._prodsrcSuppressAlerts = false;
+  }
+  if (isMulti) {
+    _prodsrcMsg(`✅ ${files.length}개 파일 처리 완료 — 생성 ${ok}개 · 중복 차단 ${skipped}개`, ok ? 'ok' : 'warn');
+  }
+}
+
 function _prodsrcProcessFile(file) {
-  _prodsrcMsg('엑셀 파일 분석 중...', 'info');
+  return new Promise((resolve) => {
+  _prodsrcMsg('엑셀 파일 분석 중... (' + (file && file.name || '파일') + ')', 'info');
   const reader = new FileReader();
   reader.onload = function(ev) {
     try {
       const wb = XLSX.read(ev.target.result, { type: 'array' });
-      if (!wb || !wb.SheetNames.length) { _prodsrcMsg('엑셀 시트가 없습니다.', 'error'); return; }
+      if (!wb || !wb.SheetNames.length) { _prodsrcMsg('엑셀 시트가 없습니다.', 'error'); resolve('error'); return; }
       const ws = wb.Sheets[wb.SheetNames[0]];
       const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: false });
-      if (!aoa.length) { _prodsrcMsg('엑셀이 비어있습니다.', 'error'); return; }
+      if (!aoa.length) { _prodsrcMsg('엑셀이 비어있습니다.', 'error'); resolve('error'); return; }
 
       // 헤더 행 찾기 — "키워드" 와 "대표 카테고리" 가 같은 행에 있는 첫 행
       let headerIdx = -1;
@@ -34343,6 +34365,7 @@ function _prodsrcProcessFile(file) {
       }
       if (headerIdx === -1) {
         _prodsrcMsg('헤더 행에서 "키워드" / "대표 카테고리" 컬럼을 찾지 못했습니다.', 'error');
+        resolve('error');
         return;
       }
       const header = aoa[headerIdx].map(c => String(c || '').replace(/\s+/g, ''));
@@ -34372,6 +34395,7 @@ function _prodsrcProcessFile(file) {
       };
       if (cols.keyword === -1 || cols.category === -1) {
         _prodsrcMsg('필수 컬럼 "키워드" 또는 "대표 카테고리" 가 없습니다.', 'error');
+        resolve('error');
         return;
       }
       const num = (v) => { const n = Number(v); return isNaN(n) ? null : n; };
@@ -34407,7 +34431,7 @@ function _prodsrcProcessFile(file) {
           totalSearchDiff: 0,
         });
       }
-      if (!newRows.length) { _prodsrcMsg('데이터 행이 없습니다.', 'error'); return; }
+      if (!newRows.length) { _prodsrcMsg('데이터 행이 없습니다.', 'error'); resolve('error'); return; }
 
       // 폴더 생성 모드 — 비교 없음. 대표 카테고리(가장 많은 행)를 폴더 이름으로 사용. 중복 폴더는 차단.
       const existing = (_prodsrcState && _prodsrcState.rows) || [];
@@ -34422,7 +34446,11 @@ function _prodsrcProcessFile(file) {
       const existingFolderNames = new Set(existing.map(r => r.folderName || r.category).filter(Boolean));
       if (existingFolderNames.has(folderName)) {
         _prodsrcMsg(`❌ "${folderName}" 폴더가 이미 존재합니다. 중복으로 업로드되지 않았습니다.`, 'error');
-        showAppAlert('중복 폴더', `"${folderName}" 폴더가 이미 존재합니다.\n같은 대표 카테고리의 데이터는 중복으로 업로드되지 않습니다.\n\n기존 폴더를 삭제 후 다시 업로드하세요.`, 'warn');
+        // 다중 업로드 시 alert 가 연속으로 뜨지 않도록 단건일 때만 알림
+        if (!window._prodsrcSuppressAlerts) {
+          showAppAlert('중복 폴더', `"${folderName}" 폴더가 이미 존재합니다.\n같은 대표 카테고리의 데이터는 중복으로 업로드되지 않습니다.\n\n기존 폴더를 삭제 후 다시 업로드하세요.`, 'warn');
+        }
+        resolve('duplicate');
         return;
       }
 
@@ -34444,12 +34472,16 @@ function _prodsrcProcessFile(file) {
       _prodsrcCurrentCategory = null;
       _prodsrcMsg(`✅ "${folderName}" 폴더 생성 — ${newRows.length}개 키워드`, 'ok');
       _prodsrcRender();
+      resolve('ok');
     } catch (e) {
       console.error('[상품 소싱 업로드] 실패:', e);
       _prodsrcMsg('업로드 실패: ' + (e.message || e), 'error');
+      resolve('error');
     }
   };
+  reader.onerror = function() { resolve('error'); };
   reader.readAsArrayBuffer(file);
+  });
 }
 
 function _prodsrcRender() {
