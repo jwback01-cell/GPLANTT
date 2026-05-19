@@ -34551,7 +34551,12 @@ function prodsrcRenderDetail() {
   const search = (document.getElementById('prodsrc-detail-search')?.value || '').trim().toLowerCase();
   let rows = (_prodsrcState.rows || []).filter(r => r.category === cat);
   if (search) rows = rows.filter(r => (r.keyword || '').toLowerCase().includes(search));
-  rows.sort((a, b) => (a.rank ?? 9999) - (b.rank ?? 9999));
+  // 총검색수 내림차순 (값이 null/없으면 맨 아래로)
+  rows.sort((a, b) => {
+    const av = a.totalSearch == null ? -Infinity : Number(a.totalSearch);
+    const bv = b.totalSearch == null ? -Infinity : Number(b.totalSearch);
+    return bv - av;
+  });
   if (titleEl) titleEl.textContent = cat;
   if (metaEl) metaEl.textContent = `${rows.length}개 키워드`;
   const diffCell = (r) => {
