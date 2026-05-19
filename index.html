@@ -13196,9 +13196,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function toggleAccountRowPw(btn, pw) {
-  // 새 구조 (.account-row 행) 우선, 옛 구조도 호환
+  // 비밀번호 전용 셀렉터로 한정 — '.js-pw-display' 만 매칭 (아이디 셀과 분리)
   const row = btn.closest('.account-row') || btn.closest('#account-list > div');
-  const dots = row ? row.querySelector('.js-pw-display, .font-mono') : null;
+  const dots = row ? row.querySelector('.js-pw-display') : null;
   if (!dots) return;
   const password = pw !== undefined ? pw : (dots.dataset.pw || '');
   const showing  = dots.dataset.showing === '1';
