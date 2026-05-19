@@ -5357,7 +5357,7 @@ PBT키캡	1180
     <main class="flex-1 overflow-y-auto pr-0 md:pr-2 pb-10 flex flex-col gap-6">
       <section class="mt-2 pl-1 md:pl-2">
         <h1 class="text-[1.8rem] md:text-[2.25rem] font-bold tracking-tight mb-2">상품 소싱 🔍</h1>
-        <p class="text-brand-gray text-base md:text-[1.1rem]">키워드 분석 엑셀을 업로드해 대표 카테고리별로 정리하고, 재업로드 시 총검색수 변동을 추적합니다.</p>
+        <p class="text-brand-gray text-base md:text-[1.1rem]">키워드 분석 엑셀을 업로드하면 대표 카테고리(가장 많은 카테고리) 이름으로 폴더가 생성됩니다. 같은 대표 카테고리는 중복으로 업로드되지 않습니다.</p>
       </section>
 
       <!-- 엑셀 업로드 카드 -->
@@ -5432,17 +5432,15 @@ PBT키캡	1180
           </div>
         </div>
         <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
-          <table class="w-full text-xs text-left border-collapse min-w-[1100px]">
+          <table class="w-full text-xs text-left border-collapse min-w-[900px]">
             <thead class="bg-brand-bg sticky top-0 z-10">
               <tr class="text-brand-gray">
-                <th class="p-3 pl-4 font-semibold">상태</th>
-                <th class="p-3 font-semibold">순위</th>
+                <th class="p-3 pl-4 font-semibold">순위</th>
                 <th class="p-3 font-semibold">키워드</th>
                 <th class="p-3 font-semibold">키워드 분류</th>
                 <th class="p-3 text-right font-semibold">PC 검색</th>
                 <th class="p-3 text-right font-semibold">모바일 검색</th>
                 <th class="p-3 text-right font-semibold">총 검색수</th>
-                <th class="p-3 text-right font-semibold">변동</th>
                 <th class="p-3 text-right font-semibold">상품수</th>
                 <th class="p-3 text-right font-semibold">경쟁강도</th>
                 <th class="p-3 pr-4 font-semibold">상세</th>
@@ -34411,32 +34409,32 @@ function _prodsrcProcessFile(file) {
       }
       if (!newRows.length) { _prodsrcMsg('데이터 행이 없습니다.', 'error'); return; }
 
-      // 누적(append) 모드 — 새 업로드는 폴더를 추가함. 같은 카테고리는 새 데이터로 갱신되며 그 안에서만 변동값 계산.
+      // 폴더 생성 모드 — 비교 없음. 대표 카테고리(가장 많은 행)를 폴더 이름으로 사용. 중복 폴더는 차단.
       const existing = (_prodsrcState && _prodsrcState.rows) || [];
-      const existingMap = new Map();
-      existing.forEach(r => existingMap.set(_prodsrcKey(r), r));
-      const newCategories = new Set(newRows.map(r => r.category));
 
-      // 각 새 행: 동일 키(카테고리|키워드) 가 기존에 있으면 → 총검색수 변동 계산. 없으면 → 해당 카테고리에 이전 데이터가 있었는지에 따라 신규 여부 결정.
-      let touchedCatExisted = new Set();
-      existing.forEach(r => { if (newCategories.has(r.category)) touchedCatExisted.add(r.category); });
+      // 1) 가장 많은 대표 카테고리 = 폴더 이름
+      const catCounts = new Map();
+      newRows.forEach(r => catCounts.set(r.category, (catCounts.get(r.category) || 0) + 1));
+      const sortedCats = [...catCounts.entries()].sort((a, b) => b[1] - a[1]);
+      const folderName = sortedCats[0][0];
+
+      // 2) 동일 이름 폴더가 이미 있는지 검사
+      const existingFolderNames = new Set(existing.map(r => r.folderName || r.category).filter(Boolean));
+      if (existingFolderNames.has(folderName)) {
+        _prodsrcMsg(`❌ "${folderName}" 폴더가 이미 존재합니다. 중복으로 업로드되지 않았습니다.`, 'error');
+        showAppAlert('중복 폴더', `"${folderName}" 폴더가 이미 존재합니다.\n같은 대표 카테고리의 데이터는 중복으로 업로드되지 않습니다.\n\n기존 폴더를 삭제 후 다시 업로드하세요.`, 'warn');
+        return;
+      }
+
+      // 3) 비교 없음 — 신규/변동 플래그 모두 초기화. 폴더 이름 부여.
       newRows.forEach(r => {
-        const k = _prodsrcKey(r);
-        const old = existingMap.get(k);
-        if (!old) {
-          r.isNew = touchedCatExisted.has(r.category); // 이 카테고리가 이전에도 있었다면 → 신규 키워드. 처음 추가되는 카테고리면 신규 표시 안 함
-        } else {
-          r.totalSearchPrev = old.totalSearch != null ? old.totalSearch : null;
-          if (r.totalSearch != null && r.totalSearchPrev != null) {
-            r.totalSearchDiff = r.totalSearch - r.totalSearchPrev;
-          }
-        }
+        r.folderName = folderName;
+        r.isNew = false;
+        r.totalSearchPrev = null;
+        r.totalSearchDiff = 0;
       });
 
-      // 새 업로드에 포함된 카테고리만 새 데이터로 교체. 나머지 카테고리는 그대로 유지.
-      const untouched = existing.filter(r => !newCategories.has(r.category));
-      const mergedRows = [...untouched, ...newRows];
-
+      const mergedRows = [...existing, ...newRows];
       _prodsrcState = {
         rows: mergedRows,
         lastUploadedAt: new Date().toISOString(),
@@ -34444,7 +34442,7 @@ function _prodsrcProcessFile(file) {
       };
       _prodsrcSave();
       _prodsrcCurrentCategory = null;
-      _prodsrcMsg(`✅ ${newRows.length}개 키워드 업로드 — 카테고리 ${newCategories.size}개 추가/갱신 (전체 ${new Set(mergedRows.map(r => r.category)).size}개 폴더)`, 'ok');
+      _prodsrcMsg(`✅ "${folderName}" 폴더 생성 — ${newRows.length}개 키워드`, 'ok');
       _prodsrcRender();
     } catch (e) {
       console.error('[상품 소싱 업로드] 실패:', e);
@@ -34487,17 +34485,14 @@ function _prodsrcRenderFolders() {
   const countEl = document.getElementById('prodsrc-cat-count');
   const lastEl = document.getElementById('prodsrc-last-uploaded');
   if (!wrap) return;
-  // 카테고리별 그룹화 + 통계
+  // 폴더(=각 업로드의 대표 카테고리) 별로 그룹화
   const cats = new Map();
   (_prodsrcState.rows || []).forEach(r => {
-    const k = r.category || '(미분류)';
-    if (!cats.has(k)) cats.set(k, { count: 0, newCount: 0, totalSearch: 0, upCount: 0, downCount: 0 });
+    const k = r.folderName || r.category || '(미분류)';
+    if (!cats.has(k)) cats.set(k, { count: 0, totalSearch: 0 });
     const c = cats.get(k);
     c.count++;
-    if (r.isNew) c.newCount++;
     if (r.totalSearch != null) c.totalSearch += Number(r.totalSearch) || 0;
-    if ((r.totalSearchDiff || 0) > 0) c.upCount++;
-    else if ((r.totalSearchDiff || 0) < 0) c.downCount++;
   });
   if (lastEl) {
     const d = _prodsrcState.lastUploadedAt ? new Date(_prodsrcState.lastUploadedAt).toLocaleString('ko-KR') : '';
@@ -34507,19 +34502,14 @@ function _prodsrcRenderFolders() {
   const entries = [...cats.entries()].sort((a, b) => b[1].count - a[1].count);
   countEl.textContent = `(${cats.size}개)`;
   wrap.innerHTML = entries.map(([name, c]) => {
-    const badges = [];
-    if (c.newCount) badges.push(`<span class="text-[10px] font-bold bg-brand-green-light text-brand-green px-1.5 py-0.5 rounded-full">신규 ${c.newCount}</span>`);
-    if (c.upCount) badges.push(`<span class="text-[10px] font-bold bg-brand-blue-light text-brand-blue px-1.5 py-0.5 rounded-full">↑ ${c.upCount}</span>`);
-    if (c.downCount) badges.push(`<span class="text-[10px] font-bold bg-brand-pink-light text-brand-pink px-1.5 py-0.5 rounded-full">↓ ${c.downCount}</span>`);
     return `<div onclick="prodsrcOpenCategory('${_prodsrcEsc(name).replace(/'/g, "\\'")}')" class="bg-brand-bg hover:bg-white border border-brand-border hover:border-brand-black rounded-2xl p-4 cursor-pointer transition-all">
-      <div class="flex items-start justify-between gap-2 mb-2">
+      <div class="mb-2">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="#FFCB52" stroke="#E5A93B" stroke-width="1" class="shrink-0"><path d="M4 14 C4 9.6 7.6 6 12 6 L30 6 L36 12 L68 12 C72.4 12 76 15.6 76 20 L76 54 C76 58.4 72.4 62 68 62 L12 62 C7.6 62 4 58.4 4 54 Z" transform="scale(0.3)"/></svg>
-        <div class="flex flex-wrap gap-1 justify-end">${badges.join('')}</div>
       </div>
       <div class="font-bold text-sm leading-tight mb-1 break-words" title="${_prodsrcEsc(name)}">${_prodsrcEsc(name)}</div>
       <div class="text-[11px] text-brand-gray">키워드 ${c.count}개 · 총검색합 ${_prodsrcFmt(c.totalSearch)}</div>
     </div>`;
-  }).join('') || '<div class="col-span-full text-center text-sm text-brand-gray py-6">카테고리가 없습니다</div>';
+  }).join('') || '<div class="col-span-full text-center text-sm text-brand-gray py-6">폴더가 없습니다</div>';
 }
 
 function prodsrcOpenCategory(name) {
@@ -34537,31 +34527,11 @@ function prodsrcRenderDetail() {
   const metaEl = document.getElementById('prodsrc-detail-meta');
   if (!tbody) return;
   const search = (document.getElementById('prodsrc-detail-search')?.value || '').trim().toLowerCase();
-  let rows = (_prodsrcState.rows || []).filter(r => r.category === cat);
+  let rows = (_prodsrcState.rows || []).filter(r => (r.folderName || r.category) === cat);
 
-  // 카테고리별 변동 요약 — 해당 카테고리에 실제 변동(신규/증가/감소) 행이 있을 때만 표시
+  // 비교 없는 폴더 생성 모드 — 변동 요약 박스 항상 숨김
   const diffBox = document.getElementById('prodsrc-detail-diff');
-  if (diffBox) {
-    let newC = 0, upC = 0, downC = 0;
-    rows.forEach(r => {
-      if (r.isNew) newC++;
-      else if ((r.totalSearchDiff || 0) > 0) upC++;
-      else if ((r.totalSearchDiff || 0) < 0) downC++;
-    });
-    if (newC + upC + downC > 0) {
-      document.getElementById('prodsrc-detail-diff-new').textContent  = newC.toLocaleString('ko-KR');
-      document.getElementById('prodsrc-detail-diff-up').textContent   = upC.toLocaleString('ko-KR');
-      document.getElementById('prodsrc-detail-diff-down').textContent = downC.toLocaleString('ko-KR');
-      const meta = document.getElementById('prodsrc-detail-diff-meta');
-      if (meta) {
-        const prevDt = _prodsrcState.prevUploadedAt ? new Date(_prodsrcState.prevUploadedAt).toLocaleString('ko-KR') : '';
-        meta.textContent = prevDt ? `이전 업로드: ${prevDt}` : '';
-      }
-      diffBox.classList.remove('hidden');
-    } else {
-      diffBox.classList.add('hidden');
-    }
-  }
+  if (diffBox) diffBox.classList.add('hidden');
 
   if (search) rows = rows.filter(r => (r.keyword || '').toLowerCase().includes(search));
   // 총검색수 내림차순 (값이 null/없으면 맨 아래로)
@@ -34572,34 +34542,20 @@ function prodsrcRenderDetail() {
   });
   if (titleEl) titleEl.textContent = cat;
   if (metaEl) metaEl.textContent = `${rows.length}개 키워드`;
-  const diffCell = (r) => {
-    if (r.isNew) return '<span class="text-[10px] font-bold bg-brand-green-light text-brand-green px-1.5 py-0.5 rounded-full">신규</span>';
-    if (r.totalSearchDiff > 0) return `<span class="text-brand-blue font-bold">↑ ${_prodsrcFmt(r.totalSearchDiff)}</span>`;
-    if (r.totalSearchDiff < 0) return `<span class="text-brand-pink font-bold">↓ ${_prodsrcFmt(Math.abs(r.totalSearchDiff))}</span>`;
-    return '<span class="text-brand-gray">-</span>';
-  };
-  const stateCell = (r) => {
-    if (r.isNew) return '<span class="inline-block text-[10px] font-bold bg-brand-green-light text-brand-green px-1.5 py-0.5 rounded-full">NEW</span>';
-    if (r.totalSearchDiff > 0) return '<span class="inline-block text-[10px] font-bold bg-brand-blue-light text-brand-blue px-1.5 py-0.5 rounded-full">↑ UP</span>';
-    if (r.totalSearchDiff < 0) return '<span class="inline-block text-[10px] font-bold bg-brand-pink-light text-brand-pink px-1.5 py-0.5 rounded-full">↓ DOWN</span>';
-    return '<span class="text-brand-gray text-[10px]">-</span>';
-  };
   tbody.innerHTML = rows.length ? rows.map(r => {
     const urlCell = r.url ? `<a href="${_prodsrcEsc(r.url)}" target="_blank" class="text-brand-blue hover:underline">열기 ↗</a>` : '<span class="text-brand-gray">-</span>';
     return `<tr class="border-b border-brand-border hover:bg-brand-bg/40">
-      <td class="p-3 pl-4">${stateCell(r)}</td>
-      <td class="p-3">${r.rank != null ? r.rank : '-'}</td>
+      <td class="p-3 pl-4">${r.rank != null ? r.rank : '-'}</td>
       <td class="p-3 font-semibold">${_prodsrcEsc(r.keyword)}</td>
       <td class="p-3 text-brand-gray">${_prodsrcEsc(r.kwType || '')}</td>
       <td class="p-3 text-right">${_prodsrcFmt(r.pcSearch)}</td>
       <td class="p-3 text-right">${_prodsrcFmt(r.mobileSearch)}</td>
       <td class="p-3 text-right font-bold">${_prodsrcFmt(r.totalSearch)}</td>
-      <td class="p-3 text-right">${diffCell(r)}</td>
       <td class="p-3 text-right text-brand-gray">${_prodsrcFmt(r.productCount)}</td>
       <td class="p-3 text-right text-brand-gray">${r.competition != null ? r.competition : '-'}</td>
       <td class="p-3 pr-4 text-xs">${urlCell}</td>
     </tr>`;
-  }).join('') : '<tr><td colspan="11" class="p-8 text-center text-brand-gray text-sm">키워드가 없습니다</td></tr>';
+  }).join('') : '<tr><td colspan="9" class="p-8 text-center text-brand-gray text-sm">키워드가 없습니다</td></tr>';
 }
 
 function prodsrcClearAll() {
