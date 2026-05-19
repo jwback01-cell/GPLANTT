@@ -3755,6 +3755,10 @@ tailwind.config = {
             </div>
 
             <div class="flex items-center gap-2 mb-4 flex-wrap">
+              <button id="ext-upload-fetch-mail-btn" onclick="fetchExternalOrderFromMail()" class="px-4 py-2 rounded-full bg-brand-blue text-white text-xs font-bold hover:opacity-90 flex items-center gap-1.5" title="네이버 메일에서 '발주양식' 이 포함된 엑셀 첨부파일을 자동으로 가져옵니다">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                📥 메일에서 자동 가져오기
+              </button>
               <button onclick="downloadExternalUploadTemplate()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg flex items-center gap-1.5">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 업로드 양식 다운로드
@@ -21374,6 +21378,60 @@ function downloadExternalUploadTemplate() {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '외부업체 주문 양식');
   XLSX.writeFile(wb, '외부업체_주문_업로드_양식.xlsx');
+}
+
+// 네이버 메일에서 외부업체 발주서 자동 가져오기 — '발주양식' 키워드가 들어간 첨부 엑셀
+async function fetchExternalOrderFromMail() {
+  const btn = document.getElementById('ext-upload-fetch-mail-btn');
+  const origHtml = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="animate-pulse">메일 조회 중...</span>'; }
+  _extUploadMsg('메일함에서 발주서 첨부파일을 조회하고 있습니다...', 'info');
+  try {
+    // 발신자 필터 없이 최근 14일, 파일명에 '발주양식' 포함된 첨부를 검색
+    const res = await fetch('/api/naver-mail-fetch?days=14&limit=30&sender=&filenamePattern=' + encodeURIComponent('발주양식'));
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = data.error || ('HTTP ' + res.status);
+      const hint = data.hint ? '\n\n' + data.hint : '';
+      throw new Error(err + hint);
+    }
+    if (!data.items || data.items.length === 0) {
+      _extUploadMsg('파일명에 "발주양식" 이 포함된 첨부가 최근 14일 메일에 없습니다.', 'warn');
+      showAppAlert('가져올 메일 없음', '파일명에 "발주양식" 이 포함된 엑셀 첨부 메일이 최근 14일 내에 없습니다.', 'info');
+      return;
+    }
+    const items = data.items;
+    if (items.length > 1) {
+      console.log('[외부업체 발주 메일 가져오기] 최근 ' + items.length + '건 중 가장 최신 1건만 처리:',
+        items.map(it => ({ date: it.date, subject: it.subject, fileName: it.fileName, from: it.from })));
+    }
+    const it = items[0];
+    console.log('[외부업체 발주 메일 가져오기] 처리 대상:', { date: it.date, subject: it.subject, fileName: it.fileName, fileSize: it.fileSize });
+
+    // base64 → Uint8Array → File
+    const binary = atob(it.fileBase64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const mimeMap = {
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      xls:  'application/vnd.ms-excel',
+      csv:  'text/csv',
+    };
+    const ext = (it.fileName.split('.').pop() || '').toLowerCase();
+    const mime = mimeMap[ext] || 'application/octet-stream';
+    const file = new File([bytes], it.fileName, { type: mime });
+
+    const dateStr = it.date ? new Date(it.date).toLocaleString('ko-KR') : '(시간 정보 없음)';
+    _extUploadMsg(`✅ ${it.fileName} 수신 — 자동으로 업로드 처리합니다... (${dateStr})`, 'info');
+    // 기존 파일 처리 함수에 그대로 전달
+    _processExternalOrderFile(file);
+  } catch (e) {
+    console.error('[외부업체 발주 메일 가져오기] 실패:', e);
+    _extUploadMsg('메일 가져오기 실패: ' + (e.message || e), 'error');
+    showAppAlert('가져오기 실패', e.message || String(e), 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+  }
 }
 
 function extUploadDragOver(e) {

@@ -42,7 +42,11 @@ export default async function handler(req, res) {
   // 쿼리 파라미터 (GET) — 본문(POST) 도 허용
   const q = req.query || {};
   const body = (req.method === 'POST' && req.body) ? req.body : {};
-  const sender = String(q.sender || body.sender || 'seoulbjs@naver.com').trim();
+  // sender: 빈 문자열이면 발신자 필터 생략 (제목/파일명만으로 검색)
+  const senderRaw = q.sender !== undefined ? q.sender : (body.sender !== undefined ? body.sender : 'seoulbjs@naver.com');
+  const sender = String(senderRaw || '').trim();
+  // filenamePattern: 첨부 파일명의 부분문자열 (대소문자 무시) — 빈 값이면 필터 안 함
+  const filenamePattern = String(q.filenamePattern || body.filenamePattern || '').trim().toLowerCase();
   const days   = parseInt(q.days || body.days || 7, 10);
   const limit  = parseInt(q.limit || body.limit || 10, 10); // 최대 처리 건수 (응답 크기 보호)
   const since  = new Date(Date.now() - Math.max(1, Math.min(30, days)) * 24 * 60 * 60 * 1000);
@@ -64,9 +68,10 @@ export default async function handler(req, res) {
     connected = true;
     const lock = await client.getMailboxLock('INBOX');
     try {
-      // 검색: from + since
+      // 검색: from(있을 때만) + since
       // imapflow.search() 는 기본적으로 sequence 번호 반환 — uid 옵션으로 UID 반환
-      const uids = await client.search({ from: sender, since }, { uid: true });
+      const criteria = sender ? { from: sender, since } : { since };
+      const uids = await client.search(criteria, { uid: true });
       if (!Array.isArray(uids) || uids.length === 0) {
         await safeLogout(client);
         res.status(200).json({ ok: true, sender, sinceDays: days, count: 0, items: [], note: '조건에 맞는 메일이 없습니다.' });
@@ -80,9 +85,13 @@ export default async function handler(req, res) {
           const msg = await client.fetchOne(uid, { source: true, envelope: true }, { uid: true });
           if (!msg || !msg.source) continue;
           const parsed = await simpleParser(msg.source);
-          const attachments = (parsed.attachments || []).filter(a =>
-            a && a.filename && /\.(xlsx|xls|csv)$/i.test(a.filename)
-          );
+          const attachments = (parsed.attachments || []).filter(a => {
+            if (!a || !a.filename) return false;
+            if (!/\.(xlsx|xls|csv)$/i.test(a.filename)) return false;
+            // 파일명 패턴 필터 (대소문자 무시 부분문자열)
+            if (filenamePattern && a.filename.toLowerCase().indexOf(filenamePattern) === -1) return false;
+            return true;
+          });
           if (!attachments.length) continue;
           for (const att of attachments) {
             results.push({
