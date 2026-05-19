@@ -5387,8 +5387,9 @@ PBT키캡	1180
       </section>
 
 
-      <!-- 주요 폴더 — 카테고리 폴더에서 드롭다운으로 옮길 수 있음 -->
-      <section id="prodsrc-fav-section" class="hidden bg-white rounded-4xl panel p-6">
+      <!-- 주요 폴더 — 카테고리 폴더에서 드래그&드롭 또는 드롭다운으로 옮길 수 있음 -->
+      <section id="prodsrc-fav-section" class="hidden bg-white rounded-4xl panel p-6"
+        ondragover="prodsrcFavDragOver(event)" ondragleave="prodsrcFavDragLeave(event)" ondrop="prodsrcFavDrop(event)">
         <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
           <h3 class="font-bold text-base flex items-center gap-2">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="#FBBF24" stroke="#F59E0B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
@@ -34570,10 +34571,17 @@ function _prodsrcRenderFolders() {
   // 엑셀 업로드 순서대로 정렬 (먼저 추가된 폴더가 앞)
   const entries = [...cats.entries()].sort((a, b) => (firstIdx.get(a[0]) ?? 0) - (firstIdx.get(b[0]) ?? 0));
   countEl.textContent = `(${cats.size}개)`;
-  wrap.innerHTML = entries.map(([name, c]) => {
-    return `<div onclick="prodsrcOpenCategory('${_prodsrcEsc(name).replace(/'/g, "\\'")}')" class="bg-brand-bg hover:bg-white border border-brand-border hover:border-brand-black rounded-2xl p-4 cursor-pointer transition-all">
-      <div class="mb-2">
+  wrap.innerHTML = entries.map(([name, c], idx) => {
+    const safeName = _prodsrcEsc(name).replace(/'/g, "\\'");
+    return `<div draggable="true"
+      ondragstart="prodsrcCatDragStart(event, '${safeName}')"
+      ondragend="prodsrcCatDragEnd(event)"
+      onclick="prodsrcOpenCategory('${safeName}')"
+      class="bg-brand-bg hover:bg-white border border-brand-border hover:border-brand-black rounded-2xl p-4 cursor-pointer transition-all"
+      title="드래그해서 주요 폴더로 이동 가능">
+      <div class="mb-2 flex items-center justify-between">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="#FFCB52" stroke="#E5A93B" stroke-width="1" class="shrink-0"><path d="M4 14 C4 9.6 7.6 6 12 6 L30 6 L36 12 L68 12 C72.4 12 76 15.6 76 20 L76 54 C76 58.4 72.4 62 68 62 L12 62 C7.6 62 4 58.4 4 54 Z" transform="scale(0.3)"/></svg>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#C0C0C0" stroke-width="2" class="shrink-0 opacity-60" title="드래그 가능"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg>
       </div>
       <div class="font-bold text-sm leading-tight mb-1 break-words" title="${_prodsrcEsc(name)}">${_prodsrcEsc(name)}</div>
       <div class="text-[11px] text-brand-gray">키워드 ${c.count}개 · 총검색합 ${_prodsrcFmt(c.totalSearch)}</div>
@@ -34624,7 +34632,7 @@ function _prodsrcRenderFavorites() {
   if (btn) btn.disabled = nonFav.length === 0;
   // 즐겨찾기 카드 렌더링
   if (!validFavs.length) {
-    wrap.innerHTML = '<div class="col-span-full text-center text-xs text-brand-gray py-4">⭐ 아직 주요 폴더가 없습니다. 위 드롭다운에서 카테고리를 선택해 추가하세요.</div>';
+    wrap.innerHTML = '<div class="col-span-full text-center text-xs text-brand-gray py-4">⭐ 아직 주요 폴더가 없습니다. 아래 카테고리 폴더를 <b>드래그하거나</b> 위 드롭다운에서 선택해 추가하세요.</div>';
     return;
   }
   wrap.innerHTML = validFavs.map(name => {
@@ -34651,6 +34659,51 @@ function prodsrcAddFavorite(name) {
   _prodsrcState.favorites.push(name);
   _prodsrcSave();
   _prodsrcRender();
+}
+
+// 드래그 앤 드롭 — 카테고리 폴더 → 주요 폴더
+let _prodsrcDragging = null;
+function prodsrcCatDragStart(e, name) {
+  _prodsrcDragging = name;
+  try { e.dataTransfer.setData('text/plain', name); e.dataTransfer.effectAllowed = 'move'; } catch(_){}
+  // 드래그 중 시각 효과
+  if (e.currentTarget) e.currentTarget.style.opacity = '0.5';
+}
+function prodsrcCatDragEnd(e) {
+  _prodsrcDragging = null;
+  if (e.currentTarget) e.currentTarget.style.opacity = '';
+  // 드롭존 강조 효과 제거
+  const favSec = document.getElementById('prodsrc-fav-section');
+  if (favSec) favSec.classList.remove('ring-2','ring-amber-400','bg-amber-50/30');
+}
+function prodsrcFavDragOver(e) {
+  // 드래그 중인 항목이 카테고리 폴더에서 온 경우에만 허용
+  if (!_prodsrcDragging) return;
+  e.preventDefault();
+  try { e.dataTransfer.dropEffect = 'move'; } catch(_){}
+  const favSec = document.getElementById('prodsrc-fav-section');
+  if (favSec) favSec.classList.add('ring-2','ring-amber-400','bg-amber-50/30');
+}
+function prodsrcFavDragLeave(e) {
+  // 자식 요소 진입 시에도 leave 가 호출되므로 — 진짜 영역 밖일 때만 강조 해제
+  const favSec = document.getElementById('prodsrc-fav-section');
+  if (!favSec) return;
+  const rect = favSec.getBoundingClientRect();
+  if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
+    favSec.classList.remove('ring-2','ring-amber-400','bg-amber-50/30');
+  }
+}
+function prodsrcFavDrop(e) {
+  e.preventDefault();
+  const favSec = document.getElementById('prodsrc-fav-section');
+  if (favSec) favSec.classList.remove('ring-2','ring-amber-400','bg-amber-50/30');
+  let name = _prodsrcDragging;
+  if (!name) {
+    try { name = e.dataTransfer.getData('text/plain'); } catch(_){}
+  }
+  if (!name) return;
+  prodsrcAddFavorite(name);
+  _prodsrcDragging = null;
 }
 
 // 커스텀 드롭다운 토글 + 항목 선택
