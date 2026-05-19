@@ -5694,9 +5694,10 @@ const PAGES = ['login','dashboard','todo','ledger','products','accounts','upload
 const currentPage = { value: 'login' };
 
 function navigate(page) {
-  // 좌측 메뉴 이동 시 — 외부업체 주문 데이터 비움 (휘발성)
+  // 좌측 메뉴 이동 시 — 외부업체 주문 + 송장 업로드 데이터 비움 (휘발성)
   if (page !== 'playauto' && page !== 'upload') {
     try { localStorage.removeItem('gplan_ext_order_upload_v1'); } catch(_) {}
+    try { if (typeof _resetInvoiceTabUI === 'function') _resetInvoiceTabUI(); } catch(_) {}
   }
   // 가상 페이지: 플레이오토 연동 — 실제로는 upload 페이지 + playauto 탭. 사이드바 활성표시는 'playauto' 로.
   if (page === 'playauto') {
@@ -22985,12 +22986,38 @@ function switchPlayautoSubTab(sub) {
   if (sub !== 'external') {
     try { localStorage.removeItem(EXT_UPLOAD_KEY); _renderExternalOrderUpload(null); } catch(_) {}
   }
+  // 송장 업로드 서브탭에서 다른 서브탭으로 이동 시 UI/데이터 비움 (휘발성)
+  if (sub !== 'invoice') {
+    try { _resetInvoiceTabUI(); } catch(_) {}
+  }
   if (sub === 'claim') { try { _initClaimSubTab(); } catch(_) {} }
 }
 
 // ── 송장 업로드 (플레이오토 연동 서브탭) ─────────────
 const INVOICE_HEADERS = ['받는분성명','받는분기타연락처','업체명(필수기입)','받는분연락처','우편번호','받는분주소','수량','상품명','운임TYPE','지불조건','출고번호','배송메세지'];
 const INVOICE_STORAGE_KEY = 'pa_invoice_records_v1';
+// 송장 업로드 데이터는 휘발성 — 페이지 로드 시 즉시 비움 (새로고침/재방문/탭재오픈 모두 깨끗한 상태)
+try { localStorage.removeItem(INVOICE_STORAGE_KEY); } catch(_) {}
+
+// 송장 업로드 탭 UI 상태 리셋 — 탭 이탈/메뉴 이동 시 호출
+function _resetInvoiceTabUI() {
+  try { localStorage.removeItem(INVOICE_STORAGE_KEY); } catch(_) {}
+  // 수집된 주문 / 처리 결과 박스 숨김
+  const ordersBox = document.getElementById('pa-inv-orders-box');
+  if (ordersBox) ordersBox.classList.add('hidden');
+  const resultBox = document.getElementById('invoice-result-box');
+  if (resultBox) resultBox.classList.add('hidden');
+  // 파일 입력 초기화
+  const fileName = document.getElementById('invoice-file-name');
+  if (fileName) fileName.textContent = '엑셀 파일을 선택하거나 여기로 끌어다 놓으세요';
+  const fileInput = document.getElementById('invoice-file-input');
+  if (fileInput) fileInput.value = '';
+  // 상태 메시지 초기화
+  const statusMsg = document.getElementById('invoice-status-msg');
+  if (statusMsg) { statusMsg.textContent = ''; statusMsg.classList.add('hidden'); }
+  const fetchStatus = document.getElementById('pa-inv-fetch-status');
+  if (fetchStatus) fetchStatus.textContent = '';
+}
 
 function _invoiceStatus(msg, tone) {
   const s = document.getElementById('invoice-status-msg'); if (!s) return;
