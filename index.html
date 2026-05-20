@@ -5459,14 +5459,7 @@ PBT키캡	1180
         </div>
         <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
           <table class="w-full text-xs text-left border-collapse">
-            <thead class="bg-brand-bg sticky top-0 z-10">
-              <tr class="text-brand-gray">
-                <th class="p-3 pl-4 font-semibold w-16">순위</th>
-                <th class="p-3 font-semibold w-48">키워드</th>
-                <th class="p-3 text-right font-bold w-40" id="prodsrc-detail-uploaded-date"></th>
-                <th class="p-3 pr-4 text-right font-semibold">상세</th>
-              </tr>
-            </thead>
+            <thead class="bg-brand-bg sticky top-0 z-10" id="prodsrc-detail-thead"></thead>
             <tbody id="prodsrc-detail-tbody"></tbody>
           </table>
         </div>
@@ -34553,6 +34546,19 @@ function _prodsrcSave() {
 function _prodsrcKey(row) { return (row.category || '') + '|' + (row.keyword || ''); }
 function _prodsrcFmt(v) { return v == null || v === '' ? '-' : Number(v).toLocaleString('ko-KR'); }
 function _prodsrcEsc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function _prodsrcTodayDateStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+// 행에서 history 배열을 가져옴 — 구버전(legacy) 데이터는 자동으로 단일 항목 history 로 변환
+function _prodsrcGetHistory(r) {
+  if (Array.isArray(r.history) && r.history.length) return r.history;
+  if (r.uploadedAt && r.totalSearch != null) {
+    const d = (typeof r.uploadedAt === 'string' && r.uploadedAt.length >= 10) ? r.uploadedAt.slice(0, 10) : _prodsrcTodayDateStr();
+    return [{ date: d, totalSearch: r.totalSearch }];
+  }
+  return [];
+}
 
 function _prodsrcMsg(text, type) {
   const el = document.getElementById('prodsrc-upload-msg');
@@ -34699,43 +34705,65 @@ function _prodsrcProcessFile(file) {
 
       const existing = (_prodsrcState && _prodsrcState.rows) || [];
 
-      // ── 폴더 안에서 업로드한 경우 — 비교 모드 (현재 폴더 데이터 갱신 + 변동 계산)
+      // ── 폴더 안에서 업로드한 경우 — history 누적 모드 (각 업로드 날짜를 컬럼으로 보존)
       if (_prodsrcCurrentCategory) {
         const currentFolder = _prodsrcCurrentCategory;
+        const todayStr = _prodsrcTodayDateStr();
         const nowIso = new Date().toISOString();
         const existingFolderRows = existing.filter(r => (r.folderName || r.category) === currentFolder);
         const existingByKw = new Map();
         existingFolderRows.forEach(r => existingByKw.set(r.keyword, r));
 
         let newC = 0, upC = 0, downC = 0;
+        const mergedFolderRows = [];
+        // 기존 행은 그대로 보관하되 history 형식으로 보장 (legacy → history 변환)
+        existingFolderRows.forEach(old => {
+          old.history = _prodsrcGetHistory(old);
+          mergedFolderRows.push(old);
+        });
+        // 새 행을 기존과 병합
         newRows.forEach(r => {
-          r.folderName = currentFolder; // 기존 폴더 이름 유지
-          r.uploadedAt = nowIso;        // 행 업로드 시각
+          r.folderName = currentFolder;
+          r.uploadedAt = nowIso;
           const old = existingByKw.get(r.keyword);
           if (!old) {
+            // 신규 키워드 — 새 행 추가, history 단일 항목으로 시작
             r.isNew = true;
+            r.history = [{ date: todayStr, totalSearch: r.totalSearch }];
+            mergedFolderRows.push(r);
             newC++;
           } else {
-            r.totalSearchPrev = old.totalSearch != null ? old.totalSearch : null;
-            if (r.totalSearch != null && r.totalSearchPrev != null) {
-              r.totalSearchDiff = r.totalSearch - r.totalSearchPrev;
-              if (r.totalSearchDiff > 0) upC++;
-              else if (r.totalSearchDiff < 0) downC++;
+            // 기존 키워드 — history 에 오늘 날짜 항목 추가/갱신
+            const hist = Array.isArray(old.history) ? old.history.slice() : [];
+            const filtered = hist.filter(h => h.date !== todayStr); // 같은 날 재업로드 시 덮어쓰기
+            filtered.push({ date: todayStr, totalSearch: r.totalSearch });
+            filtered.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+            old.history = filtered;
+            // 최근 값으로 갱신
+            const prevVal = old.totalSearch;
+            old.totalSearch = r.totalSearch;
+            old.uploadedAt = nowIso;
+            old.rank = r.rank != null ? r.rank : old.rank;
+            old.url = r.url || old.url;
+            // 변동 카운트
+            if (prevVal != null && r.totalSearch != null) {
+              const diff = r.totalSearch - prevVal;
+              if (diff > 0) upC++;
+              else if (diff < 0) downC++;
             }
           }
         });
-        // 현재 폴더 데이터 교체 + 다른 폴더는 그대로
         const otherRows = existing.filter(r => (r.folderName || r.category) !== currentFolder);
-        const mergedRows = [...otherRows, ...newRows];
+        const finalRows = [...otherRows, ...mergedFolderRows];
         _prodsrcState = {
-          rows: mergedRows,
+          rows: finalRows,
           lastUploadedAt: new Date().toISOString(),
           prevUploadedAt: _prodsrcState.lastUploadedAt || '',
           favorites: Array.isArray(_prodsrcState.favorites) ? _prodsrcState.favorites.slice() : [],
         };
         _prodsrcSave();
-        _prodsrcMsg(`✅ "${currentFolder}" 폴더 갱신 — ${newRows.length}개 키워드 · 신규 ${newC} · 증가 ${upC} · 감소 ${downC}`, 'ok');
-        _prodsrcRender(); // 폴더 상세 화면 유지
+        _prodsrcMsg(`✅ "${currentFolder}" 폴더 갱신 (${todayStr}) — 신규 ${newC} · 증가 ${upC} · 감소 ${downC}`, 'ok');
+        _prodsrcRender();
         resolve('ok');
         return;
       }
@@ -34759,14 +34787,16 @@ function _prodsrcProcessFile(file) {
         return;
       }
 
-      // 3) 비교 없음 — 신규/변동 플래그 모두 초기화. 폴더 이름 + 업로드 시각 부여.
+      // 3) 비교 없음 — 신규/변동 플래그 모두 초기화. 폴더 이름 + 업로드 시각 + history 초기화.
       const nowIso = new Date().toISOString();
+      const todayStr = _prodsrcTodayDateStr();
       newRows.forEach(r => {
         r.folderName = folderName;
         r.uploadedAt = nowIso;
         r.isNew = false;
         r.totalSearchPrev = null;
         r.totalSearchDiff = 0;
+        r.history = [{ date: todayStr, totalSearch: r.totalSearch }];
       });
 
       const mergedRows = [...existing, ...newRows];
@@ -35068,28 +35098,51 @@ function prodsrcRenderDetail() {
   });
   if (titleEl) titleEl.textContent = cat;
   if (metaEl) metaEl.textContent = `${rows.length}개 키워드`;
-  // 헤더에 업로드 날짜만 굵게 표시 (해당 폴더의 가장 최근 업로드 날짜)
-  const uploadedDates = rows.map(r => r.uploadedAt).filter(Boolean).sort();
-  const latestUploadedAt = uploadedDates.length ? uploadedDates[uploadedDates.length - 1] : null;
-  const headerDateEl = document.getElementById('prodsrc-detail-uploaded-date');
-  if (headerDateEl) {
-    if (latestUploadedAt) {
-      const d = new Date(latestUploadedAt);
-      headerDateEl.textContent = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  // 폴더 내 모든 행의 history 에서 고유 날짜 모으기 (오름차순)
+  const allDatesSet = new Set();
+  rows.forEach(r => _prodsrcGetHistory(r).forEach(h => { if (h.date) allDatesSet.add(h.date); }));
+  const dateCols = [...allDatesSet].sort((a, b) => String(a).localeCompare(String(b)));
+
+  // 동적 thead 구성
+  const thead = document.getElementById('prodsrc-detail-thead');
+  if (thead) {
+    let theadHtml = '<tr class="text-brand-gray">';
+    theadHtml += '<th class="p-3 pl-4 font-semibold w-16">순위</th>';
+    theadHtml += '<th class="p-3 font-semibold w-48">키워드</th>';
+    if (dateCols.length === 0) {
+      theadHtml += '<th class="p-3 text-right font-bold w-40 text-brand-gray">데이터 없음</th>';
     } else {
-      headerDateEl.textContent = '';
+      dateCols.forEach(d => {
+        theadHtml += `<th class="p-3 text-right font-bold w-28">${_prodsrcEsc(d)}</th>`;
+      });
     }
+    theadHtml += '<th class="p-3 pr-4 text-right font-semibold">상세</th>';
+    theadHtml += '</tr>';
+    thead.innerHTML = theadHtml;
   }
 
+  const colCount = 2 + Math.max(1, dateCols.length) + 1;
   tbody.innerHTML = rows.length ? rows.map(r => {
     const urlCell = r.url ? `<a href="${_prodsrcEsc(r.url)}" target="_blank" class="text-brand-blue hover:underline">열기 ↗</a>` : '<span class="text-brand-gray">-</span>';
+    // 행의 history 를 date→totalSearch 맵으로 변환
+    const histMap = new Map();
+    _prodsrcGetHistory(r).forEach(h => { if (h.date) histMap.set(h.date, h.totalSearch); });
+    let dateCells = '';
+    if (dateCols.length === 0) {
+      dateCells = '<td class="p-3 text-right w-40 text-brand-gray">-</td>';
+    } else {
+      dateCols.forEach(d => {
+        const v = histMap.get(d);
+        dateCells += `<td class="p-3 text-right w-28 font-bold">${v == null ? '<span class="text-brand-gray">-</span>' : _prodsrcFmt(v)}</td>`;
+      });
+    }
     return `<tr class="border-b border-brand-border hover:bg-brand-bg/40">
       <td class="p-3 pl-4 w-16">${r.rank != null ? r.rank : '-'}</td>
       <td class="p-3 font-semibold w-48">${_prodsrcEsc(r.keyword)}</td>
-      <td class="p-3 text-right w-40 font-bold">${_prodsrcFmt(r.totalSearch)}</td>
+      ${dateCells}
       <td class="p-3 pr-4 text-xs text-right">${urlCell}</td>
     </tr>`;
-  }).join('') : '<tr><td colspan="4" class="p-8 text-center text-brand-gray text-sm">키워드가 없습니다</td></tr>';
+  }).join('') : `<tr><td colspan="${colCount}" class="p-8 text-center text-brand-gray text-sm">키워드가 없습니다</td></tr>`;
 }
 
 function prodsrcClearAll() {
