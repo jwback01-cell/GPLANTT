@@ -11823,6 +11823,8 @@ async function loadProductsFromDB() {
     _allProducts = all;
     console.log(`[products] ${got}건 로드 완료${expected != null ? ` (DB ${expected}건)` : ''}`);
     renderProductsPage();
+    // 매일 1회 안전재고 자동 갱신 (오늘 이미 실행했으면 스킵)
+    try { _runDailySafetyAutoIfNeeded(); } catch(_) {}
   } catch (e) {
     console.error('loadProductsFromDB 오류:', e);
     if (typeof showAppAlert === 'function') {
@@ -13704,6 +13706,71 @@ function openSafetyStockBreakdown(productId) {
   m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
 }
 
+// ── 매일 자동 안전재고 적용 — 페이지 로드 시 오늘 한 번만 실행 ──
+const SAFETY_AUTO_LAST_KEY = 'gplan_safety_auto_last_run';
+const SAFETY_AUTO_DAYS_KEY = 'gplan_safety_auto_days';
+function _safetyAutoYmdToday() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+async function _runDailySafetyAutoIfNeeded() {
+  try {
+    const today = _safetyAutoYmdToday();
+    const last = (function(){ try { return localStorage.getItem(SAFETY_AUTO_LAST_KEY) || ''; } catch(_) { return ''; } })();
+    if (last === today) return; // 오늘 이미 실행됨 — 스킵
+    if (!_supabase) return;
+    const products = Array.isArray(_allProducts) ? _allProducts : [];
+    if (!products.length) return;
+    const targets = products.filter(p => String(p.category || '').trim() === '지플랜');
+    if (!targets.length) {
+      try { localStorage.setItem(SAFETY_AUTO_LAST_KEY, today); } catch(_) {}
+      return;
+    }
+    const days = Math.max(1, Math.min(90, Number((function(){ try { return localStorage.getItem(SAFETY_AUTO_DAYS_KEY); } catch(_) { return null; } })()) || 30));
+    const qtyMap = _calc30DayQtyBySku();
+    // 변경 대상만 추출
+    const changes = [];
+    targets.forEach(p => {
+      const skuKey = String(p.sku || '').trim().toLowerCase();
+      const qty30 = qtyMap.get(skuKey) || 0;
+      const cur = Number(p.safety_stock) || 0;
+      const suggested = qty30 <= 0 ? 0 : Math.ceil((qty30 / 30) * days);
+      if (suggested !== cur) changes.push({ p, suggested });
+    });
+    if (!changes.length) {
+      try { localStorage.setItem(SAFETY_AUTO_LAST_KEY, today); } catch(_) {}
+      console.log('[안전재고 자동(매일)] 변경 없음 - 스킵');
+      return;
+    }
+    console.log(`[안전재고 자동(매일)] ${changes.length}건 업데이트 시도 (안전기간 ${days}일)...`);
+    let ok = 0, fail = 0;
+    for (const r of changes) {
+      try {
+        const { error } = await _supabase.from('products').update({ safety_stock: r.suggested }).eq('id', r.p.id);
+        if (error) throw error;
+        r.p.safety_stock = r.suggested; // 로컬 캐시 즉시 업데이트
+        ok++;
+        try { await _syncLinkedFields(r.p.id, { safety_stock: r.suggested }); } catch(_) {}
+      } catch (e) {
+        fail++;
+        console.error('[안전재고 자동(매일)] 실패:', r.p.sku, e);
+      }
+    }
+    try { localStorage.setItem(SAFETY_AUTO_LAST_KEY, today); } catch(_) {}
+    console.log(`[안전재고 자동(매일)] 완료: 성공 ${ok}건, 실패 ${fail}건`);
+    if (ok > 0) {
+      if (typeof toast === 'function') {
+        toast(`📦 안전재고 자동 갱신 — ${ok}건 업데이트 (안전기간 ${days}일)`, 'success');
+      } else {
+        try { showAppAlert('안전재고 자동 갱신', `오늘 안전재고를 ${ok}건 자동으로 업데이트했습니다.${fail > 0 ? `\n실패 ${fail}건 (콘솔 확인)` : ''}\n\n기준: 최근 30일 판매 ÷ 30 × ${days}일`, fail === 0 ? 'success' : 'warn'); } catch(_) {}
+      }
+      if (typeof renderProductsPage === 'function') renderProductsPage();
+    }
+  } catch (e) {
+    console.warn('[안전재고 자동(매일)] 예외:', e);
+  }
+}
+
 // 안전재고 자동 계산 모달 열기 — 카테고리 지플랜 상품만, B-1 방식
 function openSafetyStockAutoCalc() {
   const products = Array.isArray(_allProducts) ? _allProducts : [];
@@ -13848,6 +13915,14 @@ async function applySafetyStockAuto() {
     return;
   }
   if (!confirm(`${rows.length}개 상품의 안전재고를 변경합니다.\n\n계속하시겠습니까?\n(취소 후 변경 없이 닫을 수 있어요)`)) return;
+
+  // 사용자가 선택한 안전기간(N일)을 저장 — 매일 자동 적용 시 기준으로 사용
+  try {
+    const daysInput = document.getElementById('safety-auto-days');
+    const days = daysInput ? Math.max(1, Math.min(90, Number(daysInput.value) || 30)) : 30;
+    localStorage.setItem(SAFETY_AUTO_DAYS_KEY, String(days));
+    localStorage.setItem(SAFETY_AUTO_LAST_KEY, _safetyAutoYmdToday()); // 오늘 수동 적용 = 자동 실행 스킵
+  } catch(_) {}
 
   const applyBtn = document.getElementById('safety-auto-apply');
   if (applyBtn) { applyBtn.disabled = true; applyBtn.textContent = '적용 중...'; }
