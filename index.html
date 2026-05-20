@@ -12048,7 +12048,12 @@ function renderProductsPage() {
         '<div class="text-brand-gray text-xs font-medium">SKU: ' + escHtml(p.sku||'') + ' | ' + escHtml(p.category||'') + (p.folder_code ? ' | 📁 ' + escHtml(p.folder_code) : '') + (p.cost ? ' | 원가 ' + Number(p.cost).toLocaleString('ko-KR') + '원' : '') + (p.supply_price ? ' | 공급가 ' + Number(p.supply_price).toLocaleString('ko-KR') + '원' : '') + (p.shipping_fee ? ' | 택배비 ' + Number(p.shipping_fee).toLocaleString('ko-KR') + '원' : '') + (p.shipping_cost ? ' | 택배비용 ' + Number(p.shipping_cost).toLocaleString('ko-KR') + '원' : '') + (p.created_at ? ' | 등록 ' + String(p.created_at).slice(0, 10) : '') + '</div></div>' +
       '</div>' +
       '<div class="text-right"><input type="number" value="' + p.stock + '" class="' + stockClass + '"></div>' +
-      '<div class="text-right"><input type="number" value="' + p.safety_stock + '" class="input-stock" style="border-style:dashed"></div>' +
+      '<div class="text-right"><div class="flex items-center justify-end gap-1">' +
+        '<button type="button" onclick="event.stopPropagation();openSafetyStockBreakdown(' + p.id + ')" class="text-brand-gray hover:text-brand-blue p-0.5" title="안전재고 계산 내역 보기 — 최근 30일 판매 내역 확인">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>' +
+        '</button>' +
+        '<input type="number" value="' + p.safety_stock + '" class="input-stock" style="border-style:dashed">' +
+      '</div></div>' +
       '<div class="text-center">' + statusHtml + '</div>' +
       '<div class="text-center">' +
         '<button onclick="event.stopPropagation();openStockMovementModal(' + p.id + ')" class="text-brand-gray hover:text-brand-blue p-1 md:p-2" title="재고 수불 이력 보기">' +
@@ -13564,6 +13569,123 @@ function _calc30DayQtyBySku() {
   });
 
   return totalQty;
+}
+
+// 안전재고 계산 내역 모달 — 한 상품의 30일 판매 내역 (직접 + 세트 분배) 표시
+function openSafetyStockBreakdown(productId) {
+  const products = Array.isArray(_allProducts) ? _allProducts : [];
+  const p = products.find(x => Number(x.id) === Number(productId));
+  if (!p) { showAppAlert('상품 없음', '상품을 찾을 수 없습니다.', 'error'); return; }
+  const sku = String(p.sku || '').trim().toLowerCase();
+  if (!sku) { showAppAlert('SKU 없음', 'SKU 가 등록되지 않은 상품입니다.', 'warn'); return; }
+
+  const data = (typeof _loadUploadData === 'function') ? _loadUploadData() : [];
+  const now = new Date();
+  const cutoff = new Date(now.getTime() - 30 * 86400000);
+  const cutoffStr = cutoff.getFullYear() + '-' + String(cutoff.getMonth()+1).padStart(2,'0') + '-' + String(cutoff.getDate()).padStart(2,'0');
+
+  // 1) 직접 판매 — 이 SKU 가 itemCode 인 행
+  const directSales = data.filter(r => {
+    const d = String(r.date || '').slice(0, 10);
+    if (!d || d < cutoffStr) return false;
+    const code = String(r.itemCode || r.skuCode || '').trim().toLowerCase();
+    if (code !== sku) return false;
+    return (Number(r.qty) || 0) > 0;
+  });
+
+  // 2) 세트 분배 — 이 SKU 가 세트 구성품인 행
+  const sets = (typeof _loadSetProducts === 'function') ? _loadSetProducts() : [];
+  const componentSets = sets.filter(s => (s.items || []).some(it => String(it.sku || '').trim().toLowerCase() === sku));
+  const setSales = [];
+  componentSets.forEach(s => {
+    const setCode = String(s.code || '').trim().toLowerCase();
+    if (!setCode) return;
+    const compItem = (s.items || []).find(it => String(it.sku || '').trim().toLowerCase() === sku);
+    const mul = Number(compItem && compItem.qty) || 0;
+    if (mul <= 0) return;
+    data.forEach(r => {
+      const d = String(r.date || '').slice(0, 10);
+      if (!d || d < cutoffStr) return;
+      const code = String(r.itemCode || r.skuCode || '').trim().toLowerCase();
+      if (code !== setCode) return;
+      const qty = Number(r.qty) || 0;
+      if (qty <= 0) return;
+      setSales.push({ date: d, shopName: r.shopName || '', itemName: r.itemName || '', qty, mul, distributed: qty * mul, setName: s.name || s.code, setCode: s.code });
+    });
+  });
+
+  const directTotal = directSales.reduce((sum, r) => sum + (Number(r.qty) || 0), 0);
+  const setTotal = setSales.reduce((sum, r) => sum + r.distributed, 0);
+  const grandTotal = directTotal + setTotal;
+
+  const _esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  const directRowsHtml = directSales.length
+    ? directSales.sort((a, b) => String(b.date).localeCompare(String(a.date))).map(r => `<tr style="border-bottom:1px solid #eee;">
+        <td style="padding:8px 10px;font-size:12px;">${_esc(String(r.date).slice(0, 10))}</td>
+        <td style="padding:8px 10px;font-size:12px;">${_esc(r.shopName || '-')}</td>
+        <td style="padding:8px 10px;font-size:12px;">${_esc(r.itemName || '-')}</td>
+        <td style="padding:8px 10px;font-size:12px;text-align:right;font-weight:bold;">${r.qty}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="4" style="padding:16px;text-align:center;color:#888;font-size:12px;">직접 판매 내역 없음</td></tr>';
+
+  const setRowsHtml = setSales.length
+    ? setSales.sort((a, b) => String(b.date).localeCompare(String(a.date))).map(r => `<tr style="border-bottom:1px solid #eee;">
+        <td style="padding:8px 10px;font-size:12px;">${_esc(String(r.date).slice(0, 10))}</td>
+        <td style="padding:8px 10px;font-size:12px;">${_esc(r.shopName || '-')}</td>
+        <td style="padding:8px 10px;font-size:12px;">${_esc(r.setName)} <span style="color:#888;font-size:10px;">[${_esc(r.setCode || '')}]</span></td>
+        <td style="padding:8px 10px;font-size:12px;text-align:right;">${r.qty} × ${r.mul}</td>
+        <td style="padding:8px 10px;font-size:12px;text-align:right;font-weight:bold;">${r.distributed}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="5" style="padding:16px;text-align:center;color:#888;font-size:12px;">세트 분배 판매 내역 없음</td></tr>';
+
+  const prev = document.getElementById('safety-breakdown-modal');
+  if (prev) prev.remove();
+  const m = document.createElement('div');
+  m.id = 'safety-breakdown-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  m.innerHTML = `<div style="background:white;border-radius:16px;max-width:950px;width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+    <div style="padding:16px 22px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+      <div>
+        <div style="font-weight:bold;font-size:16px;">안전재고 계산 내역</div>
+        <div style="color:#888;font-size:12px;margin-top:4px;">${_esc(p.name)} · SKU: <b>${_esc(p.sku || '-')}</b> · 최근 30일 (${cutoffStr} ~)</div>
+      </div>
+      <button onclick="document.getElementById('safety-breakdown-modal').remove()" style="border:none;background:transparent;cursor:pointer;font-size:26px;color:#888;line-height:1;">×</button>
+    </div>
+    <div style="padding:14px 22px;border-bottom:1px solid #eee;background:#fafafa;display:flex;gap:24px;flex-wrap:wrap;font-size:13px;">
+      <div><span style="color:#888;">직접 판매:</span> <b>${directTotal}</b>개</div>
+      <div><span style="color:#888;">세트 분배:</span> <b>${setTotal}</b>개</div>
+      <div><span style="color:#888;">30일 총 판매:</span> <b style="color:#FF6B00;">${grandTotal}</b>개</div>
+      <div><span style="color:#888;">현재 안전재고:</span> <b>${p.safety_stock || 0}</b>개</div>
+    </div>
+    <div style="overflow:auto;flex:1;padding:14px 22px;">
+      <h4 style="font-size:13px;font-weight:bold;margin:0 0 8px;color:#444;">📦 직접 판매 (이 SKU 가 품목코드인 행) — ${directSales.length}건</h4>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:24px;">
+        <thead style="background:#f8f8f8;"><tr>
+          <th style="padding:8px 10px;text-align:left;font-size:11px;color:#888;">날짜</th>
+          <th style="padding:8px 10px;text-align:left;font-size:11px;color:#888;">쇼핑몰</th>
+          <th style="padding:8px 10px;text-align:left;font-size:11px;color:#888;">상품명</th>
+          <th style="padding:8px 10px;text-align:right;font-size:11px;color:#888;">수량</th>
+        </tr></thead>
+        <tbody>${directRowsHtml}</tbody>
+      </table>
+      <h4 style="font-size:13px;font-weight:bold;margin:0 0 8px;color:#444;">🎁 세트 분배 (이 SKU 가 세트 구성품인 행) — ${setSales.length}건</h4>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead style="background:#f8f8f8;"><tr>
+          <th style="padding:8px 10px;text-align:left;font-size:11px;color:#888;">날짜</th>
+          <th style="padding:8px 10px;text-align:left;font-size:11px;color:#888;">쇼핑몰</th>
+          <th style="padding:8px 10px;text-align:left;font-size:11px;color:#888;">세트명 [세트코드]</th>
+          <th style="padding:8px 10px;text-align:right;font-size:11px;color:#888;">세트수량 × 배수</th>
+          <th style="padding:8px 10px;text-align:right;font-size:11px;color:#888;">분배수량</th>
+        </tr></thead>
+        <tbody>${setRowsHtml}</tbody>
+      </table>
+    </div>
+    <div style="padding:14px 22px;border-top:1px solid #eee;display:flex;justify-content:flex-end;">
+      <button onclick="document.getElementById('safety-breakdown-modal').remove()" style="padding:9px 22px;border-radius:20px;border:1px solid #ddd;background:white;cursor:pointer;font-size:13px;font-weight:bold;">닫기</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
 }
 
 // 안전재고 자동 계산 모달 열기 — 카테고리 지플랜 상품만, B-1 방식
