@@ -5454,14 +5454,14 @@ PBT키캡	1180
           </div>
         </div>
         <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
-          <table class="w-full text-xs text-left border-collapse min-w-[640px]">
+          <table class="w-full text-xs text-left border-collapse">
             <thead class="bg-brand-bg sticky top-0 z-10">
               <tr class="text-brand-gray">
-                <th class="p-3 pl-4 font-semibold">순위</th>
-                <th class="p-3 font-semibold">키워드</th>
-                <th class="p-3 text-right font-semibold">총 검색수</th>
-                <th class="p-3 text-right font-semibold">업로드 날짜 <span class="text-[10px] text-brand-gray font-normal block">마우스 올리면 변동값</span></th>
-                <th class="p-3 pr-4 font-semibold">상세</th>
+                <th class="p-3 pl-4 font-semibold w-16">순위</th>
+                <th class="p-3 font-semibold w-48">키워드</th>
+                <th class="p-3 text-right font-semibold w-28">총 검색수</th>
+                <th class="p-3 text-right font-semibold w-40">업로드 날짜 <span class="text-[10px] text-brand-gray font-normal block">마우스 올리면 변동값</span></th>
+                <th class="p-3 pr-4 text-right font-semibold">상세</th>
               </tr>
             </thead>
             <tbody id="prodsrc-detail-tbody"></tbody>
@@ -34859,11 +34859,11 @@ function prodsrcRenderDetail() {
                  : (r.totalSearchDiff || 0) < 0 ? 'bg-brand-pink-light/15 border-b border-brand-border'
                  : 'border-b border-brand-border hover:bg-brand-bg/40';
     return `<tr class="${rowCls}">
-      <td class="p-3 pl-4">${r.rank != null ? r.rank : '-'}</td>
-      <td class="p-3 font-semibold">${_prodsrcEsc(r.keyword)}</td>
-      <td class="p-3 text-right font-bold">${_prodsrcFmt(r.totalSearch)}</td>
-      <td class="p-3 text-right">${dateCell(r)}</td>
-      <td class="p-3 pr-4 text-xs">${urlCell}</td>
+      <td class="p-3 pl-4 w-16">${r.rank != null ? r.rank : '-'}</td>
+      <td class="p-3 font-semibold w-48">${_prodsrcEsc(r.keyword)}</td>
+      <td class="p-3 text-right font-bold w-28">${_prodsrcFmt(r.totalSearch)}</td>
+      <td class="p-3 text-right w-40">${dateCell(r)}</td>
+      <td class="p-3 pr-4 text-xs text-right">${urlCell}</td>
     </tr>`;
   }).join('') : '<tr><td colspan="5" class="p-8 text-center text-brand-gray text-sm">키워드가 없습니다</td></tr>';
 }
