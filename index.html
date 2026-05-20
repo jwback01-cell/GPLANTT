@@ -5463,8 +5463,7 @@ PBT키캡	1180
               <tr class="text-brand-gray">
                 <th class="p-3 pl-4 font-semibold w-16">순위</th>
                 <th class="p-3 font-semibold w-48">키워드</th>
-                <th class="p-3 text-right font-semibold w-28">총 검색수</th>
-                <th class="p-3 text-right font-semibold w-40">총검색수 변동값 <span class="text-[10px] text-brand-gray font-normal block">마우스 올리면 날짜</span></th>
+                <th class="p-3 text-right font-semibold w-40">업로드 날짜</th>
                 <th class="p-3 pr-4 text-right font-semibold">상세</th>
               </tr>
             </thead>
@@ -35069,41 +35068,22 @@ function prodsrcRenderDetail() {
   });
   if (titleEl) titleEl.textContent = cat;
   if (metaEl) metaEl.textContent = `${rows.length}개 키워드`;
-  // 변동값 셀 — 기본은 변동값 표시, 마우스 hover 시 업로드 날짜 툴팁
+  // 업로드 날짜 셀 — YYYY-MM-DD 형식만
   const dateCell = (r) => {
     const d = r.uploadedAt ? new Date(r.uploadedAt) : null;
-    const dateStr = d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` : '날짜 없음';
-    let mainHtml = '';
-    let tooltip = `업로드 날짜: ${dateStr}`;
-    if (r.isNew) {
-      mainHtml = '<span class="text-[11px] font-bold bg-brand-green-light text-brand-green px-2 py-0.5 rounded-full">신규</span>';
-      tooltip += ' · 신규 추가된 키워드';
-    } else if (r.totalSearchDiff > 0) {
-      mainHtml = `<span class="text-brand-blue font-bold">↑ ${_prodsrcFmt(r.totalSearchDiff)}</span>`;
-      tooltip += ` · 이전 총검색수 ${_prodsrcFmt(r.totalSearchPrev)} → 현재 ${_prodsrcFmt(r.totalSearch)} (+${_prodsrcFmt(r.totalSearchDiff)})`;
-    } else if (r.totalSearchDiff < 0) {
-      mainHtml = `<span class="text-brand-pink font-bold">↓ ${_prodsrcFmt(Math.abs(r.totalSearchDiff))}</span>`;
-      tooltip += ` · 이전 총검색수 ${_prodsrcFmt(r.totalSearchPrev)} → 현재 ${_prodsrcFmt(r.totalSearch)} (${_prodsrcFmt(r.totalSearchDiff)})`;
-    } else {
-      mainHtml = '<span class="text-brand-gray">-</span>';
-      tooltip += ' · 변동 없음';
-    }
-    return `<span title="${tooltip}" class="cursor-help">${mainHtml}</span>`;
+    if (!d) return '<span class="text-brand-gray">-</span>';
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    return `<span class="text-brand-gray">${dateStr}</span>`;
   };
   tbody.innerHTML = rows.length ? rows.map(r => {
     const urlCell = r.url ? `<a href="${_prodsrcEsc(r.url)}" target="_blank" class="text-brand-blue hover:underline">열기 ↗</a>` : '<span class="text-brand-gray">-</span>';
-    const rowCls = r.isNew ? 'bg-brand-green-light/20 border-b border-brand-border'
-                 : (r.totalSearchDiff || 0) > 0 ? 'bg-brand-blue-light/10 border-b border-brand-border'
-                 : (r.totalSearchDiff || 0) < 0 ? 'bg-brand-pink-light/15 border-b border-brand-border'
-                 : 'border-b border-brand-border hover:bg-brand-bg/40';
-    return `<tr class="${rowCls}">
+    return `<tr class="border-b border-brand-border hover:bg-brand-bg/40">
       <td class="p-3 pl-4 w-16">${r.rank != null ? r.rank : '-'}</td>
       <td class="p-3 font-semibold w-48">${_prodsrcEsc(r.keyword)}</td>
-      <td class="p-3 text-right font-bold w-28">${_prodsrcFmt(r.totalSearch)}</td>
       <td class="p-3 text-right w-40">${dateCell(r)}</td>
       <td class="p-3 pr-4 text-xs text-right">${urlCell}</td>
     </tr>`;
-  }).join('') : '<tr><td colspan="5" class="p-8 text-center text-brand-gray text-sm">키워드가 없습니다</td></tr>';
+  }).join('') : '<tr><td colspan="4" class="p-8 text-center text-brand-gray text-sm">키워드가 없습니다</td></tr>';
 }
 
 function prodsrcClearAll() {
