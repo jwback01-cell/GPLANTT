@@ -13691,6 +13691,17 @@ function openSafetyStockBreakdown(productId) {
     </div>
   </div>`;
   document.body.appendChild(m);
+  // ESC 키로 닫기 — 모달 제거 시 리스너도 해제
+  const _onEsc = (e) => {
+    if (e.key === 'Escape') {
+      const el = document.getElementById('safety-breakdown-modal');
+      if (el) el.remove();
+      document.removeEventListener('keydown', _onEsc);
+    }
+  };
+  document.addEventListener('keydown', _onEsc);
+  // 배경(어두운 영역) 클릭 시도 닫기
+  m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
 }
 
 // 안전재고 자동 계산 모달 열기 — 카테고리 지플랜 상품만, B-1 방식
