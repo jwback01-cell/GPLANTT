@@ -5454,13 +5454,13 @@ PBT키캡	1180
           </div>
         </div>
         <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
-          <table class="w-full text-xs text-left border-collapse min-w-[600px]">
+          <table class="w-full text-xs text-left border-collapse min-w-[640px]">
             <thead class="bg-brand-bg sticky top-0 z-10">
               <tr class="text-brand-gray">
                 <th class="p-3 pl-4 font-semibold">순위</th>
                 <th class="p-3 font-semibold">키워드</th>
                 <th class="p-3 text-right font-semibold">총 검색수</th>
-                <th class="p-3 text-right font-semibold">변동</th>
+                <th class="p-3 text-right font-semibold">업로드 날짜 <span class="text-[10px] text-brand-gray font-normal block">마우스 올리면 변동값</span></th>
                 <th class="p-3 pr-4 font-semibold">상세</th>
               </tr>
             </thead>
@@ -34461,6 +34461,7 @@ function _prodsrcProcessFile(file) {
       // ── 폴더 안에서 업로드한 경우 — 비교 모드 (현재 폴더 데이터 갱신 + 변동 계산)
       if (_prodsrcCurrentCategory) {
         const currentFolder = _prodsrcCurrentCategory;
+        const nowIso = new Date().toISOString();
         const existingFolderRows = existing.filter(r => (r.folderName || r.category) === currentFolder);
         const existingByKw = new Map();
         existingFolderRows.forEach(r => existingByKw.set(r.keyword, r));
@@ -34468,6 +34469,7 @@ function _prodsrcProcessFile(file) {
         let newC = 0, upC = 0, downC = 0;
         newRows.forEach(r => {
           r.folderName = currentFolder; // 기존 폴더 이름 유지
+          r.uploadedAt = nowIso;        // 행 업로드 시각
           const old = existingByKw.get(r.keyword);
           if (!old) {
             r.isNew = true;
@@ -34516,9 +34518,11 @@ function _prodsrcProcessFile(file) {
         return;
       }
 
-      // 3) 비교 없음 — 신규/변동 플래그 모두 초기화. 폴더 이름 부여.
+      // 3) 비교 없음 — 신규/변동 플래그 모두 초기화. 폴더 이름 + 업로드 시각 부여.
+      const nowIso = new Date().toISOString();
       newRows.forEach(r => {
         r.folderName = folderName;
+        r.uploadedAt = nowIso;
         r.isNew = false;
         r.totalSearchPrev = null;
         r.totalSearchDiff = 0;
@@ -34823,11 +34827,30 @@ function prodsrcRenderDetail() {
   });
   if (titleEl) titleEl.textContent = cat;
   if (metaEl) metaEl.textContent = `${rows.length}개 키워드`;
-  const diffCell = (r) => {
-    if (r.isNew) return '<span class="text-[10px] font-bold bg-brand-green-light text-brand-green px-1.5 py-0.5 rounded-full">신규</span>';
-    if (r.totalSearchDiff > 0) return `<span class="text-brand-blue font-bold">↑ ${_prodsrcFmt(r.totalSearchDiff)}</span>`;
-    if (r.totalSearchDiff < 0) return `<span class="text-brand-pink font-bold">↓ ${_prodsrcFmt(Math.abs(r.totalSearchDiff))}</span>`;
-    return '<span class="text-brand-gray">-</span>';
+  // 날짜 셀 — 업로드 일자 표시 + 마우스 hover 시 총검색수/변동값 툴팁 + 변동 배지
+  const dateCell = (r) => {
+    // 업로드 일자 포맷팅 (YYYY-MM-DD)
+    const d = r.uploadedAt ? new Date(r.uploadedAt) : null;
+    const dateStr = d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` : '-';
+    // 변동 배지
+    let diffBadge = '';
+    let tooltip = `총검색수: ${_prodsrcFmt(r.totalSearch)}`;
+    if (r.isNew) {
+      diffBadge = '<span class="text-[9px] font-bold bg-brand-green-light text-brand-green px-1.5 py-0.5 rounded-full">신규</span>';
+      tooltip += ' · 신규 추가';
+    } else if (r.totalSearchDiff > 0) {
+      diffBadge = `<span class="text-[10px] font-bold text-brand-blue">↑ ${_prodsrcFmt(r.totalSearchDiff)}</span>`;
+      tooltip += ` · 변동 +${_prodsrcFmt(r.totalSearchDiff)} (이전 ${_prodsrcFmt(r.totalSearchPrev)})`;
+    } else if (r.totalSearchDiff < 0) {
+      diffBadge = `<span class="text-[10px] font-bold text-brand-pink">↓ ${_prodsrcFmt(Math.abs(r.totalSearchDiff))}</span>`;
+      tooltip += ` · 변동 -${_prodsrcFmt(Math.abs(r.totalSearchDiff))} (이전 ${_prodsrcFmt(r.totalSearchPrev)})`;
+    } else {
+      tooltip += ' · 변동 없음';
+    }
+    return `<div class="flex flex-col items-end gap-0.5 cursor-help" title="${tooltip}">
+      <span class="text-brand-gray">${dateStr}</span>
+      ${diffBadge ? `<span>${diffBadge}</span>` : ''}
+    </div>`;
   };
   tbody.innerHTML = rows.length ? rows.map(r => {
     const urlCell = r.url ? `<a href="${_prodsrcEsc(r.url)}" target="_blank" class="text-brand-blue hover:underline">열기 ↗</a>` : '<span class="text-brand-gray">-</span>';
@@ -34839,7 +34862,7 @@ function prodsrcRenderDetail() {
       <td class="p-3 pl-4">${r.rank != null ? r.rank : '-'}</td>
       <td class="p-3 font-semibold">${_prodsrcEsc(r.keyword)}</td>
       <td class="p-3 text-right font-bold">${_prodsrcFmt(r.totalSearch)}</td>
-      <td class="p-3 text-right">${diffCell(r)}</td>
+      <td class="p-3 text-right">${dateCell(r)}</td>
       <td class="p-3 pr-4 text-xs">${urlCell}</td>
     </tr>`;
   }).join('') : '<tr><td colspan="5" class="p-8 text-center text-brand-gray text-sm">키워드가 없습니다</td></tr>';
