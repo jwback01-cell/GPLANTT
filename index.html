@@ -144,6 +144,10 @@ tailwind.config = {
   }
   .input-stock:focus { outline: none; border-color: #1A1A1A; background: #fff; }
   .input-stock.warn { border-color: #E91E63; color: #E91E63; }
+  /* 위아래 스피너 화살표 제거 (현재 재고 / 안전 재고 모두) */
+  .input-stock::-webkit-outer-spin-button,
+  .input-stock::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=number].input-stock { -moz-appearance: textfield; }
 
   /* ── Confetti ── */
   .confetti-piece {
@@ -12048,12 +12052,9 @@ function renderProductsPage() {
         '<div class="text-brand-gray text-xs font-medium">SKU: ' + escHtml(p.sku||'') + ' | ' + escHtml(p.category||'') + (p.folder_code ? ' | 📁 ' + escHtml(p.folder_code) : '') + (p.cost ? ' | 원가 ' + Number(p.cost).toLocaleString('ko-KR') + '원' : '') + (p.supply_price ? ' | 공급가 ' + Number(p.supply_price).toLocaleString('ko-KR') + '원' : '') + (p.shipping_fee ? ' | 택배비 ' + Number(p.shipping_fee).toLocaleString('ko-KR') + '원' : '') + (p.shipping_cost ? ' | 택배비용 ' + Number(p.shipping_cost).toLocaleString('ko-KR') + '원' : '') + (p.created_at ? ' | 등록 ' + String(p.created_at).slice(0, 10) : '') + '</div></div>' +
       '</div>' +
       '<div class="text-right"><input type="number" value="' + p.stock + '" class="' + stockClass + '"></div>' +
-      '<div class="text-right"><div class="flex items-center justify-end gap-1">' +
-        '<button type="button" onclick="event.stopPropagation();openSafetyStockBreakdown(' + p.id + ')" class="text-brand-gray hover:text-brand-blue p-0.5" title="안전재고 계산 내역 보기 — 최근 30일 판매 내역 확인">' +
-          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>' +
-        '</button>' +
-        '<input type="number" value="' + p.safety_stock + '" class="input-stock" style="border-style:dashed">' +
-      '</div></div>' +
+      '<div class="text-right">' +
+        '<button type="button" onclick="event.stopPropagation();openSafetyStockBreakdown(' + p.id + ')" class="input-stock cursor-pointer hover:border-brand-black hover:bg-white" style="border-style:dashed;display:inline-block;text-align:right;" title="클릭하여 30일 판매 내역(직접 + 세트 분배) 확인">' + (p.safety_stock || 0) + '</button>' +
+      '</div>' +
       '<div class="text-center">' + statusHtml + '</div>' +
       '<div class="text-center">' +
         '<button onclick="event.stopPropagation();openStockMovementModal(' + p.id + ')" class="text-brand-gray hover:text-brand-blue p-1 md:p-2" title="재고 수불 이력 보기">' +
@@ -13610,7 +13611,7 @@ function openSafetyStockBreakdown(productId) {
       if (code !== setCode) return;
       const qty = Number(r.qty) || 0;
       if (qty <= 0) return;
-      setSales.push({ date: d, shopName: r.shopName || '', itemName: r.itemName || '', qty, mul, distributed: qty * mul, setName: s.name || s.code, setCode: s.code });
+      setSales.push({ date: d, site: r.site || r.shopName || '', receiver: r.receiver || '', itemName: r.itemName || '', qty, mul, distributed: qty * mul, setName: s.name || s.code, setCode: s.code });
     });
   });
 
@@ -13623,21 +13624,23 @@ function openSafetyStockBreakdown(productId) {
   const directRowsHtml = directSales.length
     ? directSales.sort((a, b) => String(b.date).localeCompare(String(a.date))).map(r => `<tr style="border-bottom:1px solid #eee;">
         <td style="padding:8px 10px;font-size:12px;">${_esc(String(r.date).slice(0, 10))}</td>
-        <td style="padding:8px 10px;font-size:12px;">${_esc(r.shopName || '-')}</td>
+        <td style="padding:8px 10px;font-size:12px;">${_esc(r.site || r.shopName || '-')}</td>
+        <td style="padding:8px 10px;font-size:12px;">${_esc(r.receiver || '-')}</td>
         <td style="padding:8px 10px;font-size:12px;">${_esc(r.itemName || '-')}</td>
         <td style="padding:8px 10px;font-size:12px;text-align:right;font-weight:bold;">${r.qty}</td>
       </tr>`).join('')
-    : '<tr><td colspan="4" style="padding:16px;text-align:center;color:#888;font-size:12px;">직접 판매 내역 없음</td></tr>';
+    : '<tr><td colspan="5" style="padding:16px;text-align:center;color:#888;font-size:12px;">직접 판매 내역 없음</td></tr>';
 
   const setRowsHtml = setSales.length
     ? setSales.sort((a, b) => String(b.date).localeCompare(String(a.date))).map(r => `<tr style="border-bottom:1px solid #eee;">
         <td style="padding:8px 10px;font-size:12px;">${_esc(String(r.date).slice(0, 10))}</td>
-        <td style="padding:8px 10px;font-size:12px;">${_esc(r.shopName || '-')}</td>
+        <td style="padding:8px 10px;font-size:12px;">${_esc(r.site || '-')}</td>
+        <td style="padding:8px 10px;font-size:12px;">${_esc(r.receiver || '-')}</td>
         <td style="padding:8px 10px;font-size:12px;">${_esc(r.setName)} <span style="color:#888;font-size:10px;">[${_esc(r.setCode || '')}]</span></td>
         <td style="padding:8px 10px;font-size:12px;text-align:right;">${r.qty} × ${r.mul}</td>
         <td style="padding:8px 10px;font-size:12px;text-align:right;font-weight:bold;">${r.distributed}</td>
       </tr>`).join('')
-    : '<tr><td colspan="5" style="padding:16px;text-align:center;color:#888;font-size:12px;">세트 분배 판매 내역 없음</td></tr>';
+    : '<tr><td colspan="6" style="padding:16px;text-align:center;color:#888;font-size:12px;">세트 분배 판매 내역 없음</td></tr>';
 
   const prev = document.getElementById('safety-breakdown-modal');
   if (prev) prev.remove();
@@ -13664,6 +13667,7 @@ function openSafetyStockBreakdown(productId) {
         <thead style="background:#f8f8f8;"><tr>
           <th style="padding:8px 10px;text-align:left;font-size:11px;color:#888;">날짜</th>
           <th style="padding:8px 10px;text-align:left;font-size:11px;color:#888;">쇼핑몰</th>
+          <th style="padding:8px 10px;text-align:left;font-size:11px;color:#888;">고객명</th>
           <th style="padding:8px 10px;text-align:left;font-size:11px;color:#888;">상품명</th>
           <th style="padding:8px 10px;text-align:right;font-size:11px;color:#888;">수량</th>
         </tr></thead>
@@ -13674,6 +13678,7 @@ function openSafetyStockBreakdown(productId) {
         <thead style="background:#f8f8f8;"><tr>
           <th style="padding:8px 10px;text-align:left;font-size:11px;color:#888;">날짜</th>
           <th style="padding:8px 10px;text-align:left;font-size:11px;color:#888;">쇼핑몰</th>
+          <th style="padding:8px 10px;text-align:left;font-size:11px;color:#888;">고객명</th>
           <th style="padding:8px 10px;text-align:left;font-size:11px;color:#888;">세트명 [세트코드]</th>
           <th style="padding:8px 10px;text-align:right;font-size:11px;color:#888;">세트수량 × 배수</th>
           <th style="padding:8px 10px;text-align:right;font-size:11px;color:#888;">분배수량</th>
