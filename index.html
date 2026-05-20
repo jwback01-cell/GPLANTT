@@ -5460,7 +5460,7 @@ PBT키캡	1180
                 <th class="p-3 pl-4 font-semibold w-16">순위</th>
                 <th class="p-3 font-semibold w-48">키워드</th>
                 <th class="p-3 text-right font-semibold w-28">총 검색수</th>
-                <th class="p-3 text-right font-semibold w-40">업로드 날짜 <span class="text-[10px] text-brand-gray font-normal block">마우스 올리면 변동값</span></th>
+                <th class="p-3 text-right font-semibold w-40">총검색수 변동값 <span class="text-[10px] text-brand-gray font-normal block">마우스 올리면 날짜</span></th>
                 <th class="p-3 pr-4 text-right font-semibold">상세</th>
               </tr>
             </thead>
@@ -34827,30 +34827,26 @@ function prodsrcRenderDetail() {
   });
   if (titleEl) titleEl.textContent = cat;
   if (metaEl) metaEl.textContent = `${rows.length}개 키워드`;
-  // 날짜 셀 — 업로드 일자 표시 + 마우스 hover 시 총검색수/변동값 툴팁 + 변동 배지
+  // 변동값 셀 — 기본은 변동값 표시, 마우스 hover 시 업로드 날짜 툴팁
   const dateCell = (r) => {
-    // 업로드 일자 포맷팅 (YYYY-MM-DD)
     const d = r.uploadedAt ? new Date(r.uploadedAt) : null;
-    const dateStr = d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` : '-';
-    // 변동 배지
-    let diffBadge = '';
-    let tooltip = `총검색수: ${_prodsrcFmt(r.totalSearch)}`;
+    const dateStr = d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` : '날짜 없음';
+    let mainHtml = '';
+    let tooltip = `업로드 날짜: ${dateStr}`;
     if (r.isNew) {
-      diffBadge = '<span class="text-[9px] font-bold bg-brand-green-light text-brand-green px-1.5 py-0.5 rounded-full">신규</span>';
-      tooltip += ' · 신규 추가';
+      mainHtml = '<span class="text-[11px] font-bold bg-brand-green-light text-brand-green px-2 py-0.5 rounded-full">신규</span>';
+      tooltip += ' · 신규 추가된 키워드';
     } else if (r.totalSearchDiff > 0) {
-      diffBadge = `<span class="text-[10px] font-bold text-brand-blue">↑ ${_prodsrcFmt(r.totalSearchDiff)}</span>`;
-      tooltip += ` · 변동 +${_prodsrcFmt(r.totalSearchDiff)} (이전 ${_prodsrcFmt(r.totalSearchPrev)})`;
+      mainHtml = `<span class="text-brand-blue font-bold">↑ ${_prodsrcFmt(r.totalSearchDiff)}</span>`;
+      tooltip += ` · 이전 총검색수 ${_prodsrcFmt(r.totalSearchPrev)} → 현재 ${_prodsrcFmt(r.totalSearch)} (+${_prodsrcFmt(r.totalSearchDiff)})`;
     } else if (r.totalSearchDiff < 0) {
-      diffBadge = `<span class="text-[10px] font-bold text-brand-pink">↓ ${_prodsrcFmt(Math.abs(r.totalSearchDiff))}</span>`;
-      tooltip += ` · 변동 -${_prodsrcFmt(Math.abs(r.totalSearchDiff))} (이전 ${_prodsrcFmt(r.totalSearchPrev)})`;
+      mainHtml = `<span class="text-brand-pink font-bold">↓ ${_prodsrcFmt(Math.abs(r.totalSearchDiff))}</span>`;
+      tooltip += ` · 이전 총검색수 ${_prodsrcFmt(r.totalSearchPrev)} → 현재 ${_prodsrcFmt(r.totalSearch)} (${_prodsrcFmt(r.totalSearchDiff)})`;
     } else {
+      mainHtml = '<span class="text-brand-gray">-</span>';
       tooltip += ' · 변동 없음';
     }
-    return `<div class="flex flex-col items-end gap-0.5 cursor-help" title="${tooltip}">
-      <span class="text-brand-gray">${dateStr}</span>
-      ${diffBadge ? `<span>${diffBadge}</span>` : ''}
-    </div>`;
+    return `<span title="${tooltip}" class="cursor-help">${mainHtml}</span>`;
   };
   tbody.innerHTML = rows.length ? rows.map(r => {
     const urlCell = r.url ? `<a href="${_prodsrcEsc(r.url)}" target="_blank" class="text-brand-blue hover:underline">열기 ↗</a>` : '<span class="text-brand-gray">-</span>';
