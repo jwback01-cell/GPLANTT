@@ -13758,14 +13758,8 @@ async function _runDailySafetyAutoIfNeeded() {
     }
     try { localStorage.setItem(SAFETY_AUTO_LAST_KEY, today); } catch(_) {}
     console.log(`[안전재고 자동(매일)] 완료: 성공 ${ok}건, 실패 ${fail}건`);
-    if (ok > 0) {
-      if (typeof toast === 'function') {
-        toast(`📦 안전재고 자동 갱신 — ${ok}건 업데이트 (안전기간 ${days}일)`, 'success');
-      } else {
-        try { showAppAlert('안전재고 자동 갱신', `오늘 안전재고를 ${ok}건 자동으로 업데이트했습니다.${fail > 0 ? `\n실패 ${fail}건 (콘솔 확인)` : ''}\n\n기준: 최근 30일 판매 ÷ 30 × ${days}일`, fail === 0 ? 'success' : 'warn'); } catch(_) {}
-      }
-      if (typeof renderProductsPage === 'function') renderProductsPage();
-    }
+    // 팝업/토스트 없이 조용히 화면만 새로고침
+    if (ok > 0 && typeof renderProductsPage === 'function') renderProductsPage();
   } catch (e) {
     console.warn('[안전재고 자동(매일)] 예외:', e);
   }
