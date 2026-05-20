@@ -5463,7 +5463,7 @@ PBT키캡	1180
               <tr class="text-brand-gray">
                 <th class="p-3 pl-4 font-semibold w-16">순위</th>
                 <th class="p-3 font-semibold w-48">키워드</th>
-                <th class="p-3 text-right font-semibold w-40">업로드 날짜</th>
+                <th class="p-3 text-right font-semibold w-40">총 검색수 <span class="text-[10px] text-brand-gray font-normal block" id="prodsrc-detail-uploaded-date"></span></th>
                 <th class="p-3 pr-4 text-right font-semibold">상세</th>
               </tr>
             </thead>
@@ -35068,19 +35068,25 @@ function prodsrcRenderDetail() {
   });
   if (titleEl) titleEl.textContent = cat;
   if (metaEl) metaEl.textContent = `${rows.length}개 키워드`;
-  // 업로드 날짜 셀 — YYYY-MM-DD 형식만
-  const dateCell = (r) => {
-    const d = r.uploadedAt ? new Date(r.uploadedAt) : null;
-    if (!d) return '<span class="text-brand-gray">-</span>';
-    const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    return `<span class="text-brand-gray">${dateStr}</span>`;
-  };
+  // 헤더에 업로드 날짜 표시 (해당 폴더의 가장 최근 업로드 날짜)
+  const uploadedDates = rows.map(r => r.uploadedAt).filter(Boolean).sort();
+  const latestUploadedAt = uploadedDates.length ? uploadedDates[uploadedDates.length - 1] : null;
+  const headerDateEl = document.getElementById('prodsrc-detail-uploaded-date');
+  if (headerDateEl) {
+    if (latestUploadedAt) {
+      const d = new Date(latestUploadedAt);
+      headerDateEl.textContent = `업로드: ${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    } else {
+      headerDateEl.textContent = '';
+    }
+  }
+
   tbody.innerHTML = rows.length ? rows.map(r => {
     const urlCell = r.url ? `<a href="${_prodsrcEsc(r.url)}" target="_blank" class="text-brand-blue hover:underline">열기 ↗</a>` : '<span class="text-brand-gray">-</span>';
     return `<tr class="border-b border-brand-border hover:bg-brand-bg/40">
       <td class="p-3 pl-4 w-16">${r.rank != null ? r.rank : '-'}</td>
       <td class="p-3 font-semibold w-48">${_prodsrcEsc(r.keyword)}</td>
-      <td class="p-3 text-right w-40">${dateCell(r)}</td>
+      <td class="p-3 text-right w-40 font-bold">${_prodsrcFmt(r.totalSearch)}</td>
       <td class="p-3 pr-4 text-xs text-right">${urlCell}</td>
     </tr>`;
   }).join('') : '<tr><td colspan="4" class="p-8 text-center text-brand-gray text-sm">키워드가 없습니다</td></tr>';
