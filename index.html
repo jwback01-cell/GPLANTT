@@ -7201,7 +7201,7 @@ function renderKwTrend() {
       : '';
     const productName = product.name || '<이름 없음>';
     const urlLink = product.url
-      ? `<a href="${_escapeHtml(product.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="text-[11px] text-brand-blue hover:underline truncate max-w-full block">${_escapeHtml(product.url.replace(/^https?:\/\//, ''))}</a>`
+      ? `<a href="${_escapeHtml(product.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="text-[11px] text-brand-blue hover:underline truncate inline-block max-w-full align-bottom">${_escapeHtml(product.url.replace(/^https?:\/\//, ''))}</a>`
       : `<span class="text-[11px] text-brand-gray">URL 없음</span>`;
 
     // 가장 최근 업데이트 시간
