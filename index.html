@@ -6005,12 +6005,37 @@ function submitKwAddProduct() {
   if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
   const extras = _loadKwExtras();
   const newId = _kwExtraUid();
-  extras.push({ id: newId, name, url });
+  extras.push({ id: newId, name, url, imageUrl: '' });
   _saveKwExtras(extras);
   closeKwAddProductModal();
   renderKwProductSelect();
   const sel = document.getElementById('kw-product-select');
   if (sel) { sel.value = 'ex:' + newId; sel.classList.remove('text-brand-gray'); }
+  // 백그라운드로 이미지 자동 가져오기
+  _fetchKwProductImage(newId, name, url);
+}
+
+// 네이버 쇼핑 API에서 상품 이미지 자동 가져오기
+async function _fetchKwProductImage(extraId, name, url) {
+  try {
+    const productIdMatch = (url || '').match(/products\/(\d+)/);
+    const productId = productIdMatch ? productIdMatch[1] : '';
+    const r = await fetch(`/api/naver-shop?query=${encodeURIComponent(name)}&display=20&start=1`);
+    if (!r.ok) return;
+    const data = await r.json();
+    const items = data.items || [];
+    let matched = null;
+    if (productId) matched = items.find(it => (it.link || '').includes(productId) || String(it.productId) === productId);
+    if (!matched && url) matched = items.find(it => (it.link || '').includes(url.replace(/^https?:\/\//, '').split('/')[0]));
+    if (!matched) matched = items[0];
+    if (!matched || !matched.image) return;
+    const extras = _loadKwExtras();
+    const target = extras.find(p => p.id === extraId);
+    if (!target) return;
+    target.imageUrl = matched.image;
+    _saveKwExtras(extras);
+    if (typeof renderKwTrend === 'function') renderKwTrend();
+  } catch (_) { /* 조용히 실패 */ }
 }
 function removeKwExtraProduct(id) {
   const extras = _loadKwExtras().filter(p => p.id !== id);
@@ -6417,7 +6442,7 @@ function _saveKwManage(arr) { localStorage.setItem(KW_MANAGE_KEY, JSON.stringify
 function _kwUid() { return 'k_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
 function _kwAllProductOptions() {
-  return _loadKwExtras().map(p => ({ id: 'ex:' + p.id, name: p.name, url: p.url || '' }));
+  return _loadKwExtras().map(p => ({ id: 'ex:' + p.id, name: p.name, url: p.url || '', imageUrl: p.imageUrl || '' }));
 }
 function _kwResolveProduct(productKey) {
   if (!productKey) return null;
@@ -7202,6 +7227,12 @@ function renderKwTrend() {
     const numStr = String(slotNum).padStart(2, '0');
     const status = items.length > 0 ? '추적완료' : '키워드 미등록';
     const statusColor = items.length > 0 ? 'text-brand-green' : 'text-brand-gray';
+    const imgUrl = product.imageUrl || '';
+    const imgBlock = imgUrl
+      ? `<img src="${_escapeHtml(imgUrl)}" alt="" class="w-16 h-16 rounded-2xl object-cover bg-brand-bg shrink-0" onerror="this.style.display='none'">`
+      : `<div class="w-16 h-16 rounded-2xl bg-brand-bg flex items-center justify-center shrink-0">
+           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C7C7CC" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+         </div>`;
 
     return `<div onclick="openKwTrendDetail('${_escapeHtml(productKey)}')" class="bg-white border border-brand-border rounded-3xl p-5 flex gap-4 hover:shadow-md hover:border-brand-black/30 transition-all cursor-pointer min-h-[180px]">
       <!-- 슬롯 번호 -->
@@ -7209,6 +7240,9 @@ function renderKwTrend() {
         <div class="text-[1.6rem] font-black text-brand-black leading-none">${numStr}</div>
         <div class="text-[10px] font-bold ${statusColor} mt-1 whitespace-nowrap">${status}</div>
       </div>
+
+      <!-- 썸네일 -->
+      ${imgBlock}
 
       <!-- 본문 -->
       <div class="flex-1 min-w-0 flex flex-col gap-2.5">
@@ -7274,6 +7308,21 @@ function renderKwTrend() {
   const nextSlot = allProducts.length + 1;
   const cardsHtml = allProducts.map((p, i) => _renderCard(p.id, p, i + 1)).join('');
   canvas.innerHTML = cardsHtml + _plusCard(nextSlot);
+
+  // 이미지가 없는 기존 상품은 백그라운드로 자동 가져오기 (한 번에 하나씩, 중복 호출 방지)
+  if (!window._kwImgFetching) {
+    const extras = _loadKwExtras();
+    const missing = extras.filter(p => !p.imageUrl && p.name);
+    if (missing.length) {
+      window._kwImgFetching = true;
+      (async () => {
+        for (const p of missing.slice(0, 5)) { // 최대 5개씩만
+          await _fetchKwProductImage(p.id, p.name, p.url || '');
+        }
+        window._kwImgFetching = false;
+      })();
+    }
+  }
 }
 
 // 슬롯(상품) 전체 삭제
