@@ -7539,7 +7539,7 @@ function _renderKwDetailTable() {
     }).join('');
     const typeBadge = item.rankType === 'plus'
       ? '<span class="inline-block bg-brand-green-light text-[#00C853] text-[10px] font-bold px-1.5 py-0.5 rounded">플러스</span>'
-      : '<span class="inline-block bg-brand-blue-light text-brand-blue text-[10px] font-bold px-1.5 py-0.5 rounded">가격비교</span>';
+      : '';
     // 위치 드롭다운 — 동일 id는 첫 행에서만 표시
     const myIdxInUnique = uniqueIds.indexOf(item.id);
     const isFirstRowOfId = items.findIndex(x => x.id === item.id) === items.indexOf(item);
