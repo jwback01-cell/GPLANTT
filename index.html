@@ -4595,8 +4595,49 @@ tailwind.config = {
             </div>
           </div>
 
-          <!-- 카드 그리드 — 1/2/3열 반응형 -->
-          <div id="kw-trend-canvas" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+          <!-- 상단 통계 바 -->
+          <div id="kw-trend-stats" class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5 pb-5 border-b border-brand-border">
+            <div class="flex flex-col gap-1">
+              <span class="text-[11px] font-bold text-brand-gray">슬롯 사용 현황</span>
+              <div class="flex items-baseline gap-1">
+                <span id="kw-stat-slots" class="text-[1.4rem] font-black text-brand-black">0</span>
+                <span class="text-xs text-brand-gray">개</span>
+              </div>
+              <div class="h-1 bg-brand-bg rounded-full overflow-hidden mt-0.5"><div id="kw-stat-slots-bar" class="h-full bg-brand-orange rounded-full transition-all" style="width:0%"></div></div>
+            </div>
+            <div class="flex flex-col gap-1">
+              <span class="text-[11px] font-bold text-brand-gray">등록 키워드</span>
+              <div class="flex items-baseline gap-1">
+                <span id="kw-stat-kws" class="text-[1.4rem] font-black text-brand-black">0</span>
+                <span class="text-xs text-brand-gray">개</span>
+              </div>
+              <div class="h-1 bg-brand-bg rounded-full overflow-hidden mt-0.5"><div id="kw-stat-kws-bar" class="h-full bg-brand-blue rounded-full transition-all" style="width:0%"></div></div>
+            </div>
+            <div class="flex flex-col gap-1">
+              <span class="text-[11px] font-bold text-brand-gray">유지 키워드 <span class="text-brand-gray">-</span></span>
+              <div class="flex items-baseline gap-1">
+                <span id="kw-stat-keep" class="text-[1.4rem] font-black text-brand-gray">0</span>
+                <span class="text-xs text-brand-gray">개</span>
+              </div>
+            </div>
+            <div class="flex flex-col gap-1">
+              <span class="text-[11px] font-bold text-brand-gray">상승 키워드 <span class="text-brand-blue">▲</span></span>
+              <div class="flex items-baseline gap-1">
+                <span id="kw-stat-up" class="text-[1.4rem] font-black text-brand-blue">0</span>
+                <span class="text-xs text-brand-gray">개</span>
+              </div>
+            </div>
+            <div class="flex flex-col gap-1">
+              <span class="text-[11px] font-bold text-brand-gray">하락 키워드 <span class="text-brand-pink">▼</span></span>
+              <div class="flex items-baseline gap-1">
+                <span id="kw-stat-down" class="text-[1.4rem] font-black text-brand-pink">0</span>
+                <span class="text-xs text-brand-gray">개</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 카드 그리드 — 1줄에 2개 -->
+          <div id="kw-trend-canvas" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
         </section>
       </div><!-- /kw-tab-trend -->
 
@@ -7051,17 +7092,29 @@ function renderKwTrend() {
     });
   });
 
-  // "+" 카드: 새 상품 추가
-  const plusCard = `
-    <button type="button" onclick="openKwAddProductModal()" class="border-2 border-dashed border-brand-border rounded-3xl p-6 flex flex-col items-center justify-center gap-3 hover:border-brand-black hover:bg-brand-bg/40 transition-colors min-h-[180px] text-center">
-      <div class="w-14 h-14 rounded-full bg-brand-orange-light/60 flex items-center justify-center">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF9500" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  // "+" 카드: 새 상품 추가 (슬롯 번호는 동적으로 채워짐)
+  function _plusCard(slotNum) {
+    const numStr = String(slotNum).padStart(2, '0');
+    return `
+    <button type="button" onclick="openKwAddProductModal()" class="bg-white border-2 border-dashed border-brand-border rounded-3xl p-5 flex items-center gap-5 hover:border-brand-orange hover:bg-brand-orange-light/20 transition-colors min-h-[180px] text-left">
+      <div class="shrink-0 flex flex-col items-center justify-center w-14">
+        <div class="text-[1.6rem] font-black text-brand-gray leading-none">${numStr}</div>
+        <div class="text-[10px] font-bold text-brand-gray mt-1">미등록</div>
       </div>
-      <div>
-        <div class="text-sm font-bold text-brand-black">모니터링할 상품 추가</div>
-        <div class="text-[11px] text-brand-gray mt-1">상품을 등록하면 키워드 순위를 카드로 묶어 보여줍니다.</div>
+      <div class="flex-1 flex items-center gap-4">
+        <div class="w-16 h-16 rounded-2xl bg-brand-bg flex items-center justify-center shrink-0">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#C7C7CC" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-bold text-brand-gray">상품을 등록해주세요</div>
+          <div class="text-[11px] text-brand-gray mt-1 leading-relaxed">클릭하면 새 상품을 추가할 수 있습니다.</div>
+        </div>
+        <div class="w-10 h-10 rounded-full bg-brand-orange-light/60 flex items-center justify-center shrink-0">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF9500" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </div>
       </div>
     </button>`;
+  }
 
   // 가장 최근 시리즈 항목의 (rank, prevRank) 추출
   // - prevRank는 같은 histKey의 그 직전 항목
@@ -7108,8 +7161,8 @@ function renderKwTrend() {
     </span>`;
   }
 
-  // 카드 1개 렌더 — 등록 상품(byProduct에 있든 없든)별로
-  function _renderCard(productKey, product) {
+  // 카드 1개 렌더 — 등록 상품별로 (슬롯 번호 + ROPAGO 스타일 가로 레이아웃)
+  function _renderCard(productKey, product, slotNum) {
     const data = byProduct.get(productKey);
     const items = data ? data.items : [];
     // 키워드 정렬: 순위 있는 것부터 (오름차순), 그 다음 미조회 / 순위권 밖
@@ -7136,35 +7189,130 @@ function renderKwTrend() {
       ? `<a href="${_escapeHtml(product.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="text-[11px] text-brand-blue hover:underline truncate max-w-full block">${_escapeHtml(product.url.replace(/^https?:\/\//, ''))}</a>`
       : `<span class="text-[11px] text-brand-gray">URL 없음</span>`;
 
-    return `<div onclick="openKwTrendDetail('${_escapeHtml(productKey)}')" class="bg-white border border-brand-border rounded-3xl p-5 flex flex-col gap-3 hover:shadow-md hover:border-brand-black/30 transition-all cursor-pointer">
-      <div class="flex items-start justify-between gap-2">
-        <div class="min-w-0 flex-1">
-          <h3 class="font-bold text-[15px] text-brand-black leading-tight truncate" title="${_escapeHtml(productName)}">${_escapeHtml(productName)}</h3>
-          <div class="mt-1">${urlLink}</div>
+    // 가장 최근 업데이트 시간
+    let latestTime = '';
+    items.forEach(it => {
+      const t = _latest(it.histKey, it.rankType === 'price' ? it.legacyKey : null).t;
+      if (t && t > latestTime) latestTime = t;
+    });
+    const updateText = latestTime
+      ? `<span class="text-[10px] font-bold text-brand-gray">LAST RANK UPDATE</span><span class="text-[11px] font-bold text-brand-black ml-1.5">${_escapeHtml(latestTime.replace('T', ' ').slice(0, 16))}</span>`
+      : `<span class="text-[10px] font-bold text-brand-gray">미조회</span>`;
+
+    const numStr = String(slotNum).padStart(2, '0');
+    const status = items.length > 0 ? '추적완료' : '키워드 미등록';
+    const statusColor = items.length > 0 ? 'text-brand-green' : 'text-brand-gray';
+
+    return `<div onclick="openKwTrendDetail('${_escapeHtml(productKey)}')" class="bg-white border border-brand-border rounded-3xl p-5 flex gap-4 hover:shadow-md hover:border-brand-black/30 transition-all cursor-pointer min-h-[180px]">
+      <!-- 슬롯 번호 -->
+      <div class="shrink-0 flex flex-col items-center justify-start w-14 pt-1">
+        <div class="text-[1.6rem] font-black text-brand-black leading-none">${numStr}</div>
+        <div class="text-[10px] font-bold ${statusColor} mt-1 whitespace-nowrap">${status}</div>
+      </div>
+
+      <!-- 본문 -->
+      <div class="flex-1 min-w-0 flex flex-col gap-2.5">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <h3 class="font-bold text-[15px] text-brand-black leading-tight truncate" title="${_escapeHtml(productName)}">${_escapeHtml(productName)}</h3>
+            <div class="mt-1">${urlLink}</div>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <span class="text-[10px] font-bold text-brand-gray bg-brand-bg border border-brand-border px-2 py-0.5 rounded-full whitespace-nowrap">${items.length}개</span>
+            <button type="button" onclick="event.stopPropagation(); deleteKwTrendSlot('${_escapeHtml(productKey)}')" title="이 슬롯(상품) 삭제" class="w-7 h-7 rounded-full text-brand-gray hover:text-white hover:bg-brand-pink flex items-center justify-center transition-colors">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
+            </button>
+          </div>
         </div>
-        <span class="shrink-0 text-[10px] font-bold text-brand-gray bg-brand-bg border border-brand-border px-2 py-0.5 rounded-full whitespace-nowrap">${items.length}개 키워드</span>
-      </div>
-      <div class="border-t border-brand-border pt-3 flex flex-wrap gap-1.5 min-h-[40px]">
-        ${items.length === 0
-          ? '<span class="text-brand-gray text-xs">등록된 키워드 없음 — 순위 조회 후 "선택한 키워드 등록"으로 추가하세요</span>'
-          : chipsHtml + hiddenHtml}
-      </div>
-      <div class="text-[11px] text-brand-gray text-right -mt-1 flex items-center justify-end gap-1">
-        <span>날짜별 추이 보기</span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        <div class="border-t border-brand-border pt-2.5 flex flex-wrap gap-1.5 min-h-[36px]">
+          ${items.length === 0
+            ? '<span class="text-brand-gray text-xs">등록된 키워드 없음 — 순위 조회 후 "선택한 키워드 등록"으로 추가하세요</span>'
+            : chipsHtml + hiddenHtml}
+        </div>
+        <div class="border-t border-brand-border pt-2 flex items-center justify-between">
+          <div>${updateText}</div>
+          <div class="text-[11px] text-brand-gray flex items-center gap-1">
+            <span>날짜별 추이 보기</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+        </div>
       </div>
     </div>`;
   }
 
-  if (!allProducts.length) {
-    canvas.innerHTML = plusCard;
-    return;
+  // 통계 계산: 슬롯/키워드/유지/상승/하락
+  let totalKws = 0, upCnt = 0, downCnt = 0, keepCnt = 0;
+  byProduct.forEach(({ items }) => {
+    items.forEach(it => {
+      totalKws++;
+      const { rank, prev } = _latest(it.histKey, it.rankType === 'price' ? it.legacyKey : null);
+      if (typeof rank === 'number' && typeof prev === 'number') {
+        const diff = prev - rank;
+        if (diff > 0) upCnt++;
+        else if (diff < 0) downCnt++;
+        else keepCnt++;
+      }
+    });
+  });
+  const slotEl = document.getElementById('kw-stat-slots');
+  if (slotEl) slotEl.textContent = String(allProducts.length);
+  const kwEl = document.getElementById('kw-stat-kws');
+  if (kwEl) kwEl.textContent = String(totalKws);
+  const keepEl = document.getElementById('kw-stat-keep');
+  if (keepEl) keepEl.textContent = String(keepCnt);
+  const upEl = document.getElementById('kw-stat-up');
+  if (upEl) upEl.textContent = String(upCnt);
+  const downEl = document.getElementById('kw-stat-down');
+  if (downEl) downEl.textContent = String(downCnt);
+  // 진행바 (최대 50기준으로 가정 — 슬롯/키워드 양쪽 모두)
+  const slotBar = document.getElementById('kw-stat-slots-bar');
+  if (slotBar) slotBar.style.width = Math.min(100, allProducts.length * 10) + '%'; // 10슬롯 가득 = 100%
+  const kwsBar = document.getElementById('kw-stat-kws-bar');
+  if (kwsBar) kwsBar.style.width = Math.min(100, (totalKws / 50) * 100) + '%';
+
+  // 카드 렌더링 — 슬롯 번호는 1부터
+  const nextSlot = allProducts.length + 1;
+  const cardsHtml = allProducts.map((p, i) => _renderCard(p.id, p, i + 1)).join('');
+  canvas.innerHTML = cardsHtml + _plusCard(nextSlot);
+}
+
+// 슬롯(상품) 전체 삭제
+function deleteKwTrendSlot(productKey) {
+  if (!productKey) return;
+  // ex:<id> 형태인 경우 id 추출
+  const m = String(productKey).match(/^ex:(.+)$/);
+  if (!m) { renderKwTrend(); return; }
+  const id = m[1];
+  // 등록된 키워드도 함께 삭제됨 (removeKwExtraProduct는 product만 지움 → manage 정리 추가)
+  const manage = _loadKwManage();
+  const remain = manage.filter(it => it.productKey !== productKey);
+  const removedKws = manage.filter(it => it.productKey === productKey);
+  const apply = () => {
+    _saveKwManage(remain);
+    // 시리즈에서도 해당 productKey 관련 키워드 정리
+    try {
+      const series = _loadKwSeries();
+      const product = _kwResolveProduct(productKey);
+      const realKey = product ? (product.url || product.name) : productKey;
+      removedKws.forEach(it => {
+        const types = Array.isArray(it.rankTypes) && it.rankTypes.length ? it.rankTypes : ['price'];
+        types.forEach(t => { delete series[realKey + '||' + it.keyword + '||' + t]; });
+        delete series[realKey + '||' + it.keyword];
+      });
+      _saveKwSeries(series);
+    } catch(_) {}
+    removeKwExtraProduct(id);
+  };
+  if (window.showAppConfirm) {
+    showAppConfirm(
+      '슬롯 삭제',
+      `이 슬롯(상품)을 삭제할까요?\n등록된 ${removedKws.length}개 키워드와 추이 데이터도 함께 삭제됩니다.`,
+      apply,
+      { type: 'danger', confirmText: '삭제', confirmStyle: 'danger' }
+    );
+  } else {
+    if (confirm(`이 슬롯(상품)을 삭제할까요?\n등록된 ${removedKws.length}개 키워드와 추이 데이터도 함께 삭제됩니다.`)) apply();
   }
-
-  const cardsHtml = allProducts.map(p => _renderCard(p.id, p)).join('');
-  canvas.innerHTML = cardsHtml + plusCard;
-
-  // 키워드 검색량 표시는 카드뷰에선 생략 (디자인 단순화) — 필요 시 칩에 추가 가능
 }
 
 // 추이 카드 칩에서 X 버튼 → 키워드 즉시 삭제
