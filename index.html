@@ -4656,6 +4656,9 @@ tailwind.config = {
 <div id="sidebar-overlay" class="hidden fixed inset-0 bg-black/20 z-30" onclick="closeSidebar()"></div>
 
 <script>
+// ── 공용 헬퍼 (GPAGO로 이식하며 누락된 함수 복원) ──
+function _escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
 // ── Supabase ────────────────────────────────
 const SUPABASE_URL = 'https://gdsutxmceghvkemcfyuw.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdkc3V0eG1jZWdodmtlbWNmeXV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODc0MDEsImV4cCI6MjA5MTU2MzQwMX0.yO_UwxtQVtVBLC2dVsmJQ4_qgOuWl5LBVAbsnmlwq1U';
