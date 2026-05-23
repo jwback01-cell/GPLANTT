@@ -4437,14 +4437,14 @@ tailwind.config = {
       <!-- 탭 네비게이션 -->
       <div class="flex">
         <div class="bg-white p-1.5 rounded-full panel inline-flex gap-1">
-          <button id="kw-tab-btn-track" type="button" onclick="setKwTab('track')" class="px-6 py-2.5 rounded-full text-sm font-bold bg-brand-black text-white transition-all">순위 추적</button>
-          <button id="kw-tab-btn-trend" type="button" onclick="setKwTab('trend')" class="px-6 py-2.5 rounded-full text-sm font-medium text-brand-gray hover:text-brand-black transition-all">순위 변동 추이</button>
+          <button id="kw-tab-btn-trend" type="button" onclick="setKwTab('trend')" class="px-6 py-2.5 rounded-full text-sm font-bold bg-brand-black text-white transition-all">순위 변동 추이</button>
+          <button id="kw-tab-btn-track" type="button" onclick="setKwTab('track')" class="px-6 py-2.5 rounded-full text-sm font-medium text-brand-gray hover:text-brand-black transition-all">순위 추적</button>
           <button id="kw-tab-btn-settings" type="button" onclick="setKwTab('settings')" class="px-6 py-2.5 rounded-full text-sm font-medium text-brand-gray hover:text-brand-black transition-all">설정</button>
         </div>
       </div>
 
       <!-- 탭: 순위 추적 -->
-      <div id="kw-tab-track" class="space-y-6">
+      <div id="kw-tab-track" class="hidden space-y-6">
 
       <!-- Row 1: 조회 폼 + 결과 -->
       <div class="flex flex-col gap-6 xl:flex-row">
@@ -4575,7 +4575,7 @@ tailwind.config = {
       </div><!-- /kw-tab-track -->
 
       <!-- 탭: 순위 변동 추이 -->
-      <div id="kw-tab-trend" class="hidden space-y-6">
+      <div id="kw-tab-trend" class="space-y-6">
         <section class="bg-white p-6 md:p-8 rounded-4xl panel flex flex-col">
           <div class="flex justify-between items-center mb-5 shrink-0 flex-wrap gap-3">
             <div class="flex items-center gap-3">
@@ -6800,8 +6800,8 @@ function toggleKwManageAuto(id, checked) {
 
 // ── 키워드 페이지 탭 전환 ─────────────────────────
 function setKwTab(tab) {
-  const tabs = ['track', 'trend', 'settings'];
-  if (!tabs.includes(tab)) tab = 'track';
+  const tabs = ['trend', 'track', 'settings'];
+  if (!tabs.includes(tab)) tab = 'trend';
   const activeCls = 'px-6 py-2.5 rounded-full text-sm font-bold bg-brand-black text-white transition-all';
   const idleCls = 'px-6 py-2.5 rounded-full text-sm font-medium text-brand-gray hover:text-brand-black transition-all';
   for (const t of tabs) {
