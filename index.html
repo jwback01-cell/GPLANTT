@@ -7547,9 +7547,14 @@ function _renderKwDetailTable() {
     const posSelect = isFirstRowOfId
       ? `<select onchange="changeKwDetailOrder('${item.id}', parseInt(this.value, 10))" onclick="event.stopPropagation()" class="text-[11px] font-bold bg-brand-bg border border-brand-border rounded-md px-1.5 py-0.5 text-brand-black focus:outline-none focus:border-brand-black" title="위치 변경">${posOptions}</select>`
       : `<span class="inline-block w-7"></span>`;
-    return `<tr class="border-b border-brand-border last:border-b-0 hover:bg-gray-50/50">
+    const dragHandle = isFirstRowOfId
+      ? `<span class="kw-drag-handle text-brand-gray hover:text-brand-black cursor-grab active:cursor-grabbing select-none" title="드래그해서 위치 변경"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></span>`
+      : `<span class="inline-block w-3.5"></span>`;
+    const rowDraggable = isFirstRowOfId ? 'draggable="true"' : '';
+    return `<tr ${rowDraggable} data-kw-id="${item.id}" data-kw-pos="${myIdxInUnique}" ondragstart="_kwRowDragStart(event)" ondragover="_kwRowDragOver(event)" ondragleave="_kwRowDragLeave(event)" ondrop="_kwRowDrop(event)" ondragend="_kwRowDragEnd(event)" class="border-b border-brand-border last:border-b-0 hover:bg-gray-50/50 transition-colors">
       <td class="p-3 pl-4 sticky left-0 bg-white z-10 border-r border-brand-border">
         <div class="flex items-center gap-2">
+          ${dragHandle}
           ${posSelect}
           <span class="font-semibold text-sm text-brand-black whitespace-nowrap">${_escapeHtml(item.keyword)}</span>
           ${typeBadge}
@@ -7575,6 +7580,55 @@ function _renderKwDetailTable() {
 
   // 검색량 비동기 갱신 (캐시 즉시 표시 → 만료된 키워드만 백그라운드 fetch)
   if (typeof _refreshKwVolumesForRendered === 'function') _refreshKwVolumesForRendered();
+}
+
+// ── 드래그 앤 드롭 핸들러 (상세 모달 테이블) ─────────────
+let _kwDragSrcId = null;
+function _kwRowDragStart(e) {
+  const tr = e.currentTarget;
+  _kwDragSrcId = tr.dataset.kwId;
+  tr.classList.add('opacity-40');
+  try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', _kwDragSrcId); } catch(_) {}
+}
+function _kwRowDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const tr = e.currentTarget;
+  if (tr.dataset.kwId !== _kwDragSrcId) {
+    // 마우스 위치에 따라 위/아래 border highlight
+    const rect = tr.getBoundingClientRect();
+    const isUpper = (e.clientY - rect.top) < rect.height / 2;
+    tr.classList.remove('border-t-2', 'border-b-2', 'border-brand-blue');
+    tr.classList.add(isUpper ? 'border-t-2' : 'border-b-2', 'border-brand-blue');
+  }
+}
+function _kwRowDragLeave(e) {
+  e.currentTarget.classList.remove('border-t-2', 'border-b-2', 'border-brand-blue');
+}
+function _kwRowDrop(e) {
+  e.preventDefault();
+  const tr = e.currentTarget;
+  tr.classList.remove('border-t-2', 'border-b-2', 'border-brand-blue');
+  if (!_kwDragSrcId || tr.dataset.kwId === _kwDragSrcId) return;
+  // 소스 행의 현재 위치 추출
+  const srcTr = document.querySelector(`#kw-detail-canvas tr[data-kw-id="${_kwDragSrcId}"]`);
+  const srcPos = srcTr ? parseInt(srcTr.dataset.kwPos, 10) : 0;
+  const targetPos = parseInt(tr.dataset.kwPos, 10);
+  const rect = tr.getBoundingClientRect();
+  const isUpper = (e.clientY - rect.top) < rect.height / 2;
+  let newIndex = isUpper ? targetPos : targetPos + 1;
+  // changeKwDetailOrder는 소스 제거 후 newIndex에 삽입하므로 인덱스 보정 필요
+  if (srcPos < newIndex) newIndex--;
+  changeKwDetailOrder(_kwDragSrcId, newIndex);
+  _kwDragSrcId = null;
+}
+function _kwRowDragEnd(e) {
+  e.currentTarget.classList.remove('opacity-40');
+  // 혹시 남은 highlight 제거
+  document.querySelectorAll('#kw-detail-canvas tr.border-brand-blue').forEach(el => {
+    el.classList.remove('border-t-2', 'border-b-2', 'border-brand-blue');
+  });
+  _kwDragSrcId = null;
 }
 
 // 키워드 행을 새 위치로 이동 (해당 상품 내에서만)
