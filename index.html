@@ -4960,10 +4960,28 @@ function navigate(page) {
 
 // ── Keywords: 조회할 상품 관리 ───────────────
 
+// 하위 메뉴를 가진 페이지 → 하위 메뉴 셀렉터 매핑
+const _SUBMENU_MAP = {
+  'playauto': '.playauto-submenu',
+  'todo': '.todo-submenu'
+};
+
 function updateNavItems(activePage) {
   document.querySelectorAll('.nav-item').forEach(item => {
     const p = item.dataset.page;
-    item.onclick = (e) => { e.preventDefault(); navigate(p); };
+    item.onclick = (e) => {
+      e.preventDefault();
+      // 이미 활성 페이지인 메뉴를 다시 누르면 → 하위 메뉴 토글 (있을 때만)
+      if (p === currentPage.value && _SUBMENU_MAP[p]) {
+        document.querySelectorAll(_SUBMENU_MAP[p]).forEach(el => {
+          const closed = el.classList.contains('hidden');
+          el.classList.toggle('hidden', !closed);
+          el.classList.toggle('flex', closed);
+        });
+        return;
+      }
+      navigate(p);
+    };
     // 기존 Tailwind 인라인 클래스 제거 (이전 스타일 잔재)
     item.classList.remove('bg-brand-black','text-white','shadow-md','text-brand-gray','hover:text-brand-black','hover:bg-brand-bg');
     // ROPAGO 스타일은 .active 클래스로 통일
