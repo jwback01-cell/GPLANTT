@@ -62,6 +62,89 @@ tailwind.config = {
   ::-webkit-scrollbar-thumb { background: #E5E5EA; border-radius: 10px; }
   ::-webkit-scrollbar-thumb:hover { background: #D1D1D6; }
 
+  /* ─── ROPAGO 스타일 사이드바 (GPAGO 동일) ─── */
+  .nav-item {
+    position: relative;
+    transition: all .18s ease;
+    color: #1A1A1A !important;
+    background: #fff !important;
+    border: 1px solid #F2F2F7;
+    box-shadow: 0 1px 2px rgba(0,0,0,.02);
+    font-weight: 600;
+  }
+  .nav-item::after {
+    content: '';
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: #E5E5EA;
+    transition: background .18s;
+  }
+  .nav-item:hover {
+    background: #F9F9FB !important;
+    border-color: #E5E5EA;
+  }
+  .nav-item:hover::after { background: #00C853; }
+  .nav-item.active {
+    background: #fff !important;
+    border-color: #E5E5EA;
+    box-shadow: 0 4px 14px rgba(0,0,0,.06);
+    font-weight: 800;
+    color: #1A1A1A !important;
+  }
+  .nav-item.active::after { background: #00C853; box-shadow: 0 0 0 3px rgba(0,200,83,.18); }
+  .nav-item.active::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    top: 18%;
+    bottom: 18%;
+    width: 3px;
+    border-radius: 2px;
+    background: #2196F3;
+  }
+  .nav-item > svg:first-of-type {
+    color: #8E8E93;
+    border-radius: 999px;
+    box-shadow: 0 0 0 8px #F9F9FB;
+    margin-left: 4px;
+    margin-right: 6px;
+    transition: all .18s;
+  }
+  .nav-item:hover > svg:first-of-type,
+  .nav-item.active > svg:first-of-type {
+    color: #2196F3;
+    box-shadow: 0 0 0 8px #EFF6FF;
+  }
+  /* 하위 메뉴 */
+  .nav-sub {
+    position: relative;
+    color: #8E8E93;
+    font-weight: 600;
+    padding-left: 22px;
+    transition: all .18s;
+  }
+  .nav-sub::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: #E5E5EA;
+    transition: background .18s;
+  }
+  .nav-sub:hover { color: #1A1A1A; }
+  .nav-sub:hover::before { background: #8E8E93; }
+  .nav-sub.active { color: #1A1A1A; font-weight: 800; }
+  .nav-sub.active::before { background: #00C853; box-shadow: 0 0 0 3px rgba(0,200,83,.18); }
+
   /* ── Glass nav ── */
   .glass-nav {
     background: rgba(255,255,255,0.85);
@@ -539,6 +622,13 @@ tailwind.config = {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6"/><path d="M15 2v6"/><path d="M12 17v5"/><path d="M5 8h14a2 2 0 0 1 2 2v2a6 6 0 0 1-12 0v-2a2 2 0 0 1 0-4z"/></svg>
           플레이오토 연동
         </a>
+      <div class="playauto-submenu hidden flex-col gap-1.5 ml-7 mb-1">
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="order">주문수집</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="claim">클레임 관리</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="external">외부업체 주문</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="invoice">송장 업로드</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="config">플레이오토연동</a>
+      </div>
         <a href="#" data-page="todo" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px] transition-colors">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>
           할 일 목록
@@ -765,6 +855,13 @@ tailwind.config = {
       <nav class="flex flex-col gap-2" id="sidenav-todo">
         <a href="#" data-page="dashboard" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px] transition-colors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>대시보드</a>
         <a href="#" data-page="playauto" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px] transition-colors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2v6"/><path d="M15 2v6"/><path d="M12 17v5"/><path d="M5 8h14a2 2 0 0 1 2 2v2a6 6 0 0 1-12 0v-2a2 2 0 0 1 0-4z"/></svg>플레이오토 연동</a>
+      <div class="playauto-submenu hidden flex-col gap-1.5 ml-7 mb-1">
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="order">주문수집</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="claim">클레임 관리</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="external">외부업체 주문</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="invoice">송장 업로드</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="config">플레이오토연동</a>
+      </div>
         <a href="#" data-page="todo" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px] transition-colors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>할 일 목록</a>
         <a href="#" data-page="ledger" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px] transition-colors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>매출 장부</a>
         <a href="#" data-page="products" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px] transition-colors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="16.5" x2="7.5" y1="9.4" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" x2="12" y1="22.08" y2="12"/></svg>상품 관리</a>
@@ -1061,6 +1158,13 @@ tailwind.config = {
       <nav class="flex flex-col gap-2" id="sidenav-ledger">
         <a href="#" data-page="dashboard" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>대시보드</a>
         <a href="#" data-page="playauto" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2v6"/><path d="M15 2v6"/><path d="M12 17v5"/><path d="M5 8h14a2 2 0 0 1 2 2v2a6 6 0 0 1-12 0v-2a2 2 0 0 1 0-4z"/></svg>플레이오토 연동</a>
+      <div class="playauto-submenu hidden flex-col gap-1.5 ml-7 mb-1">
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="order">주문수집</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="claim">클레임 관리</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="external">외부업체 주문</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="invoice">송장 업로드</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="config">플레이오토연동</a>
+      </div>
         <a href="#" data-page="todo" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>할 일 목록</a>
         <a href="#" data-page="ledger" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>매출 장부</a>
         <a href="#" data-page="products" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="16.5" x2="7.5" y1="9.4" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" x2="12" y1="22.08" y2="12"/></svg>상품 관리</a>
@@ -1545,6 +1649,13 @@ tailwind.config = {
       <nav class="flex flex-col gap-2" id="sidenav-products">
         <a href="#" data-page="dashboard" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>대시보드</a>
         <a href="#" data-page="playauto" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2v6"/><path d="M15 2v6"/><path d="M12 17v5"/><path d="M5 8h14a2 2 0 0 1 2 2v2a6 6 0 0 1-12 0v-2a2 2 0 0 1 0-4z"/></svg>플레이오토 연동</a>
+      <div class="playauto-submenu hidden flex-col gap-1.5 ml-7 mb-1">
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="order">주문수집</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="claim">클레임 관리</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="external">외부업체 주문</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="invoice">송장 업로드</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="config">플레이오토연동</a>
+      </div>
         <a href="#" data-page="todo" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>할 일 목록</a>
         <a href="#" data-page="ledger" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>매출 장부</a>
         <a href="#" data-page="products" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="16.5" x2="7.5" y1="9.4" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" x2="12" y1="22.08" y2="12"/></svg>상품 관리</a>
@@ -2027,6 +2138,13 @@ tailwind.config = {
       <nav class="flex flex-col gap-2" id="sidenav-accounts">
         <a href="#" data-page="dashboard" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>대시보드</a>
         <a href="#" data-page="playauto" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2v6"/><path d="M15 2v6"/><path d="M12 17v5"/><path d="M5 8h14a2 2 0 0 1 2 2v2a6 6 0 0 1-12 0v-2a2 2 0 0 1 0-4z"/></svg>플레이오토 연동</a>
+      <div class="playauto-submenu hidden flex-col gap-1.5 ml-7 mb-1">
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="order">주문수집</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="claim">클레임 관리</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="external">외부업체 주문</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="invoice">송장 업로드</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="config">플레이오토연동</a>
+      </div>
         <a href="#" data-page="todo" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>할 일 목록</a>
         <a href="#" data-page="ledger" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>매출 장부</a>
         <a href="#" data-page="products" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="16.5" x2="7.5" y1="9.4" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" x2="12" y1="22.08" y2="12"/></svg>상품 관리</a>
@@ -2831,6 +2949,13 @@ tailwind.config = {
       <nav class="flex flex-col gap-2" id="sidenav-upload">
         <a href="#" data-page="dashboard" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>대시보드</a>
         <a href="#" data-page="playauto" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2v6"/><path d="M15 2v6"/><path d="M12 17v5"/><path d="M5 8h14a2 2 0 0 1 2 2v2a6 6 0 0 1-12 0v-2a2 2 0 0 1 0-4z"/></svg>플레이오토 연동</a>
+      <div class="playauto-submenu hidden flex-col gap-1.5 ml-7 mb-1">
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="order">주문수집</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="claim">클레임 관리</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="external">외부업체 주문</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="invoice">송장 업로드</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="config">플레이오토연동</a>
+      </div>
         <a href="#" data-page="todo" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>할 일 목록</a>
         <a href="#" data-page="ledger" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>매출 장부</a>
         <a href="#" data-page="products" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="16.5" x2="7.5" y1="9.4" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" x2="12" y1="22.08" y2="12"/></svg>상품 관리</a>
@@ -4389,6 +4514,13 @@ tailwind.config = {
       <nav class="flex flex-col gap-2" id="sidenav-dataops">
         <a href="#" data-page="dashboard" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>대시보드</a>
         <a href="#" data-page="playauto" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2v6"/><path d="M15 2v6"/><path d="M12 17v5"/><path d="M5 8h14a2 2 0 0 1 2 2v2a6 6 0 0 1-12 0v-2a2 2 0 0 1 0-4z"/></svg>플레이오토 연동</a>
+      <div class="playauto-submenu hidden flex-col gap-1.5 ml-7 mb-1">
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="order">주문수집</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="claim">클레임 관리</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="external">외부업체 주문</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="invoice">송장 업로드</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="config">플레이오토연동</a>
+      </div>
         <a href="#" data-page="todo" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>할 일 목록</a>
         <a href="#" data-page="ledger" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>매출 장부</a>
         <a href="#" data-page="products" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="16.5" x2="7.5" y1="9.4" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" x2="12" y1="22.08" y2="12"/></svg>상품 관리</a>
@@ -4488,6 +4620,13 @@ tailwind.config = {
       <nav class="flex flex-col gap-2" id="sidenav-design">
         <a href="#" data-page="dashboard" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>대시보드</a>
         <a href="#" data-page="playauto" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2v6"/><path d="M15 2v6"/><path d="M12 17v5"/><path d="M5 8h14a2 2 0 0 1 2 2v2a6 6 0 0 1-12 0v-2a2 2 0 0 1 0-4z"/></svg>플레이오토 연동</a>
+      <div class="playauto-submenu hidden flex-col gap-1.5 ml-7 mb-1">
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="order">주문수집</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="claim">클레임 관리</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="external">외부업체 주문</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="invoice">송장 업로드</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-pa-tab="config">플레이오토연동</a>
+      </div>
         <a href="#" data-page="todo" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>할 일 목록</a>
         <a href="#" data-page="ledger" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>매출 장부</a>
         <a href="#" data-page="products" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="16.5" x2="7.5" y1="9.4" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" x2="12" y1="22.08" y2="12"/></svg>상품 관리</a>
@@ -4740,10 +4879,20 @@ function navigate(page) {
     const tabBar = document.getElementById('upload-tab-bar');
     if (tabBar) tabBar.classList.add('hidden');
     updateNavItems('playauto');
+    // 플레이오토 하위 메뉴 펼침
+    document.querySelectorAll('.playauto-submenu').forEach(el => {
+      el.classList.remove('hidden');
+      el.classList.add('flex');
+    });
     closeSidebar();
     setTimeout(() => { try { if (typeof switchUploadTab === 'function') switchUploadTab('playauto'); } catch(_){} }, 0);
     return;
   }
+  // playauto가 아니면 하위 메뉴 접기
+  document.querySelectorAll('.playauto-submenu').forEach(el => {
+    el.classList.add('hidden');
+    el.classList.remove('flex');
+  });
   PAGES.forEach(p => {
     const el = document.getElementById('page-' + p);
     if (el) el.classList.remove('active');
@@ -4774,16 +4923,24 @@ function updateNavItems(activePage) {
   document.querySelectorAll('.nav-item').forEach(item => {
     const p = item.dataset.page;
     item.onclick = (e) => { e.preventDefault(); navigate(p); };
-    if (p === activePage) {
-      item.className = item.className.replace(/text-brand-gray|hover:text-brand-black|hover:bg-brand-bg/g,'');
-      item.classList.add('bg-brand-black','text-white','shadow-md');
-      item.classList.remove('text-brand-gray');
-    } else {
-      item.classList.remove('bg-brand-black','text-white','shadow-md');
-      item.classList.add('text-brand-gray','hover:text-brand-black','hover:bg-brand-bg');
-    }
+    // 기존 Tailwind 인라인 클래스 제거 (이전 스타일 잔재)
+    item.classList.remove('bg-brand-black','text-white','shadow-md','text-brand-gray','hover:text-brand-black','hover:bg-brand-bg');
+    // ROPAGO 스타일은 .active 클래스로 통일
+    item.classList.toggle('active', p === activePage);
   });
 }
+
+// 플레이오토 하위 메뉴 클릭 핸들러 (위임)
+document.addEventListener('click', (e) => {
+  const sub = e.target.closest('[data-pa-tab]');
+  if (!sub) return;
+  e.preventDefault();
+  const tab = sub.dataset.paTab;
+  if (currentPage.value !== 'playauto') navigate('playauto');
+  setTimeout(() => { try { if (typeof switchPlayautoSubTab === 'function') switchPlayautoSubTab(tab); } catch(_) {} }, 50);
+  // 하위 메뉴 active 표시
+  document.querySelectorAll('[data-pa-tab]').forEach(a => a.classList.toggle('active', a.dataset.paTab === tab));
+});
 
 // ── Login (Supabase Auth) ────────────────────
 function showLoginError(msg) {
