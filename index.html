@@ -7190,17 +7190,7 @@ function renderKwTrend() {
   function _renderCard(productKey, product, slotNum) {
     const data = byProduct.get(productKey);
     const items = data ? data.items : [];
-    // 키워드 정렬: 순위 있는 것부터 (오름차순), 그 다음 미조회 / 순위권 밖
-    items.sort((a, b) => {
-      const ra = _latest(a.histKey, a.rankType === 'price' ? a.legacyKey : null).rank;
-      const rb = _latest(b.histKey, b.rankType === 'price' ? b.legacyKey : null).rank;
-      const aOK = (typeof ra === 'number');
-      const bOK = (typeof rb === 'number');
-      if (aOK && bOK) return ra - rb;
-      if (aOK) return -1;
-      if (bOK) return 1;
-      return 0;
-    });
+    // 정렬은 manage 배열 순서(=사용자가 상세 모달 드롭다운으로 지정한 순서)를 그대로 따름
 
     const SHOWN = 6;
     const visible = items.slice(0, SHOWN);
@@ -7517,6 +7507,8 @@ function _renderKwDetailTable() {
     return v;
   }
 
+  // 동일 id를 가진 항목들은 같은 manage 항목에서 나온 것이므로 dedupe
+  const uniqueIds = [...new Set(items.map(it => it.id))];
   const headerCells = dateCols.map(c => `<th class="font-semibold p-3 text-left whitespace-nowrap min-w-[130px]">${c.label}</th>`).join('');
   const rowsHtml = items.map(item => {
     const lk = item.rankType === 'price' ? item.legacyKey : null;
@@ -7548,9 +7540,17 @@ function _renderKwDetailTable() {
     const typeBadge = item.rankType === 'plus'
       ? '<span class="inline-block bg-brand-green-light text-[#00C853] text-[10px] font-bold px-1.5 py-0.5 rounded">플러스</span>'
       : '<span class="inline-block bg-brand-blue-light text-brand-blue text-[10px] font-bold px-1.5 py-0.5 rounded">가격비교</span>';
+    // 위치 드롭다운 — 동일 id는 첫 행에서만 표시
+    const myIdxInUnique = uniqueIds.indexOf(item.id);
+    const isFirstRowOfId = items.findIndex(x => x.id === item.id) === items.indexOf(item);
+    const posOptions = uniqueIds.map((_, i) => `<option value="${i}" ${i === myIdxInUnique ? 'selected' : ''}>${i + 1}</option>`).join('');
+    const posSelect = isFirstRowOfId
+      ? `<select onchange="changeKwDetailOrder('${item.id}', parseInt(this.value, 10))" onclick="event.stopPropagation()" class="text-[11px] font-bold bg-brand-bg border border-brand-border rounded-md px-1.5 py-0.5 text-brand-black focus:outline-none focus:border-brand-black" title="위치 변경">${posOptions}</select>`
+      : `<span class="inline-block w-7"></span>`;
     return `<tr class="border-b border-brand-border last:border-b-0 hover:bg-gray-50/50">
       <td class="p-3 pl-4 sticky left-0 bg-white z-10 border-r border-brand-border">
         <div class="flex items-center gap-2">
+          ${posSelect}
           <span class="font-semibold text-sm text-brand-black whitespace-nowrap">${_escapeHtml(item.keyword)}</span>
           ${typeBadge}
         </div>
@@ -7575,6 +7575,37 @@ function _renderKwDetailTable() {
 
   // 검색량 비동기 갱신 (캐시 즉시 표시 → 만료된 키워드만 백그라운드 fetch)
   if (typeof _refreshKwVolumesForRendered === 'function') _refreshKwVolumesForRendered();
+}
+
+// 키워드 행을 새 위치로 이동 (해당 상품 내에서만)
+function changeKwDetailOrder(id, newIndex) {
+  if (!id || !_kwDetailProductKey) return;
+  const manage = _loadKwManage();
+  const target = manage.find(it => it.id === id);
+  if (!target) return;
+  // 이 상품의 항목만 추출 (현재 순서 유지)
+  const productItems = manage.filter(it => it.productKey === _kwDetailProductKey);
+  const otherItems = manage.filter(it => it.productKey !== _kwDetailProductKey);
+  const currentIdx = productItems.findIndex(it => it.id === id);
+  if (currentIdx === -1) return;
+  // 제거 → 새 위치에 삽입
+  productItems.splice(currentIdx, 1);
+  const clamped = Math.max(0, Math.min(newIndex, productItems.length));
+  productItems.splice(clamped, 0, target);
+  // otherItems + productItems 순으로 재구성하지 않고, manage 전체에서 productItems 순서를 적용
+  // — 원래 manage 배열 내 productKey 항목들 위치를 새 순서로 교체
+  const newManage = [];
+  let pIdx = 0;
+  manage.forEach(it => {
+    if (it.productKey === _kwDetailProductKey) {
+      newManage.push(productItems[pIdx++]);
+    } else {
+      newManage.push(it);
+    }
+  });
+  _saveKwManage(newManage);
+  _renderKwDetailTable();
+  if (typeof renderKwTrend === 'function') renderKwTrend();
 }
 
 // ── 키워드 월 검색량 (네이버 검색광고 API) ─────────────────────────
