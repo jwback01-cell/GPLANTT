@@ -4908,6 +4908,15 @@ function navigate(page) {
     try { localStorage.removeItem('gplan_ext_order_upload_v1'); } catch(_) {}
     try { if (typeof _resetInvoiceTabUI === 'function') _resetInvoiceTabUI(); } catch(_) {}
   }
+  // 모든 사이드바 하위 메뉴는 일단 닫고, 해당 페이지일 때만 펼침 (단일 펼침 유지)
+  document.querySelectorAll('.playauto-submenu').forEach(el => {
+    el.classList.toggle('hidden', page !== 'playauto');
+    el.classList.toggle('flex', page === 'playauto');
+  });
+  document.querySelectorAll('.todo-submenu').forEach(el => {
+    el.classList.toggle('hidden', page !== 'todo');
+    el.classList.toggle('flex', page === 'todo');
+  });
   // 가상 페이지: 플레이오토 연동 — 실제로는 upload 페이지 + playauto 탭. 사이드바 활성표시는 'playauto' 로.
   if (page === 'playauto') {
     PAGES.forEach(p => {
@@ -4921,26 +4930,10 @@ function navigate(page) {
     const tabBar = document.getElementById('upload-tab-bar');
     if (tabBar) tabBar.classList.add('hidden');
     updateNavItems('playauto');
-    // 플레이오토 하위 메뉴 펼침
-    document.querySelectorAll('.playauto-submenu').forEach(el => {
-      el.classList.remove('hidden');
-      el.classList.add('flex');
-    });
     closeSidebar();
     setTimeout(() => { try { if (typeof switchUploadTab === 'function') switchUploadTab('playauto'); } catch(_){} }, 0);
     return;
   }
-  // playauto가 아니면 하위 메뉴 접기
-  document.querySelectorAll('.playauto-submenu').forEach(el => {
-    el.classList.add('hidden');
-    el.classList.remove('flex');
-  });
-  // todo 페이지면 하위 메뉴 펼침, 아니면 접기
-  const isTodo = (page === 'todo');
-  document.querySelectorAll('.todo-submenu').forEach(el => {
-    el.classList.toggle('hidden', !isTodo);
-    el.classList.toggle('flex', isTodo);
-  });
   PAGES.forEach(p => {
     const el = document.getElementById('page-' + p);
     if (el) el.classList.remove('active');
