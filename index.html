@@ -3410,11 +3410,10 @@ tailwind.config = {
 
       <!-- ── Tab: 플레이오토 연동 ── -->
       <div id="upload-panel-playauto" class="flex flex-col gap-6 hidden">
-        <!-- Sub-tabs (4개) -->
-        <div class="flex gap-1 p-1 bg-brand-bg rounded-full border border-brand-border w-fit flex-wrap">
+        <!-- Sub-tabs — 사이드바 하위 메뉴로 이동, 페이지 내 버튼은 숨김 (switchPlayautoSubTab의 active 표시를 위해 DOM 유지) -->
+        <div class="hidden gap-1 p-1 bg-brand-bg rounded-full border border-brand-border w-fit flex-wrap">
           <button id="pa-sub-tab-order" class="pa-sub-btn px-4 py-2 rounded-full text-xs font-bold bg-brand-black text-white" onclick="switchPlayautoSubTab('order')">주문수집</button>
           <button id="pa-sub-tab-claim" class="pa-sub-btn px-4 py-2 rounded-full text-xs font-bold text-brand-gray hover:text-brand-black" onclick="switchPlayautoSubTab('claim')">클레임 관리</button>
-          <!-- 마이너스 확인 탭 — 주문수집 인라인 결과로 대체되어 숨김 -->
           <button id="pa-sub-tab-minus" class="hidden" onclick="switchPlayautoSubTab('minus')">마이너스 확인</button>
           <button id="pa-sub-tab-external" class="pa-sub-btn px-4 py-2 rounded-full text-xs font-bold text-brand-gray hover:text-brand-black" onclick="switchPlayautoSubTab('external')">외부업체 주문</button>
           <button id="pa-sub-tab-invoice" class="pa-sub-btn px-4 py-2 rounded-full text-xs font-bold text-brand-gray hover:text-brand-black" onclick="switchPlayautoSubTab('invoice')">송장 업로드</button>
