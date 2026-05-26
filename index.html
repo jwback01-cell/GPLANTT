@@ -3905,8 +3905,21 @@ tailwind.config = {
               <div class="flex items-center justify-between gap-3 flex-wrap mb-3">
                 <div class="text-xs text-brand-gray">
                   파일: <span id="ext-upload-filename" class="font-bold text-brand-black"></span> · 총 <span id="ext-upload-count" class="font-bold text-brand-black">0</span>건
+                  <span id="ext-upload-invoice-status" class="ml-2"></span>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
+                  <button onclick="applyPaInvoicesToExtUpload()" class="px-4 py-2 rounded-full bg-brand-green text-white text-xs font-bold hover:opacity-90 flex items-center gap-1.5" title="플레이오토 출고관리에서 송장을 가져와 받는분성명·연락처로 매칭한 뒤 송장번호 컬럼을 채웁니다">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                    🚚 플토 송장 매칭
+                  </button>
+                  <button onclick="sendExtUploadReplyEmail(false)" class="px-4 py-2 rounded-full bg-brand-blue text-white text-xs font-bold hover:opacity-90 flex items-center gap-1.5" title="송장이 채워진 외부업체 양식 엑셀을 seoulbjs@naver.com 으로 메일 발송">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    📧 서울리빙 회신 메일
+                  </button>
+                  <button onclick="sendExtUploadReplyEmail(true)" class="px-4 py-2 rounded-full border border-brand-border bg-white text-brand-gray text-xs font-bold hover:bg-brand-bg flex items-center gap-1.5" title="jwback01@nate.com 으로 테스트 메일 발송">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    🧪 테스트
+                  </button>
                   <button onclick="openPaUploadDialog()" class="px-4 py-2 rounded-full bg-gradient-to-r from-brand-orange to-brand-pink text-white text-xs font-bold hover:opacity-90 flex items-center gap-1.5">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 19V5"/><polyline points="5 12 12 5 19 12"/></svg>
                     플레이오토에 신규주문으로 업로드 (API)
@@ -16494,6 +16507,7 @@ function _renderExternalOrderUpload(payload) {
   wrap.classList.remove('hidden');
   if (clearBtn) clearBtn.classList.remove('hidden');
   if (exportBtn) exportBtn.classList.remove('hidden');
+  if (typeof _renderExtUploadInvoiceStatus === 'function') _renderExtUploadInvoiceStatus(payload);
 }
 
 function _loadExternalOrderUpload() {
@@ -16524,6 +16538,165 @@ function exportExternalOrderUpload() {
   const _d = new Date();
   const stamp = _d.getFullYear() + String(_d.getMonth()+1).padStart(2,'0') + String(_d.getDate()).padStart(2,'0') + '_' + String(_d.getHours()).padStart(2,'0') + String(_d.getMinutes()).padStart(2,'0');
   XLSX.writeFile(wb, `외부업체_주문_${stamp}.xlsx`);
+}
+
+// 송장 매칭 상태 표시 — 결과 영역 헤더에 "송장 N건 채워짐" 칩
+function _renderExtUploadInvoiceStatus(payload) {
+  const el = document.getElementById('ext-upload-invoice-status');
+  if (!el || !payload || !Array.isArray(payload.rows)) { if (el) el.innerHTML = ''; return; }
+  const filled = payload.rows.filter(r => r.invoice && String(r.invoice).trim()).length;
+  const total = payload.rows.length;
+  if (filled === 0) {
+    el.innerHTML = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-bg text-brand-gray">송장 0/${total}</span>`;
+  } else if (filled === total) {
+    el.innerHTML = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-green-light text-brand-green">송장 ${filled}/${total} 채워짐 ✓</span>`;
+  } else {
+    el.innerHTML = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-orange-light text-brand-orange">송장 ${filled}/${total}</span>`;
+  }
+}
+
+// 플레이오토 출고관리에서 송장 가져와서 외부업체 업로드 데이터에 매칭
+// 매칭 키: 받는분성명 + 받는분연락처 (둘 다 일치 우선) → 이름만 일치 (단일 후보일 때)
+async function applyPaInvoicesToExtUpload() {
+  const _msg = (text, tone) => _extUploadMsg(text, tone);
+  const payload = _loadExternalOrderUpload();
+  if (!payload || !Array.isArray(payload.rows) || !payload.rows.length) {
+    _msg('업로드된 외부업체 주문 데이터가 없습니다. 먼저 엑셀을 업로드하세요.', 'error');
+    return false;
+  }
+
+  // 플토 주문이 비어있으면 자동으로 가져오기 (출고관리 상태, 최근 90일)
+  if (!Array.isArray(_paOrders) || !_paOrders.length) {
+    _msg('플레이오토 출고관리에서 주문 가져오는 중... (최근 90일)', 'info');
+    try {
+      await fetchInvoiceShipManagementOrders();
+    } catch (e) {
+      _msg('플레이오토 가져오기 실패: ' + (e.message || e), 'error');
+      return false;
+    }
+  }
+  if (!Array.isArray(_paOrders) || !_paOrders.length) {
+    _msg('플레이오토 출고관리에서 가져온 주문이 없습니다. 플레이오토 API 설정 또는 출고 상태 주문을 확인하세요.', 'error');
+    return false;
+  }
+
+  // 공백·하이픈 제거 후 비교 (전화번호 형식 차이 흡수)
+  const _norm = s => String(s || '').replace(/[\s\-\(\)]/g, '').trim();
+
+  // 플토 주문 인덱스 — 이름+연락처 / 이름만
+  const idxByNamePhone = new Map();
+  const idxByName = new Map();
+  _paOrders.forEach(o => {
+    const name = _norm(_paPickField(o, ['to_name', 'receiver_name', 'receiverName', 'recipient_name']));
+    const phone = _norm(_extReceiverPhone(o));
+    if (name && phone) idxByNamePhone.set(name + '|' + phone, o);
+    if (name) {
+      if (!idxByName.has(name)) idxByName.set(name, []);
+      idxByName.get(name).push(o);
+    }
+  });
+
+  const _pickInvoice = o => String(_paPickField(o, ['invoice_no', 'tracking_no', 'invoice_number', 'inv_no']) || '').trim();
+
+  let newlyMatched = 0, alreadyHad = 0, noMatch = 0, matchedButNoInvoice = 0;
+  payload.rows.forEach(r => {
+    if (r.invoice && String(r.invoice).trim()) { alreadyHad++; return; }
+    const name = _norm(r.receiver);
+    const phone = _norm(r.phone);
+    let match = null;
+    if (name && phone) match = idxByNamePhone.get(name + '|' + phone);
+    if (!match && name) {
+      const list = idxByName.get(name);
+      if (list && list.length === 1) match = list[0];  // 동명이인 위험 회피 — 단일 후보만 매칭
+    }
+    if (!match) { noMatch++; return; }
+    const inv = _pickInvoice(match);
+    if (!inv) { matchedButNoInvoice++; return; }
+    r.invoice = inv;
+    newlyMatched++;
+  });
+
+  try { localStorage.setItem(EXT_UPLOAD_KEY, JSON.stringify(payload)); } catch(_) {}
+  _renderExternalOrderUpload(payload);
+  _renderExtUploadInvoiceStatus(payload);
+
+  const tone = newlyMatched > 0 ? 'ok' : (noMatch === payload.rows.length - alreadyHad ? 'error' : 'warn');
+  _msg(
+    `✅ 송장 매칭 — 새로 채움 ${newlyMatched}건 / 기존 송장 ${alreadyHad}건 / ` +
+    `매칭은 됐지만 송장 미입력 ${matchedButNoInvoice}건 / 미매칭 ${noMatch}건 ` +
+    `(플레이오토 주문 ${_paOrders.length}건 기준)`,
+    tone
+  );
+  return newlyMatched > 0;
+}
+
+// 송장 채운 외부업체 양식 엑셀을 메일로 발송 (서울리빙 또는 테스트)
+async function sendExtUploadReplyEmail(testMode) {
+  const _msg = (text, tone) => _extUploadMsg(text, tone);
+  const payload = _loadExternalOrderUpload();
+  if (!payload || !Array.isArray(payload.rows) || !payload.rows.length) {
+    _msg('업로드된 외부업체 주문 데이터가 없습니다.', 'error');
+    return;
+  }
+  const filledCount = payload.rows.filter(r => r.invoice && String(r.invoice).trim()).length;
+  if (filledCount === 0) {
+    _msg('송장이 채워진 행이 없습니다. 먼저 "🚚 플토 송장 매칭" 버튼을 눌러주세요.', 'warn');
+    return;
+  }
+
+  // 외부업체 양식 그대로 엑셀 생성 (서울리빙이 같은 형태로 받아서 처리 가능)
+  const aoa = [EXT_UPLOAD_COLS, ...payload.rows.map(r => [r.receiver, r.invoice, r.phone, r.company, r.phone2, r.zip, r.address, r.qty, r.supply || 0, r.itemName, r.freight, r.payment, r.shipNo, r.msg])];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:10},{wch:14},{wch:16},{wch:18},{wch:18},{wch:10},{wch:40},{wch:6},{wch:10},{wch:40},{wch:12},{wch:10},{wch:12},{wch:16}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '외부업체 주문');
+
+  let base64;
+  try { base64 = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' }); }
+  catch (e) { _msg('파일 변환 실패: ' + (e.message || e), 'error'); return; }
+
+  const _d = new Date();
+  const stamp = String(_d.getFullYear()).slice(-2) + String(_d.getMonth() + 1).padStart(2, '0') + String(_d.getDate()).padStart(2, '0');
+  const fileName = `송장회신_${stamp}.xlsx`;
+  const toEmail = testMode ? 'jwback01@nate.com' : SEOULLIVING_TO_EMAIL;
+  const subject = testMode ? `[테스트] ${fileName}` : fileName;
+  const labelTag = testMode ? '🧪 테스트 메일' : '📧 송장 회신 메일';
+
+  _msg(`${labelTag} ${toEmail} 로 메일 발송 중... (Naver SMTP)`, 'info');
+  try {
+    const response = await fetch('/api/send-mail', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: toEmail,
+        subject: subject,
+        fromName: '지플랜',
+        message:
+          (testMode ? `※ 이 메일은 테스트 발송입니다 (수신처: ${toEmail})\n\n` : '') +
+          `발주 송장 회신 — 총 ${payload.rows.length}건 (송장 ${filledCount}건 채움)\n\n` +
+          `지플랜\n` +
+          `인천 미추홀구 토금남로4번길 12, 더젠시티 504호\n\n` +
+          `O. 070-4509-1408\n` +
+          `M. 010-9925-4445\n` +
+          `E-mail : gplan23@naver.com`,
+        fileName,
+        fileBase64: base64,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.ok) {
+      const errMsg = data.error || `HTTP ${response.status}`;
+      const hint = data.hint ? `\n${data.hint}` : '';
+      gplanAlert('메일 발송 실패\n\n' + errMsg + hint, { type: 'error', title: '메일 발송 실패' });
+      _msg(`${labelTag} 실패: ` + errMsg, 'error');
+      return;
+    }
+    _msg(`${labelTag} 완료 — ${toEmail} 로 ${fileName} 전송 (${payload.rows.length}행, 송장 ${filledCount}건, gplan23@naver.com 발신)`, 'ok');
+  } catch (err) {
+    console.error('[송장회신] 실패:', err);
+    gplanAlert('메일 발송 중 네트워크 오류\n\n' + (err.message || err), { type: 'error', title: '메일 발송 실패' });
+    _msg(`${labelTag} 실패: ` + (err.message || err), 'error');
+  }
 }
 
 // ── 플레이오토 공식 엑셀 양식 (주문/신규주문 입력) 다운로드 ─────────────────
