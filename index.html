@@ -16698,7 +16698,74 @@ async function applyPaInvoicesToExtUpload() {
   return newlyMatched > 0;
 }
 
-// 송장 채운 외부업체 양식 엑셀을 메일로 발송 (서울리빙 또는 테스트)
+// 회신용 엑셀 빌더 — 받은 양식과 동일한 디자인 (공급가 컬럼 제외, 13컬럼)
+// D열(업체명) 노란 배경 + 빨간 글씨, I열(품목명) 데이터 빨간 글씨, 회색 헤더 + 격자
+async function _buildExtUploadReplyExcelBase64(payload) {
+  // 받은 양식과 동일한 컬럼 순서 (공급가 없음)
+  const REPLY_COLS = ['받는분성명', '송장번호', '받는분연락처', '업체명(필수기입)', '받는분기타연락처', '우편번호', '받는분주소', '수량', '품목명', '운임TYPE', '지불조건', '출고번호', '배송메세지'];
+  const aoa = [REPLY_COLS, ...payload.rows.map(r => [
+    r.receiver, r.invoice, r.phone, r.company, r.phone2, r.zip, r.address, r.qty,
+    r.itemName, r.freight, r.payment, r.shipNo, r.msg
+  ])];
+
+  const XLSXS = await _loadXlsxStyled();
+  const wb = XLSXS.utils.book_new();
+  const ws = XLSXS.utils.aoa_to_sheet(aoa);
+  // 컬럼 폭 (받는분성명/송장/연락처/업체명/기타연락처/우편/주소/수량/품목명/운임/지불/출고/메세지)
+  ws['!cols'] = [{wch:10},{wch:14},{wch:16},{wch:18},{wch:18},{wch:10},{wch:40},{wch:6},{wch:40},{wch:12},{wch:10},{wch:12},{wch:18}];
+
+  const thin = { style: 'thin', color: { rgb: '000000' } };
+  const border = { top: thin, bottom: thin, left: thin, right: thin };
+  const centerAlign = { horizontal: 'center', vertical: 'center', wrapText: true };
+  const leftAlign = { horizontal: 'left', vertical: 'center', wrapText: true };
+  const yellowFill = { patternType: 'solid', fgColor: { rgb: 'FFFF00' }, bgColor: { rgb: 'FFFF00' } };
+  const grayFill = { patternType: 'solid', fgColor: { rgb: 'D9D9D9' }, bgColor: { rgb: 'D9D9D9' } };
+  const redFont = { color: { rgb: 'FF0000' } };
+
+  // 우편번호 — 앞자리 0 보존 (F열 = index 5)
+  const zipCol = 5;
+  for (let r = 1; r < aoa.length; r++) {
+    const addr = XLSXS.utils.encode_cell({ r, c: zipCol });
+    const v = aoa[r][zipCol];
+    ws[addr] = { t: 's', v: v == null ? '' : String(v), z: '@' };
+  }
+
+  const ncols = REPLY_COLS.length;
+  for (let r = 0; r < aoa.length; r++) {
+    for (let c = 0; c < ncols; c++) {
+      const addr = XLSXS.utils.encode_cell({ r, c });
+      if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+      const isHeader = r === 0;
+      const isCompanyCol = c === 3;   // D열 (업체명)
+      const isItemCol = c === 8;      // I열 (품목명)
+      const isAddrCol = c === 6;      // G열 (주소)
+      const isMsgCol = c === 12;      // M열 (배송메세지)
+
+      let fill;
+      if (isHeader) fill = isCompanyCol ? yellowFill : grayFill;
+      else if (isCompanyCol) fill = yellowFill;  // D열 데이터도 노란 배경
+
+      // 글자색 — 헤더의 D열 + 모든 행의 I열(품목명) 데이터는 빨간색
+      const isRedFont = (isHeader && isCompanyCol) || (!isHeader && isItemCol);
+
+      ws[addr].s = {
+        font: {
+          bold: isHeader || isCompanyCol,
+          ...(isRedFont ? redFont : {}),
+        },
+        alignment: (isAddrCol || isItemCol || isMsgCol) ? leftAlign : centerAlign,
+        border,
+        ...(fill ? { fill } : {}),
+      };
+    }
+  }
+
+  XLSXS.utils.book_append_sheet(wb, ws, '서울리빙_회신');
+  return XLSXS.write(wb, { bookType: 'xlsx', type: 'base64' });
+}
+
+// 송장 채운 외부업체 양식 엑셀을 받은 메일에 답장으로 발송 (서울리빙 또는 테스트)
+// 제목: "RE : " + 받은 파일명 — 받은 양식과 동일한 디자인의 엑셀을 첨부
 async function sendExtUploadReplyEmail(testMode) {
   const _msg = (text, tone) => _extUploadMsg(text, tone);
   const payload = _loadExternalOrderUpload();
@@ -16712,22 +16779,19 @@ async function sendExtUploadReplyEmail(testMode) {
     return;
   }
 
-  // 외부업체 양식 그대로 엑셀 생성 (서울리빙이 같은 형태로 받아서 처리 가능)
-  const aoa = [EXT_UPLOAD_COLS, ...payload.rows.map(r => [r.receiver, r.invoice, r.phone, r.company, r.phone2, r.zip, r.address, r.qty, r.supply || 0, r.itemName, r.freight, r.payment, r.shipNo, r.msg])];
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{wch:10},{wch:14},{wch:16},{wch:18},{wch:18},{wch:10},{wch:40},{wch:6},{wch:10},{wch:40},{wch:12},{wch:10},{wch:12},{wch:16}];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '외부업체 주문');
-
+  // 디자인 적용된 엑셀 생성 (받은 양식과 동일)
   let base64;
-  try { base64 = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' }); }
+  try { base64 = await _buildExtUploadReplyExcelBase64(payload); }
   catch (e) { _msg('파일 변환 실패: ' + (e.message || e), 'error'); return; }
 
-  const _d = new Date();
-  const stamp = String(_d.getFullYear()).slice(-2) + String(_d.getMonth() + 1).padStart(2, '0') + String(_d.getDate()).padStart(2, '0');
-  const fileName = `송장회신_${stamp}.xlsx`;
+  // 답장 제목 = "RE : " + 받은 파일명 (받은 그대로 .xls 확장자 유지)
+  // 첨부 파일명은 받은 파일명에서 확장자만 .xlsx 로 (실제 포맷과 일치)
+  const receivedFileName = payload.fileName || '다올 버즈에어팟류 발주양식 (리빙컴퍼니).xls';
+  const replySubject = 'RE : ' + receivedFileName;
+  const attachFileName = receivedFileName.replace(/\.(xls|xlsx|csv)$/i, '') + '.xlsx';
+
   const toEmail = testMode ? 'jwback01@nate.com' : SEOULLIVING_TO_EMAIL;
-  const subject = testMode ? `[테스트] ${fileName}` : fileName;
+  const subject = testMode ? `[테스트] ${replySubject}` : replySubject;
   const labelTag = testMode ? '🧪 테스트 메일' : '📧 송장 회신 메일';
 
   _msg(`${labelTag} ${toEmail} 로 메일 발송 중... (Naver SMTP)`, 'info');
@@ -16741,13 +16805,15 @@ async function sendExtUploadReplyEmail(testMode) {
         fromName: '지플랜',
         message:
           (testMode ? `※ 이 메일은 테스트 발송입니다 (수신처: ${toEmail})\n\n` : '') +
-          `발주 송장 회신 — 총 ${payload.rows.length}건 (송장 ${filledCount}건 채움)\n\n` +
+          `발주서 송장 회신드립니다.\n` +
+          `총 ${payload.rows.length}건 (송장 ${filledCount}건 채움)\n\n` +
+          `감사합니다.\n\n` +
           `지플랜\n` +
           `인천 미추홀구 토금남로4번길 12, 더젠시티 504호\n\n` +
           `O. 070-4509-1408\n` +
           `M. 010-9925-4445\n` +
           `E-mail : gplan23@naver.com`,
-        fileName,
+        fileName: attachFileName,
         fileBase64: base64,
       }),
     });
@@ -16759,7 +16825,7 @@ async function sendExtUploadReplyEmail(testMode) {
       _msg(`${labelTag} 실패: ` + errMsg, 'error');
       return;
     }
-    _msg(`${labelTag} 완료 — ${toEmail} 로 ${fileName} 전송 (${payload.rows.length}행, 송장 ${filledCount}건, gplan23@naver.com 발신)`, 'ok');
+    _msg(`${labelTag} 완료 — ${toEmail} 로 [${subject}] 전송 (${payload.rows.length}행, 송장 ${filledCount}건, gplan23@naver.com 발신)`, 'ok');
   } catch (err) {
     console.error('[송장회신] 실패:', err);
     gplanAlert('메일 발송 중 네트워크 오류\n\n' + (err.message || err), { type: 'error', title: '메일 발송 실패' });
