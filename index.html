@@ -16555,6 +16555,25 @@ function _renderExtUploadInvoiceStatus(payload) {
   }
 }
 
+// 송장 매칭 전용 — 플레이오토에서 송장이 찍혔을 만한 모든 상태의 주문을 한꺼번에 가져옴
+// (출고관리=출고대기만 가져오는 fetchInvoiceShipManagementOrders 와 별개로, 운송장출력/출고완료/배송중 등 포괄)
+async function _paFetchAllOrdersForInvoiceMatching() {
+  if (!_loadPaKey() || !_loadPaAuth()) {
+    throw new Error('플레이오토 API 설정이 필요합니다. "플레이오토연동" 탭에서 먼저 등록하세요.');
+  }
+  const today = new Date();
+  const startDate = new Date(today.getTime() - 90 * 86400000);
+  // status 필터 없이 최근 90일 전체 주문 가져옴 (송장 유무는 클라이언트에서 확인)
+  const body = {
+    start: 0, length: 1000, date_type: 'wdate',
+    masking_yn: false, bundle_yn: false, orderby: 'wdate desc',
+    sdate: _fmtYmd(startDate) + ' 00:00:00',
+    edate: _fmtYmd(today) + ' 23:59:59',
+  };
+  const data = await _paFetch('/orders', { method: 'POST', body: JSON.stringify(body) });
+  return _paUnwrap(data) || [];
+}
+
 // 플레이오토 출고관리에서 송장 가져와서 외부업체 업로드 데이터에 매칭
 // 매칭 키: 받는분성명 + 받는분연락처 (둘 다 일치 우선) → 이름만 일치 (단일 후보일 때)
 async function applyPaInvoicesToExtUpload() {
@@ -16565,20 +16584,26 @@ async function applyPaInvoicesToExtUpload() {
     return false;
   }
 
-  // 플토 주문이 비어있으면 자동으로 가져오기 (출고관리 상태, 최근 90일)
-  if (!Array.isArray(_paOrders) || !_paOrders.length) {
-    _msg('플레이오토 출고관리에서 주문 가져오는 중... (최근 90일)', 'info');
-    try {
-      await fetchInvoiceShipManagementOrders();
-    } catch (e) {
-      _msg('플레이오토 가져오기 실패: ' + (e.message || e), 'error');
-      return false;
-    }
-  }
-  if (!Array.isArray(_paOrders) || !_paOrders.length) {
-    _msg('플레이오토 출고관리에서 가져온 주문이 없습니다. 플레이오토 API 설정 또는 출고 상태 주문을 확인하세요.', 'error');
+  // 매칭 전용 fetch — 운송장출력/출고완료/배송중 등 송장이 찍힌 모든 상태 포괄 (최근 90일)
+  _msg('플레이오토에서 송장 있는 주문 가져오는 중... (전체 상태, 최근 90일)', 'info');
+  let allOrders;
+  try {
+    allOrders = await _paFetchAllOrdersForInvoiceMatching();
+  } catch (e) {
+    _msg('플레이오토 가져오기 실패: ' + (e.message || e), 'error');
     return false;
   }
+  if (!Array.isArray(allOrders) || !allOrders.length) {
+    _msg('플레이오토에서 가져온 주문이 없습니다. API 설정 또는 최근 90일 주문을 확인하세요.', 'error');
+    return false;
+  }
+  // 상태 분포 콘솔 출력 (어떤 상태가 들어왔는지 확인)
+  const statusDist = {};
+  allOrders.forEach(o => {
+    const st = String(_paPickField(o, ['ord_status', 'status', 'order_status']) || '(빈값)').trim();
+    statusDist[st] = (statusDist[st] || 0) + 1;
+  });
+  console.log('[송장매칭] PA 전체 주문 상태 분포:', statusDist, '총', allOrders.length, '건');
 
   // 공백·하이픈 제거 후 비교 (전화번호 형식 차이 흡수)
   const _norm = s => String(s || '').replace(/[\s\-\(\)]/g, '').trim();
@@ -16595,27 +16620,24 @@ async function applyPaInvoicesToExtUpload() {
     'shipping_no', 'ship_no'];
 
   // 진단용: 첫 PA 주문의 모든 키 + 추출 결과 콘솔 출력
-  if (_paOrders[0]) {
-    const sample = _paOrders[0];
+  if (allOrders[0]) {
+    const sample = allOrders[0];
     const allKeys = Object.keys(sample);
     console.log('[송장매칭 진단] PA 첫 주문 키 목록:', allKeys);
     console.log('[송장매칭 진단] PA 첫 주문 시도 결과 —',
       'name=', _paPickField(sample, NAME_KEYS),
       '| phone=', _paPickField(sample, PHONE_KEYS),
       '| invoice=', _paPickField(sample, INVOICE_KEYS));
-    // 이름/연락처/송장 비슷한 키 후보를 자동 탐색해 안내
-    const candidates = {
-      name:    allKeys.filter(k => /name|receiver|recipient|rcv/i.test(k)),
-      phone:   allKeys.filter(k => /phone|tel|cel|mobile|hp/i.test(k)),
-      invoice: allKeys.filter(k => /invoice|tracking|deliv|ship|inv_/i.test(k)),
-    };
-    console.log('[송장매칭 진단] PA 응답에 있는 후보 필드명:', candidates);
   }
 
-  // 플토 주문 인덱스 — 이름+연락처 / 이름만
+  // 플토 주문 인덱스 — 이름+연락처 / 이름만 (송장이 있는 주문만)
   const idxByNamePhone = new Map();
   const idxByName = new Map();
-  _paOrders.forEach(o => {
+  let withInvoiceCount = 0;
+  allOrders.forEach(o => {
+    const inv = String(_paPickField(o, INVOICE_KEYS) || '').trim();
+    if (!inv) return;  // 송장 없는 주문은 인덱스에서 제외 (매칭 의미 없음)
+    withInvoiceCount++;
     const name = _norm(_paPickField(o, NAME_KEYS));
     const phone = _norm(_paPickField(o, PHONE_KEYS));
     if (name && phone) idxByNamePhone.set(name + '|' + phone, o);
@@ -16624,6 +16646,7 @@ async function applyPaInvoicesToExtUpload() {
       idxByName.get(name).push(o);
     }
   });
+  console.log('[송장매칭] 송장 있는 PA 주문:', withInvoiceCount, '/', allOrders.length, '건');
 
   const _pickInvoice = o => String(_paPickField(o, INVOICE_KEYS) || '').trim();
 
@@ -16669,7 +16692,7 @@ async function applyPaInvoicesToExtUpload() {
   _msg(
     `✅ 송장 매칭 — 새로 채움 ${newlyMatched}건 / 기존 송장 ${alreadyHad}건 / ` +
     `매칭은 됐지만 송장 미입력 ${matchedButNoInvoice}건 / 미매칭 ${noMatch}건 ` +
-    `(플레이오토 주문 ${_paOrders.length}건 기준)`,
+    `(PA 전체 ${allOrders.length}건 중 송장 있는 ${withInvoiceCount}건 기준)`,
     tone
   );
   return newlyMatched > 0;
