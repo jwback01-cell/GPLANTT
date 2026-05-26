@@ -6546,7 +6546,7 @@ function renderProductsPage() {
       '<div class="flex items-center gap-3 md:gap-4 cursor-pointer rounded-xl -mx-1 px-1 py-1 hover:bg-brand-bg transition-colors" onclick="openEditProduct(' + p.id + ')" title="클릭하여 수정">' +
         '<div class="w-12 md:w-14 h-12 md:h-14 rounded-xl ' + bg + ' ' + fg + ' flex items-center justify-center font-bold shrink-0">' + escHtml(initials) + '</div>' +
         '<div><div class="font-bold text-sm mb-0.5">' + escHtml(p.name) + linkBadge + '</div>' +
-        '<div class="text-brand-gray text-xs font-medium">SKU: ' + escHtml(p.sku||'') + ' | ' + escHtml(p.category||'') + (p.folder_code ? ' | 📁 ' + escHtml(p.folder_code) : '') + (p.cost ? ' | 원가 ' + Number(p.cost).toLocaleString('ko-KR') + '원' : '') + (p.supply_price ? ' | 공급가 ' + Number(p.supply_price).toLocaleString('ko-KR') + '원' : '') + (p.shipping_fee ? ' | 택배비 ' + Number(p.shipping_fee).toLocaleString('ko-KR') + '원' : '') + (p.shipping_cost ? ' | 택배비용 ' + Number(p.shipping_cost).toLocaleString('ko-KR') + '원' : '') + (p.created_at ? ' | 등록 ' + String(p.created_at).slice(0, 10) : '') + '</div></div>' +
+        '<div class="text-brand-gray text-xs font-medium">SKU: <span class="cursor-pointer hover:text-brand-blue hover:underline transition-colors font-semibold" data-sku="' + escHtml(p.sku||'') + '" onclick="event.stopPropagation(); copySkuToClipboard(this.dataset.sku, this)" title="클릭하여 SKU 복사">' + escHtml(p.sku||'') + '</span> | ' + escHtml(p.category||'') + (p.folder_code ? ' | 📁 ' + escHtml(p.folder_code) : '') + (p.cost ? ' | 원가 ' + Number(p.cost).toLocaleString('ko-KR') + '원' : '') + (p.supply_price ? ' | 공급가 ' + Number(p.supply_price).toLocaleString('ko-KR') + '원' : '') + (p.shipping_fee ? ' | 택배비 ' + Number(p.shipping_fee).toLocaleString('ko-KR') + '원' : '') + (p.shipping_cost ? ' | 택배비용 ' + Number(p.shipping_cost).toLocaleString('ko-KR') + '원' : '') + (p.created_at ? ' | 등록 ' + String(p.created_at).slice(0, 10) : '') + '</div></div>' +
       '</div>' +
       '<div class="text-right"><input type="number" value="' + p.stock + '" class="' + stockClass + '"></div>' +
       '<div class="text-right">' +
@@ -6903,6 +6903,42 @@ function _updateProductSearchClearBtn() {
   if (!el || !btn) return;
   if ((el.value || '').length > 0) btn.classList.remove('hidden');
   else                              btn.classList.add('hidden');
+}
+
+// ── SKU 클릭 복사 ──
+// 상품 목록의 'SKU: GB0103' 부분을 클릭하면 클립보드에 복사 + 시각적 피드백
+async function copySkuToClipboard(sku, el) {
+  if (!sku) return;
+  let copied = false;
+  // 1) 최신 API
+  try {
+    await navigator.clipboard.writeText(sku);
+    copied = true;
+  } catch (_) {
+    // 2) Fallback — execCommand
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = sku;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      copied = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (_) {}
+  }
+  // 3) 시각적 피드백 — 잠깐 '✓ 복사됨' 으로 바뀌었다가 1.2초 후 원래대로
+  if (el) {
+    const orig = el.textContent;
+    el.textContent = copied ? '✓ 복사됨' : '⚠ 복사 실패';
+    el.classList.remove('hover:text-brand-blue', 'hover:underline');
+    el.classList.add(copied ? 'text-brand-green' : 'text-brand-pink');
+    setTimeout(() => {
+      el.textContent = orig;
+      el.classList.remove('text-brand-green', 'text-brand-pink');
+      el.classList.add('hover:text-brand-blue', 'hover:underline');
+    }, 1200);
+  }
 }
 
 // ── 폴더코드 검색 핸들러 ──
