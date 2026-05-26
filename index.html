@@ -16583,12 +16583,41 @@ async function applyPaInvoicesToExtUpload() {
   // 공백·하이픈 제거 후 비교 (전화번호 형식 차이 흡수)
   const _norm = s => String(s || '').replace(/[\s\-\(\)]/g, '').trim();
 
+  // 받는분 이름·연락처·송장번호의 PA 필드명 후보를 폭넓게 시도
+  // (플레이오토 응답이 계정/버전에 따라 키가 달라서 폴백 다수 추가)
+  const NAME_KEYS = ['to_name', 'receiver_name', 'receiverName', 'recipient_name',
+    'ord_to_name', 'order_receiver_name', 'shop_receiver_name', 'rcv_name', 'name'];
+  const PHONE_KEYS = ['to_cel1', 'to_htel', 'to_htel1', 'to_mobile', 'receiver_cel',
+    'receiver_mobile', 'to_tel1', 'to_tel', 'receiver_tel', 'to_cel', 'to_phone',
+    'receiver_phone', 'rcv_cel', 'rcv_phone', 'mobile', 'phone'];
+  const INVOICE_KEYS = ['invoice_no', 'tracking_no', 'invoice_number', 'inv_no',
+    'invoice', 'tracking_number', 'trackingNo', 'invoice_num', 'delivery_no',
+    'shipping_no', 'ship_no'];
+
+  // 진단용: 첫 PA 주문의 모든 키 + 추출 결과 콘솔 출력
+  if (_paOrders[0]) {
+    const sample = _paOrders[0];
+    const allKeys = Object.keys(sample);
+    console.log('[송장매칭 진단] PA 첫 주문 키 목록:', allKeys);
+    console.log('[송장매칭 진단] PA 첫 주문 시도 결과 —',
+      'name=', _paPickField(sample, NAME_KEYS),
+      '| phone=', _paPickField(sample, PHONE_KEYS),
+      '| invoice=', _paPickField(sample, INVOICE_KEYS));
+    // 이름/연락처/송장 비슷한 키 후보를 자동 탐색해 안내
+    const candidates = {
+      name:    allKeys.filter(k => /name|receiver|recipient|rcv/i.test(k)),
+      phone:   allKeys.filter(k => /phone|tel|cel|mobile|hp/i.test(k)),
+      invoice: allKeys.filter(k => /invoice|tracking|deliv|ship|inv_/i.test(k)),
+    };
+    console.log('[송장매칭 진단] PA 응답에 있는 후보 필드명:', candidates);
+  }
+
   // 플토 주문 인덱스 — 이름+연락처 / 이름만
   const idxByNamePhone = new Map();
   const idxByName = new Map();
   _paOrders.forEach(o => {
-    const name = _norm(_paPickField(o, ['to_name', 'receiver_name', 'receiverName', 'recipient_name']));
-    const phone = _norm(_extReceiverPhone(o));
+    const name = _norm(_paPickField(o, NAME_KEYS));
+    const phone = _norm(_paPickField(o, PHONE_KEYS));
     if (name && phone) idxByNamePhone.set(name + '|' + phone, o);
     if (name) {
       if (!idxByName.has(name)) idxByName.set(name, []);
@@ -16596,9 +16625,10 @@ async function applyPaInvoicesToExtUpload() {
     }
   });
 
-  const _pickInvoice = o => String(_paPickField(o, ['invoice_no', 'tracking_no', 'invoice_number', 'inv_no']) || '').trim();
+  const _pickInvoice = o => String(_paPickField(o, INVOICE_KEYS) || '').trim();
 
   let newlyMatched = 0, alreadyHad = 0, noMatch = 0, matchedButNoInvoice = 0;
+  const unmatchedSamples = [];  // 진단용 미매칭 샘플 (최대 3건)
   payload.rows.forEach(r => {
     if (r.invoice && String(r.invoice).trim()) { alreadyHad++; return; }
     const name = _norm(r.receiver);
@@ -16609,12 +16639,27 @@ async function applyPaInvoicesToExtUpload() {
       const list = idxByName.get(name);
       if (list && list.length === 1) match = list[0];  // 동명이인 위험 회피 — 단일 후보만 매칭
     }
-    if (!match) { noMatch++; return; }
+    if (!match) {
+      noMatch++;
+      if (unmatchedSamples.length < 3) {
+        unmatchedSamples.push({ receiver: r.receiver, phone: r.phone, normName: name, normPhone: phone });
+      }
+      return;
+    }
     const inv = _pickInvoice(match);
     if (!inv) { matchedButNoInvoice++; return; }
     r.invoice = inv;
     newlyMatched++;
   });
+
+  // 진단: 미매칭이 있으면 외부업체 측 정규화된 키들 출력 (PA 측 인덱스 키와 비교 가능)
+  if (unmatchedSamples.length) {
+    console.log('[송장매칭 진단] 미매칭 외부업체 행 (정규화 후):', unmatchedSamples);
+    console.log('[송장매칭 진단] PA 측 이름+연락처 인덱스 키 샘플 (최대 5건):',
+      [...idxByNamePhone.keys()].slice(0, 5));
+    console.log('[송장매칭 진단] PA 측 이름만 인덱스 키 샘플 (최대 10건):',
+      [...idxByName.keys()].slice(0, 10));
+  }
 
   try { localStorage.setItem(EXT_UPLOAD_KEY, JSON.stringify(payload)); } catch(_) {}
   _renderExternalOrderUpload(payload);
