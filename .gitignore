@@ -31,3 +31,6 @@ Thumbs.db
 # 환경변수 (절대 커밋 금지)
 .env
 .env.*
+
+# 외부 API 임시 응답 파일 (인증 토큰 노출 위험)
+plto_api*.json
