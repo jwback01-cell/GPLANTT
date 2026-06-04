@@ -4525,6 +4525,7 @@ tailwind.config = {
               </div>
               <button id="returns-fetch-mail-btn" onclick="fetchReturnFromMail()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-blue hover:bg-brand-bg" title="네이버 메일에서 파일명에 'CS'가 포함된 반품 엑셀을 자동으로 가져와 등록합니다">📥 메일에서 가져오기</button>
               <button onclick="exportReturnData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg">엑셀 내보내기</button>
+              <button onclick="exportReturnsForEcount()" class="px-4 py-2 rounded-full border border-brand-blue bg-brand-blue text-white text-sm font-bold hover:opacity-90" title="이카운트 매출반품(SaveSaleReturn) 양식으로 엑셀 다운로드 — 이카운트 웹에서 업로드하세요">📤 이카운트 반품양식</button>
               <button id="returns-delete-btn" onclick="deleteSelectedReturns()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-pink hover:bg-brand-bg">선택 삭제 <span id="returns-sel-count" class="ml-1 text-xs text-brand-gray">(0)</span></button>
             </div>
           </div>
@@ -25363,6 +25364,93 @@ function exportReturnData() {
   XLSX.utils.book_append_sheet(wb, ws, '반품데이터');
   const stamp = new Date().toISOString().slice(0,10);
   XLSX.writeFile(wb, `GPLAN_반품데이터_${stamp}.xlsx`);
+}
+
+// ── 이카운트 매출반품(매출 반품 등록) 양식 엑셀 다운로드 ────────────────
+// 이카운트 웹에서 [매출반품] → [엑셀업로드] 메뉴로 그대로 업로드 가능
+function exportReturnsForEcount() {
+  const all = _loadReturns();
+  if (!all.length) { showAppAlert('내보낼 데이터 없음', '저장된 반품 데이터가 없습니다.', 'info'); return; }
+  const filtered = _filterReturnsByUI(all);
+  const target = filtered.length ? filtered : all;
+  // SKU/상품명 → 상품관리 매칭 (단가/거래처 자동 채움용)
+  const products = (typeof _allProducts !== 'undefined' && Array.isArray(_allProducts)) ? _allProducts : [];
+  const _norm = s => String(s || '').replace(/\s+/g,'').replace(/[\(\)\[\]\.,_\-\/·]/g,'').toLowerCase();
+  const bySku = new Map();
+  const byName = new Map();
+  products.forEach(p => {
+    const sk = _norm(p.sku);
+    if (sk && !bySku.has(sk)) bySku.set(sk, p);
+    const nk = _norm(p.name);
+    if (nk && !byName.has(nk)) byName.set(nk, p);
+  });
+  // 거래처 매핑 — 업체명 → 이카운트 거래처코드 (저장된 매핑 사용)
+  let vendorMap = {};
+  try {
+    const raw = localStorage.getItem('gplan_ecount_vendor_map_v1');
+    if (raw) vendorMap = JSON.parse(raw) || {};
+  } catch (_) {}
+  // 오늘 날짜 (이카운트 형식: YYYYMMDD)
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+  // 행 구성
+  let lineNo = 0;
+  const rows = target.map(r => {
+    lineNo++;
+    const qty = Math.abs(Number(r.qty) || 0);
+    // 상품 매칭 — SKU 우선, 상품명 폴백
+    let prod = null;
+    const skNorm = _norm(r.sku);
+    if (skNorm && bySku.has(skNorm)) prod = bySku.get(skNorm);
+    else {
+      const nmNorm = _norm(r.itemName);
+      if (nmNorm && byName.has(nmNorm)) prod = byName.get(nmNorm);
+    }
+    const sku = (prod && prod.sku) || r.sku || '';
+    const itemName = (prod && prod.name) || r.itemName || '';
+    const supply = (prod && Number(prod.supply_price)) || 0;   // 매출반품 단가 = 공급가 기본값
+    // 날짜 — 출고일이 있으면 그걸, 없으면 오늘
+    const rawDate = _normReturnOutDate(r.outDate) || String(r.outDate || '').slice(0,10);
+    const dateStr = rawDate ? rawDate.replace(/\D/g, '').slice(0, 8) || todayStr : todayStr;
+    // 거래처 — 업체명을 키로 매핑, 매핑이 없으면 공란 (이카운트에서 직접 매핑)
+    const vendor = String(r.vendor || '').trim();
+    const vendorCode = vendor && vendorMap[vendor] ? vendorMap[vendor] : '';
+    return [
+      String(lineNo),         // 순번 (참고용)
+      dateStr,                // 일자 (YYYYMMDD)
+      vendorCode,             // 거래처코드 (있으면)
+      vendor,                 // 거래처명
+      sku,                    // 품목코드 (SKU)
+      itemName,               // 품목명
+      '',                     // 규격
+      qty,                    // 수량 (양수 — 매출반품은 양수로 입력, 이카운트가 반품으로 처리)
+      supply,                 // 단가 (공급가 또는 0)
+      qty * supply,           // 공급가액
+      `반품(${r.action || ''}) ${r.detail || ''}`.trim().slice(0, 100),  // 적요
+    ];
+  });
+  // 헤더 안내 + 컬럼명
+  const header = [
+    ['이카운트 매출반품 업로드 양식 — 이카운트 웹: 영업관리 → 매출관리 → 매출반품 → 엑셀업로드'],
+    [`총 ${rows.length}건 / 생성일 ${today.toLocaleString('ko-KR')}`],
+    ['💡 단가는 상품관리의 공급가를 기본으로 채웠습니다. 실제 반품 단가와 다르면 행에서 직접 수정 후 업로드하세요.'],
+    [],
+    ['순번','일자','거래처코드','거래처명','품목코드','품목명','규격','수량','단가','공급가액','적요'],
+  ];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([...header, ...rows]);
+  ws['!cols'] = [
+    {wch:5},{wch:10},{wch:12},{wch:18},{wch:14},{wch:34},{wch:8},
+    {wch:6},{wch:10},{wch:12},{wch:30},
+  ];
+  XLSX.utils.book_append_sheet(wb, ws, '이카운트 매출반품');
+  const stamp = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `이카운트_매출반품_${stamp}.xlsx`);
+  showAppAlert(
+    '이카운트 매출반품 양식 다운로드 완료',
+    `${rows.length}건의 매출반품 데이터가 엑셀로 저장되었습니다.\n\n다음 단계:\n1. 이카운트 웹 → 영업관리 → 매출반품 → 엑셀업로드\n2. 다운로드한 파일 선택\n3. 필드 매핑 확인 후 업로드\n\n※ 거래처코드가 비어있는 행은 이카운트에서 직접 매핑해 주세요.`,
+    'success'
+  );
 }
 
 // 반품 업로드 시 자동 재고 복원 — itemName 으로 SKU 매칭 후 stock += qty
