@@ -5088,7 +5088,12 @@ function navigate(page) {
   if (page === 'dashboard') { syncLedgerFromUploadData(); syncDashboardRevenue(); renderWeeklyBars(); }
   if (page === 'ledger') { syncLedgerFromUploadData(); syncDashboardRevenue(); animateDonut(); try { if (typeof _refreshActiveLedgerTab === 'function') _refreshActiveLedgerTab(); } catch(_) {} }
   if (page === 'upload') { try { _fillEcountSettingsForm(); _renderEcountHistory && _renderEcountHistory(); } catch(_) {} }
-  if (page === 'products') loadProductsFromDB();
+  if (page === 'products') {
+    loadProductsFromDB();
+    // 사이드바 하위 메뉴 active 동기화 — 기본은 '상품관리'
+    const curSub = (typeof _activeProductTab !== 'undefined' && _activeProductTab === 'import') ? 'import' : 'normal';
+    document.querySelectorAll('[data-prod-tab]').forEach(a => a.classList.toggle('active', a.dataset.prodTab === curSub));
+  }
   if (page === 'accounts') filterAccounts();
 }
 
@@ -5105,6 +5110,8 @@ const _SUBMENU_MAP = {
 function _goToProdTab(which) {
   if (currentPage.value !== 'products') navigate('products');
   setTimeout(() => { try { switchProductTab(which); } catch (_) {} }, 50);
+  // 사이드바 active 표시 (초록불)
+  document.querySelectorAll('[data-prod-tab]').forEach(a => a.classList.toggle('active', a.dataset.prodTab === which));
 }
 
 function updateNavItems(activePage) {
@@ -9157,6 +9164,9 @@ function switchProductTab(which) {
   if (_activeProductTab === 'receive') _initReceivingTab();
   if (_activeProductTab === 'stockvalue') renderStockValueView();
   if (_activeProductTab === 'import') renderImpTab();
+  // 사이드바 하위 메뉴 활성 표시 동기화 — '수입관리' 외 나머지는 모두 '상품관리'로 표시
+  const sidebarTab = _activeProductTab === 'import' ? 'import' : 'normal';
+  document.querySelectorAll('[data-prod-tab]').forEach(a => a.classList.toggle('active', a.dataset.prodTab === sidebarTab));
 }
 
 // ═══════════════════ 수입관리 (중국 1688/위안화 입항 단가표) ════════════
