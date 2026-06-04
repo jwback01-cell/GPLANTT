@@ -25692,16 +25692,17 @@ async function _proceedUploadReturnsToEcountAPI(target, s) {
   let vendorMap = {};
   try { const raw = localStorage.getItem('gplan_ecount_vendor_map_v1'); if (raw) vendorMap = JSON.parse(raw) || {}; } catch (_) {}
 
-  // 택배비 트리거 처리사항
-  const SHIP_TRIGGER = new Set(['불량반품','불량교환','오배송반품','오배송교환','불량 반품','불량 교환','오배송 반품','오배송 교환']);
+  // 택배비 음수(-) 트리거 처리사항 — 이 외 처리사항은 양수(+)로 등록
+  const SHIP_NEG_TRIGGER = new Set(['불량반품','불량교환','오배송반품','오배송교환','불량 반품','불량 교환','오배송 반품','오배송 교환']);
   // 고객(받는분)별 묶음 정보 — 같은 고객 = 1개의 주문
-  const byCustomer = new Map();   // key=recvName, val={ rows:[], needsShip, maxShipCost, ioDate, vendor, custCode }
+  // 택배비는 항상 고객당 1건 추가 — 부호는 처리사항에 따라 결정 (negCount>0 이면 -, 아니면 +)
+  const byCustomer = new Map();   // key=recvName, val={ rows:[], negCount, maxShipCost, ioDate, vendor, custCode }
   target.forEach(r => {
     const cust = String(r.recvName || '').trim() || `(이름없음)__${r._key || Math.random()}`;
-    if (!byCustomer.has(cust)) byCustomer.set(cust, { rows: [], needsShip: false, maxShipCost: 0, ioDate: '', vendor: '', custCode: '' });
+    if (!byCustomer.has(cust)) byCustomer.set(cust, { rows: [], negCount: 0, maxShipCost: 0, ioDate: '', vendor: '', custCode: '' });
     const grp = byCustomer.get(cust);
     grp.rows.push(r);
-    if (SHIP_TRIGGER.has(String(r.action || '').trim())) grp.needsShip = true;
+    if (SHIP_NEG_TRIGGER.has(String(r.action || '').trim())) grp.negCount++;
   });
 
   let serNo = 0;
@@ -25774,18 +25775,18 @@ async function _proceedUploadReturnsToEcountAPI(target, s) {
           REMARKS:      remark,
         }
       });
-      // 이 고객의 가장 큰 택배비용 (상품관리 shipping_cost) 추적
-      if (grp.needsShip) {
-        const sc = Number(prod && prod.shipping_cost) || 0;
-        if (sc > grp.maxShipCost) grp.maxShipCost = sc;
-      }
+      // 이 고객 묶음의 가장 큰 택배비용 (상품관리 shipping_cost) 추적 — 처리사항 무관
+      const sc = Number(prod && prod.shipping_cost) || 0;
+      if (sc > grp.maxShipCost) grp.maxShipCost = sc;
     });
-    // 택배비 라인 — 고객당 1건, 같은 전표
-    if (grp.needsShip && firstIoDate) {
+    // 택배비 라인 — 고객당 1건, 같은 전표 (처리사항이 음수 트리거에 있으면 -1, 아니면 +1)
+    if (firstIoDate) {
       const gk = `${firstIoDate}__${custName}`;
       const ser = groupSer.get(gk);
       const shipCost = grp.maxShipCost;
       if (shipCost <= 0) { shipMissing++; return; }
+      const isNeg = (grp.negCount > 0);
+      const sign = isNeg ? -1 : 1;
       lineNo++;
       const shipEx  = Math.round(shipCost / 1.1);
       const shipVat = Math.round(shipCost) - shipEx;
@@ -25801,11 +25802,11 @@ async function _proceedUploadReturnsToEcountAPI(target, s) {
           IO_TYPE:      '',
           PROD_CD:      'SK0001',
           PROD_DES:     '택배비',
-          QTY:          '1',
+          QTY:          String(sign),                       // +1 또는 -1
           PRICE:        String(shipEx),
-          SUPPLY_AMT:   String(shipEx),
-          VAT_AMT:      String(shipVat),
-          REMARKS:      `택배비(반품) ${custName}`,
+          SUPPLY_AMT:   String(sign * shipEx),               // 부호 동일
+          VAT_AMT:      String(sign * shipVat),
+          REMARKS:      `택배비${isNeg ? '(반품)' : ''} ${custName}`,
         }
       });
       shipAdded++;
