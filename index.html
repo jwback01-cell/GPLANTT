@@ -23271,26 +23271,30 @@ function _reconcileCompare(ledgerRows, mode = 'sale') {
     const candidates = (byKey.get(k) || []).filter(g => !usedGplan.has(g._idx));
     if (!candidates.length) { onlyLedger.push(L); return; }
     // 같은 날짜·수령자에 여러 건일 때 단가가 가장 가까운 후보 우선 선택
+    // 매입 모드는 거래원장 단가가 공급가에 매칭되어야 하므로 supply 기준, 매출 모드는 price 기준
+    const _candKey = (g) => (mode === 'purchase' ? (Number(g.supply) || 0) : (Number(g.price) || 0));
     candidates.sort((a, b) => {
-      const da = Math.abs((Number(a.price) || 0) - (L.unit || 0));
-      const db = Math.abs((Number(b.price) || 0) - (L.unit || 0));
+      const da = Math.abs(_candKey(a) - (L.unit || 0));
+      const db = Math.abs(_candKey(b) - (L.unit || 0));
       return da - db;
     });
     const G = candidates[0];
     usedGplan.add(G._idx);
-    // 값 비교 — 수량 / 단가 / 금액(매출↔원가 또는 매입↔단가)
-    const gQty   = Number(G.qty) || 0;
-    const gPrice = Number(G.price) || 0;
-    const gCost  = Number(G.cost) || 0;
+    // 값 비교 — 수량 / 단가 / 금액(매출↔원가 또는 매입↔공급가)
+    const gQty    = Number(G.qty)    || 0;
+    const gPrice  = Number(G.price)  || 0;
+    const gSupply = Number(G.supply) || 0;
+    const gCost   = Number(G.cost)   || 0;
     const diffs = [];
-    if (gQty !== L.qty)        diffs.push({ field: '수량', ledger: L.qty, gplan: gQty });
-    if (L.unit && gPrice !== L.unit) diffs.push({ field: '단가', ledger: L.unit, gplan: gPrice });
+    if (gQty !== L.qty) diffs.push({ field: '수량', ledger: L.qty, gplan: gQty });
     if (mode === 'purchase') {
-      // 매입 모드: 거래원장 매입/수금 ↔ GPLAN 단가(price)
-      if (L.purchase && gPrice !== L.purchase) diffs.push({ field: '단가/매입', ledger: L.purchase, gplan: gPrice });
+      // 매입 모드: 거래원장 단가/매입 ↔ GPLAN 공급가(supply)
+      if (L.unit     && gSupply !== L.unit)     diffs.push({ field: '단가',     ledger: L.unit,     gplan: gSupply });
+      if (L.purchase && gSupply !== L.purchase) diffs.push({ field: '단가/매입', ledger: L.purchase, gplan: gSupply });
     } else {
-      // 매출 모드: 거래원장 매출/지급 ↔ GPLAN 원가(cost)
-      if (L.sale && gCost !== L.sale) diffs.push({ field: '원가/매출', ledger: L.sale, gplan: gCost });
+      // 매출 모드: 거래원장 단가 ↔ GPLAN 단가(price), 매출 ↔ GPLAN 원가(cost)
+      if (L.unit && gPrice !== L.unit) diffs.push({ field: '단가',     ledger: L.unit, gplan: gPrice });
+      if (L.sale && gCost  !== L.sale) diffs.push({ field: '원가/매출', ledger: L.sale, gplan: gCost  });
     }
     if (diffs.length) matched.push({ ledger: L, gplan: G, diffs });
     else matchedSame.push({ ledger: L, gplan: G });
@@ -23525,13 +23529,13 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
   // ── 모드별 레이블 / 금액 추출 함수 ──
   const isPurchase = mode === 'purchase';
   const TXN_HEADER     = isPurchase ? '매입/수금' : '매출/지급';
-  const G_AMOUNT_LABEL = isPurchase ? '단가(GPLAN)' : '원가(GPLAN)';
+  const G_AMOUNT_LABEL = isPurchase ? '공급가(GPLAN)' : '원가(GPLAN)';
   const SOURCE_LABEL   = isPurchase ? '서울리빙(수동) 사이트' : '서울리빙 계열';
   const FIELD_LABEL    = isPurchase ? '단가/매입' : '원가/매출';
   // 거래원장 측 금액: sale 모드 = L.sale, purchase 모드 = L.purchase
   const _amtL = (L) => isPurchase ? (Number(L.purchase) || 0) : (Number(L.sale) || 0);
-  // GPLAN 측 금액: sale 모드 = r.cost (원가), purchase 모드 = r.price (단가/매입가)
-  const _amtG = (r) => isPurchase ? (Number(r.price) || 0) : (Number(r.cost) || 0);
+  // GPLAN 측 금액: sale 모드 = r.cost (원가), purchase 모드 = r.supply (공급가)
+  const _amtG = (r) => isPurchase ? (Number(r.supply) || 0) : (Number(r.cost) || 0);
   const FILE_SUFFIX    = isPurchase ? '_매입' : '';
 
   // 거래원장 행 → GPLAN 매칭 룩업 (date+recv+name)
@@ -23829,7 +23833,7 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
     ? `서울리빙 거래원장 대조 결과 (매입) — ${srcFile}`
     : `서울리빙 거래원장 대조 결과 — ${srcFile}`;
   const diffColExplain = isPurchase
-    ? `차이 컬럼: GPLAN 단가(price) − 거래원장 매입/수금. 0 이면 일치, 다르면 차액 표시. "값 없음" 은 GPLAN 에 매칭 행이 없음.`
+    ? `차이 컬럼: GPLAN 공급가(supply) − 거래원장 단가/매입. 0 이면 일치, 다르면 차액 표시. "값 없음" 은 GPLAN 에 매칭 행이 없음.`
     : `차이 컬럼: GPLAN 원가(cost) − 거래원장 매출/지급. 0 이면 일치, 다르면 차액 표시. "값 없음" 은 GPLAN 에 매칭 행이 없음.`;
   const summaryBlock = [
     [summaryTitle],
