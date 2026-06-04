@@ -25384,17 +25384,34 @@ function exportReturnsForEcount() {
     showAppAlert('내보낼 데이터 없음', '체크된 반품이 없습니다. 행을 체크하거나 날짜 필터를 조정하세요.', 'info');
     return;
   }
+  // 단가를 찾지 못했을 때 사용할 기본 단가 — 사용자가 입력 가능 (취소면 0)
+  const defaultUnitRaw = prompt(
+    '단가를 못 찾은 행에 사용할 기본 단가를 입력하세요 (원).\n'
+    + '예: 5000 → 매출반품 단가 5000원, 공급가액 = 수량 × 5000.\n'
+    + '비워두면 0원으로 처리됩니다 (엑셀에서 직접 수정 필요).',
+    '0'
+  );
+  if (defaultUnitRaw === null) return;   // 취소
+  const defaultUnit = Math.max(0, Math.round(Number(defaultUnitRaw) || 0));
 
   // SKU/상품명 → 상품관리 매칭 (단가/거래처 자동 채움용)
+  // 중복 키일 때 supply_price > 0 인 상품을 우선 보존
   const products = (typeof _allProducts !== 'undefined' && Array.isArray(_allProducts)) ? _allProducts : [];
   const _norm = s => String(s || '').replace(/\s+/g,'').replace(/[\(\)\[\]\.,_\-\/·]/g,'').toLowerCase();
   const bySku = new Map();
   const byName = new Map();
+  const _hasSupply = (p) => Number(p && p.supply_price) > 0;
   products.forEach(p => {
     const sk = _norm(p.sku);
-    if (sk && !bySku.has(sk)) bySku.set(sk, p);
+    if (sk) {
+      const cur = bySku.get(sk);
+      if (!cur || (!_hasSupply(cur) && _hasSupply(p))) bySku.set(sk, p);
+    }
     const nk = _norm(p.name);
-    if (nk && !byName.has(nk)) byName.set(nk, p);
+    if (nk) {
+      const cur = byName.get(nk);
+      if (!cur || (!_hasSupply(cur) && _hasSupply(p))) byName.set(nk, p);
+    }
   });
   // 과거 매출(업로드 데이터)에서 단가/공급가 룩업 — 같은 SKU/상품명의 가장 최근 매출 단가를 사용
   // 우선순위: r.supply > r.price 의 vat 제외값
@@ -25445,7 +25462,7 @@ function exportReturnsForEcount() {
     }
     const sku = (prod && prod.sku) || r.sku || '';
     const itemName = (prod && prod.name) || r.itemName || '';
-    // 단가 결정 — 우선순위: 과거 매출 supply > 상품관리 supply_price > 상품관리 price(vat제외)
+    // 단가 결정 — 우선순위: 과거 매출 supply > 상품관리 supply_price > 상품관리 price(vat제외) > 사용자 기본단가
     const skuKey  = _norm(sku);
     const nameKey = _norm(itemName);
     let unitPrice = 0;
@@ -25453,7 +25470,10 @@ function exportReturnsForEcount() {
     else if (nameKey && recentByName.has(nameKey)) unitPrice = recentByName.get(nameKey);
     else if (prod && Number(prod.supply_price))    unitPrice = Number(prod.supply_price);
     else if (prod && Number(prod.price))           unitPrice = Math.round(Number(prod.price) / 1.1);
-    if (unitPrice <= 0) priceMissingCount++;
+    if (unitPrice <= 0) {
+      if (defaultUnit > 0) unitPrice = defaultUnit;
+      else priceMissingCount++;
+    }
     // 날짜 — 출고일이 있으면 그걸, 없으면 오늘
     const rawDate = _normReturnOutDate(r.outDate) || String(r.outDate || '').slice(0,10);
     const dateStr = rawDate ? rawDate.replace(/\D/g, '').slice(0, 8) || todayStr : todayStr;
