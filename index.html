@@ -1697,7 +1697,7 @@ tailwind.config = {
       <div class="mt-auto pt-6 border-t border-brand-border"><div class="bg-brand-bg rounded-[20px] p-4 text-sm"><div class="font-bold mb-1">도움이 필요하신가요?</div><button onclick="window.open('https://open.kakao.com/o/sJ5u6sqi','_blank')" class="w-full bg-white border border-brand-border rounded-full py-2 font-semibold hover:bg-gray-50 mt-2 text-sm">고객센터 문의</button></div></div>
     </aside>
     <main class="flex-1 overflow-y-auto pr-0 md:pr-2 pb-10 flex flex-col gap-5 md:gap-6">
-      <section class="mt-2 pl-1 md:pl-2 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+      <section id="prod-header-section" class="mt-2 pl-1 md:pl-2 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h1 class="text-[1.8rem] md:text-[2.25rem] font-bold tracking-tight mb-2">상품 관리 📦</h1>
           <p class="text-brand-gray text-base md:text-[1.1rem]">재고 현황과 안전재고를 확인하고, 상품 정보를 관리하세요.</p>
@@ -1769,13 +1769,12 @@ tailwind.config = {
         </div>
       </section>
 
-      <!-- 일반/세트/입고/재고금액/수입관리 서브탭 -->
-      <div class="bg-white rounded-full panel p-1.5 inline-flex gap-1 self-start flex-wrap">
+      <!-- 일반/세트/입고/재고금액 서브탭 -->
+      <div id="prod-tab-bar" class="bg-white rounded-full panel p-1.5 inline-flex gap-1 self-start flex-wrap">
         <button id="prod-tab-normal" onclick="switchProductTab('normal')" class="px-5 py-2 rounded-full text-sm font-bold bg-brand-black text-white">📦 일반 상품</button>
         <button id="prod-tab-set"    onclick="switchProductTab('set')"    class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black">🎁 세트 상품</button>
         <button id="prod-tab-receive" onclick="switchProductTab('receive')" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black">📥 입고하기</button>
         <button id="prod-tab-stockvalue" onclick="switchProductTab('stockvalue')" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black">💰 재고금액</button>
-        <button id="prod-tab-import" onclick="switchProductTab('import')" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black">🌏 수입관리</button>
       </div>
 
       <!-- ───── 일반 상품 영역 ───── -->
@@ -2078,8 +2077,15 @@ tailwind.config = {
         </div>
       </div><!-- /products-view-stockvalue -->
 
-      <!-- ───── 수입관리 영역 ───── -->
+      <!-- ───── 수입관리 영역 (상품관리와 완전 별개) ───── -->
       <div id="products-view-import" class="hidden flex flex-col gap-5 md:gap-6">
+        <!-- 수입관리 전용 헤더 -->
+        <section class="mt-2 pl-1 md:pl-2 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+          <div>
+            <h1 class="text-[1.8rem] md:text-[2.25rem] font-bold tracking-tight mb-2">수입관리 🌏</h1>
+            <p class="text-brand-gray text-base md:text-[1.1rem]">중국 1688 위안화 단가표 — 환율과 수수료를 기준으로 1개금액을 자동 계산합니다.</p>
+          </div>
+        </section>
         <!-- 환율/수수료/충전위안화 입력 카드 -->
         <section class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           <div class="bg-white p-4 md:p-5 rounded-3xl panel">
@@ -5090,9 +5096,8 @@ function navigate(page) {
   if (page === 'upload') { try { _fillEcountSettingsForm(); _renderEcountHistory && _renderEcountHistory(); } catch(_) {} }
   if (page === 'products') {
     loadProductsFromDB();
-    // 사이드바 하위 메뉴 active 동기화 — 기본은 '상품관리'
-    const curSub = (typeof _activeProductTab !== 'undefined' && _activeProductTab === 'import') ? 'import' : 'normal';
-    document.querySelectorAll('[data-prod-tab]').forEach(a => a.classList.toggle('active', a.dataset.prodTab === curSub));
+    // 헤더/탭 가시성 동기화 — 수입관리 ↔ 상품관리 전환 시 화면 깨짐 방지
+    try { switchProductTab(typeof _activeProductTab !== 'undefined' ? _activeProductTab : 'normal'); } catch (_) {}
   }
   if (page === 'accounts') filterAccounts();
 }
@@ -9136,22 +9141,27 @@ function switchProductTab(which) {
   // 'normal' | 'set' | 'receive' | 'stockvalue' | 'import'
   const valid = ['normal','set','receive','stockvalue','import'];
   _activeProductTab = valid.indexOf(which) !== -1 ? which : 'normal';
+  const isImport = _activeProductTab === 'import';
   const vN = document.getElementById('products-view-normal');
   const vS = document.getElementById('products-view-set');
   const vR = document.getElementById('products-view-receive');
   const vV = document.getElementById('products-view-stockvalue');
   const vI = document.getElementById('products-view-import');
-  if (vN) vN.classList.toggle('hidden', _activeProductTab !== 'normal');
-  if (vS) vS.classList.toggle('hidden', _activeProductTab !== 'set');
-  if (vR) vR.classList.toggle('hidden', _activeProductTab !== 'receive');
-  if (vV) vV.classList.toggle('hidden', _activeProductTab !== 'stockvalue');
-  if (vI) vI.classList.toggle('hidden', _activeProductTab !== 'import');
+  if (vN) vN.classList.toggle('hidden', isImport || _activeProductTab !== 'normal');
+  if (vS) vS.classList.toggle('hidden', isImport || _activeProductTab !== 'set');
+  if (vR) vR.classList.toggle('hidden', isImport || _activeProductTab !== 'receive');
+  if (vV) vV.classList.toggle('hidden', isImport || _activeProductTab !== 'stockvalue');
+  if (vI) vI.classList.toggle('hidden', !isImport);
+  // 수입관리 모드면 상품관리의 헤더(제목·이카운트·플레이오토·엑셀·중복정리·안전재고 버튼)와 4탭 바 숨김
+  const hdr = document.getElementById('prod-header-section');
+  const tabBar = document.getElementById('prod-tab-bar');
+  if (hdr)    hdr.classList.toggle('hidden', isImport);
+  if (tabBar) tabBar.classList.toggle('hidden', isImport);
   const tabs = [
     { btn: 'prod-tab-normal',     active: _activeProductTab === 'normal' },
     { btn: 'prod-tab-set',        active: _activeProductTab === 'set' },
     { btn: 'prod-tab-receive',    active: _activeProductTab === 'receive' },
     { btn: 'prod-tab-stockvalue', active: _activeProductTab === 'stockvalue' },
-    { btn: 'prod-tab-import',     active: _activeProductTab === 'import' },
   ];
   tabs.forEach(t => {
     const el = document.getElementById(t.btn);
@@ -9165,7 +9175,7 @@ function switchProductTab(which) {
   if (_activeProductTab === 'stockvalue') renderStockValueView();
   if (_activeProductTab === 'import') renderImpTab();
   // 사이드바 하위 메뉴 활성 표시 동기화 — '수입관리' 외 나머지는 모두 '상품관리'로 표시
-  const sidebarTab = _activeProductTab === 'import' ? 'import' : 'normal';
+  const sidebarTab = isImport ? 'import' : 'normal';
   document.querySelectorAll('[data-prod-tab]').forEach(a => a.classList.toggle('active', a.dataset.prodTab === sidebarTab));
 }
 
