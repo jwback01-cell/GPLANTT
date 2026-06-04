@@ -2089,30 +2089,30 @@ tailwind.config = {
         <!-- 환율/수수료/충전위안화 입력 카드 -->
         <section class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           <div class="bg-white p-4 md:p-5 rounded-3xl panel">
-            <div class="text-brand-gray text-xs font-medium mb-1">원화 (입금/송금)</div>
+            <div class="text-brand-gray text-xs font-medium mb-2">원화 (입금/송금)</div>
             <div class="flex items-baseline gap-1">
-              <input id="imp-krw" type="number" oninput="_impRecalcAll()" class="bg-transparent border-0 text-xl md:text-2xl font-bold tracking-tight focus:outline-none w-full" placeholder="1,521,788">
-              <span class="text-brand-gray text-xs">원</span>
+              <input id="imp-krw" type="number" oninput="_impRecalcAll()" class="bg-brand-bg border border-brand-border focus:border-brand-black focus:bg-white rounded-xl px-3 py-2 text-lg md:text-xl font-bold tracking-tight focus:outline-none w-full placeholder:text-brand-gray/40 placeholder:font-normal" placeholder="0">
+              <span class="text-brand-gray text-xs shrink-0">원</span>
             </div>
           </div>
           <div class="bg-white p-4 md:p-5 rounded-3xl panel">
-            <div class="text-brand-gray text-xs font-medium mb-1">중판수수료</div>
+            <div class="text-brand-gray text-xs font-medium mb-2">중판수수료</div>
             <div class="flex items-baseline gap-1">
-              <input id="imp-feekrw" type="number" oninput="_impRecalcAll()" class="bg-transparent border-0 text-xl md:text-2xl font-bold tracking-tight focus:outline-none w-full" placeholder="32,309">
-              <span class="text-brand-gray text-xs">원</span>
+              <input id="imp-feekrw" type="number" oninput="_impRecalcAll()" class="bg-brand-bg border border-brand-border focus:border-brand-black focus:bg-white rounded-xl px-3 py-2 text-lg md:text-xl font-bold tracking-tight focus:outline-none w-full placeholder:text-brand-gray/40 placeholder:font-normal" placeholder="0">
+              <span class="text-brand-gray text-xs shrink-0">원</span>
             </div>
           </div>
           <div class="bg-white p-4 md:p-5 rounded-3xl panel">
-            <div class="text-brand-gray text-xs font-medium mb-1">충전위안화</div>
+            <div class="text-brand-gray text-xs font-medium mb-2">충전위안화</div>
             <div class="flex items-baseline gap-1">
-              <input id="imp-cny" type="number" step="0.01" oninput="_impRecalcAll()" class="bg-transparent border-0 text-xl md:text-2xl font-bold tracking-tight focus:outline-none w-full" placeholder="6,880">
-              <span class="text-brand-gray text-xs">위안</span>
+              <input id="imp-cny" type="number" step="0.01" oninput="_impRecalcAll()" class="bg-brand-bg border border-brand-border focus:border-brand-black focus:bg-white rounded-xl px-3 py-2 text-lg md:text-xl font-bold tracking-tight focus:outline-none w-full placeholder:text-brand-gray/40 placeholder:font-normal" placeholder="0">
+              <span class="text-brand-gray text-xs shrink-0">위안</span>
             </div>
           </div>
           <div class="bg-white p-4 md:p-5 rounded-3xl panel">
-            <div class="text-brand-gray text-xs font-medium mb-1">1위안 환율 (자동계산)</div>
+            <div class="text-brand-gray text-xs font-medium mb-2">1위안 환율 (자동계산)</div>
             <div class="flex items-baseline gap-1">
-              <span id="imp-rate" class="text-xl md:text-2xl font-bold tracking-tight text-brand-blue">0</span>
+              <span id="imp-rate" class="text-lg md:text-xl font-bold tracking-tight text-brand-blue">0</span>
               <span class="text-brand-gray text-xs">원 / 위안</span>
             </div>
             <div class="text-[10px] text-brand-gray mt-1">= (원화 - 중판수수료) ÷ 충전위안화</div>
