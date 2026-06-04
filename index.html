@@ -2122,7 +2122,8 @@ tailwind.config = {
         <!-- 액션 -->
         <section class="flex items-center justify-between flex-wrap gap-2">
           <div class="text-brand-gray text-sm">
-            셀을 클릭해 직접 편집하세요. 원화·합계·1개금액은 자동 계산됩니다.
+            행마다 <b>환율</b>이 따로 저장됩니다. 상단 값을 바꿔도 이전에 저장된 행의 원화는 그대로 유지돼요.
+            <br><span class="text-[11px]">새 행을 추가하면 그 시점의 환율이 자동으로 박혀, 시간이 지나도 옛 원가를 정확히 볼 수 있습니다.</span>
           </div>
           <div class="flex items-center gap-2">
             <button onclick="addImpRow()" class="px-4 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333] flex items-center gap-1.5">
@@ -2146,6 +2147,7 @@ tailwind.config = {
                   <th class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[120px]">중판코드</th>
                   <th class="px-3 py-3 text-left   font-bold border-b-2 border-brand-border min-w-[220px]">제품명</th>
                   <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[90px]">위안화</th>
+                  <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[80px]" title="이 행이 저장한 1위안 환율 (행 추가 시 자동 입력, 직접 수정 가능)">환율</th>
                   <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[110px]">원화</th>
                   <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[110px]">중판비용</th>
                   <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[90px]">관세</th>
@@ -2160,6 +2162,7 @@ tailwind.config = {
                 <tr class="bg-brand-bg/50 font-bold">
                   <td colspan="3" class="px-3 py-2.5 text-right text-brand-gray text-xs">합계</td>
                   <td class="px-3 py-2.5 text-right" id="imp-sum-cny">0</td>
+                  <td class="px-3 py-2.5"></td>
                   <td class="px-3 py-2.5 text-right" id="imp-sum-krw">0</td>
                   <td class="px-3 py-2.5 text-right" id="imp-sum-fee">0</td>
                   <td class="px-3 py-2.5 text-right" id="imp-sum-tax">0</td>
@@ -9199,6 +9202,11 @@ function _impNewRow() {
   return {
     id: 'imp_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
     date: today, code: '', name: '', cny: 0, fee: 0, tax: 0, qty: 0,
+    // 환율 스냅샷 — 행 추가 시점의 현재 환율을 그대로 보존 (이후 상단 입력이 바뀌어도 영향 없음)
+    rate: _impRate(),
+    krwAtEntry: Number(_impState.krw) || 0,
+    feeKrwAtEntry: Number(_impState.feeKrw) || 0,
+    cnyAtEntry: Number(_impState.cny) || 0,
   };
 }
 function _impRate() {
@@ -9206,6 +9214,18 @@ function _impRate() {
   const fee = Number(_impState.feeKrw) || 0;
   const cny = Number(_impState.cny) || 0;
   return cny > 0 ? (krw - fee) / cny : 0;
+}
+// 기존 행에 환율 스냅샷이 없으면 현재 글로벌 환율로 채움 (마이그레이션)
+function _impMigrateRows() {
+  const curRate = _impRate();
+  let changed = false;
+  (_impState.rows || []).forEach(r => {
+    if (r.rate == null || r.rate === '' || isNaN(Number(r.rate))) {
+      r.rate = curRate;
+      changed = true;
+    }
+  });
+  if (changed) _impSave();
 }
 function _impFmt(n) {
   if (n == null || isNaN(n)) return '0';
@@ -9216,8 +9236,8 @@ function _impEsc(s) {
 }
 function renderImpTab() {
   _impLoad();
+  _impMigrateRows();
   // 헤더 input 값 복원
-  const setVal = (id, v) => { const e = document.getElementById(id); if (e && e.value === '' && v) e.value = v; };
   document.getElementById('imp-krw').value = _impState.krw || '';
   document.getElementById('imp-feekrw').value = _impState.feeKrw || '';
   document.getElementById('imp-cny').value = _impState.cny || '';
@@ -9230,11 +9250,12 @@ function renderImpTab() {
     if (empty) empty.classList.remove('hidden');
   } else {
     if (empty) empty.classList.add('hidden');
-    const rate = _impRate();
+    const curRate = _impRate();
     let sCny = 0, sKrw = 0, sFee = 0, sTax = 0, sTotal = 0, sQty = 0;
     tbody.innerHTML = _impState.rows.map(r => {
       const cny = Number(r.cny) || 0;
-      const krw = cny * rate;
+      const rowRate = Number(r.rate) || 0;   // 행마다 저장된 환율 사용
+      const krw = cny * rowRate;
       const fee = Number(r.fee) || 0;
       const tax = Number(r.tax) || 0;
       const total = krw + fee + tax;
@@ -9242,11 +9263,18 @@ function renderImpTab() {
       const unit = qty > 0 ? total / qty : 0;
       sCny += cny; sKrw += krw; sFee += fee; sTax += tax; sTotal += total; sQty += qty;
       const inp = 'w-full bg-transparent focus:outline-none focus:bg-white border border-transparent hover:border-brand-border rounded px-2 py-1';
+      // 환율 표시 — 현재 글로벌 환율과 다르면 주황색으로 구분
+      const rateDiff = curRate > 0 && Math.abs(rowRate - curRate) > 0.5;
+      const rateCellCls = rateDiff ? 'text-brand-orange' : 'text-brand-gray';
       return `<tr class="border-b border-brand-border hover:bg-brand-bg/40" data-id="${r.id}">
         <td class="px-1 py-1"><input type="text" value="${_impEsc(r.date)}" oninput="_onImpEdit('${r.id}','date',this.value)" class="${inp} text-xs text-center"></td>
         <td class="px-1 py-1"><input type="text" value="${_impEsc(r.code)}" oninput="_onImpEdit('${r.id}','code',this.value)" class="${inp} text-xs font-mono text-center"></td>
         <td class="px-1 py-1"><input type="text" value="${_impEsc(r.name)}" oninput="_onImpEdit('${r.id}','name',this.value)" class="${inp} text-sm font-semibold"></td>
         <td class="px-1 py-1"><input type="number" step="0.01" value="${cny || ''}" oninput="_onImpEdit('${r.id}','cny',this.value)" class="${inp} text-sm text-right"></td>
+        <td class="px-1 py-1">
+          <input type="number" step="0.01" value="${rowRate || ''}" oninput="_onImpEdit('${r.id}','rate',this.value)"
+                 class="${inp} text-xs text-right ${rateCellCls}" title="저장된 환율 (행 추가 시점의 1위안 가격)">
+        </td>
         <td class="px-3 py-1 text-right text-sm">${_impFmt(krw)}</td>
         <td class="px-1 py-1"><input type="number" value="${fee || ''}" oninput="_onImpEdit('${r.id}','fee',this.value)" class="${inp} text-sm text-right"></td>
         <td class="px-1 py-1"><input type="number" value="${tax || ''}" oninput="_onImpEdit('${r.id}','tax',this.value)" class="${inp} text-sm text-right"></td>
@@ -9278,7 +9306,7 @@ function _onImpEdit(id, field, val) {
   _impLoad();
   const r = _impState.rows.find(x => x.id === id);
   if (!r) return;
-  if (['cny','fee','tax','qty'].includes(field)) r[field] = Number(val) || 0;
+  if (['cny','fee','tax','qty','rate'].includes(field)) r[field] = Number(val) || 0;
   else r[field] = val;
   _impSave();
   renderImpTab();
@@ -9302,23 +9330,24 @@ function deleteImpRow(id) {
 }
 async function exportImpExcel() {
   _impLoad();
-  const rate = _impRate();
-  const headers = ['입항일','중판코드','제품명','위안화','원화','중판비용','관세','합계','수량','1개금액'];
+  _impMigrateRows();
+  const headers = ['입항일','중판코드','제품명','위안화','환율(1위안)','원화','중판비용','관세','합계','수량','1개금액'];
   const rows = _impState.rows.map(r => {
     const cny = Number(r.cny) || 0;
-    const krw = cny * rate;
+    const rowRate = Number(r.rate) || 0;
+    const krw = cny * rowRate;
     const fee = Number(r.fee) || 0;
     const tax = Number(r.tax) || 0;
     const total = krw + fee + tax;
     const qty = Number(r.qty) || 0;
     const unit = qty > 0 ? total / qty : 0;
-    return [r.date, r.code, r.name, cny, Math.round(krw), fee, tax, Math.round(total), qty, Math.round(unit)];
+    return [r.date, r.code, r.name, cny, Math.round(rowRate), Math.round(krw), fee, tax, Math.round(total), qty, Math.round(unit)];
   });
   const aoa = [
-    ['원화', _impState.krw],
-    ['중판수수료', _impState.feeKrw],
-    ['충전위안화', _impState.cny],
-    ['1위안', Math.round(rate)],
+    ['현재 원화', _impState.krw],
+    ['현재 중판수수료', _impState.feeKrw],
+    ['현재 충전위안화', _impState.cny],
+    ['현재 1위안', Math.round(_impRate())],
     [],
     headers,
     ...rows,
