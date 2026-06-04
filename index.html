@@ -25395,22 +25395,22 @@ function exportReturnsForEcount() {
   const defaultUnit = Math.max(0, Math.round(Number(defaultUnitRaw) || 0));
 
   // SKU/상품명 → 상품관리 매칭 (단가/거래처 자동 채움용)
-  // 중복 키일 때 supply_price > 0 인 상품을 우선 보존
+  // 중복 키일 때 원가(cost) > 0 인 상품을 우선 보존
   const products = (typeof _allProducts !== 'undefined' && Array.isArray(_allProducts)) ? _allProducts : [];
   const _norm = s => String(s || '').replace(/\s+/g,'').replace(/[\(\)\[\]\.,_\-\/·]/g,'').toLowerCase();
   const bySku = new Map();
   const byName = new Map();
-  const _hasSupply = (p) => Number(p && p.supply_price) > 0;
+  const _hasCost = (p) => Number(p && p.cost) > 0;
   products.forEach(p => {
     const sk = _norm(p.sku);
     if (sk) {
       const cur = bySku.get(sk);
-      if (!cur || (!_hasSupply(cur) && _hasSupply(p))) bySku.set(sk, p);
+      if (!cur || (!_hasCost(cur) && _hasCost(p))) bySku.set(sk, p);
     }
     const nk = _norm(p.name);
     if (nk) {
       const cur = byName.get(nk);
-      if (!cur || (!_hasSupply(cur) && _hasSupply(p))) byName.set(nk, p);
+      if (!cur || (!_hasCost(cur) && _hasCost(p))) byName.set(nk, p);
     }
   });
   // 과거 매출(업로드 데이터)에서 단가/공급가 룩업 — 같은 SKU/상품명의 가장 최근 매출 단가를 사용
@@ -25462,11 +25462,12 @@ function exportReturnsForEcount() {
     }
     const sku = (prod && prod.sku) || r.sku || '';
     const itemName = (prod && prod.name) || r.itemName || '';
-    // 단가 결정 — 우선순위: 과거 매출 supply > 상품관리 supply_price > 상품관리 price(vat제외) > 사용자 기본단가
+    // 단가 결정 — 우선순위: 상품관리 원가(cost) > 과거 매출 supply > 매출 단가/1.1 > 상품관리 공급가 > 상품관리 단가/1.1 > 사용자 기본단가
     const skuKey  = _norm(sku);
     const nameKey = _norm(itemName);
     let unitPrice = 0;
-    if (skuKey && recentBySku.has(skuKey))         unitPrice = recentBySku.get(skuKey);
+    if (prod && Number(prod.cost))                 unitPrice = Number(prod.cost);
+    else if (skuKey && recentBySku.has(skuKey))    unitPrice = recentBySku.get(skuKey);
     else if (nameKey && recentByName.has(nameKey)) unitPrice = recentByName.get(nameKey);
     else if (prod && Number(prod.supply_price))    unitPrice = Number(prod.supply_price);
     else if (prod && Number(prod.price))           unitPrice = Math.round(Number(prod.price) / 1.1);
@@ -25499,7 +25500,7 @@ function exportReturnsForEcount() {
   const header = [
     ['이카운트 매출반품 업로드 양식 — 이카운트 웹: 영업관리 → 매출관리 → 매출반품 → 엑셀업로드'],
     [`총 ${rows.length}건 (${sourceInfo}) / 생성일 ${today.toLocaleString('ko-KR')}`],
-    ['💡 단가: 1) 과거 매출 supply > 2) 상품관리 공급가 > 3) 상품관리 단가/1.1 순으로 자동 채움. 다르면 행에서 직접 수정 후 업로드.'],
+    ['💡 단가는 상품관리의 원가(cost)를 우선으로 자동 채웁니다. 다르면 행에서 직접 수정 후 업로드.'],
     [],
     ['순번','일자','거래처코드','거래처명','품목코드','품목명','규격','수량','단가','공급가액','적요'],
   ];
