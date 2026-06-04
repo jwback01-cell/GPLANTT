@@ -4523,6 +4523,7 @@ tailwind.config = {
                 <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-brand-gray pointer-events-none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 <input id="returns-search" type="text" placeholder="이름·상품명·처리사항·내용 검색" oninput="renderReturnData()" class="pl-9 pr-3 py-1.5 rounded-full border border-brand-border bg-brand-bg text-sm font-medium outline-none focus:border-brand-black w-60">
               </div>
+              <button id="returns-fetch-mail-btn" onclick="fetchReturnFromMail()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-blue hover:bg-brand-bg" title="네이버 메일에서 파일명에 'CS'가 포함된 반품 엑셀을 자동으로 가져와 등록합니다">📥 메일에서 가져오기</button>
               <button onclick="exportReturnData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg">엑셀 내보내기</button>
               <button id="returns-delete-btn" onclick="deleteSelectedReturns()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-pink hover:bg-brand-bg">선택 삭제 <span id="returns-sel-count" class="ml-1 text-xs text-brand-gray">(0)</span></button>
             </div>
@@ -16638,6 +16639,74 @@ function downloadExternalUploadTemplate() {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '외부업체 주문 양식');
   XLSX.writeFile(wb, '외부업체_주문_업로드_양식.xlsx');
+}
+
+// 네이버 메일에서 반품(CS) 엑셀 자동 가져오기 — 파일명에 'CS' 포함된 첨부
+async function fetchReturnFromMail() {
+  const btn = document.getElementById('returns-fetch-mail-btn');
+  const origHtml = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="animate-pulse">메일 조회 중...</span>'; }
+  try {
+    // 최근 30일, 파일명에 'CS' 포함된 첨부 검색
+    const apiUrl = '/api/naver-mail-fetch?days=30&limit=50&sender=&filenamePattern=' + encodeURIComponent('CS');
+    console.log('[반품 메일 가져오기] 요청 URL:', apiUrl);
+    const res = await fetch(apiUrl);
+    const data = await res.json().catch(() => ({}));
+    console.log('[반품 메일 가져오기] 응답:', data);
+    if (!res.ok) {
+      const err = data.error || ('HTTP ' + res.status);
+      throw new Error(err + (data.hint ? '\n\n' + data.hint : ''));
+    }
+    if (!data.items || data.items.length === 0) {
+      showAppAlert('가져올 메일 없음', '파일명에 "CS" 가 포함된 엑셀 첨부 메일이 최근 30일 내에 없습니다.', 'info');
+      return;
+    }
+    // 클라이언트 안전망 — 파일명에 'CS' 포함, '발주' 단독은 제외 (CS만 매칭)
+    const items = data.items.filter(it => {
+      const fn = String(it.fileName || '');
+      return /CS/i.test(fn);
+    });
+    if (items.length === 0) {
+      const sampleNames = data.items.slice(0, 5).map(it => '· ' + (it.fileName || '(이름없음)')).join('\n');
+      showAppAlert('가져올 메일 없음', `파일명에 "CS" 가 포함된 메일이 없습니다.\n\n조회된 최근 첨부 (예시):\n${sampleNames}`, 'info');
+      return;
+    }
+    if (items.length > 1) {
+      console.log('[반품 메일 가져오기] 매칭 ' + items.length + '건 중 가장 최신 1건만 처리:',
+        items.map(it => ({ date: it.date, subject: it.subject, fileName: it.fileName, from: it.from })));
+    }
+    const it = items[0];
+    console.log('[반품 메일 가져오기] 처리 대상:', { date: it.date, subject: it.subject, fileName: it.fileName });
+
+    // base64 → File
+    const binary = atob(it.fileBase64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const mimeMap = {
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      xls:  'application/vnd.ms-excel',
+      csv:  'text/csv',
+    };
+    const ext = (it.fileName.split('.').pop() || '').toLowerCase();
+    const mime = mimeMap[ext] || 'application/octet-stream';
+    const file = new File([bytes], it.fileName, { type: mime });
+
+    // _uploadTemplate 을 'return' 으로 강제 후 기존 처리 함수 호출 (처리 후 원복)
+    const prevTpl = _uploadTemplate;
+    _uploadTemplate = 'return';
+    try {
+      const dateStr = it.date ? new Date(it.date).toLocaleString('ko-KR') : '(시간 정보 없음)';
+      showAppAlert('메일 수신', `${it.fileName} (${dateStr}) — 반품 데이터로 등록합니다.`, 'info');
+      processExcelFile(file);
+    } finally {
+      _uploadTemplate = prevTpl;
+    }
+  } catch (e) {
+    console.error('[반품 메일 가져오기] 실패:', e);
+    showAppAlert('가져오기 실패', e.message || String(e), 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+  }
 }
 
 // 네이버 메일에서 외부업체 발주서 자동 가져오기 — '다올 버즈에어팟류' 키워드가 들어간 첨부 엑셀
