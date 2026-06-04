@@ -25465,15 +25465,8 @@ function exportReturnsForEcount() {
     showAppAlert('내보낼 데이터 없음', '체크된 반품이 없습니다. 행을 체크하거나 날짜 필터를 조정하세요.', 'info');
     return;
   }
-  // 단가를 찾지 못했을 때 사용할 기본 단가 — 사용자가 입력 가능 (취소면 0)
-  const defaultUnitRaw = prompt(
-    '단가를 못 찾은 행에 사용할 기본 단가를 입력하세요 (원).\n'
-    + '예: 5000 → 매출반품 단가 5000원, 공급가액 = 수량 × 5000.\n'
-    + '비워두면 0원으로 처리됩니다 (엑셀에서 직접 수정 필요).',
-    '0'
-  );
-  if (defaultUnitRaw === null) return;   // 취소
-  const defaultUnit = Math.max(0, Math.round(Number(defaultUnitRaw) || 0));
+  // 단가를 찾지 못한 행은 0으로 처리 (엑셀에서 직접 수정)
+  const defaultUnit = 0;
 
   // SKU/상품명 → 상품관리 매칭 (단가/거래처 자동 채움용)
   // 중복 키일 때 원가(cost) > 0 인 상품을 우선 보존
