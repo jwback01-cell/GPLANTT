@@ -3175,13 +3175,14 @@ tailwind.config = {
       </section>
 
       <!-- Sub tabs — 플레이오토 연동 버튼은 좌측 메뉴 최상단으로 분리됨 -->
-      <div id="upload-tab-bar" class="flex gap-2 items-center bg-brand-bg p-1 rounded-full border border-brand-border w-fit flex-wrap">
-        <button id="upload-tab-file" class="px-5 py-2 rounded-full text-sm font-bold bg-brand-black text-white shadow-sm" onclick="switchUploadTab('file')">엑셀 업로드</button>
-        <button id="upload-tab-ecount" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black" onclick="switchUploadTab('ecount')">이카운트 연동</button>
-        <button id="upload-tab-ad" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black" onclick="switchUploadTab('ad')">광고비 업로드</button>
-        <button id="upload-tab-data" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black" onclick="switchUploadTab('data')">업로드 데이터</button>
-        <button id="upload-tab-returns" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black" onclick="switchUploadTab('returns')">반품 데이터</button>
-        <button id="upload-tab-ops" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black" onclick="switchUploadTab('ops')">운영비</button>
+      <!-- 상단 탭바는 사이드바 소메뉴로 대체되어 숨김 (switchUploadTab JS 호환 위해 hidden 버튼 유지) -->
+      <div id="upload-tab-bar" class="hidden">
+        <button id="upload-tab-file"    onclick="switchUploadTab('file')"></button>
+        <button id="upload-tab-ecount"  onclick="switchUploadTab('ecount')"></button>
+        <button id="upload-tab-ad"      onclick="switchUploadTab('ad')"></button>
+        <button id="upload-tab-data"    onclick="switchUploadTab('data')"></button>
+        <button id="upload-tab-returns" onclick="switchUploadTab('returns')"></button>
+        <button id="upload-tab-ops"     onclick="switchUploadTab('ops')"></button>
       </div>
 
       <!-- ── Tab: 엑셀 업로드 ── -->
@@ -5156,10 +5157,8 @@ function navigate(page) {
     target.classList.add('active');
     currentPage.value = page;
   }
-  // upload 페이지 진입 시 — sub-tab 바 다시 보이게 + 기본 탭(엑셀) 으로 리셋
+  // upload 페이지 진입 시 — 기본 탭(엑셀)으로 리셋 (사이드바 소메뉴로 대체되어 상단 탭바는 더 이상 사용 안 함)
   if (page === 'upload') {
-    const tabBar = document.getElementById('upload-tab-bar');
-    if (tabBar) tabBar.classList.remove('hidden');
     setTimeout(() => { try { if (typeof switchUploadTab === 'function') switchUploadTab('file'); } catch(_){} }, 0);
   }
   updateNavItems(page);
