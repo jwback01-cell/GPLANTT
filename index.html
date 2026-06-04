@@ -4574,8 +4574,7 @@ tailwind.config = {
               </div>
               <button id="returns-fetch-mail-btn" onclick="fetchReturnFromMail()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-blue hover:bg-brand-bg" title="네이버 메일에서 파일명에 'CS'가 포함된 반품 엑셀을 자동으로 가져와 등록합니다">📥 메일에서 가져오기</button>
               <button onclick="exportReturnData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg">엑셀 내보내기</button>
-              <button onclick="exportReturnsForEcount()" class="px-4 py-2 rounded-full border border-brand-blue bg-brand-blue text-white text-sm font-bold hover:opacity-90" title="이카운트 매출반품 양식으로 엑셀 다운로드 — 이카운트 웹에서 업로드">📤 반품 엑셀</button>
-              <button onclick="uploadReturnsToEcountAPI()" class="px-4 py-2 rounded-full border border-brand-purple bg-brand-purple text-white text-sm font-bold hover:opacity-90" title="이카운트 API로 직접 업로드 — 재고I → 구매관리 → 구매조회에 음수 수량(매입반품)으로 등록">🔗 이카운트 API (매입반품)</button>
+              <button onclick="uploadReturnsToEcountAPI()" class="px-4 py-2 rounded-full border border-brand-blue bg-brand-blue text-white text-sm font-bold hover:opacity-90" title="이카운트 API로 직접 업로드 — 재고I → 구매관리 → 구매조회에 매입반품(음수 수량) 또는 매입(양수)으로 등록">📤 이카운트 업로드</button>
               <button id="returns-delete-btn" onclick="deleteSelectedReturns()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-pink hover:bg-brand-bg">선택 삭제 <span id="returns-sel-count" class="ml-1 text-xs text-brand-gray">(0)</span></button>
             </div>
           </div>
