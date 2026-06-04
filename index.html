@@ -25751,8 +25751,10 @@ async function _proceedUploadReturnsToEcountAPI(target, s) {
       const totalInc = unitPrice * qty;
       const totalEx  = Math.round(totalInc / 1.1);
       const vatTotal = Math.round(totalInc) - totalEx;
-      const remarkBase = `반품(${r.action || ''})`.trim();
-      const remark = `${remarkBase} ${custName} ${(r.detail || '').slice(0, 60)}`.trim().slice(0, 100);
+      // 줄바꿈/탭/이중공백 제거 — 이카운트 적요에 \n 같은 escape 가 들어오지 않도록
+      const _flat = (str) => String(str || '').replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+      const remarkBase = _flat(`반품(${r.action || ''})`);
+      const remark = _flat(`${remarkBase} ${custName} ${_flat(r.detail).slice(0, 60)}`).slice(0, 100);
       purchaseList.push({
         Line: String(lineNo),
         BulkDatas: {
