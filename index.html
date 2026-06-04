@@ -4574,7 +4574,8 @@ tailwind.config = {
               </div>
               <button id="returns-fetch-mail-btn" onclick="fetchReturnFromMail()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-blue hover:bg-brand-bg" title="네이버 메일에서 파일명에 'CS'가 포함된 반품 엑셀을 자동으로 가져와 등록합니다">📥 메일에서 가져오기</button>
               <button onclick="exportReturnData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg">엑셀 내보내기</button>
-              <button onclick="exportReturnsForEcount()" class="px-4 py-2 rounded-full border border-brand-blue bg-brand-blue text-white text-sm font-bold hover:opacity-90" title="이카운트 매출반품(SaveSaleReturn) 양식으로 엑셀 다운로드 — 이카운트 웹에서 업로드하세요">📤 이카운트 반품양식</button>
+              <button onclick="exportReturnsForEcount()" class="px-4 py-2 rounded-full border border-brand-blue bg-brand-blue text-white text-sm font-bold hover:opacity-90" title="이카운트 매출반품 양식으로 엑셀 다운로드 — 이카운트 웹에서 업로드">📤 반품 엑셀</button>
+              <button onclick="uploadReturnsToEcountAPI()" class="px-4 py-2 rounded-full border border-brand-purple bg-brand-purple text-white text-sm font-bold hover:opacity-90" title="이카운트 API로 직접 업로드 — 재고I → 구매관리 → 구매조회에 음수 수량(매입반품)으로 등록">🔗 이카운트 API (매입반품)</button>
               <button id="returns-delete-btn" onclick="deleteSelectedReturns()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-pink hover:bg-brand-bg">선택 삭제 <span id="returns-sel-count" class="ml-1 text-xs text-brand-gray">(0)</span></button>
             </div>
           </div>
@@ -25358,7 +25359,7 @@ function renderReturnData() {
       <td class="px-4 py-3 text-xs whitespace-nowrap">${escHtml(_normReturnOutDate(r.outDate) || r.outDate || '-')}</td>
       <td class="px-4 py-3 text-xs whitespace-nowrap"><span class="px-2 py-0.5 rounded-full bg-brand-pink-light text-brand-pink font-bold">${escHtml(r.action || '-')}</span></td>
       <td class="px-4 py-3 text-xs truncate max-w-[280px]" title="${escHtml(r.detail || '')}">${escHtml(r.detail || '-')}</td>
-      <td class="px-4 py-3 text-xs text-brand-gray whitespace-nowrap">${String(r._uploadedAt || '').slice(0, 16).replace('T',' ')}</td>
+      <td class="px-4 py-3 text-xs text-brand-gray whitespace-nowrap">${r._mailDate ? String(r._mailDate) : String(r._uploadedAt || '').slice(0, 16).replace('T',' ')}</td>
     </tr>`).join('');
   }
   const tfoot = document.getElementById('returns-tfoot');
@@ -25629,6 +25630,178 @@ function exportReturnsForEcount() {
     '이카운트 매출반품 양식 다운로드 완료',
     `${rows.length}건 (${sourceInfo})의 매출반품 데이터가 엑셀로 저장되었습니다.${priceWarn}\n\n다음 단계:\n1. 이카운트 웹 → 영업관리 → 매출반품 → 엑셀업로드\n2. 다운로드한 파일 선택\n3. 필드 매핑 확인 후 업로드\n\n※ 거래처코드가 비어있는 행은 이카운트에서 직접 매핑해 주세요.`,
     'success'
+  );
+}
+
+// ── 반품 → 이카운트 API 직접 업로드 (매입반품: 구매입력 + 수량 음수) ──────
+//   엔드포인트: /OAPI/V2/Purchases/SavePurchases (재고I → 구매관리 → 구매조회)
+//   단가: 상품관리 원가(cost) 우선, 수량: 음수
+async function uploadReturnsToEcountAPI() {
+  // 1) 설정 확인 — _ecCheckSettings 가 있으면 API 키 등 검증
+  let s = null;
+  try { if (typeof _ecCheckSettings === 'function') s = _ecCheckSettings(); } catch (_) {}
+  if (!s) {
+    if (typeof _ecCheckSettings !== 'function') {
+      showAppAlert('이카운트 설정 필요', '먼저 [이카운트 연동] 메뉴에서 API 키·로그인 정보를 등록해 주세요.', 'warn');
+    }
+    return;
+  }
+  // 2) 대상 행 — 체크 우선, 없으면 필터된 행
+  const all = _loadReturns();
+  if (!all.length) { showAppAlert('전송할 데이터 없음', '저장된 반품 데이터가 없습니다.', 'info'); return; }
+  const checkedKeys = new Set([...document.querySelectorAll('#returns-tbody .returns-cb:checked')].map(cb => cb.dataset.key));
+  let target;
+  if (checkedKeys.size) target = all.filter(r => checkedKeys.has(r._key));
+  else {
+    const filtered = _filterReturnsByUI(all);
+    target = filtered.length ? filtered : all;
+  }
+  if (!target.length) {
+    showAppAlert('전송할 데이터 없음', '체크된 반품이 없습니다. 행을 체크하거나 날짜 필터를 조정하세요.', 'info');
+    return;
+  }
+  if (!confirm(
+    `이카운트 API 로 ${target.length}건의 매입반품을 전송할까요?\n\n`
+    + `· 엔드포인트: 재고I → 구매관리 → 구매조회 (구매입력 API)\n`
+    + `· 수량: 음수(-)로 등록 (매입반품 처리)\n`
+    + `· 단가: 상품관리 원가 자동 적용\n`
+    + `· 일자: 메일 제목 날짜(_mailDate) 또는 출고일`
+  )) return;
+
+  // 3) 상품/거래처 매핑 — 매출반품 엑셀과 동일한 로직
+  const products = (typeof _allProducts !== 'undefined' && Array.isArray(_allProducts)) ? _allProducts : [];
+  const _norm = s2 => String(s2 || '').replace(/\s+/g,'').replace(/[\(\)\[\]\.,_\-\/·]/g,'').toLowerCase();
+  const _hasCost = (p) => Number(p && p.cost) > 0;
+  const bySku = new Map();
+  const byName = new Map();
+  products.forEach(p => {
+    const sk = _norm(p.sku);
+    if (sk) { const cur = bySku.get(sk); if (!cur || (!_hasCost(cur) && _hasCost(p))) bySku.set(sk, p); }
+    const nk = _norm(p.name);
+    if (nk) { const cur = byName.get(nk); if (!cur || (!_hasCost(cur) && _hasCost(p))) byName.set(nk, p); }
+  });
+  let vendorMap = {};
+  try { const raw = localStorage.getItem('gplan_ecount_vendor_map_v1'); if (raw) vendorMap = JSON.parse(raw) || {}; } catch (_) {}
+
+  // 4) 페이로드 행 빌드
+  let serNo = 0;
+  let lineNo = 0;
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+  // UPLOAD_SER_NO 묶음 — 같은 일자 + 같은 거래처면 1전표로 묶음
+  const groupSer = new Map();
+  const purchaseList = [];
+  let priceMissing = 0, productMissing = 0;
+  target.forEach(r => {
+    const qty = Math.abs(Number(r.qty) || 0);
+    if (!qty) return;
+    // 상품 매칭
+    let prod = null;
+    const skNorm = _norm(r.sku);
+    if (skNorm && bySku.has(skNorm)) prod = bySku.get(skNorm);
+    else { const nmNorm = _norm(r.itemName); if (nmNorm && byName.has(nmNorm)) prod = byName.get(nmNorm); }
+    const sku = (prod && prod.sku) || r.sku || '';
+    const name = (prod && prod.name) || r.itemName || '';
+    if (!sku) { productMissing++; return; }   // SKU 없는 행은 이카운트가 거부 — 스킵
+    // 단가 — 상품관리 원가(cost) 우선
+    const unitPrice = (prod && Number(prod.cost)) || 0;
+    if (unitPrice <= 0) priceMissing++;
+    // 일자 — _mailDate 우선, 없으면 출고일, 없으면 오늘
+    let dStr = '';
+    if (r._mailDate) dStr = String(r._mailDate);
+    else dStr = _normReturnOutDate(r.outDate) || String(r.outDate || '').slice(0,10);
+    const ioDate = (dStr || '').replace(/\D/g,'').slice(0,8) || todayStr;
+    // 거래처
+    const vendor = String(r.vendor || '').trim();
+    const custCode = vendor && vendorMap[vendor] ? vendorMap[vendor] : '';
+    // UPLOAD_SER_NO — 같은 일자·거래처 1전표
+    const gk = `${ioDate}__${custCode || vendor || '_'}`;
+    if (!groupSer.has(gk)) { serNo++; groupSer.set(gk, serNo); }
+    const ser = groupSer.get(gk);
+    lineNo++;
+    // 음수 수량
+    const negQty = -qty;
+    // 라인 금액 — VAT 포함 합계 = unitPrice * |qty|, 음수로 보냄
+    const totalInc = unitPrice * qty;
+    const totalEx  = Math.round(totalInc / 1.1);
+    const vatTotal = Math.round(totalInc) - totalEx;
+    const remark = `반품(${r.action || ''}) ${r.detail || ''}`.trim().slice(0, 100);
+    purchaseList.push({
+      Line: String(lineNo),
+      BulkDatas: {
+        IO_DATE:      ioDate,
+        UPLOAD_SER_NO: String(ser),
+        CUST:         custCode,
+        CUST_DES:     vendor,
+        EMP_CD:       'API',
+        WH_CD:        '',
+        IO_TYPE:      '',
+        PROD_CD:      sku,
+        PROD_DES:     name,
+        QTY:          String(negQty),
+        PRICE:        String(Math.round(unitPrice / 1.1)),
+        SUPPLY_AMT:   String(-totalEx),
+        VAT_AMT:      String(-vatTotal),
+        REMARKS:      remark || `반품 ${r.recvName || ''}`,
+      }
+    });
+  });
+  if (!purchaseList.length) {
+    showAppAlert(
+      '전송할 행 없음',
+      `대상 ${target.length}건 중 SKU 가 없거나 수량이 0이라 모두 제외되었습니다.\n상품관리에 SKU/원가가 등록되었는지 확인하세요.`,
+      'warn'
+    );
+    return;
+  }
+
+  // 5) 로그인 + 전송 (300건 한도로 청크 분할)
+  let login;
+  try { login = await _ecountLogin(s, false); }
+  catch (e) { showAppAlert('이카운트 로그인 실패', e.message || String(e), 'error'); return; }
+  if (!login || !login.sessionId) { showAppAlert('이카운트 로그인 실패', '세션을 받지 못했습니다. API 설정을 확인하세요.', 'error'); return; }
+
+  const ECOUNT_CHUNK_LIMIT = 250;
+  function _chunkBySer(list) {
+    const chunks = [];
+    let cur = [], curSer = null;
+    for (const item of list) {
+      const ser = item && item.BulkDatas && item.BulkDatas.UPLOAD_SER_NO;
+      if (cur.length >= ECOUNT_CHUNK_LIMIT && ser !== curSer) { chunks.push(cur); cur = []; }
+      cur.push(item); curSer = ser;
+    }
+    if (cur.length) chunks.push(cur);
+    return chunks;
+  }
+  const chunks = _chunkBySer(purchaseList);
+  let okCount = 0, failCount = 0;
+  const errors = [];
+  for (let ci = 0; ci < chunks.length; ci++) {
+    const chunk = chunks[ci];
+    const payload = { PurchasesList: chunk };
+    let resp;
+    try {
+      resp = await _ecountPost(login.zone, '/OAPI/V2/Purchases/SavePurchases', login.sessionId, payload);
+    } catch (e) {
+      errors.push(`청크 ${ci+1}/${chunks.length} 네트워크 오류: ${e.message || e}`);
+      failCount += chunk.length;
+      break;
+    }
+    const r = (typeof _countResult === 'function') ? _countResult(resp) : { ok: chunk.length, fail: 0, errors: [] };
+    okCount += r.ok || 0;
+    failCount += r.fail || Math.max(0, chunk.length - (r.ok || 0));
+    if (Array.isArray(r.errors) && r.errors.length) errors.push(...r.errors.map(e => `청크 ${ci+1}: ${e.msg || e.message || JSON.stringify(e)}`));
+    if ((r.fail || 0) > 0) break;   // 1건이라도 실패하면 후속 청크 중단
+  }
+
+  const warnLines = [];
+  if (priceMissing)   warnLines.push(`⚠ 원가 미등록 ${priceMissing}건 (단가 0 으로 전송)`);
+  if (productMissing) warnLines.push(`⚠ SKU 미매칭으로 제외된 행 ${productMissing}건`);
+  const errLine = errors.length ? `\n\n오류 메시지(최대 5개):\n${errors.slice(0,5).join('\n')}` : '';
+  showAppAlert(
+    failCount === 0 ? '✅ 이카운트 매입반품 업로드 완료' : '⚠ 일부 실패',
+    `성공 ${okCount}건 / 실패 ${failCount}건\n청크 ${chunks.length}개로 분할 전송됨.\n${warnLines.join('\n')}${errLine}\n\n이카운트 웹에서 [재고I → 구매관리 → 구매조회] 메뉴를 새로고침해 확인하세요.`,
+    failCount === 0 ? 'success' : 'warn'
   );
 }
 
