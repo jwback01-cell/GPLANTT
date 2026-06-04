@@ -25636,8 +25636,9 @@ function exportReturnsForEcount() {
 // ── 반품 → 이카운트 API 직접 업로드 (매입반품: 구매입력 + 수량 음수) ──────
 //   엔드포인트: /OAPI/V2/Purchases/SavePurchases (재고I → 구매관리 → 구매조회)
 //   단가: 상품관리 원가(cost) 우선, 수량: 음수
+//   택배비: 처리사항이 불량반품/불량교환/오배송반품/오배송교환 이면 고객별 1건 추가
 async function uploadReturnsToEcountAPI() {
-  // 1) 설정 확인 — _ecCheckSettings 가 있으면 API 키 등 검증
+  // 1) 설정 확인
   let s = null;
   try { if (typeof _ecCheckSettings === 'function') s = _ecCheckSettings(); } catch (_) {}
   if (!s) {
@@ -25660,15 +25661,23 @@ async function uploadReturnsToEcountAPI() {
     showAppAlert('전송할 데이터 없음', '체크된 반품이 없습니다. 행을 체크하거나 날짜 필터를 조정하세요.', 'info');
     return;
   }
-  if (!confirm(
-    `이카운트 API 로 ${target.length}건의 매입반품을 전송할까요?\n\n`
-    + `· 엔드포인트: 재고I → 구매관리 → 구매조회 (구매입력 API)\n`
-    + `· 수량: 음수(-)로 등록 (매입반품 처리)\n`
-    + `· 단가: 상품관리 원가 자동 적용\n`
-    + `· 일자: 메일 제목 날짜(_mailDate) 또는 출고일`
-  )) return;
 
-  // 3) 상품/거래처 매핑 — 매출반품 엑셀과 동일한 로직
+  // 사이트 디자인 모달 확인
+  const desc =
+    `대상: ${target.length}건의 매입반품\n` +
+    `\n` +
+    `• 엔드포인트: 재고I → 구매관리 → 구매조회 (구매입력 API)\n` +
+    `• 수량: 음수(-)로 등록 (매입반품 처리)\n` +
+    `• 단가: 상품관리 원가(cost) 자동 적용\n` +
+    `• 일자: 메일 제목 날짜 우선, 없으면 출고일\n` +
+    `• 적요: 처리사항 + 고객 이름\n` +
+    `• 택배비: 처리사항이 불량반품/불량교환/오배송반품/오배송교환 이면 고객별 1건 자동 추가 (상품관리 택배비용 기준)`;
+  showAppConfirm('이카운트 API 매입반품 업로드', desc, () => _proceedUploadReturnsToEcountAPI(target, s),
+    { type: 'info', confirmText: '전송' });
+}
+
+async function _proceedUploadReturnsToEcountAPI(target, s) {
+  // 상품/거래처 매핑
   const products = (typeof _allProducts !== 'undefined' && Array.isArray(_allProducts)) ? _allProducts : [];
   const _norm = s2 => String(s2 || '').replace(/\s+/g,'').replace(/[\(\)\[\]\.,_\-\/·]/g,'').toLowerCase();
   const _hasCost = (p) => Number(p && p.cost) > 0;
@@ -25683,69 +25692,124 @@ async function uploadReturnsToEcountAPI() {
   let vendorMap = {};
   try { const raw = localStorage.getItem('gplan_ecount_vendor_map_v1'); if (raw) vendorMap = JSON.parse(raw) || {}; } catch (_) {}
 
-  // 4) 페이로드 행 빌드
+  // 택배비 트리거 처리사항
+  const SHIP_TRIGGER = new Set(['불량반품','불량교환','오배송반품','오배송교환','불량 반품','불량 교환','오배송 반품','오배송 교환']);
+  // 고객(받는분)별 묶음 정보 — 같은 고객 = 1개의 주문
+  const byCustomer = new Map();   // key=recvName, val={ rows:[], needsShip, maxShipCost, ioDate, vendor, custCode }
+  target.forEach(r => {
+    const cust = String(r.recvName || '').trim() || `(이름없음)__${r._key || Math.random()}`;
+    if (!byCustomer.has(cust)) byCustomer.set(cust, { rows: [], needsShip: false, maxShipCost: 0, ioDate: '', vendor: '', custCode: '' });
+    const grp = byCustomer.get(cust);
+    grp.rows.push(r);
+    if (SHIP_TRIGGER.has(String(r.action || '').trim())) grp.needsShip = true;
+  });
+
   let serNo = 0;
   let lineNo = 0;
   const today = new Date();
   const todayStr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
-  // UPLOAD_SER_NO 묶음 — 같은 일자 + 같은 거래처면 1전표로 묶음
   const groupSer = new Map();
   const purchaseList = [];
-  let priceMissing = 0, productMissing = 0;
-  target.forEach(r => {
-    const qty = Math.abs(Number(r.qty) || 0);
-    if (!qty) return;
-    // 상품 매칭
-    let prod = null;
-    const skNorm = _norm(r.sku);
-    if (skNorm && bySku.has(skNorm)) prod = bySku.get(skNorm);
-    else { const nmNorm = _norm(r.itemName); if (nmNorm && byName.has(nmNorm)) prod = byName.get(nmNorm); }
-    const sku = (prod && prod.sku) || r.sku || '';
-    const name = (prod && prod.name) || r.itemName || '';
-    if (!sku) { productMissing++; return; }   // SKU 없는 행은 이카운트가 거부 — 스킵
-    // 단가 — 상품관리 원가(cost) 우선
-    const unitPrice = (prod && Number(prod.cost)) || 0;
-    if (unitPrice <= 0) priceMissing++;
-    // 일자 — _mailDate 우선, 없으면 출고일, 없으면 오늘
-    let dStr = '';
-    if (r._mailDate) dStr = String(r._mailDate);
-    else dStr = _normReturnOutDate(r.outDate) || String(r.outDate || '').slice(0,10);
-    const ioDate = (dStr || '').replace(/\D/g,'').slice(0,8) || todayStr;
-    // 거래처
-    const vendor = String(r.vendor || '').trim();
-    const custCode = vendor && vendorMap[vendor] ? vendorMap[vendor] : '';
-    // UPLOAD_SER_NO — 같은 일자·거래처 1전표
-    const gk = `${ioDate}__${custCode || vendor || '_'}`;
-    if (!groupSer.has(gk)) { serNo++; groupSer.set(gk, serNo); }
-    const ser = groupSer.get(gk);
-    lineNo++;
-    // 음수 수량
-    const negQty = -qty;
-    // 라인 금액 — VAT 포함 합계 = unitPrice * |qty|, 음수로 보냄
-    const totalInc = unitPrice * qty;
-    const totalEx  = Math.round(totalInc / 1.1);
-    const vatTotal = Math.round(totalInc) - totalEx;
-    const remark = `반품(${r.action || ''}) ${r.detail || ''}`.trim().slice(0, 100);
-    purchaseList.push({
-      Line: String(lineNo),
-      BulkDatas: {
-        IO_DATE:      ioDate,
-        UPLOAD_SER_NO: String(ser),
-        CUST:         custCode,
-        CUST_DES:     vendor,
-        EMP_CD:       'API',
-        WH_CD:        '',
-        IO_TYPE:      '',
-        PROD_CD:      sku,
-        PROD_DES:     name,
-        QTY:          String(negQty),
-        PRICE:        String(Math.round(unitPrice / 1.1)),
-        SUPPLY_AMT:   String(-totalEx),
-        VAT_AMT:      String(-vatTotal),
-        REMARKS:      remark || `반품 ${r.recvName || ''}`,
+  let priceMissing = 0, productMissing = 0, shipAdded = 0, shipMissing = 0;
+
+  // 고객별로 묶어서 처리 — 상품 라인 + (택배비 라인)
+  byCustomer.forEach((grp, custName) => {
+    let firstIoDate = '';
+    let firstVendor = '';
+    let firstCustCode = '';
+    grp.rows.forEach(r => {
+      const qty = Math.abs(Number(r.qty) || 0);
+      if (!qty) return;
+      // 상품 매칭
+      let prod = null;
+      const skNorm = _norm(r.sku);
+      if (skNorm && bySku.has(skNorm)) prod = bySku.get(skNorm);
+      else { const nmNorm = _norm(r.itemName); if (nmNorm && byName.has(nmNorm)) prod = byName.get(nmNorm); }
+      const sku = (prod && prod.sku) || r.sku || '';
+      const name = (prod && prod.name) || r.itemName || '';
+      if (!sku) { productMissing++; return; }
+      // 단가 — 상품관리 원가(cost)
+      const unitPrice = (prod && Number(prod.cost)) || 0;
+      if (unitPrice <= 0) priceMissing++;
+      // 일자
+      let dStr = '';
+      if (r._mailDate) dStr = String(r._mailDate);
+      else dStr = _normReturnOutDate(r.outDate) || String(r.outDate || '').slice(0,10);
+      const ioDate = (dStr || '').replace(/\D/g,'').slice(0,8) || todayStr;
+      // 거래처
+      const vendor = String(r.vendor || '').trim();
+      const custCode = vendor && vendorMap[vendor] ? vendorMap[vendor] : '';
+      if (!firstIoDate)   firstIoDate = ioDate;
+      if (!firstVendor)   firstVendor = vendor;
+      if (!firstCustCode) firstCustCode = custCode;
+      // UPLOAD_SER_NO — 같은 일자·고객 1전표
+      const gk = `${ioDate}__${custName}`;
+      if (!groupSer.has(gk)) { serNo++; groupSer.set(gk, serNo); }
+      const ser = groupSer.get(gk);
+      lineNo++;
+      const negQty = -qty;
+      const totalInc = unitPrice * qty;
+      const totalEx  = Math.round(totalInc / 1.1);
+      const vatTotal = Math.round(totalInc) - totalEx;
+      const remarkBase = `반품(${r.action || ''})`.trim();
+      const remark = `${remarkBase} ${custName} ${(r.detail || '').slice(0, 60)}`.trim().slice(0, 100);
+      purchaseList.push({
+        Line: String(lineNo),
+        BulkDatas: {
+          IO_DATE:      ioDate,
+          UPLOAD_SER_NO: String(ser),
+          CUST:         custCode,
+          CUST_DES:     vendor,
+          EMP_CD:       'API',
+          WH_CD:        '',
+          IO_TYPE:      '',
+          PROD_CD:      sku,
+          PROD_DES:     name,
+          QTY:          String(negQty),
+          PRICE:        String(Math.round(unitPrice / 1.1)),
+          SUPPLY_AMT:   String(-totalEx),
+          VAT_AMT:      String(-vatTotal),
+          REMARKS:      remark,
+        }
+      });
+      // 이 고객의 가장 큰 택배비용 (상품관리 shipping_cost) 추적
+      if (grp.needsShip) {
+        const sc = Number(prod && prod.shipping_cost) || 0;
+        if (sc > grp.maxShipCost) grp.maxShipCost = sc;
       }
     });
+    // 택배비 라인 — 고객당 1건, 같은 전표
+    if (grp.needsShip && firstIoDate) {
+      const gk = `${firstIoDate}__${custName}`;
+      const ser = groupSer.get(gk);
+      const shipCost = grp.maxShipCost;
+      if (shipCost <= 0) { shipMissing++; return; }
+      lineNo++;
+      const shipEx  = Math.round(shipCost / 1.1);
+      const shipVat = Math.round(shipCost) - shipEx;
+      purchaseList.push({
+        Line: String(lineNo),
+        BulkDatas: {
+          IO_DATE:      firstIoDate,
+          UPLOAD_SER_NO: String(ser),
+          CUST:         firstCustCode,
+          CUST_DES:     firstVendor,
+          EMP_CD:       'API',
+          WH_CD:        '',
+          IO_TYPE:      '',
+          PROD_CD:      'SK0001',
+          PROD_DES:     '택배비',
+          QTY:          '1',
+          PRICE:        String(shipEx),
+          SUPPLY_AMT:   String(shipEx),
+          VAT_AMT:      String(shipVat),
+          REMARKS:      `택배비(반품) ${custName}`,
+        }
+      });
+      shipAdded++;
+    }
   });
+
   if (!purchaseList.length) {
     showAppAlert(
       '전송할 행 없음',
@@ -25755,7 +25819,7 @@ async function uploadReturnsToEcountAPI() {
     return;
   }
 
-  // 5) 로그인 + 전송 (300건 한도로 청크 분할)
+  // 로그인 + 전송
   let login;
   try { login = await _ecountLogin(s, false); }
   catch (e) { showAppAlert('이카운트 로그인 실패', e.message || String(e), 'error'); return; }
@@ -25791,16 +25855,18 @@ async function uploadReturnsToEcountAPI() {
     okCount += r.ok || 0;
     failCount += r.fail || Math.max(0, chunk.length - (r.ok || 0));
     if (Array.isArray(r.errors) && r.errors.length) errors.push(...r.errors.map(e => `청크 ${ci+1}: ${e.msg || e.message || JSON.stringify(e)}`));
-    if ((r.fail || 0) > 0) break;   // 1건이라도 실패하면 후속 청크 중단
+    if ((r.fail || 0) > 0) break;
   }
 
   const warnLines = [];
+  if (shipAdded)      warnLines.push(`📦 택배비 추가: ${shipAdded}개 고객 (자동)`);
+  if (shipMissing)    warnLines.push(`⚠ 택배비 미발생 ${shipMissing}건 — 상품관리 택배비용 0`);
   if (priceMissing)   warnLines.push(`⚠ 원가 미등록 ${priceMissing}건 (단가 0 으로 전송)`);
-  if (productMissing) warnLines.push(`⚠ SKU 미매칭으로 제외된 행 ${productMissing}건`);
-  const errLine = errors.length ? `\n\n오류 메시지(최대 5개):\n${errors.slice(0,5).join('\n')}` : '';
+  if (productMissing) warnLines.push(`⚠ SKU 미매칭 제외 ${productMissing}건`);
+  const errLine = errors.length ? `\n\n오류(최대 5개):\n${errors.slice(0,5).join('\n')}` : '';
   showAppAlert(
     failCount === 0 ? '✅ 이카운트 매입반품 업로드 완료' : '⚠ 일부 실패',
-    `성공 ${okCount}건 / 실패 ${failCount}건\n청크 ${chunks.length}개로 분할 전송됨.\n${warnLines.join('\n')}${errLine}\n\n이카운트 웹에서 [재고I → 구매관리 → 구매조회] 메뉴를 새로고침해 확인하세요.`,
+    `성공 ${okCount}건 / 실패 ${failCount}건 (총 ${purchaseList.length}라인 / 청크 ${chunks.length}개)\n${warnLines.join('\n')}${errLine}\n\n이카운트 [재고I → 구매관리 → 구매조회] 에서 새로고침해 확인하세요.`,
     failCount === 0 ? 'success' : 'warn'
   );
 }
