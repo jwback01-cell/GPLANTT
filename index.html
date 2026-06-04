@@ -25371,8 +25371,20 @@ function exportReturnData() {
 function exportReturnsForEcount() {
   const all = _loadReturns();
   if (!all.length) { showAppAlert('내보낼 데이터 없음', '저장된 반품 데이터가 없습니다.', 'info'); return; }
-  const filtered = _filterReturnsByUI(all);
-  const target = filtered.length ? filtered : all;
+  // 1순위: 체크된 행만, 2순위: 필터된 행, 3순위: 전체
+  const checkedKeys = new Set([...document.querySelectorAll('#returns-tbody .returns-cb:checked')].map(cb => cb.dataset.key));
+  let target;
+  if (checkedKeys.size) {
+    target = all.filter(r => checkedKeys.has(r._key));
+  } else {
+    const filtered = _filterReturnsByUI(all);
+    target = filtered.length ? filtered : all;
+  }
+  if (!target.length) {
+    showAppAlert('내보낼 데이터 없음', '체크된 반품이 없습니다. 행을 체크하거나 날짜 필터를 조정하세요.', 'info');
+    return;
+  }
+
   // SKU/상품명 → 상품관리 매칭 (단가/거래처 자동 채움용)
   const products = (typeof _allProducts !== 'undefined' && Array.isArray(_allProducts)) ? _allProducts : [];
   const _norm = s => String(s || '').replace(/\s+/g,'').replace(/[\(\)\[\]\.,_\-\/·]/g,'').toLowerCase();
@@ -25384,6 +25396,30 @@ function exportReturnsForEcount() {
     const nk = _norm(p.name);
     if (nk && !byName.has(nk)) byName.set(nk, p);
   });
+  // 과거 매출(업로드 데이터)에서 단가/공급가 룩업 — 같은 SKU/상품명의 가장 최근 매출 단가를 사용
+  // 우선순위: r.supply > r.price 의 vat 제외값
+  let uploadData = [];
+  try {
+    const raw = localStorage.getItem('gplan_upload_data_v1');
+    if (raw) uploadData = JSON.parse(raw) || [];
+  } catch (_) {}
+  // SKU별 최근 supply / 상품명별 최근 supply 인덱스
+  const recentBySku = new Map();
+  const recentByName = new Map();
+  // 최근 데이터부터 처리 (마지막에 들어온 것일수록 최근)
+  const sortedUpload = uploadData.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  sortedUpload.forEach(u => {
+    const skNorm = _norm(u.skuCode || u.sku);
+    const nmNorm = _norm(u.name || u.itemName || u.onlineName);
+    const supply = Number(u.supply) || 0;
+    const price  = Number(u.price)  || 0;
+    const unitSupply = supply > 0 ? supply : (price > 0 ? Math.round(price / 1.1) : 0);
+    if (unitSupply > 0) {
+      if (skNorm && !recentBySku.has(skNorm))  recentBySku.set(skNorm,  unitSupply);
+      if (nmNorm && !recentByName.has(nmNorm)) recentByName.set(nmNorm, unitSupply);
+    }
+  });
+
   // 거래처 매핑 — 업체명 → 이카운트 거래처코드 (저장된 매핑 사용)
   let vendorMap = {};
   try {
@@ -25395,6 +25431,7 @@ function exportReturnsForEcount() {
   const todayStr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
   // 행 구성
   let lineNo = 0;
+  let priceMissingCount = 0;
   const rows = target.map(r => {
     lineNo++;
     const qty = Math.abs(Number(r.qty) || 0);
@@ -25408,7 +25445,15 @@ function exportReturnsForEcount() {
     }
     const sku = (prod && prod.sku) || r.sku || '';
     const itemName = (prod && prod.name) || r.itemName || '';
-    const supply = (prod && Number(prod.supply_price)) || 0;   // 매출반품 단가 = 공급가 기본값
+    // 단가 결정 — 우선순위: 과거 매출 supply > 상품관리 supply_price > 상품관리 price(vat제외)
+    const skuKey  = _norm(sku);
+    const nameKey = _norm(itemName);
+    let unitPrice = 0;
+    if (skuKey && recentBySku.has(skuKey))         unitPrice = recentBySku.get(skuKey);
+    else if (nameKey && recentByName.has(nameKey)) unitPrice = recentByName.get(nameKey);
+    else if (prod && Number(prod.supply_price))    unitPrice = Number(prod.supply_price);
+    else if (prod && Number(prod.price))           unitPrice = Math.round(Number(prod.price) / 1.1);
+    if (unitPrice <= 0) priceMissingCount++;
     // 날짜 — 출고일이 있으면 그걸, 없으면 오늘
     const rawDate = _normReturnOutDate(r.outDate) || String(r.outDate || '').slice(0,10);
     const dateStr = rawDate ? rawDate.replace(/\D/g, '').slice(0, 8) || todayStr : todayStr;
@@ -25423,17 +25468,18 @@ function exportReturnsForEcount() {
       sku,                    // 품목코드 (SKU)
       itemName,               // 품목명
       '',                     // 규격
-      qty,                    // 수량 (양수 — 매출반품은 양수로 입력, 이카운트가 반품으로 처리)
-      supply,                 // 단가 (공급가 또는 0)
-      qty * supply,           // 공급가액
+      qty,                    // 수량
+      unitPrice,              // 단가
+      qty * unitPrice,        // 공급가액
       `반품(${r.action || ''}) ${r.detail || ''}`.trim().slice(0, 100),  // 적요
     ];
   });
   // 헤더 안내 + 컬럼명
+  const sourceInfo = checkedKeys.size ? `선택 체크 ${checkedKeys.size}건` : '필터된 행 전체';
   const header = [
     ['이카운트 매출반품 업로드 양식 — 이카운트 웹: 영업관리 → 매출관리 → 매출반품 → 엑셀업로드'],
-    [`총 ${rows.length}건 / 생성일 ${today.toLocaleString('ko-KR')}`],
-    ['💡 단가는 상품관리의 공급가를 기본으로 채웠습니다. 실제 반품 단가와 다르면 행에서 직접 수정 후 업로드하세요.'],
+    [`총 ${rows.length}건 (${sourceInfo}) / 생성일 ${today.toLocaleString('ko-KR')}`],
+    ['💡 단가: 1) 과거 매출 supply > 2) 상품관리 공급가 > 3) 상품관리 단가/1.1 순으로 자동 채움. 다르면 행에서 직접 수정 후 업로드.'],
     [],
     ['순번','일자','거래처코드','거래처명','품목코드','품목명','규격','수량','단가','공급가액','적요'],
   ];
@@ -25446,9 +25492,12 @@ function exportReturnsForEcount() {
   XLSX.utils.book_append_sheet(wb, ws, '이카운트 매출반품');
   const stamp = new Date().toISOString().slice(0,10);
   XLSX.writeFile(wb, `이카운트_매출반품_${stamp}.xlsx`);
+  const priceWarn = priceMissingCount > 0
+    ? `\n\n⚠ 단가를 찾지 못한 행 ${priceMissingCount}건 — 과거 매출 데이터와 상품관리에 공급가가 없어 0원으로 표시됩니다. 엑셀에서 직접 입력하세요.`
+    : '';
   showAppAlert(
     '이카운트 매출반품 양식 다운로드 완료',
-    `${rows.length}건의 매출반품 데이터가 엑셀로 저장되었습니다.\n\n다음 단계:\n1. 이카운트 웹 → 영업관리 → 매출반품 → 엑셀업로드\n2. 다운로드한 파일 선택\n3. 필드 매핑 확인 후 업로드\n\n※ 거래처코드가 비어있는 행은 이카운트에서 직접 매핑해 주세요.`,
+    `${rows.length}건 (${sourceInfo})의 매출반품 데이터가 엑셀로 저장되었습니다.${priceWarn}\n\n다음 단계:\n1. 이카운트 웹 → 영업관리 → 매출반품 → 엑셀업로드\n2. 다운로드한 파일 선택\n3. 필드 매핑 확인 후 업로드\n\n※ 거래처코드가 비어있는 행은 이카운트에서 직접 매핑해 주세요.`,
     'success'
   );
 }
