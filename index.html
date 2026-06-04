@@ -16691,16 +16691,26 @@ async function fetchReturnFromMail() {
     const mime = mimeMap[ext] || 'application/octet-stream';
     const file = new File([bytes], it.fileName, { type: mime });
 
-    // _uploadTemplate 을 'return' 으로 강제 후 기존 처리 함수 호출 (처리 후 원복)
+    // _uploadTemplate 을 'return' 으로 강제 후 업로드 데이터 처리 함수 호출
+    // (FileReader 비동기라 finally 에서 원복하면 너무 일찍 풀림 — 처리 끝난 뒤 잠시 후 복원)
     const prevTpl = _uploadTemplate;
     _uploadTemplate = 'return';
-    try {
-      const dateStr = it.date ? new Date(it.date).toLocaleString('ko-KR') : '(시간 정보 없음)';
-      showAppAlert('메일 수신', `${it.fileName} (${dateStr}) — 반품 데이터로 등록합니다.`, 'info');
-      processExcelFile(file);
-    } finally {
+    // 양식 버튼 표시도 '반품' 으로 맞춤 (사용자 시각 피드백)
+    try { setUploadTemplate && setUploadTemplate('return'); } catch(_) {}
+    const dateStr = it.date ? new Date(it.date).toLocaleString('ko-KR') : '(시간 정보 없음)';
+    console.log(`[반품 메일 가져오기] ${it.fileName} 처리 시작 (${dateStr})`);
+    _handleUploadFile(file);
+    // 처리 완료 후(약 1초) 날짜 필터 '전체' 로 리셋하여 새로 추가된 행 즉시 표시
+    setTimeout(() => {
+      try {
+        const ds = document.getElementById('returns-date-start');
+        const de = document.getElementById('returns-date-end');
+        if (ds) ds.value = '';
+        if (de) de.value = '';
+        if (typeof renderReturnData === 'function') renderReturnData();
+      } catch (_) {}
       _uploadTemplate = prevTpl;
-    }
+    }, 1500);
   } catch (e) {
     console.error('[반품 메일 가져오기] 실패:', e);
     showAppAlert('가져오기 실패', e.message || String(e), 'error');
