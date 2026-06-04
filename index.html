@@ -16687,8 +16687,9 @@ async function applyPaInvoicesToExtUpload() {
   });
   console.log('[송장매칭] PA 전체 주문 상태 분포:', statusDist, '총', allOrders.length, '건');
 
-  // 공백·하이픈 제거 후 비교 (전화번호 형식 차이 흡수)
-  const _norm = s => String(s || '').replace(/[\s\-\(\)]/g, '').trim();
+  // 공백·하이픈·괄호·마스킹문자(*★☆) 제거 후 비교 (전화번호 형식·이름 마스킹 차이 흡수)
+  // 예: "손영*" ↔ "손영" 매칭, "010-1234-5678" ↔ "01012345678" 매칭
+  const _norm = s => String(s || '').replace(/[\s\-\(\)\*★☆·]/g, '').trim();
 
   // 받는분 이름·연락처·송장번호의 PA 필드명 후보를 폭넓게 시도
   // (플레이오토 응답이 계정/버전에 따라 키가 달라서 폴백 다수 추가)
