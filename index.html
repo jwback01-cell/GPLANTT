@@ -15641,20 +15641,56 @@ async function runPaMinusCheck() {
   }
 
   // 1단계: 각 주문 행 추출 (택배비용은 SKU 매칭값 그대로)
-  // ⚠ 한 주문에 옵션이 여러 개면 (예: prod_list[3개]) 옵션 수만큼 펼쳐서 각각 행으로 만든다
-  //   — 그렇지 않으면 한 묶음의 첫 옵션만 수집되어 NO.1/NO.2 가 누락됨
+  // ⚠ 한 주문에 옵션이 여러 개면 옵션 수만큼 펼침
+  //   - PA 응답이 _paOrdersProd(results_prod) 에 옵션별로 들어있으면 그것을 우선 사용
+  //   - 그렇지 않으면 주문 객체의 중첩 배열(prod_list 등)에서 펼침
+  //   - 그래도 없으면 1주문=1행 (기존 동작)
+  // 진단: 첫 주문의 모든 키 출력 — 어느 키에 옵션 배열이 들었는지 사용자에게 알리기 위함
+  if (_paOrders[0]) {
+    const o = _paOrders[0];
+    const arrKeys = Object.keys(o).filter(k => Array.isArray(o[k]) && o[k].length).map(k => `${k}[${o[k].length}]`);
+    console.log('[마이너스확인 진단] 첫 주문의 배열 키들:', arrKeys.join(', ') || '(없음)');
+    console.log('[마이너스확인 진단] 첫 주문 전체 키:', Object.keys(o).join(', '));
+    console.log('[마이너스확인 진단] _paOrdersProd 길이:', (window._paOrdersProd || _paOrdersProd || []).length);
+  }
   const _expandedOrders = [];
-  const NESTED_KEYS = ['prod_list','ord_opt_list','products','items','set_pack_list','sku_list','order_items'];
+  const NESTED_KEYS = ['prod_list','ord_opt_list','products','items','set_pack_list','sku_list','order_items','order_products','order_item_list','option_list','opt_list','goods_list'];
+
+  // 우선 results_prod 데이터로 펼치기 시도 — bundle_no/shop_ord_no/order_no 로 부모와 매칭
+  const _pp = Array.isArray(_paOrdersProd) ? _paOrdersProd : [];
+  const _ppByBundle = new Map();
+  if (_pp.length > _paOrders.length) {
+    _pp.forEach(p => {
+      const key = String(p.bundle_no || p.pa_bundle_no || p.shop_ord_no || p.ord_no || p.order_no || '').trim();
+      if (!key) return;
+      if (!_ppByBundle.has(key)) _ppByBundle.set(key, []);
+      _ppByBundle.get(key).push(p);
+    });
+    console.log('[마이너스확인] results_prod 그룹:', _ppByBundle.size, '묶음 / 행', _pp.length);
+  }
+
   _paOrders.forEach(o => {
+    // 1) results_prod 우선
+    const bk = String(o.bundle_no || o.pa_bundle_no || o.shop_ord_no || o.ord_no || o.order_no || '').trim();
+    if (bk && _ppByBundle.has(bk) && _ppByBundle.get(bk).length > 1) {
+      _ppByBundle.get(bk).forEach((it, idx) => {
+        _expandedOrders.push({ ...o, ...it, _expandedIdx: idx, _origOrder: o });
+      });
+      return;
+    }
+    // 2) 중첩 배열 검사
     let list = null;
     for (const k of NESTED_KEYS) {
       if (Array.isArray(o[k]) && o[k].length > 1) { list = o[k]; break; }
     }
-    if (!list) { _expandedOrders.push(o); return; }
-    list.forEach((it, idx) => {
-      // 옵션 객체와 부모 주문 객체 병합 — 옵션 필드가 우선
-      _expandedOrders.push({ ...o, ...it, _expandedIdx: idx, _origOrder: o });
-    });
+    if (list) {
+      list.forEach((it, idx) => {
+        _expandedOrders.push({ ...o, ...it, _expandedIdx: idx, _origOrder: o });
+      });
+      return;
+    }
+    // 3) 폴백 — 원본 그대로
+    _expandedOrders.push(o);
   });
   console.log(`[마이너스확인] 주문 펼침: ${_paOrders.length} → ${_expandedOrders.length} (옵션 단위)`);
   _paMinusRows = _expandedOrders.map(o => {
