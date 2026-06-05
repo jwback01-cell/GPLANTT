@@ -15641,7 +15641,23 @@ async function runPaMinusCheck() {
   }
 
   // 1단계: 각 주문 행 추출 (택배비용은 SKU 매칭값 그대로)
-  _paMinusRows = _paOrders.map(o => {
+  // ⚠ 한 주문에 옵션이 여러 개면 (예: prod_list[3개]) 옵션 수만큼 펼쳐서 각각 행으로 만든다
+  //   — 그렇지 않으면 한 묶음의 첫 옵션만 수집되어 NO.1/NO.2 가 누락됨
+  const _expandedOrders = [];
+  const NESTED_KEYS = ['prod_list','ord_opt_list','products','items','set_pack_list','sku_list','order_items'];
+  _paOrders.forEach(o => {
+    let list = null;
+    for (const k of NESTED_KEYS) {
+      if (Array.isArray(o[k]) && o[k].length > 1) { list = o[k]; break; }
+    }
+    if (!list) { _expandedOrders.push(o); return; }
+    list.forEach((it, idx) => {
+      // 옵션 객체와 부모 주문 객체 병합 — 옵션 필드가 우선
+      _expandedOrders.push({ ...o, ...it, _expandedIdx: idx, _origOrder: o });
+    });
+  });
+  console.log(`[마이너스확인] 주문 펼침: ${_paOrders.length} → ${_expandedOrders.length} (옵션 단위)`);
+  _paMinusRows = _expandedOrders.map(o => {
     const r = _paExtractOrderRow(o);
     return { ...r, _bundleKey: String(o.bundle_no || o.pa_bundle_no || o.uniq || o.shop_ord_no || o.ori_uniq || o.order_no || o.ord_no || ''), shipCostBeforeDedup: r.shipCost };
   });
