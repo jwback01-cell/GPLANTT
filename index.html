@@ -9032,6 +9032,7 @@ async function submitAddProduct() {
     if (error) { showErr((isEditing ? '수정 실패: ' : '상품 추가 실패: ') + error.message + (error.details ? ` (${error.details})` : '')); return; }
     // 재고 연동: 수정인 경우 같은 그룹 멤버에게 재고/안전재고/원가/공급가 동기화
     if (isEditing) {
+      try { _pmMarkEdited(_editingProductId); } catch (_) {}   // '오늘 수정' 필터용 로컬 수정시각 기록
       try { await _syncLinkedFields(_editingProductId, { stock, safety_stock: safety, cost, supply_price: supply }); } catch (_) {}
       // 수불 이력 — 편집으로 재고가 변경된 경우만
       if (stock !== _prevStockBeforeEdit) {
