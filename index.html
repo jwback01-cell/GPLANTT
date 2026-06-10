@@ -12100,16 +12100,9 @@ function applyDetailRange(tab) {
     { idx:4, s:new Date('2026-05-01'), e:new Date('2026-05-31T23:59:59') },
   ];
 
-  const idxs = MONTH_RANGES
-    .filter(m => m.s <= endDate && m.e >= startDate)
-    .map(m => m.idx);
-
-  if (idxs.length === 0) {
-    const lblEl = document.getElementById(tab + '-period-label');
-    if (lblEl) lblEl.textContent = '해당 기간 데이터 없음';
-    toggleRangePicker(tab);
-    return;
-  }
+  // (구버전: MONTH_RANGES 로 겹치는 월이 없으면 렌더를 멈춰서, 6월 등 MONTH_RANGES 밖 날짜를
+  //  선택하면 이전 표가 그대로 남던 버그 → 제거. 아래에서 실제 선택 날짜 범위로 직접 필터해 렌더한다.)
+  void MONTH_RANGES;
 
   // 레이블: "M월 D일 ~ M월 D일" (같은 연도면 연도 생략)
   const fmtKo = d => `${d.getMonth()+1}월 ${d.getDate()}일`;
