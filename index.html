@@ -4475,6 +4475,13 @@ tailwind.config = {
                 <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-brand-gray pointer-events-none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 <input id="upload-data-search" type="text" placeholder="거래처·품목·수령자 검색" oninput="renderUploadData()" class="pl-9 pr-3 py-1.5 rounded-full border border-brand-border bg-brand-bg text-sm font-medium outline-none focus:border-brand-black w-56">
               </div>
+              <div class="relative">
+                <button type="button" id="upload-data-vendor-btn" onclick="toggleUploadDataVendorMenu()" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg flex items-center gap-1.5" title="거래처를 선택해 해당 거래처만 보기 (복수 선택 가능)">
+                  <span id="upload-data-vendor-label">거래처 전체</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div id="upload-data-vendor-menu" class="hidden absolute z-50 mt-1 left-0 bg-white border border-brand-border rounded-2xl shadow-xl p-2 w-56 max-h-72 overflow-y-auto"></div>
+              </div>
               <button id="upload-data-rematch-btn" onclick="rematchUploadDataShipCosts()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-blue hover:bg-brand-bg flex items-center gap-1.5" title="미매칭된 행을 현재 상품관리/세트상품으로 다시 매칭합니다">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                 SKU 매칭
@@ -22590,6 +22597,78 @@ function setUploadDataDate(mode) {
   renderUploadData();
 }
 
+// ── 거래처(vendor) 다중선택 필터 ──────────────────────────
+// null = 필터 없음(전체). Set = 표시할 거래처들. 빈 Set = 아무것도 안 보임.
+let _uploadDataVendorFilter = null;
+function _uploadDataVendorList() {
+  const data = (typeof _loadUploadData === 'function') ? _loadUploadData() : [];
+  const set = new Set();
+  data.forEach(r => set.add(String(r.vendor || '').trim()));
+  return [...set].sort((a, b) => a.localeCompare(b, 'ko'));
+}
+function toggleUploadDataVendorMenu() {
+  const menu = document.getElementById('upload-data-vendor-menu');
+  if (!menu) return;
+  if (!menu.classList.contains('hidden')) { menu.classList.add('hidden'); return; }
+  _renderUploadDataVendorMenu();
+  menu.classList.remove('hidden');
+}
+function _renderUploadDataVendorMenu() {
+  const menu = document.getElementById('upload-data-vendor-menu');
+  if (!menu) return;
+  const vendors = _uploadDataVendorList();
+  const f = _uploadDataVendorFilter;
+  const rows = vendors.map(v => {
+    const label = v === '' ? '(거래처 없음)' : v;
+    const checked = (f === null) || f.has(v);
+    const safe = v.replace(/"/g, '&quot;');
+    return `<label class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-brand-bg cursor-pointer text-xs font-semibold">
+      <input type="checkbox" class="upload-data-vendor-cb" data-vendor="${safe}" ${checked ? 'checked' : ''} onchange="onUploadDataVendorToggle()">
+      <span>${_escapeHtml(label)}</span>
+    </label>`;
+  }).join('');
+  menu.innerHTML = `
+    <div class="flex items-center justify-between px-2 py-1 mb-1 border-b border-brand-border sticky top-0 bg-white">
+      <button type="button" onclick="setUploadDataVendorAll(true)" class="text-[11px] font-bold text-brand-blue hover:underline">전체 선택</button>
+      <button type="button" onclick="setUploadDataVendorAll(false)" class="text-[11px] font-bold text-brand-gray hover:underline">선택 해제</button>
+    </div>
+    ${rows || '<div class="px-2 py-3 text-xs text-brand-gray text-center">거래처 없음</div>'}`;
+}
+function onUploadDataVendorToggle() {
+  const menu = document.getElementById('upload-data-vendor-menu');
+  if (!menu) return;
+  const cbs = [...menu.querySelectorAll('.upload-data-vendor-cb')];
+  const checked = cbs.filter(cb => cb.checked).map(cb => cb.getAttribute('data-vendor') || '');
+  _uploadDataVendorFilter = (checked.length === cbs.length) ? null : new Set(checked);
+  _uploadDataPage = 1;
+  updateUploadDataVendorLabel();
+  renderUploadData();
+}
+function setUploadDataVendorAll(select) {
+  _uploadDataVendorFilter = select ? null : new Set();
+  _uploadDataPage = 1;
+  _renderUploadDataVendorMenu();
+  updateUploadDataVendorLabel();
+  renderUploadData();
+}
+function updateUploadDataVendorLabel() {
+  const el = document.getElementById('upload-data-vendor-label');
+  if (!el) return;
+  const f = _uploadDataVendorFilter;
+  if (f === null) { el.textContent = '거래처 전체'; return; }
+  if (f.size === 0) { el.textContent = '거래처 없음'; return; }
+  if (f.size === 1) { const v = [...f][0]; el.textContent = v === '' ? '(거래처 없음)' : v; return; }
+  el.textContent = `거래처 ${f.size}곳`;
+}
+// 메뉴 바깥 클릭 시 닫기 (한 번만 등록)
+document.addEventListener('mousedown', (e) => {
+  const menu = document.getElementById('upload-data-vendor-menu');
+  const btn = document.getElementById('upload-data-vendor-btn');
+  if (!menu || menu.classList.contains('hidden')) return;
+  if (menu.contains(e.target) || (btn && btn.contains(e.target))) return;
+  menu.classList.add('hidden');
+});
+
 // 업로드 데이터 정렬 상태
 let _uploadDataSort = { col: null, dir: 'asc' };
 const _UPLOAD_DATA_NUM_COLS = new Set(['qty','price','ship','shipCost','cost','profit']);
@@ -22876,6 +22955,9 @@ function renderUploadData() {
   const endDate   = (document.getElementById('upload-data-date-end')?.value   || '').replace(/-/g,'');
   const _normDate = s => String(s || '').replace(/-/g,'').replace(/\s.*$/, '').slice(0, 8);
   let all = data.filter(r => {
+    if (_uploadDataVendorFilter !== null) {
+      if (!_uploadDataVendorFilter.has(String(r.vendor || '').trim())) return false;
+    }
     if (search) {
       const hit = (r.vendor||'').toLowerCase().includes(search)
                || (r.site||'').toLowerCase().includes(search)
@@ -23245,6 +23327,9 @@ function _getVisibleUploadData() {
   const endDate   = (document.getElementById('upload-data-date-end')?.value   || '').replace(/-/g,'');
   const _normDate = s => String(s || '').replace(/-/g,'').replace(/\s.*$/, '').slice(0, 8);
   let all = data.filter(r => {
+    if (_uploadDataVendorFilter !== null) {
+      if (!_uploadDataVendorFilter.has(String(r.vendor || '').trim())) return false;
+    }
     if (search) {
       const hit = (r.vendor||'').toLowerCase().includes(search)
                || (r.site||'').toLowerCase().includes(search)
