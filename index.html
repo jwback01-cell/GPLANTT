@@ -23849,7 +23849,12 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
   //   1차) prefix 매칭 — '국혜인' ↔ '국혜인복지사'
   //   2차) 공통 글자 >= 2 — '이승메' ↔ '이승매' (오타·이형 표기 대응)
   const usedGplanKeys = new Set(); // fuzzy 로 매칭된 GPLAN 키들 — onlyGplan 에서 제외용
+  let _lastDateChanged = null;          // 날짜무시 매칭 시 GPLAN 날짜(YYYY-MM-DD) 기록
+  const dateTolMatch = new Map();       // 날짜무시 매칭: "ledgerDate__recvKey" → {rows, gplanDate, gplanKey}
+  const dateTolUsedKeys = new Set();    // 날짜무시 매칭에 소비된 GPLAN 그룹 키 (onlyGplan 중복표시 방지)
+  const dateChangedCells = [];          // 거래일자 셀 색칠 대상 — rows 배열 인덱스
   const _findGplanGroup = (date, recvKey) => {
+    _lastDateChanged = null;
     const exactKey = `${date}__${recvKey}`;
     const exact = _gByGroup[exactKey];
     if (exact && exact.length) {
@@ -23887,8 +23892,73 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
         return _gByGroup[k];
       }
     }
+
+    // 3차: 날짜 무시 매칭 — 같은 수령자 + 같은 금액이지만 날짜가 다른 GPLAN 그룹
+    //      (사전 계산 dateTolMatch). 매칭되면 _lastDateChanged 에 GPLAN 날짜 기록 → 거래일자 셀 색칠
+    const _tol = dateTolMatch.get(`${date}__${recvKey}`);
+    if (_tol) {
+      usedGplanKeys.add(_tol.gplanKey);
+      _lastDateChanged = _tol.gplanDate;
+      return _tol.rows;
+    }
     return [];
   };
+
+  // ── 날짜 무시 매칭 사전 계산 ─────────────────────────────
+  // 같은 날짜에 매칭 후보(정확/prefix/공통글자)가 전혀 없는 거래원장 그룹에 대해,
+  // 같은 수령자 + 같은 금액(공급가/원가 합계)인 다른 날짜의 GPLAN 그룹을 찾아 매칭한다.
+  {
+    // 같은 날짜에 매칭 후보가 존재하는지 — _findGplanGroup 의 same-date 전략(정확/prefix/공통2글자) 미러
+    const _hasSameDateCand = (date, recvKey) => {
+      if (_gByGroup[`${date}__${recvKey}`]) return true;
+      if (!recvKey || recvKey.length < 2) return false;
+      const prefix = date + '__';
+      const setA = new Set(recvKey.split(''));
+      for (const k of Object.keys(_gByGroup)) {
+        if (!k.startsWith(prefix)) continue;
+        const other = k.substring(prefix.length);
+        if (!other || other.length < 2 || other === recvKey) continue;
+        if (other.startsWith(recvKey) || recvKey.startsWith(other)) return true;
+        let common = 0; const setB = new Set(other.split(''));
+        setA.forEach(c => { if (setB.has(c)) common++; });
+        if (common >= 2) return true;
+      }
+      return false;
+    };
+    // 거래원장 그룹 합계 (택배 제외, 날짜+수령자 단위)
+    const ledgerGroups = new Map(); // "date__recvKey" → {date, recvKey, amt}
+    allLedger.forEach(({ L }) => {
+      if (_isTaekbae(L)) return;
+      const recvKey = _normRecv(String(L.recv || ''));
+      if (!recvKey) return;
+      const gk = `${L.date}__${recvKey}`;
+      if (!ledgerGroups.has(gk)) ledgerGroups.set(gk, { date: L.date, recvKey, amt: 0 });
+      ledgerGroups.get(gk).amt += _amtL(L);
+    });
+    // GPLAN 그룹 합계 미리 계산
+    const gplanGroupSum = new Map(); // key → 금액합
+    Object.keys(_gByGroup).forEach(k => {
+      gplanGroupSum.set(k, (_gByGroup[k] || []).reduce((s, r) => s + _amtG(r), 0));
+    });
+    ledgerGroups.forEach((lg, gk) => {
+      if (!lg.amt) return;
+      if (_hasSameDateCand(lg.date, lg.recvKey)) return; // 같은 날짜 후보 있으면 정상 경로에 맡김
+      for (const k of Object.keys(_gByGroup)) {
+        if (dateTolUsedKeys.has(k)) continue;
+        if (ledgerGroups.has(k)) continue;     // 그 GPLAN 그룹은 자기 날짜 거래원장과 정상 매칭됨 → 가로채지 않음
+        const sep = k.indexOf('__');
+        if (sep < 0) continue;
+        const kDate = k.slice(0, sep);
+        const kRecv = k.slice(sep + 2);
+        if (kDate === lg.date) continue;       // 다른 날짜만
+        if (kRecv !== lg.recvKey) continue;    // 수령자 정확히 일치
+        if (gplanGroupSum.get(k) !== lg.amt) continue; // 금액 정확히 일치
+        dateTolMatch.set(gk, { rows: _gByGroup[k], gplanDate: kDate, gplanKey: k });
+        dateTolUsedKeys.add(k);
+        break;
+      }
+    });
+  }
 
   // GPLAN 에만 있는 행을 날짜별로 분배 — 각 날짜 소계 위에 삽입
   // (단, 아래 sortedDates.forEach 에서 fuzzy 매칭된 행은 제외 — usedGplanKeys 활용)
@@ -23911,6 +23981,7 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
     const group = byDate.get(date) || [];
     let sumQty = 0, sumSale = 0, sumGCost = 0, sumDiff = 0;
     let unmatchedInGroup = 0;
+    const groupDC = new Map(); // recvKey → 변경된(GPLAN) 날짜 — 날짜무시 매칭 그룹 표시용
 
     // 택배 / 비-택배 분리 — 택배는 날짜당 1행으로 합쳐서 표시
     const regularItems = group.filter(({ L }) => !_isTaekbae(L));
@@ -23942,6 +24013,8 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
 
         // GPLAN 측 같은 (날짜+수령자) 그룹 합계 — fuzzy 매칭 (prefix) 도 시도
         const gplanRows = _findGplanGroup(date, recvKey);
+        const _dcDate = _lastDateChanged; // 날짜무시 매칭이면 GPLAN 날짜, 아니면 null
+        if (_dcDate) { groupDC.set(recvKey, _dcDate); left[0] = _dcDate; } // 거래일자를 매칭된 날짜로 변경
         const gplanGroupAmt = gplanRows.reduce((s, r) => s + _amtG(r), 0);
         const gplanNames = gplanRows.map(r => r.itemName).filter(Boolean);
         const gplanNameLabel = gplanNames.length === 0 ? ''
@@ -23962,12 +24035,15 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
           const groupLabel = (groupItems.length > 1 || gplanRows.length > 1)
             ? `${gplanNameLabel} [그룹 합계: 거래원장 ${groupItems.length}건 ↔ GPLAN ${gplanRows.length}건]`
             : gplanNameLabel;
+          if (_dcDate) dateChangedCells.push(rows.length); // 거래일자 셀 색칠 대상
           rows.push([...left, groupLabel, gplanRecvLabel, gplanGroupAmt, diff]);
           sumGCost += gplanGroupAmt;
           sumDiff += diff;
         }
       } else {
         // 같은 그룹의 후속 행 — 위 그룹의 수령자명으로 채우고 차이는 0
+        const _dcDate2 = groupDC.get(recvKey);
+        if (_dcDate2) { left[0] = _dcDate2; dateChangedCells.push(rows.length); }
         rows.push([...left, recv, recv, 0, 0]);
       }
       sumQty += Number(L.qty) || 0;
@@ -24014,7 +24090,7 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
     const onlyGforDate = _onlyGRaw.filter(G => {
       const recvKey = _normRecv(G.receiver);
       const gKey = `${date}__${recvKey}`;
-      return !usedGplanKeys.has(gKey);
+      return !usedGplanKeys.has(gKey) && !dateTolUsedKeys.has(gKey);
     });
     onlyGforDate.forEach(G => {
       const gAmt = _amtG(G);
@@ -24095,6 +24171,7 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
     [`기간: ${rangeLabel || '범위 없음'} (업로드한 엑셀의 거래일자 범위 기준)`],
     [`거래원장 ${ledgerCount}건 / 같은 기간 GPLAN(${SOURCE_LABEL}) ${gplanCount}건 / 일치 ${matchedSame.length}건 · 차이 ${totalDiff}건 (값 불일치 ${matched.length} · 누락 ${onlyLedger.length} · 추가 ${onlyGplan.length})`],
     [diffColExplain],
+    [`거래일자 셀이 노란색이면: 거래원장과 날짜는 다르지만 수령자·금액이 같아 자동으로 날짜를 맞춰 매칭한 행입니다. (표시된 날짜 = GPLAN 기준)`],
     [], // 빈 줄
   ];
 
@@ -24249,6 +24326,18 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
         font: isMismatch ? { bold: true, color: { rgb: 'DC2626' } } : (cell.s?.font || {})
       });
     }
+
+    // 4) 날짜무시 매칭 행 — 거래일자(A) 셀 노란 배경 + 굵게 (날짜가 자동 변경되었음 표시)
+    const DATECHG_BG = 'FFF2CC'; // 연한 노랑
+    dateChangedCells.forEach(idx => {
+      const r = dataStartRow + idx;
+      const addr = XLSX.utils.encode_cell({ r, c: 0 });
+      if (!ws[addr]) ws[addr] = { v: '', t: 's' };
+      ws[addr].s = Object.assign({}, ws[addr].s || {}, {
+        fill: { patternType: 'solid', fgColor: { rgb: DATECHG_BG } },
+        font: Object.assign({}, ws[addr].s?.font || {}, { bold: true, color: { rgb: 'B45309' } })
+      });
+    });
   }
 
   // 파일명: GPLAN_거래원장대조[_매입]_YYYY-MM-DD.xlsx
