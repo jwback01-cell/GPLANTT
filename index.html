@@ -23938,6 +23938,7 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
   const dateTolMatch = new Map();       // 날짜무시 매칭: "ledgerDate__recvKey" → {rows, gplanDate, gplanKey}
   const dateTolUsedKeys = new Set();    // 날짜무시 매칭에 소비된 GPLAN 그룹 키 (onlyGplan 중복표시 방지)
   const dateChangedCells = [];          // 거래일자 셀 색칠 대상 — rows 배열 인덱스
+  const taekbaeMoveByDate = {};         // 날짜 이동에 따라 택배비도 따라가도록: 날짜별 택배 가감액(거래원장측)
   const _findGplanGroup = (date, recvKey) => {
     _lastDateChanged = null;
     const exactKey = `${date}__${recvKey}`;
@@ -24040,6 +24041,13 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
         if (gplanGroupSum.get(k) !== lg.amt) continue; // 금액 정확히 일치
         dateTolMatch.set(gk, { rows: _gByGroup[k], gplanDate: kDate, gplanKey: k });
         dateTolUsedKeys.add(k);
+        // 택배비도 날짜를 따라 이동 — 이 주문의 GPLAN 택배비(shipCost/ship)를
+        // 거래원장 원래날짜(lg.date)에서 빼고 매칭된 날짜(kDate)로 더한다.
+        const _S = (_gByGroup[k] || []).reduce((s, r) => s + (isPurchase ? (Number(r.ship) || 0) : (Number(r.shipCost) || 0)), 0);
+        if (_S) {
+          taekbaeMoveByDate[lg.date] = (taekbaeMoveByDate[lg.date] || 0) - _S;
+          taekbaeMoveByDate[kDate]   = (taekbaeMoveByDate[kDate]   || 0) + _S;
+        }
         break;
       }
     });
@@ -24136,17 +24144,22 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
     });
 
     // 2) 택배 행 합산 — 1줄로 만들고 GPLAN 택배비용 합계와 비교
-    if (taekbaeItems.length > 0) {
+    //    날짜무시 매칭으로 주문이 이동한 경우, 그 주문의 택배비도 같은 날짜로 따라가도록
+    //    거래원장 택배 합계에 taekbaeMoveByDate 가감액을 반영한다.
+    const _tMove = Number(taekbaeMoveByDate[date]) || 0;
+    if (taekbaeItems.length > 0 || _tMove) {
       const tQty = taekbaeItems.reduce((s, { L }) => s + (Number(L.qty) || 0), 0);
-      const tSale = taekbaeItems.reduce((s, { L }) => s + _amtL(L), 0);
-      const firstUnit = Number(taekbaeItems[0].L.unit) || 0;
-      const tUnit = firstUnit || (tQty ? Math.round(tSale / tQty) : 0);
+      const tSaleBase = taekbaeItems.reduce((s, { L }) => s + _amtL(L), 0);
+      const tSale = tSaleBase + _tMove; // 택배비 날짜이동 반영
+      const firstUnit = Number(taekbaeItems[0]?.L?.unit) || 0;
+      const tUnit = firstUnit || (tQty ? Math.round(tSaleBase / tQty) : 0);
 
       const gShipSum = Number(_shipByDate[date]) || 0;
       // 택배는 비용 항목 — 차이 = GPLAN 택배비용(shipCost) - 거래원장 금액
       // (음수면 우리가 더 받은 것, 양수면 우리가 더 쓴 것)
       const tDiff = gShipSum - tSale;
-      const taekbaeName = taekbaeItems.length > 1 ? `택배 (${taekbaeItems.length}건 합산)` : '택배';
+      let taekbaeName = taekbaeItems.length > 1 ? `택배 (${taekbaeItems.length}건 합산)` : '택배';
+      if (_tMove) taekbaeName += ' (날짜이동 반영)';
 
       rows.push([
         date,                                 // 거래일자
@@ -24161,6 +24174,7 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
         gShipSum,                             // 매입(택배비) 또는 매출(택배비용) 합계
         tDiff,                                // 차이
       ]);
+      if (_tMove) dateChangedCells.push(rows.length - 1); // 택배 이동 행도 거래일자 셀 색칠
 
       sumQty += tQty;
       sumSale += tSale;
@@ -24199,7 +24213,7 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
     });
 
     // 4) 날짜별 소계 행 — 값 없음 행도 차이에 포함됨 (위에서 sumDiff += ledgerGroupSale)
-    const totalCount = regularItems.length + (taekbaeItems.length > 0 ? 1 : 0) + onlyGforDate.length;
+    const totalCount = regularItems.length + ((taekbaeItems.length > 0 || _tMove) ? 1 : 0) + onlyGforDate.length;
     const diffCell = sumDiff;
     rows.push([
       '',                                 // 거래일자
