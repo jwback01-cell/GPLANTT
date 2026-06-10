@@ -12255,7 +12255,7 @@ function renderProductTab(m, rangeOrIdxs) {
 
   document.getElementById('product-kpi').innerHTML = [
     { label:'취급 상품 수',  value: rows.length + '개' },
-    { label:'베스트셀러',    value: best ? best.name : '-', small:true },
+    { label:'순이익 합계',   value: totalProfit.toLocaleString('ko-KR'), color: totalProfit < 0 ? 'text-brand-pink' : 'text-brand-green' },
     { label:'1위 상품 매출', value: best ? best.sales.toLocaleString('ko-KR') : '-' },
     { label:'평균 수익률',   value: avgMargin + '%', color:'text-brand-green' },
     { label:'기간 광고비',   value: totalAd.toLocaleString('ko-KR'), color:'text-brand-pink' },
