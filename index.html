@@ -733,7 +733,16 @@ tailwind.config = {
               <p class="text-brand-gray text-xs md:text-sm mt-0.5">출고완료일 기준 주문을 수집 → 매출 장부에 저장 → 이카운트로 전송합니다.</p>
             </div>
           </div>
-          <div class="flex gap-2 shrink-0">
+          <div class="flex gap-2 shrink-0 items-center flex-wrap justify-end">
+            <div class="flex items-center gap-1.5 bg-brand-bg rounded-full px-2 py-1 border border-brand-border">
+              <input id="dashboard-pa-date-start" type="date" class="bg-white rounded-full px-2.5 py-1.5 text-xs font-semibold border border-brand-border outline-none focus:border-brand-black">
+              <span class="text-xs text-brand-gray">~</span>
+              <input id="dashboard-pa-date-end" type="date" class="bg-white rounded-full px-2.5 py-1.5 text-xs font-semibold border border-brand-border outline-none focus:border-brand-black">
+              <button onclick="dashboardOneClickEcount('custom')" id="dashboard-pa-custom-btn" class="px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-brand-black hover:opacity-90 transition-opacity whitespace-nowrap flex items-center gap-1.5">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                선택일 전송
+              </button>
+            </div>
             <button onclick="dashboardOneClickEcount('yesterday')" id="dashboard-pa-yesterday-btn" class="px-5 py-2.5 rounded-full text-sm font-bold bg-brand-bg border border-brand-border hover:bg-white transition-colors flex items-center gap-2">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
               어제
@@ -20326,6 +20335,7 @@ async function dashboardOneClickEcount(mode) {
   const statusEl = document.getElementById('dashboard-pa-status');
   const todayBtn = document.getElementById('dashboard-pa-today-btn');
   const yestBtn = document.getElementById('dashboard-pa-yesterday-btn');
+  const customBtn = document.getElementById('dashboard-pa-custom-btn');
   const setStatus = (msg, cls) => {
     if (!statusEl) return;
     statusEl.textContent = msg;
@@ -20345,12 +20355,26 @@ async function dashboardOneClickEcount(mode) {
     return;
   }
   // 날짜/기준/상태 기본값 세팅
-  setPaOrderQuickDate(mode);  // 오늘 or 어제
+  if (mode === 'custom') {
+    // 대시보드에서 직접 선택한 날짜(기간) 사용
+    const ds = document.getElementById('dashboard-pa-date-start');
+    const de = document.getElementById('dashboard-pa-date-end');
+    let sv = (ds && ds.value) || '';
+    let ev = (de && de.value) || '';
+    if (!sv && !ev) { setStatus('전송할 날짜를 선택하세요.', 'text-brand-pink'); return; }
+    if (!sv) sv = ev;
+    if (!ev) ev = sv;
+    if (sv > ev) { const t = sv; sv = ev; ev = t; } // 시작>종료면 자동 교정
+    s.value = sv; e.value = ev;
+  } else {
+    setPaOrderQuickDate(mode);  // 오늘 or 어제
+  }
   dt.value = 'shipped_time';  // 출고완료일 기준
   if (st) st.value = '';      // 주문 상태 전체
 
   if (todayBtn) todayBtn.disabled = true;
   if (yestBtn) yestBtn.disabled = true;
+  if (customBtn) customBtn.disabled = true;
   setStatus('실행 중...', 'text-brand-blue');
 
   try {
@@ -20361,8 +20385,20 @@ async function dashboardOneClickEcount(mode) {
   } finally {
     if (todayBtn) todayBtn.disabled = false;
     if (yestBtn) yestBtn.disabled = false;
+    if (customBtn) customBtn.disabled = false;
   }
 }
+
+// 대시보드 PA '선택일 전송' 날짜 입력 기본값 = 오늘
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    const today = _fmtYmd(new Date());
+    const ds = document.getElementById('dashboard-pa-date-start');
+    const de = document.getElementById('dashboard-pa-date-end');
+    if (ds && !ds.value) ds.value = today;
+    if (de && !de.value) de.value = today;
+  } catch (_) {}
+});
 
 // 원클릭 실행 시 PA 쇼핑몰 목록(별칭 포함)을 확실히 로드
 async function _paEnsureShopsLoaded() {
