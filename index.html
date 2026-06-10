@@ -21972,7 +21972,15 @@ async function savePlayautoOrdersToLedger(silent) {
     }
     const supply   = Number(core.supply) || 0;
     const shipFee  = Number(core.shipFee) || 0;
-    const shipCost = Number(core.shipCost) || 0;
+    let shipCostVal = core.shipCost; // null 가능(미매칭) — 그대로 유지
+    // 제주도 배송: 받는분 주소에 '제주' 포함 + 택배비를 실제 부담(>0)하는 행이면
+    // 제주 추가배송비 고정 3,000원 가산 (묶음 0원 처리 행/미매칭 행에는 가산 안 함)
+    let jejuShipApplied = false;
+    try {
+      const _addr = [o.to_state, o.to_city, o.to_addr1, o.to_addr2, o.addr1, o.addr2].filter(Boolean).join(' ');
+      if (/제주/.test(_addr) && Number(shipCostVal) > 0) { shipCostVal = Number(shipCostVal) + 3000; jejuShipApplied = true; }
+    } catch (_) {}
+    const shipCost = Number(shipCostVal) || 0;
     const profit = core.cost == null ? null : (supply + shipFee - Number(core.cost) - shipCost);
     return {
       vendor: vendorName,
@@ -21989,7 +21997,8 @@ async function savePlayautoOrdersToLedger(silent) {
       price:    core.price,
       supply:   core.supply,
       ship:     core.shipFee,
-      shipCost: core.shipCost,
+      shipCost: shipCostVal,                // 제주도 주소면 +3,000 가산된 값
+      jejuShipApplied,                      // 제주 추가배송비 3,000원 가산 여부
       cost:     core.cost,                  // null 가능 — 마이너스와 동일
       // 택배비용 진단용 — 마이너스 확인의 배지(SKU 없음 / 미매칭 / 묶음 적용)와 동일하게 표시하기 위함
       skuCode:               core.skuCode || '',
