@@ -5984,6 +5984,17 @@ function setStatFilter(type) {
 
 // ── Product Stats ─────────────────────────────
 let _allProducts = []; // DB에서 로드한 전체 상품 캐시
+// 상품 로컬 수정시각 — DB updated_at 컬럼 유무와 무관하게 '오늘 수정' 필터가 동작하도록 (id -> 'YYYY-MM-DD')
+function _pmLoadEdited() { try { return JSON.parse(localStorage.getItem('pm_edited_dates') || '{}') || {}; } catch (_) { return {}; } }
+function _pmMarkEdited(id) {
+  if (!id) return;
+  try {
+    const m = _pmLoadEdited();
+    const d = new Date();
+    m[id] = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    localStorage.setItem('pm_edited_dates', JSON.stringify(m));
+  } catch (_) {}
+}
 
 // ── 재고 연동 그룹 헬퍼 ─────────────────────────
 // 같은 stock_link_group 값을 가진 상품들끼리 재고/안전재고/원가/공급가를 공유
@@ -6594,6 +6605,7 @@ function renderProductsPage() {
   const catAll = catSel === '카테고리 전체';
   const dateStart = (document.getElementById('product-date-start')?.value || '').replace(/-/g,'');
   const dateEnd   = (document.getElementById('product-date-end')?.value   || '').replace(/-/g,'');
+  const _pmEditedMap = _pmLoadEdited();   // 로컬 수정시각 (id -> YYYY-MM-DD)
 
   // 필터링
   const filtered = _allProducts.filter(p => {
@@ -6623,15 +6635,17 @@ function renderProductsPage() {
     const matchCat   = catAll || cat === catSel;
     const matchStat  = activeStatFilter === 'all'
                     || (activeStatFilter === 'low'  && isLow);
-    // 등록일 범위 필터 (created_at 의 YYYYMMDD 부분만 비교)
+    // 날짜 범위 필터 — 등록일(created_at) 또는 수정일(updated_at/로컬 기록) 중 하나라도 범위에 들면 표시
     let matchDate = true;
     if (dateStart || dateEnd) {
-      const c = String(p.created_at || '').slice(0, 10).replace(/-/g, '');
-      if (!c) matchDate = false;
-      else {
-        if (dateStart && c < dateStart) matchDate = false;
-        if (dateEnd && c > dateEnd) matchDate = false;
-      }
+      const inRange = (ymd) => {
+        const c = String(ymd || '').slice(0, 10).replace(/-/g, '');
+        if (!c) return false;
+        if (dateStart && c < dateStart) return false;
+        if (dateEnd && c > dateEnd) return false;
+        return true;
+      };
+      matchDate = inRange(p.created_at) || inRange(p.updated_at) || inRange(_pmEditedMap[p.id]);
     }
     return matchQuery && matchFolder && matchCat && matchStat && matchDate;
   });
@@ -6943,6 +6957,7 @@ async function submitBulkEditProducts() {
     showErr('일괄 수정 실패: ' + error.message + (error.details ? ` (${error.details})` : ''));
     return;
   }
+  try { (ids || []).forEach(id => _pmMarkEdited(id)); } catch (_) {}
 
   const updatedCount = Array.isArray(updatedRows) ? updatedRows.length : ids.length;
   if (updatedCount === 0) {
@@ -7539,6 +7554,8 @@ async function confirmImport() {
       updErr++;
       console.error('update error:', error, 'patch:', patch);
       if (failureSamples.length < 10) failureSamples.push({ sku: patch.sku || '?', name: patch.name || '?', msg: error.message || String(error) });
+    } else {
+      try { _pmMarkEdited(u.id); } catch (_) {}
     }
   }
   if (inserts.length) {
