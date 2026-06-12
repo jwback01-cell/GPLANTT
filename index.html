@@ -20367,6 +20367,12 @@ async function dashboardOneClickEcount(mode) {
   } else {
     setPaOrderQuickDate(mode);  // 오늘 or 어제
   }
+  // fetchSaveAndSendToEcount 가 주문수집 기간을 pa-one-click 입력값으로 덮어쓰므로(우선순위),
+  // 묵은 값이 선택일을 가로채지 않도록 pa-one-click 도 동일 날짜로 맞춤
+  const _oc1 = document.getElementById('pa-one-click-start');
+  const _oc2 = document.getElementById('pa-one-click-end');
+  if (_oc1) _oc1.value = s.value;
+  if (_oc2) _oc2.value = e.value;
   dt.value = 'shipped_time';  // 출고완료일 기준
   if (st) st.value = '';      // 주문 상태 전체
 
@@ -20376,8 +20382,17 @@ async function dashboardOneClickEcount(mode) {
   setStatus('실행 중...', 'text-brand-blue');
 
   try {
-    await fetchSaveAndSendToEcount();
-    setStatus('전송 완료. 이카운트 연동 탭에서 내역을 확인하세요.', 'text-brand-green');
+    const result = await fetchSaveAndSendToEcount();
+    if (result && result.ok) {
+      setStatus(`전송 완료 (${result.sent || 0}건). 이카운트 연동 탭에서 내역을 확인하세요.`, 'text-brand-green');
+    } else {
+      // 전송 안 됨(주문 없음/실패/롤백 등) — fetchSaveAndSendToEcount 가 사유 모달을 이미 표시함
+      const why = result && result.reason === 'no_orders' ? '선택한 날짜에 수집된 주문이 없습니다.'
+              : result && result.reason === 'ledger_fail' ? '매출 장부 저장에 실패했습니다.'
+              : result && result.reason === 'no_ecount_config' ? '이카운트 연동 설정이 필요합니다.'
+              : '전송되지 않았습니다. 위 안내를 확인하세요.';
+      setStatus('⚠ ' + why, 'text-brand-pink');
+    }
   } catch (err) {
     setStatus('실패: ' + (err && err.message ? err.message : err), 'text-brand-pink');
   } finally {
@@ -20427,7 +20442,7 @@ async function fetchSaveAndSendToEcount() {
         () => { switchUploadTab('ecount'); },
         { type: 'info', confirmText: '이동' }
       );
-      return;
+      return { ok: false, reason: 'no_ecount_config' };
     }
 
     // 원클릭 전용 기간 입력을 주문 수집 기간에 반영 (비어있으면 유지)
@@ -20445,7 +20460,7 @@ async function fetchSaveAndSendToEcount() {
 
     // 3. 주문 수집
     await fetchPlayautoOrders();
-    if (!_paOrders.length) { showAppAlert('수집된 주문 없음', '수집된 주문이 없어 전송을 중단합니다.', 'warn'); return; }
+    if (!_paOrders.length) { showAppAlert('수집된 주문 없음', '수집된 주문이 없어 전송을 중단합니다.', 'warn'); return { ok: false, reason: 'no_orders' }; }
 
     // 4. 매출 장부 저장 — 저장 직전 스냅샷을 떠둠 (이카운트 실패 시 롤백 위해)
     if (btn) btn.innerHTML = '<span class="animate-pulse">2/3 장부 저장 중...</span>';
@@ -20453,7 +20468,7 @@ async function fetchSaveAndSendToEcount() {
     const paEnd = pa2 ? pa2.value || '' : '';
     try { ledgerSnapshot = localStorage.getItem('gplan_upload_data_v1'); } catch(_) { ledgerSnapshot = null; }
     ledgerSavedCount = await savePlayautoOrdersToLedger(true);
-    if (!ledgerSavedCount) { showAppAlert('장부 저장 실패', '매출 장부 저장에 실패했습니다.', 'error'); return; }
+    if (!ledgerSavedCount) { showAppAlert('장부 저장 실패', '매출 장부 저장에 실패했습니다.', 'error'); return { ok: false, reason: 'ledger_fail' }; }
 
     // 5. 이카운트 전송용 날짜 범위를 PA 조회 범위로 동기화
     const ecStart = document.getElementById('ecount-range-start');
@@ -20516,7 +20531,9 @@ async function fetchSaveAndSendToEcount() {
         'warn'
       );
       ledgerSnapshot = null; // 이미 복원됨 — finally 에서 재복원하지 않도록
+      return { ok: false, reason: 'ecount_fail' };
     }
+    return { ok: true, sent: okSum }; // 실제 전송 성공
   } catch (e) {
     // 예외 발생 시도 롤백
     if (ledgerSnapshot != null) {
@@ -20527,6 +20544,7 @@ async function fetchSaveAndSendToEcount() {
       ledgerSnapshot = null;
     }
     showAppAlert('원클릭 실행 오류', (e && e.message ? e.message : String(e)) + (ledgerSavedCount ? `\n\n장부 저장 ${ledgerSavedCount}건도 롤백했습니다.` : ''), 'error');
+    return { ok: false, reason: 'exception' };
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = orig; }
   }
