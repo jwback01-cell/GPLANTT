@@ -1316,19 +1316,22 @@ tailwind.config = {
             <div class="relative w-40 md:w-56 h-40 md:h-56 shrink-0">
               <svg viewBox="0 0 36 36" class="w-full h-full -rotate-90">
                 <circle cx="18" cy="18" r="16" fill="none" stroke="#F2F2F7" stroke-width="4"/>
-                <circle cx="18" cy="18" r="16" fill="none" stroke="#1A1A1A" stroke-width="4" stroke-dasharray="0 100" class="donut-segment" data-dash="0 100"/>
+                <circle cx="18" cy="18" r="16" fill="none" stroke="#00C853" stroke-width="4" stroke-dasharray="0 100" stroke-dashoffset="0" class="donut-segment" data-dash="0 100"/>
+                <circle cx="18" cy="18" r="16" fill="none" stroke="#1A1A1A" stroke-width="4" stroke-dasharray="0 100" stroke-dashoffset="0" class="donut-segment" data-dash="0 100"/>
                 <circle cx="18" cy="18" r="16" fill="none" stroke="#2196F3" stroke-width="4" stroke-dasharray="0 100" stroke-dashoffset="0" class="donut-segment" data-dash="0 100"/>
                 <circle cx="18" cy="18" r="16" fill="none" stroke="#E91E63" stroke-width="4" stroke-dasharray="0 100" stroke-dashoffset="0" class="donut-segment" data-dash="0 100"/>
                 <circle cx="18" cy="18" r="16" fill="none" stroke="#FF9800" stroke-width="4" stroke-dasharray="0 100" stroke-dashoffset="0" class="donut-segment" data-dash="0 100"/>
+                <circle cx="18" cy="18" r="16" fill="none" stroke="#9C27B0" stroke-width="4" stroke-dasharray="0 100" stroke-dashoffset="0" class="donut-segment" data-dash="0 100"/>
               </svg>
-              <div class="absolute inset-0 flex flex-col items-center justify-center"><span class="text-brand-gray text-xs font-semibold">총 지출</span><span id="ledger-donut-total" class="text-base md:text-lg font-bold">0</span></div>
+              <div class="absolute inset-0 flex flex-col items-center justify-center"><span class="text-brand-gray text-xs font-semibold">합계</span><span id="ledger-donut-total" class="text-base md:text-lg font-bold">0</span></div>
             </div>
             <div class="flex-1 grid grid-cols-1 gap-3 w-full">
-              <div class="flex items-center justify-between p-3 md:p-4 bg-brand-green-light/50 border border-brand-green/20 rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full bg-brand-green shrink-0"></div><span class="font-bold text-sm md:text-base">공급가 <span class="text-brand-gray font-medium text-xs">(이번 달 · 수익 기준)</span></span></div><div class="flex items-baseline gap-2"><span id="ledger-donut-supply-amt" class="font-bold text-base md:text-lg text-brand-green">0</span></div></div>
+              <div class="flex items-center justify-between p-3 md:p-4 bg-brand-green-light/50 border border-brand-green/20 rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full bg-brand-green shrink-0"></div><span class="font-bold text-sm md:text-base">공급가 <span class="text-brand-gray font-medium text-xs">(이번 달 · 수익)</span></span></div><div class="flex items-baseline gap-2"><span id="ledger-donut-supply-pct" class="font-bold text-base md:text-lg text-brand-green">0%</span><span id="ledger-donut-supply-amt" class="text-brand-gray text-xs md:text-sm hidden md:block">0</span></div></div>
               <div class="flex items-center justify-between p-3 md:p-4 bg-brand-bg rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full bg-brand-black shrink-0"></div><span class="font-bold text-sm md:text-base">상품 매입가</span></div><div class="flex items-baseline gap-2"><span id="ledger-donut-purchase-pct" class="font-bold text-base md:text-lg">0%</span><span id="ledger-donut-purchase-amt" class="text-brand-gray text-xs md:text-sm hidden md:block">0</span></div></div>
               <div class="flex items-center justify-between p-3 md:p-4 bg-brand-bg rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full bg-brand-blue shrink-0"></div><span class="font-bold text-sm md:text-base">광고비</span></div><div class="flex items-baseline gap-2"><span id="ledger-donut-marketing-pct" class="font-bold text-base md:text-lg">0%</span><span id="ledger-donut-marketing-amt" class="text-brand-gray text-xs md:text-sm hidden md:block">0</span></div></div>
               <div class="flex items-center justify-between p-3 md:p-4 bg-brand-bg rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full bg-brand-pink shrink-0"></div><span class="font-bold text-sm md:text-base">물류 및 배송</span></div><div class="flex items-baseline gap-2"><span id="ledger-donut-logistics-pct" class="font-bold text-base md:text-lg">0%</span><span id="ledger-donut-logistics-amt" class="text-brand-gray text-xs md:text-sm hidden md:block">0</span></div></div>
               <div class="flex items-center justify-between p-3 md:p-4 bg-brand-bg rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full bg-brand-orange shrink-0"></div><span class="font-bold text-sm md:text-base">운영비</span></div><div class="flex items-baseline gap-2"><span id="ledger-donut-delivery-pct" class="font-bold text-base md:text-lg">0%</span><span id="ledger-donut-delivery-amt" class="text-brand-gray text-xs md:text-sm hidden md:block">0</span></div></div>
+              <div class="flex items-center justify-between p-3 md:p-4 bg-brand-bg rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full shrink-0" style="background:#9C27B0"></div><span class="font-bold text-sm md:text-base">판매수수료 <span class="text-brand-gray font-medium text-xs">(매출 8% 추정)</span></span></div><div class="flex items-baseline gap-2"><span id="ledger-donut-commission-pct" class="font-bold text-base md:text-lg">0%</span><span id="ledger-donut-commission-amt" class="text-brand-gray text-xs md:text-sm hidden md:block">0</span></div></div>
             </div>
           </div>
         </div>
@@ -5578,49 +5581,56 @@ function animateDonut() {
   // 운영비(이번 달 월별 총액 = 반복 + 그 달 일회성) — 4번째 슬롯
   const _opsThisMonth = (typeof _opsMonthlyTotalForMonth === 'function')
     ? _opsMonthlyTotalForMonth(`${_now.getFullYear()}-${String(_curMonth).padStart(2,'0')}`) : 0;
-  const totalExpense = totalPurchase + totalFee + totalDelivery + _opsThisMonth;
-  const pctPurchase = totalExpense > 0 ? Math.round(totalPurchase / totalExpense * 100) : 0;
-  const pctFee      = totalExpense > 0 ? Math.round(totalFee / totalExpense * 100) : 0;
-  const pctDelivery = totalExpense > 0 ? Math.round(totalDelivery / totalExpense * 100) : 0;
-  const pctOther    = totalExpense > 0 ? Math.max(0, 100 - pctPurchase - pctFee - pctDelivery) : 0; // 운영비(잔여=합 100 보정)
+  // 판매수수료 (매출 8% 추정) + 이번 달 공급가
+  const _commission = Math.round((_curData.sales || 0) * 0.08);
+  const _curMonthSupply = (typeof _ledgerEntries !== 'undefined' && _ledgerEntries) ? _ledgerEntries.reduce((s, r) => {
+    const mm = parseInt(String(r['날짜'] || '').split('-')[1]) || 0;
+    return mm === _curMonthNum ? s + (Number(r['공급가']) || 0) : s;
+  }, 0) : 0;
+  // 합계 = 공급가 + 모든 비용 (공급가 포함 비율 비교용)
+  const _combined = _curMonthSupply + totalPurchase + totalFee + totalDelivery + _opsThisMonth + _commission;
+  const _pc = v => _combined > 0 ? Math.round(v / _combined * 100) : 0;
+  const pSupply   = _pc(_curMonthSupply);
+  const pPurchase = _pc(totalPurchase);
+  const pFee      = _pc(totalFee);
+  const pDelivery = _pc(totalDelivery);
+  const pOps      = _pc(_opsThisMonth);
+  const pComm     = _combined > 0 ? Math.max(0, 100 - pSupply - pPurchase - pFee - pDelivery - pOps) : 0; // 잔여=수수료(합 100 보정)
 
-  // 도넛 segment dash 업데이트
+  // 도넛 6 세그먼트: 공급가, 매입, 광고, 물류, 운영, 수수료
   const segments = document.querySelectorAll('.donut-segment');
-  if (segments.length >= 4) {
+  if (segments.length >= 6) {
     const circ = 100;
-    segments[0].dataset.dash = pctPurchase + ' ' + circ;
-    segments[1].dataset.dash = pctFee + ' ' + circ;
-    segments[1].setAttribute('stroke-dashoffset', -pctPurchase);
-    segments[2].dataset.dash = pctDelivery + ' ' + circ;
-    segments[2].setAttribute('stroke-dashoffset', -(pctPurchase + pctFee));
-    segments[3].dataset.dash = pctOther + ' ' + circ;
-    segments[3].setAttribute('stroke-dashoffset', -(pctPurchase + pctFee + pctDelivery));
+    const order = [pSupply, pPurchase, pFee, pDelivery, pOps, pComm];
+    let acc = 0;
+    order.forEach((p, i) => {
+      segments[i].dataset.dash = p + ' ' + circ;
+      segments[i].setAttribute('stroke-dashoffset', -acc);
+      acc += p;
+    });
   }
 
-  // 중앙 총 지출 + 우측 범례 (ID 기반)
+  // 중앙 합계 + 우측 범례 (ID 기반)
   const fmtW = n => Math.round(n).toLocaleString('ko-KR');
   const setText = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
-  setText('ledger-donut-total', fmtW(totalExpense));
-  setText('ledger-donut-purchase-pct',  pctPurchase + '%');
-  setText('ledger-donut-purchase-amt',  fmtW(totalPurchase));
-  setText('ledger-donut-marketing-pct', pctFee + '%');
-  setText('ledger-donut-marketing-amt', fmtW(totalFee));
-  setText('ledger-donut-logistics-pct', pctDelivery + '%');
-  setText('ledger-donut-logistics-amt', fmtW(totalDelivery));
-  setText('ledger-donut-delivery-pct',  pctOther + '%');
-  setText('ledger-donut-delivery-amt',  fmtW(_opsThisMonth));
+  setText('ledger-donut-total', fmtW(_combined));
+  setText('ledger-donut-supply-pct',     pSupply + '%');
+  setText('ledger-donut-supply-amt',     fmtW(_curMonthSupply));
+  setText('ledger-donut-purchase-pct',   pPurchase + '%');
+  setText('ledger-donut-purchase-amt',   fmtW(totalPurchase));
+  setText('ledger-donut-marketing-pct',  pFee + '%');
+  setText('ledger-donut-marketing-amt',  fmtW(totalFee));
+  setText('ledger-donut-logistics-pct',  pDelivery + '%');
+  setText('ledger-donut-logistics-amt',  fmtW(totalDelivery));
+  setText('ledger-donut-delivery-pct',   pOps + '%');
+  setText('ledger-donut-delivery-amt',   fmtW(_opsThisMonth));
+  setText('ledger-donut-commission-pct', pComm + '%');
+  setText('ledger-donut-commission-amt', fmtW(_commission));
 
   // 광고비 / 운영비 / 물류 및 배송 KPI 카드 (이번 달)
   setText('ledger-kpi-ad',       fmtW(totalFee));
   setText('ledger-kpi-ops',      fmtW(_opsThisMonth));
   setText('ledger-kpi-delivery', fmtW(totalDelivery));
-
-  // 공급가 (이번 달 · 수익 기준) — 도넛 총지출에는 포함 안 함, 참고용
-  const _curMonthSupply = (typeof _ledgerEntries !== 'undefined' && _ledgerEntries) ? _ledgerEntries.reduce((s, r) => {
-    const mm = parseInt(String(r['날짜'] || '').split('-')[1]) || 0;
-    return mm === _curMonthNum ? s + (Number(r['공급가']) || 0) : s;
-  }, 0) : 0;
-  setText('ledger-donut-supply-amt', fmtW(_curMonthSupply));
 
   setTimeout(() => {
     document.querySelectorAll('.donut-segment').forEach(seg => {
