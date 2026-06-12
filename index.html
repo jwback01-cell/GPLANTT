@@ -10941,6 +10941,7 @@ function syncLedgerFromUploadData() {
     '품목명'       : r.itemName   || '',
     '수량'         : Number(r.qty || 0),
     '단가(vat포함)': Number(r.price || 0),
+    '공급가'       : Number(r.supply || 0),
     '택배비'       : Number(r.ship || 0),
     '택배비용'     : Number(r.shipCost || 0),
     '원가'         : Number(r.cost || 0),
