@@ -4517,8 +4517,8 @@ tailwind.config = {
               <div class="relative">
                 <button type="button" onclick="_toggleMenu('upload-monthend-menu')" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-blue hover:bg-brand-bg flex items-center gap-1.5" title="거래원장 대조 / 매입 대조 / 이카운트 전송">📅 월마감<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>
                 <div id="upload-monthend-menu" class="ud-dropdown-menu hidden absolute z-50 mt-1 left-0 bg-white border border-brand-border rounded-2xl shadow-xl p-1.5 w-56">
-                  <button onclick="_closeMenu('upload-monthend-menu');openSeoulLivingReconcile()" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold text-brand-blue hover:bg-brand-bg">🔍 거래원장 대조</button>
                   <button onclick="_closeMenu('upload-monthend-menu');openSeoulLivingReconcilePurchase()" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold text-brand-blue hover:bg-brand-bg">🔍 거래원장 대조 (매입)</button>
+                  <button onclick="_closeMenu('upload-monthend-menu');openSeoulLivingReconcile()" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold text-brand-blue hover:bg-brand-bg">🔍 거래원장 대조 (매출)</button>
                   <button onclick="_closeMenu('upload-monthend-menu');goEcountFromUploadData()" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold text-brand-black hover:bg-brand-bg">📤 이카운트로 전송</button>
                 </div>
               </div>
