@@ -648,6 +648,7 @@ tailwind.config = {
         </a>
       <div class="products-submenu hidden flex-col gap-1.5 ml-7 mb-1">
         <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="normal" onclick="_goToProdTab('normal')">상품관리</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="receive" onclick="_goToProdTab('receive')">입고하기</a>
         <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="import" onclick="_goToProdTab('import')">수입관리</a>
       </div>
         <a href="#" data-page="accounts" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px] transition-colors">
@@ -1213,6 +1214,7 @@ tailwind.config = {
         <a href="#" data-page="products" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="16.5" x2="7.5" y1="9.4" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" x2="12" y1="22.08" y2="12"/></svg>상품 관리</a>
       <div class="products-submenu hidden flex-col gap-1.5 ml-7 mb-1">
         <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="normal" onclick="_goToProdTab('normal')">상품관리</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="receive" onclick="_goToProdTab('receive')">입고하기</a>
         <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="import" onclick="_goToProdTab('import')">수입관리</a>
       </div>
         <a href="#" data-page="accounts" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>계정 보관함</a>
@@ -1741,6 +1743,7 @@ tailwind.config = {
         <a href="#" data-page="products" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="16.5" x2="7.5" y1="9.4" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" x2="12" y1="22.08" y2="12"/></svg>상품 관리</a>
       <div class="products-submenu hidden flex-col gap-1.5 ml-7 mb-1">
         <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="normal" onclick="_goToProdTab('normal')">상품관리</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="receive" onclick="_goToProdTab('receive')">입고하기</a>
         <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="import" onclick="_goToProdTab('import')">수입관리</a>
       </div>
         <a href="#" data-page="accounts" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>계정 보관함</a>
@@ -9508,8 +9511,8 @@ function switchProductTab(which) {
   if (_activeProductTab === 'receive') _initReceivingTab();
   if (_activeProductTab === 'stockvalue') renderStockValueView();
   if (_activeProductTab === 'import') renderImpTab();
-  // 사이드바 하위 메뉴 활성 표시 동기화 — '수입관리' 외 나머지는 모두 '상품관리'로 표시
-  const sidebarTab = isImport ? 'import' : 'normal';
+  // 사이드바 하위 메뉴 활성 표시 동기화 — 입고하기/수입관리는 자기 항목, 그 외(일반/세트/재고금액)는 상품관리
+  const sidebarTab = isImport ? 'import' : (_activeProductTab === 'receive' ? 'receive' : 'normal');
   document.querySelectorAll('[data-prod-tab]').forEach(a => a.classList.toggle('active', a.dataset.prodTab === sidebarTab));
 }
 
