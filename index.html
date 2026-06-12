@@ -12015,6 +12015,7 @@ function buildPeriodButtons(tabId) {
   let html = `<button onclick="setDetailPeriod('${tabId}',0)" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold bg-brand-black text-white transition-all">전체</button>`;
   // "오늘" 버튼 — dp-today-btn 으로 별도 마킹 (인덱스 기반 활성화에서 제외)
   html += `<button onclick="setTodayPeriod('${tabId}')" class="dp-btn dp-today-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">오늘</button>`;
+  html += `<button onclick="setYesterdayPeriod('${tabId}')" class="dp-btn dp-yest-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">어제</button>`;
   for (let m = 1; m <= _currentMonth; m++) {
     html += `<button onclick="setDetailPeriod('${tabId}',${m})" class="dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all">${m}월</button>`;
   }
@@ -12042,8 +12043,13 @@ function setDetailPeriod(tab, m) {
   if (todayBtn) {
     todayBtn.className = 'dp-btn dp-today-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all';
   }
-  // 전체/1월/2월/... 버튼만 인덱스로 활성화
-  const btns = document.querySelectorAll('#' + tab + '-period-btns .dp-btn:not(.dp-today-btn)');
+  // "어제" 버튼도 비활성화
+  const yestBtn = document.querySelector('#' + tab + '-period-btns .dp-yest-btn');
+  if (yestBtn) {
+    yestBtn.className = 'dp-btn dp-yest-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all';
+  }
+  // 전체/1월/2월/... 버튼만 인덱스로 활성화 (오늘·어제 제외)
+  const btns = document.querySelectorAll('#' + tab + '-period-btns .dp-btn:not(.dp-today-btn):not(.dp-yest-btn)');
   btns.forEach((btn, i) => {
     btn.className = (i === m)
       ? 'dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold bg-brand-black text-white transition-all'
@@ -12074,7 +12080,8 @@ function setTodayPeriod(tab) {
     if (b.classList.contains('dp-today-btn')) {
       b.className = 'dp-btn dp-today-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold bg-brand-black text-white transition-all';
     } else {
-      b.className = 'dp-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all';
+      const marker = b.classList.contains('dp-yest-btn') ? ' dp-yest-btn' : '';
+      b.className = 'dp-btn' + marker + ' shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all';
     }
   });
 
@@ -12085,6 +12092,42 @@ function setTodayPeriod(tab) {
     if (el) el.textContent = label;
   });
   // 직접 선택 input 도 채움
+  const sEl = document.getElementById(tab + '-range-start');
+  const eEl = document.getElementById(tab + '-range-end');
+  if (sEl) sEl.value = k;
+  if (eEl) eEl.value = k;
+
+  const range = { start: k, end: k };
+  if (tab === 'product')       renderProductTab(0, range);
+  else if (tab === 'supplier') renderSupplierTab(0, range);
+  else if (tab === 'channel')  renderChannelTab(0, range);
+  else if (tab === 'analysis') renderAnalysisTab(0, range);
+}
+
+// 어제 버튼 — 시작/종료를 모두 어제로 설정 (오늘 버튼과 동일한 흐름)
+function setYesterdayPeriod(tab) {
+  const d0 = new Date(); d0.setDate(d0.getDate() - 1);
+  const y = d0.getFullYear();
+  const mo = String(d0.getMonth() + 1).padStart(2, '0');
+  const d = String(d0.getDate()).padStart(2, '0');
+  const k = `${y}-${mo}-${d}`;
+
+  // 어제 버튼만 활성화, 나머지(전체/오늘/월) 비활성화 — 마커 클래스는 보존
+  const all = document.querySelectorAll('#' + tab + '-period-btns .dp-btn');
+  all.forEach(b => {
+    if (b.classList.contains('dp-yest-btn')) {
+      b.className = 'dp-btn dp-yest-btn shrink-0 px-4 py-2 rounded-full text-sm font-bold bg-brand-black text-white transition-all';
+    } else {
+      const marker = b.classList.contains('dp-today-btn') ? ' dp-today-btn' : '';
+      b.className = 'dp-btn' + marker + ' shrink-0 px-4 py-2 rounded-full text-sm font-bold text-brand-gray hover:bg-white transition-all';
+    }
+  });
+
+  const label = `${y}년 ${d0.getMonth() + 1}월 ${d0.getDate()}일`;
+  ['period-label', 'table-label'].forEach(sfx => {
+    const el = document.getElementById(tab + '-' + sfx);
+    if (el) el.textContent = label;
+  });
   const sEl = document.getElementById(tab + '-range-start');
   const eEl = document.getElementById(tab + '-range-end');
   if (sEl) sEl.value = k;
