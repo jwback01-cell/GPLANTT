@@ -4514,16 +4514,24 @@ tailwind.config = {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                 SKU 매칭
               </button>
-              <button onclick="filterUploadDataByJet()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-black hover:bg-brand-bg" title="검색창에 '제트배송' 키워드 적용">📦 제트배송만 보기</button>
-              <button onclick="syncJetReportsToUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-blue hover:bg-brand-bg" title="저장된 제트배송 리포트(입출고비/배송비/보관비/재고손실/주문/수수료) 데이터를 업로드 데이터로 가져오기">⟳ 제트배송 동기화</button>
-              <button onclick="openSeoulLivingReconcile()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-blue hover:bg-brand-bg" title="서울리빙 거래원장 엑셀의 매출 컬럼과 GPLAN(거래처=서울리빙 계열) 비교">🔍 거래원장 대조</button>
+              <div class="relative">
+                <button type="button" onclick="_toggleMenu('upload-monthend-menu')" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-blue hover:bg-brand-bg flex items-center gap-1.5" title="거래원장 대조 / 매입 대조 / 이카운트 전송">📅 월마감<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>
+                <div id="upload-monthend-menu" class="ud-dropdown-menu hidden absolute z-50 mt-1 left-0 bg-white border border-brand-border rounded-2xl shadow-xl p-1.5 w-56">
+                  <button onclick="_closeMenu('upload-monthend-menu');openSeoulLivingReconcile()" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold text-brand-blue hover:bg-brand-bg">🔍 거래원장 대조</button>
+                  <button onclick="_closeMenu('upload-monthend-menu');openSeoulLivingReconcilePurchase()" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold text-brand-blue hover:bg-brand-bg">🔍 거래원장 대조 (매입)</button>
+                  <button onclick="_closeMenu('upload-monthend-menu');goEcountFromUploadData()" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold text-brand-black hover:bg-brand-bg">📤 이카운트로 전송</button>
+                </div>
+              </div>
               <input type="file" id="reconcile-file-input" accept=".xlsx,.xls,.csv" class="hidden" onchange="_reconcileFileChosen(event)">
-              <button onclick="openSeoulLivingReconcilePurchase()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-blue hover:bg-brand-bg" title="서울리빙 거래원장 엑셀의 매입 컬럼과 GPLAN(사이트=서울리빙(수동)) 비교">🔍 거래원장 대조 (매입)</button>
               <input type="file" id="reconcile-purchase-file-input" accept=".xlsx,.xls,.csv" class="hidden" onchange="_reconcileFileChosenPurchase(event)">
               <button onclick="openManualUploadModal()" class="px-4 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:-translate-y-0.5 transition-transform shadow-md">+ 수기 등록</button>
-              <button onclick="goEcountFromUploadData()" class="px-4 py-2 rounded-full bg-gradient-to-r from-brand-blue to-brand-blue text-white text-sm font-bold hover:opacity-90 transition-opacity shadow-md" title="현재 조회 기간의 데이터를 이카운트로 전송 (미리보기 후 전송)">📤 이카운트로 전송</button>
-              <button onclick="convertSelectedToReturn('buyer')" class="px-4 py-2 rounded-full border border-brand-pink bg-brand-pink-light text-sm font-bold text-brand-pink hover:bg-brand-pink hover:text-white transition-colors" title="구매자 귀책 — 택배비용은 양수 그대로 (우리가 부담)">↩ 반품(구매자귀책)</button>
-              <button onclick="convertSelectedToReturn('seller')" class="px-4 py-2 rounded-full border border-brand-pink bg-brand-pink-light text-sm font-bold text-brand-pink hover:bg-brand-pink hover:text-white transition-colors" title="판매자 귀책 — 택배비용도 음수 처리 (회수)">↩ 반품(판매자귀책)</button>
+              <div class="relative">
+                <button type="button" onclick="_toggleMenu('upload-return-menu')" class="px-4 py-2 rounded-full border border-brand-pink bg-brand-pink-light text-sm font-bold text-brand-pink hover:bg-brand-pink hover:text-white transition-colors flex items-center gap-1.5" title="반품(구매자귀책) / 반품(판매자귀책)">↩ 반품<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>
+                <div id="upload-return-menu" class="ud-dropdown-menu hidden absolute z-50 mt-1 left-0 bg-white border border-brand-border rounded-2xl shadow-xl p-1.5 w-52">
+                  <button onclick="_closeMenu('upload-return-menu');convertSelectedToReturn('buyer')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold text-brand-pink hover:bg-brand-pink-light" title="구매자 귀책 — 택배비용은 양수 그대로 (우리가 부담)">↩ 반품(구매자귀책)</button>
+                  <button onclick="_closeMenu('upload-return-menu');convertSelectedToReturn('seller')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold text-brand-pink hover:bg-brand-pink-light" title="판매자 귀책 — 택배비용도 음수 처리 (회수)">↩ 반품(판매자귀책)</button>
+                </div>
+              </div>
               <button onclick="exportUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg">엑셀 내보내기</button>
               <button id="upload-data-delete-btn" onclick="deleteSelectedUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-pink hover:bg-brand-bg">선택 삭제 <span id="upload-data-sel-count" class="ml-1 text-xs text-brand-gray">(0)</span></button>
             </div>
@@ -25037,6 +25045,24 @@ function submitManualUpload() {
     showAppAlert('수기 등록 완료', `${itemName}\n수량 ${qty} · 마진 ${profit.toLocaleString('ko-KR')}원`, 'success');
   }
 }
+
+// 업로드 데이터 버튼 바 드롭다운(월마감/반품) 토글
+function _toggleMenu(id) {
+  const m = document.getElementById(id);
+  if (!m) return;
+  const willOpen = m.classList.contains('hidden');
+  document.querySelectorAll('.ud-dropdown-menu').forEach(x => x.classList.add('hidden'));
+  if (willOpen) m.classList.remove('hidden');
+}
+function _closeMenu(id) { const m = document.getElementById(id); if (m) m.classList.add('hidden'); }
+document.addEventListener('mousedown', (e) => {
+  document.querySelectorAll('.ud-dropdown-menu').forEach(m => {
+    if (m.classList.contains('hidden')) return;
+    const wrap = m.closest('.relative');
+    if (wrap && wrap.contains(e.target)) return;
+    m.classList.add('hidden');
+  });
+});
 
 // 업로드 데이터 → 이카운트 연동 탭으로 이동(현재 조회 기간 적용) 후 미리보기 자동 실행
 function goEcountFromUploadData() {
