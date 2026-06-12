@@ -2103,7 +2103,7 @@ tailwind.config = {
           <div class="p-4 md:p-6 border-b border-brand-border flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <div class="font-bold text-[15px]">상세 내역</div>
-              <div class="text-xs text-brand-gray mt-1">카테고리 = "지플랜" + 재고 &gt; 0 인 상품만 표시. 재고금액 = 재고 × 원가.</div>
+              <div class="text-xs text-brand-gray mt-1">카테고리 = "지플랜" + 재고 &gt; 0 + 원가(재고금액) 설정된 상품만 표시. 재고금액 = 재고 × 원가.</div>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
               <div class="relative">
@@ -9989,9 +9989,9 @@ function sortStockValue(col) {
 
 function renderStockValueView() {
   const products = Array.isArray(_allProducts) ? _allProducts : [];
-  // 카테고리 = 지플랜 + 재고 > 0
+  // 카테고리 = 지플랜 + 재고 > 0 + 원가 설정됨(재고금액 > 0)
   const all = products.filter(p =>
-    String(p.category || '').trim() === '지플랜' && (Number(p.stock) || 0) > 0
+    String(p.category || '').trim() === '지플랜' && (Number(p.stock) || 0) > 0 && (Number(p.cost) || 0) > 0
   );
   // 행 데이터 준비
   let rows = all.map(p => {
