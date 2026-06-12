@@ -1832,11 +1832,10 @@ tailwind.config = {
         </div>
       </section>
 
-      <!-- 일반/세트/입고/재고금액 서브탭 -->
+      <!-- 일반/세트/재고금액 서브탭 (입고하기는 사이드바 하위 메뉴로 이동) -->
       <div id="prod-tab-bar" class="bg-white rounded-full panel p-1.5 inline-flex gap-1 self-start flex-wrap">
         <button id="prod-tab-normal" onclick="switchProductTab('normal')" class="px-5 py-2 rounded-full text-sm font-bold bg-brand-black text-white">📦 일반 상품</button>
         <button id="prod-tab-set"    onclick="switchProductTab('set')"    class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black">🎁 세트 상품</button>
-        <button id="prod-tab-receive" onclick="switchProductTab('receive')" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black">📥 입고하기</button>
         <button id="prod-tab-stockvalue" onclick="switchProductTab('stockvalue')" class="px-5 py-2 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black">💰 재고금액</button>
       </div>
 
