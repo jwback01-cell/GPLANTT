@@ -1288,6 +1288,21 @@ tailwind.config = {
           </div>
         </div>
       </section>
+      <!-- 광고비 / 운영비 / 물류 및 배송 KPI (이번 달) -->
+      <section class="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
+        <div class="bg-white p-5 md:p-6 rounded-3xl panel">
+          <div class="flex items-center gap-2.5 mb-3"><div class="w-2.5 h-2.5 rounded-full bg-brand-blue shrink-0"></div><span class="font-semibold text-sm md:text-base text-brand-gray">광고비 (이번 달)</span></div>
+          <div id="ledger-kpi-ad" class="text-xl md:text-2xl font-bold tracking-tight">0</div>
+        </div>
+        <div class="bg-white p-5 md:p-6 rounded-3xl panel">
+          <div class="flex items-center gap-2.5 mb-3"><div class="w-2.5 h-2.5 rounded-full bg-brand-orange shrink-0"></div><span class="font-semibold text-sm md:text-base text-brand-gray">운영비 (이번 달)</span></div>
+          <div id="ledger-kpi-ops" class="text-xl md:text-2xl font-bold tracking-tight">0</div>
+        </div>
+        <div class="bg-white p-5 md:p-6 rounded-3xl panel">
+          <div class="flex items-center gap-2.5 mb-3"><div class="w-2.5 h-2.5 rounded-full bg-brand-pink shrink-0"></div><span class="font-semibold text-sm md:text-base text-brand-gray">물류 및 배송 (이번 달)</span></div>
+          <div id="ledger-kpi-delivery" class="text-xl md:text-2xl font-bold tracking-tight">0</div>
+        </div>
+      </section>
       <!-- Chart + Insights -->
       <section class="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-4 md:gap-6">
         <div class="bg-white p-6 md:p-8 rounded-4xl panel flex flex-col" style="min-height:320px;">
@@ -5548,12 +5563,12 @@ function renderWeeklyBars() {
 function animateDonut() {
   // 장부 입력 데이터로 도넛 차트 업데이트 (없으면 0/-)
   const monthly = _buildMonthlyDataFromEntries() || [];
-  let totalPurchase = 0, totalFee = 0, totalDelivery = 0;
-  monthly.forEach(d => {
-    totalPurchase += d.purchase || 0;
-    totalFee      += d.fee      || 0;
-    totalDelivery += d.delivery || 0;
-  });
+  // 이번 달 데이터만 사용 (전 기간 합계가 아니라) — 광고비/운영비와 기준 통일
+  const _curMonthNum = new Date().getMonth() + 1;
+  const _curData = monthly.find(d => parseInt(d.label) === _curMonthNum) || {};
+  let totalPurchase = _curData.purchase || 0;
+  let totalFee      = _curData.fee      || 0;
+  let totalDelivery = _curData.delivery || 0;
   // 마케팅 비용(fee 자리) — 실제 광고비 업로드 데이터(이번 달 합계)로 대체
   // 기존: fee = sales * 0.08 추정값
   // 변경: 광고비 업로드의 이번 달 실 사용액
@@ -5595,6 +5610,11 @@ function animateDonut() {
   setText('ledger-donut-logistics-amt', fmtW(totalDelivery));
   setText('ledger-donut-delivery-pct',  pctOther + '%');
   setText('ledger-donut-delivery-amt',  fmtW(_opsThisMonth));
+
+  // 광고비 / 운영비 / 물류 및 배송 KPI 카드 (이번 달)
+  setText('ledger-kpi-ad',       fmtW(totalFee));
+  setText('ledger-kpi-ops',      fmtW(_opsThisMonth));
+  setText('ledger-kpi-delivery', fmtW(totalDelivery));
 
   setTimeout(() => {
     document.querySelectorAll('.donut-segment').forEach(seg => {
