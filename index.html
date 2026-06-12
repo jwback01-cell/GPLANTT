@@ -5437,7 +5437,11 @@ function syncDashboardRevenue() {
   // 반품 손실액 차감 — 해당 월의 qty × 단가(VAT포함) 합
   const _curMonthNum = parseInt(current.label) || 0;
   const _curReturnLoss = (typeof _returnAmountByMonth === 'function' && _curMonthNum > 0) ? _returnAmountByMonth(_curMonthNum) : 0;
-  const curProfit  = _profitOfMonth(current) - _curReturnLoss;
+  // 운영비(월별 총액 = 반복 + 그 달 일회성) 차감 → 영업이익
+  const _yr = new Date().getFullYear();
+  const _opsKey = n => `${_yr}-${String(n).padStart(2, '0')}`;
+  const _curOps = (typeof _opsMonthlyTotalForMonth === 'function' && _curMonthNum > 0) ? _opsMonthlyTotalForMonth(_opsKey(_curMonthNum)) : 0;
+  const curProfit  = _profitOfMonth(current) - _curReturnLoss - _curOps;
   const adjCurSales = current.sales - _curReturnLoss;
   const profitRate = adjCurSales > 0 ? Math.round((curProfit / adjCurSales) * 100) : 0;
 
@@ -5445,7 +5449,8 @@ function syncDashboardRevenue() {
   if (prev) {
     const _prevMonthNum = parseInt(prev.label) || 0;
     const _prevReturnLoss = (typeof _returnAmountByMonth === 'function' && _prevMonthNum > 0) ? _returnAmountByMonth(_prevMonthNum) : 0;
-    prevProfit = _profitOfMonth(prev) - _prevReturnLoss;
+    const _prevOps = (typeof _opsMonthlyTotalForMonth === 'function' && _prevMonthNum > 0) ? _opsMonthlyTotalForMonth(_opsKey(_prevMonthNum)) : 0;
+    prevProfit = _profitOfMonth(prev) - _prevReturnLoss - _prevOps;
     profitChange = prevProfit > 0 ? (((curProfit - prevProfit) / prevProfit) * 100).toFixed(1) : 0;
   }
   const profitUp = profitChange >= 0;
@@ -25527,6 +25532,20 @@ async function deleteOpsUnitItem(id) {
 }
 
 // ── 월별 총액 ──────────────────────────────
+// 특정 월(YYYY-MM)의 운영비 총액 = 매월 반복 항목 합 + 그 달 일회성 항목 합
+// 순이익(영업이익)에서 차감하는 데 사용
+function _opsMonthlyTotalForMonth(monthKey) {
+  try {
+    const data = (typeof _loadOpsCosts === 'function') ? _loadOpsCosts() : null;
+    if (!data) return 0;
+    const recurring = Array.isArray(data.recurringItems) ? data.recurringItems : [];
+    const arr = (data.monthlyTotals && Array.isArray(data.monthlyTotals[monthKey])) ? data.monthlyTotals[monthKey] : [];
+    const recSum = recurring.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+    const onceSum = arr.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+    return recSum + onceSum;
+  } catch (_) { return 0; }
+}
+
 // recurringItems(매월 반복) 는 모든 월에 자동으로 위쪽에 표시 + 합계에 포함
 function renderOpsMonthly() {
   const tbody = document.getElementById('ops-monthly-tbody');
