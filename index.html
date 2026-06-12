@@ -1310,9 +1310,9 @@ tailwind.config = {
             </div>
             <div class="flex-1 grid grid-cols-1 gap-3 w-full">
               <div class="flex items-center justify-between p-3 md:p-4 bg-brand-bg rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full bg-brand-black shrink-0"></div><span class="font-bold text-sm md:text-base">상품 매입가</span></div><div class="flex items-baseline gap-2"><span id="ledger-donut-purchase-pct" class="font-bold text-base md:text-lg">0%</span><span id="ledger-donut-purchase-amt" class="text-brand-gray text-xs md:text-sm hidden md:block">0</span></div></div>
-              <div class="flex items-center justify-between p-3 md:p-4 bg-brand-bg rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full bg-brand-blue shrink-0"></div><span class="font-bold text-sm md:text-base">마케팅 비용</span></div><div class="flex items-baseline gap-2"><span id="ledger-donut-marketing-pct" class="font-bold text-base md:text-lg">0%</span><span id="ledger-donut-marketing-amt" class="text-brand-gray text-xs md:text-sm hidden md:block">0</span></div></div>
+              <div class="flex items-center justify-between p-3 md:p-4 bg-brand-bg rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full bg-brand-blue shrink-0"></div><span class="font-bold text-sm md:text-base">광고비</span></div><div class="flex items-baseline gap-2"><span id="ledger-donut-marketing-pct" class="font-bold text-base md:text-lg">0%</span><span id="ledger-donut-marketing-amt" class="text-brand-gray text-xs md:text-sm hidden md:block">0</span></div></div>
               <div class="flex items-center justify-between p-3 md:p-4 bg-brand-bg rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full bg-brand-pink shrink-0"></div><span class="font-bold text-sm md:text-base">물류 및 배송</span></div><div class="flex items-baseline gap-2"><span id="ledger-donut-logistics-pct" class="font-bold text-base md:text-lg">0%</span><span id="ledger-donut-logistics-amt" class="text-brand-gray text-xs md:text-sm hidden md:block">0</span></div></div>
-              <div class="flex items-center justify-between p-3 md:p-4 bg-brand-bg rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full bg-brand-orange shrink-0"></div><span class="font-bold text-sm md:text-base">택배비</span></div><div class="flex items-baseline gap-2"><span id="ledger-donut-delivery-pct" class="font-bold text-base md:text-lg">0%</span><span id="ledger-donut-delivery-amt" class="text-brand-gray text-xs md:text-sm hidden md:block">0</span></div></div>
+              <div class="flex items-center justify-between p-3 md:p-4 bg-brand-bg rounded-2xl"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full bg-brand-orange shrink-0"></div><span class="font-bold text-sm md:text-base">운영비</span></div><div class="flex items-baseline gap-2"><span id="ledger-donut-delivery-pct" class="font-bold text-base md:text-lg">0%</span><span id="ledger-donut-delivery-amt" class="text-brand-gray text-xs md:text-sm hidden md:block">0</span></div></div>
             </div>
           </div>
         </div>
@@ -5561,11 +5561,14 @@ function animateDonut() {
   const _curMonth = _now.getMonth() + 1;
   const _adThisMonth = (typeof _adCostSumByMonth === 'function') ? _adCostSumByMonth(_curMonth) : 0;
   if (_adThisMonth > 0) totalFee = _adThisMonth;
-  const totalExpense = totalPurchase + totalFee + totalDelivery;
+  // 운영비(이번 달 월별 총액 = 반복 + 그 달 일회성) — 4번째 슬롯
+  const _opsThisMonth = (typeof _opsMonthlyTotalForMonth === 'function')
+    ? _opsMonthlyTotalForMonth(`${_now.getFullYear()}-${String(_curMonth).padStart(2,'0')}`) : 0;
+  const totalExpense = totalPurchase + totalFee + totalDelivery + _opsThisMonth;
   const pctPurchase = totalExpense > 0 ? Math.round(totalPurchase / totalExpense * 100) : 0;
   const pctFee      = totalExpense > 0 ? Math.round(totalFee / totalExpense * 100) : 0;
   const pctDelivery = totalExpense > 0 ? Math.round(totalDelivery / totalExpense * 100) : 0;
-  const pctOther    = totalExpense > 0 ? Math.max(0, 100 - pctPurchase - pctFee - pctDelivery) : 0;
+  const pctOther    = totalExpense > 0 ? Math.max(0, 100 - pctPurchase - pctFee - pctDelivery) : 0; // 운영비(잔여=합 100 보정)
 
   // 도넛 segment dash 업데이트
   const segments = document.querySelectorAll('.donut-segment');
@@ -5591,7 +5594,7 @@ function animateDonut() {
   setText('ledger-donut-logistics-pct', pctDelivery + '%');
   setText('ledger-donut-logistics-amt', fmtW(totalDelivery));
   setText('ledger-donut-delivery-pct',  pctOther + '%');
-  setText('ledger-donut-delivery-amt',  fmtW(Math.max(0, totalExpense - totalPurchase - totalFee - totalDelivery)));
+  setText('ledger-donut-delivery-amt',  fmtW(_opsThisMonth));
 
   setTimeout(() => {
     document.querySelectorAll('.donut-segment').forEach(seg => {
