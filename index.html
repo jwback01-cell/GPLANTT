@@ -729,8 +729,8 @@ tailwind.config = {
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF9800" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
             </div>
             <div class="min-w-0">
-              <div class="font-bold text-[1.05rem]">플레이오토 주문 한 번에 이카운트로</div>
-              <p class="text-brand-gray text-xs md:text-sm mt-0.5">출고완료일 기준 주문을 수집 → 매출 장부에 저장 → 이카운트로 전송합니다.</p>
+              <div class="font-bold text-[1.05rem]">장부 입력</div>
+              <p class="text-brand-gray text-xs md:text-sm mt-0.5">출고완료일 기준 플레이오토 주문을 수집해 매출 장부에 저장합니다. (이카운트 전송은 [장부 업로드 → 업로드 데이터]에서)</p>
             </div>
           </div>
           <div class="flex gap-2 shrink-0 items-center flex-wrap justify-end">
@@ -740,7 +740,7 @@ tailwind.config = {
               <input id="dashboard-pa-date-end" type="date" class="bg-white rounded-full px-2.5 py-1.5 text-xs font-semibold border border-brand-border outline-none focus:border-brand-black">
               <button onclick="dashboardOneClickEcount('custom')" id="dashboard-pa-custom-btn" class="px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-brand-black hover:opacity-90 transition-opacity whitespace-nowrap flex items-center gap-1.5">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                선택일 전송
+                선택일 저장
               </button>
             </div>
             <button onclick="dashboardOneClickEcount('yesterday')" id="dashboard-pa-yesterday-btn" class="px-5 py-2.5 rounded-full text-sm font-bold bg-brand-bg border border-brand-border hover:bg-white transition-colors flex items-center gap-2">
@@ -749,7 +749,7 @@ tailwind.config = {
             </button>
             <button onclick="dashboardOneClickEcount('today')" id="dashboard-pa-today-btn" class="px-5 py-2.5 rounded-full text-sm font-bold text-white bg-gradient-to-r from-brand-orange to-brand-pink hover:opacity-90 transition-opacity flex items-center gap-2">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-              오늘 주문 전송
+              오늘 주문 저장
             </button>
           </div>
         </div>
@@ -4522,6 +4522,7 @@ tailwind.config = {
               <button onclick="openSeoulLivingReconcilePurchase()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-blue hover:bg-brand-bg" title="서울리빙 거래원장 엑셀의 매입 컬럼과 GPLAN(사이트=서울리빙(수동)) 비교">🔍 거래원장 대조 (매입)</button>
               <input type="file" id="reconcile-purchase-file-input" accept=".xlsx,.xls,.csv" class="hidden" onchange="_reconcileFileChosenPurchase(event)">
               <button onclick="openManualUploadModal()" class="px-4 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:-translate-y-0.5 transition-transform shadow-md">+ 수기 등록</button>
+              <button onclick="goEcountFromUploadData()" class="px-4 py-2 rounded-full bg-gradient-to-r from-brand-blue to-brand-blue text-white text-sm font-bold hover:opacity-90 transition-opacity shadow-md" title="현재 조회 기간의 데이터를 이카운트로 전송 (미리보기 후 전송)">📤 이카운트로 전송</button>
               <button onclick="convertSelectedToReturn('buyer')" class="px-4 py-2 rounded-full border border-brand-pink bg-brand-pink-light text-sm font-bold text-brand-pink hover:bg-brand-pink hover:text-white transition-colors" title="구매자 귀책 — 택배비용은 양수 그대로 (우리가 부담)">↩ 반품(구매자귀책)</button>
               <button onclick="convertSelectedToReturn('seller')" class="px-4 py-2 rounded-full border border-brand-pink bg-brand-pink-light text-sm font-bold text-brand-pink hover:bg-brand-pink hover:text-white transition-colors" title="판매자 귀책 — 택배비용도 음수 처리 (회수)">↩ 반품(판매자귀책)</button>
               <button onclick="exportUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg">엑셀 내보내기</button>
@@ -20723,18 +20724,17 @@ async function dashboardOneClickEcount(mode) {
   if (todayBtn) todayBtn.disabled = true;
   if (yestBtn) yestBtn.disabled = true;
   if (customBtn) customBtn.disabled = true;
-  setStatus('실행 중...', 'text-brand-blue');
+  setStatus('장부 저장 중...', 'text-brand-blue');
 
   try {
-    const result = await fetchSaveAndSendToEcount();
+    // 장부 입력 전용 — 수집 + 매출장부 저장만, 이카운트 전송은 안 함
+    const result = await fetchSaveAndSendToEcount({ skipEcount: true });
     if (result && result.ok) {
-      setStatus(`전송 완료 (${result.sent || 0}건). 이카운트 연동 탭에서 내역을 확인하세요.`, 'text-brand-green');
+      setStatus(`장부 저장 완료 (${result.ledgerCount || 0}건). 이카운트 전송은 [장부 업로드 → 업로드 데이터]에서 진행하세요.`, 'text-brand-green');
     } else {
-      // 전송 안 됨(주문 없음/실패/롤백 등) — fetchSaveAndSendToEcount 가 사유 모달을 이미 표시함
       const why = result && result.reason === 'no_orders' ? '선택한 날짜에 수집된 주문이 없습니다.'
               : result && result.reason === 'ledger_fail' ? '매출 장부 저장에 실패했습니다.'
-              : result && result.reason === 'no_ecount_config' ? '이카운트 연동 설정이 필요합니다.'
-              : '전송되지 않았습니다. 위 안내를 확인하세요.';
+              : '저장되지 않았습니다. 위 안내를 확인하세요.';
       setStatus('⚠ ' + why, 'text-brand-pink');
     }
   } catch (err) {
@@ -20771,22 +20771,25 @@ async function _paEnsureShopsLoaded() {
 // 원클릭: 주문 수집 → 매출 장부 저장 → 이카운트 전송
 // ⚠ 원자적 처리: 이카운트 전송이 (사전검증/네트워크/부분실패 등으로) 1건이라도 실패하면
 //   매출 장부에 저장한 행도 모두 롤백 — "전체 등록 안 됨" 정책.
-async function fetchSaveAndSendToEcount() {
+async function fetchSaveAndSendToEcount(opts) {
+  const skipEcount = !!(opts && opts.skipEcount); // true 면 수집+장부저장만 (이카운트 전송 안 함)
   const btn = document.getElementById('pa-one-click-btn');
   const orig = btn ? btn.innerHTML : '';
   let ledgerSnapshot = null;
   let ledgerSavedCount = 0;
   try {
-    // 1. 이카운트 설정 선(先) 확인 (전송 단계에서 실패하기 전에 빠르게 차단)
-    const ec = _readEcountForm();
-    if (!ec.company || !ec.user || !ec.apikey) {
-      showAppConfirm(
-        '이카운트 연동 설정 필요',
-        '이카운트 연동 설정이 없습니다. "이카운트 연동" 탭에서 설정하시겠습니까?',
-        () => { switchUploadTab('ecount'); },
-        { type: 'info', confirmText: '이동' }
-      );
-      return { ok: false, reason: 'no_ecount_config' };
+    // 1. 이카운트 설정 선(先) 확인 (전송 모드일 때만)
+    if (!skipEcount) {
+      const ec = _readEcountForm();
+      if (!ec.company || !ec.user || !ec.apikey) {
+        showAppConfirm(
+          '이카운트 연동 설정 필요',
+          '이카운트 연동 설정이 없습니다. "이카운트 연동" 탭에서 설정하시겠습니까?',
+          () => { switchUploadTab('ecount'); },
+          { type: 'info', confirmText: '이동' }
+        );
+        return { ok: false, reason: 'no_ecount_config' };
+      }
     }
 
     // 원클릭 전용 기간 입력을 주문 수집 기간에 반영 (비어있으면 유지)
@@ -20813,6 +20816,12 @@ async function fetchSaveAndSendToEcount() {
     try { ledgerSnapshot = localStorage.getItem('gplan_upload_data_v1'); } catch(_) { ledgerSnapshot = null; }
     ledgerSavedCount = await savePlayautoOrdersToLedger(true);
     if (!ledgerSavedCount) { showAppAlert('장부 저장 실패', '매출 장부 저장에 실패했습니다.', 'error'); return { ok: false, reason: 'ledger_fail' }; }
+
+    // 저장 전용 모드(장부 입력) — 이카운트 전송 없이 여기서 종료
+    if (skipEcount) {
+      try { if (typeof renderUploadData === 'function') renderUploadData(); } catch (_) {}
+      return { ok: true, sent: 0, savedOnly: true, ledgerCount: ledgerSavedCount };
+    }
 
     // 5. 이카운트 전송용 날짜 범위를 PA 조회 범위로 동기화
     const ecStart = document.getElementById('ecount-range-start');
@@ -25028,6 +25037,26 @@ function submitManualUpload() {
   if (typeof showAppAlert === 'function') {
     showAppAlert('수기 등록 완료', `${itemName}\n수량 ${qty} · 마진 ${profit.toLocaleString('ko-KR')}원`, 'success');
   }
+}
+
+// 업로드 데이터 → 이카운트 연동 탭으로 이동(현재 조회 기간 적용) 후 미리보기 자동 실행
+function goEcountFromUploadData() {
+  try {
+    const s = document.getElementById('upload-data-date-start');
+    const e = document.getElementById('upload-data-date-end');
+    const ecS = document.getElementById('ecount-range-start');
+    const ecE = document.getElementById('ecount-range-end');
+    if (ecS && s && s.value) ecS.value = s.value;
+    if (ecE && e && e.value) ecE.value = e.value;
+  } catch (_) {}
+  try { if (typeof switchUploadTab === 'function') switchUploadTab('ecount'); } catch (_) {}
+  // 기간이 지정돼 있으면 전송 미리보기 자동 실행
+  setTimeout(() => {
+    try {
+      const ecS = document.getElementById('ecount-range-start');
+      if (ecS && ecS.value && typeof previewEcountTransfer === 'function') previewEcountTransfer();
+    } catch (_) {}
+  }, 250);
 }
 
 function exportUploadData() {
