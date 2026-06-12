@@ -1673,7 +1673,7 @@ tailwind.config = {
             <div id="analysis-product-rank" class="flex flex-col divide-y divide-brand-border"></div>
           </div>
           <div class="bg-white rounded-3xl panel px-6 py-5">
-            <div class="font-bold text-[15px] mb-5">채널별 매출 분포</div>
+            <div class="font-bold text-[15px] mb-5">채널별 공급가 분포 <span class="text-xs font-medium text-brand-gray">(공급가 순 · 순이익 표시)</span></div>
             <div id="analysis-channel-bars" class="flex flex-col gap-4"></div>
           </div>
         </div>
@@ -12275,11 +12275,12 @@ function _getChannelRowsFromEntries(m, range) {
   const map = {};
   entries.forEach(r => {
     const name = r['사이트'] || '미분류';
-    if (!map[name]) map[name] = { name, color: '#8E8E93', fr: 0, orders: 0, sales: 0, fee: 0, profit: 0 };
+    if (!map[name]) map[name] = { name, color: '#8E8E93', fr: 0, orders: 0, sales: 0, supply: 0, fee: 0, profit: 0 };
     const qty = r['수량'] || 0;
     const price = r['단가(vat포함)'] || 0;
     map[name].orders += 1;
     map[name].sales  += qty * price;
+    map[name].supply += r['공급가'] || 0;
     map[name].profit += r['이익'] || 0;
   });
   return Object.values(map).map(r => ({
@@ -12614,15 +12615,23 @@ function renderAnalysisTab(m, rangeOrIdxs) {
       <span class="text-brand-green font-bold text-sm shrink-0">${r.margin}%</span>
     </div>`).join('');
 
-  document.getElementById('analysis-channel-bars').innerHTML = cRows.map(r => {
-    const pct = totalSales > 0 ? (r.sales / totalSales * 100).toFixed(1) : '0.0';
+  // 공급가 순으로 정렬 + 매출/공급가/순이익 함께 표시 (막대 % 는 공급가 분포 기준)
+  const totalSupply = cRows.reduce((s, r) => s + (r.supply || 0), 0);
+  const chSorted = cRows.slice().sort((a, b) => (b.supply || 0) - (a.supply || 0));
+  document.getElementById('analysis-channel-bars').innerHTML = chSorted.map(r => {
+    const pct = totalSupply > 0 ? (r.supply / totalSupply * 100).toFixed(1) : '0.0';
+    const profitCls = (r.profit || 0) >= 0 ? 'text-brand-green' : 'text-brand-pink';
     return `<div>
       <div class="flex items-center justify-between mb-1.5">
         <span class="text-sm font-semibold text-brand-gray">${r.name}</span>
         <span class="text-sm font-bold">${pct}%</span>
       </div>
       <div class="bg-brand-bg rounded-full h-2.5 overflow-hidden"><div class="h-2.5 rounded-full transition-all" style="width:${pct}%;background:${r.color}"></div></div>
-      <div class="text-xs text-brand-gray mt-1">${_fmtW(r.sales)}</div>
+      <div class="flex flex-wrap items-center gap-x-3 text-xs text-brand-gray mt-1">
+        <span>공급가 <b class="text-brand-black">${_fmtW(r.supply || 0)}</b></span>
+        <span>매출 ${_fmtW(r.sales)}</span>
+        <span class="${profitCls} font-bold">순이익 ${_fmtW(r.profit || 0)}</span>
+      </div>
     </div>`;
   }).join('');
 
