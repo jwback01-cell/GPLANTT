@@ -11744,6 +11744,37 @@ function setDailyRange(type) {
 
 const DOW_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 
+// 일별 추이 차트 — 막대에 마우스 올리면 매출/순이익/광고비 툴팁 표시
+function _attachDailyChartTooltip(barsEl) {
+  let tip = document.getElementById('daily-chart-tip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = 'daily-chart-tip';
+    tip.style.cssText = 'position:fixed;z-index:99999;pointer-events:none;display:none;background:#1A1A1A;color:#fff;padding:9px 12px;border-radius:10px;font-size:12px;line-height:1.55;box-shadow:0 8px 24px rgba(0,0,0,.28);white-space:nowrap;';
+    document.body.appendChild(tip);
+  }
+  const fmtN = n => Number(n || 0).toLocaleString('ko-KR');
+  barsEl.onmousemove = (e) => {
+    const col = e.target.closest('.daily-bar-col');
+    if (!col || !barsEl.contains(col)) { tip.style.display = 'none'; return; }
+    const s = Number(col.dataset.s) || 0, p = Number(col.dataset.p) || 0, c = Number(col.dataset.c) || 0, a = Number(col.dataset.a) || 0;
+    const pCls = p >= 0 ? '#4ADE80' : '#F87171';
+    tip.innerHTML = `<div style="font-weight:700;margin-bottom:4px;">${col.dataset.d} <span style="color:#9CA3AF;font-weight:400;">(${fmtN(c)}건)</span></div>`
+      + `<div><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#D1D1D6;margin-right:6px;"></span>매출 <b>${fmtN(s)}</b>원</div>`
+      + `<div><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#2196F3;margin-right:6px;"></span>순이익 <b style="color:${pCls};">${fmtN(p)}</b>원</div>`
+      + (a ? `<div><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#E91E63;margin-right:6px;"></span>광고비 <b>${fmtN(a)}</b>원</div>` : '');
+    tip.style.display = 'block';
+    let x = e.clientX + 14, y = e.clientY - 12;
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    if (x + tw > window.innerWidth - 8) x = e.clientX - tw - 14;
+    if (y + th > window.innerHeight - 8) y = window.innerHeight - th - 8;
+    if (y < 8) y = 8;
+    tip.style.left = x + 'px';
+    tip.style.top = y + 'px';
+  };
+  barsEl.onmouseleave = () => { tip.style.display = 'none'; };
+}
+
 function renderDailyTab() {
   const startEl = document.getElementById('daily-start');
   const endEl = document.getElementById('daily-end');
@@ -11863,11 +11894,12 @@ function renderDailyTab() {
         const salesH = Math.round((d.sales / maxV) * 100);
         const profitH = Math.round((Math.max(0, d.profit) / maxV) * 100);
         return `
-          <div class="flex flex-col items-center justify-end relative" style="min-width:${minBarWidth}px;height:100%;">
-            <div class="absolute bottom-0 w-full rounded-t" style="background:#D1D1D6;height:${salesH}%;" title="${d.date} 매출 ${fmtN(d.sales)}원"></div>
-            <div class="absolute bottom-0 rounded-t" style="background:#2196F3;width:60%;left:20%;height:${profitH}%;opacity:0.85;" title="${d.date} 순이익 ${fmtN(d.profit)}원"></div>
+          <div class="daily-bar-col flex flex-col items-center justify-end relative cursor-pointer" data-d="${d.date}" data-s="${d.sales}" data-p="${d.profit||0}" data-c="${d.count||0}" data-a="${d.adCost||0}" style="min-width:${minBarWidth}px;height:100%;">
+            <div class="absolute bottom-0 w-full rounded-t pointer-events-none" style="background:#D1D1D6;height:${salesH}%;"></div>
+            <div class="absolute bottom-0 rounded-t pointer-events-none" style="background:#2196F3;width:60%;left:20%;height:${profitH}%;opacity:0.85;"></div>
           </div>`;
       }).join('');
+      if (typeof _attachDailyChartTooltip === 'function') _attachDailyChartTooltip(barsEl);
       labelsEl.innerHTML = visibleDays.map(d => {
         const dt = new Date(d.date + 'T00:00:00');
         const md = `${dt.getMonth()+1}/${dt.getDate()}`;
