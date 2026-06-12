@@ -12670,6 +12670,32 @@ renderDashboardTodos();
   }
 })();
 
+// ── 자동 새로고침: 배포로 index.html 이 바뀌면 감지해 자동 reload (강력 새로고침 불필요) ──
+(function autoReloadOnDeploy() {
+  let baseTag = null;
+  const url = location.pathname + (location.search || '');
+  async function getTag() {
+    try {
+      const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+      return res.headers.get('etag') || res.headers.get('last-modified') || null;
+    } catch (_) { return null; }
+  }
+  async function check() {
+    const tag = await getTag();
+    if (!tag) return;
+    if (baseTag == null) { baseTag = tag; return; }
+    if (tag === baseTag) return;
+    // 입력 중(텍스트 입력 포커스)이면 미루기 — 다음 체크 때 재시도 (작업 방해 방지)
+    const ae = document.activeElement;
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+    location.reload();
+  }
+  getTag().then(t => { baseTag = t; });
+  setInterval(check, 20000); // 20초마다
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+  window.addEventListener('focus', check);
+})();
+
 // ── Todo Calendar ─────────────────────────────
 let calYear  = new Date().getFullYear();
 let calMonth = new Date().getMonth(); // 0-indexed
