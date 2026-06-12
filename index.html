@@ -1673,7 +1673,7 @@ tailwind.config = {
             <div id="analysis-product-rank" class="flex flex-col divide-y divide-brand-border"></div>
           </div>
           <div class="bg-white rounded-3xl panel px-6 py-5">
-            <div class="font-bold text-[15px] mb-5">채널별 공급가 분포 <span class="text-xs font-medium text-brand-gray">(공급가 순 · 순이익 표시)</span></div>
+            <div class="font-bold text-[15px] mb-5">채널별 순이익 분포 <span class="text-xs font-medium"><span class="text-brand-green">■</span> 순이익 <span class="text-brand-pink">■</span> 광고비</span></div>
             <div id="analysis-channel-bars" class="flex flex-col gap-4"></div>
           </div>
         </div>
@@ -12615,22 +12615,34 @@ function renderAnalysisTab(m, rangeOrIdxs) {
       <span class="text-brand-green font-bold text-sm shrink-0">${r.margin}%</span>
     </div>`).join('');
 
-  // 공급가 순으로 정렬 + 매출/공급가/순이익 함께 표시 (막대 % 는 공급가 분포 기준)
-  const totalSupply = cRows.reduce((s, r) => s + (r.supply || 0), 0);
-  const chSorted = cRows.slice().sort((a, b) => (b.supply || 0) - (a.supply || 0));
+  // 순이익 기준 막대(초록) + 광고비 막대(분홍) — 순이익 내림차순 정렬
+  // 광고비는 채널 매출 비례로 안분 (광고 데이터에 채널 정보가 없으므로)
+  const totalChSales = cRows.reduce((s, r) => s + (r.sales || 0), 0);
+  const chWithAd = cRows.map(r => ({
+    ...r,
+    ad: totalChSales > 0 ? Math.round(totalAd * (r.sales || 0) / totalChSales) : 0
+  }));
+  const totalProfitCh = chWithAd.reduce((s, r) => s + (r.profit || 0), 0);
+  // 두 막대 공통 스케일 — 채널들의 순이익/광고비 중 최댓값을 100%로
+  const chScale = Math.max(1, ...chWithAd.map(r => Math.max(r.profit || 0, r.ad || 0)));
+  const chSorted = chWithAd.slice().sort((a, b) => (b.profit || 0) - (a.profit || 0));
   document.getElementById('analysis-channel-bars').innerHTML = chSorted.map(r => {
-    const pct = totalSupply > 0 ? (r.supply / totalSupply * 100).toFixed(1) : '0.0';
+    const profitPct = Math.max(0, (r.profit || 0) / chScale * 100).toFixed(1);
+    const adPct     = Math.max(0, (r.ad || 0) / chScale * 100).toFixed(1);
+    const shareLabel = totalProfitCh !== 0 ? ((r.profit || 0) / totalProfitCh * 100).toFixed(1) : '0.0';
     const profitCls = (r.profit || 0) >= 0 ? 'text-brand-green' : 'text-brand-pink';
     return `<div>
       <div class="flex items-center justify-between mb-1.5">
         <span class="text-sm font-semibold text-brand-gray">${r.name}</span>
-        <span class="text-sm font-bold">${pct}%</span>
+        <span class="text-sm font-bold ${profitCls}">${shareLabel}%</span>
       </div>
-      <div class="bg-brand-bg rounded-full h-2.5 overflow-hidden"><div class="h-2.5 rounded-full transition-all" style="width:${pct}%;background:${r.color}"></div></div>
+      <div class="bg-brand-bg rounded-full h-2.5 overflow-hidden"><div class="h-2.5 rounded-full transition-all" style="width:${profitPct}%;background:#00C853"></div></div>
+      <div class="bg-brand-bg rounded-full h-2 overflow-hidden mt-1"><div class="h-2 rounded-full transition-all" style="width:${adPct}%;background:#E91E63"></div></div>
       <div class="flex flex-wrap items-center gap-x-3 text-xs text-brand-gray mt-1">
-        <span>공급가 <b class="text-brand-black">${_fmtW(r.supply || 0)}</b></span>
-        <span>매출 ${_fmtW(r.sales)}</span>
         <span class="${profitCls} font-bold">순이익 ${_fmtW(r.profit || 0)}</span>
+        <span class="text-brand-pink">광고비 ${_fmtW(r.ad || 0)}</span>
+        <span>공급가 ${_fmtW(r.supply || 0)}</span>
+        <span>매출 ${_fmtW(r.sales)}</span>
       </div>
     </div>`;
   }).join('');
