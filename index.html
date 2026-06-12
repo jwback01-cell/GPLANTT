@@ -5568,15 +5568,13 @@ function animateDonut() {
   const _curMonthNum = new Date().getMonth() + 1;
   const _curData = monthly.find(d => parseInt(d.label) === _curMonthNum) || {};
   let totalPurchase = _curData.purchase || 0;
-  let totalFee      = _curData.fee      || 0;
   let totalDelivery = _curData.delivery || 0;
-  // 마케팅 비용(fee 자리) — 실제 광고비 업로드 데이터(이번 달 합계)로 대체
-  // 기존: fee = sales * 0.08 추정값
-  // 변경: 광고비 업로드의 이번 달 실 사용액
+  // 광고비 = 실제 광고비 업로드(이번 달)만 사용. 없으면 0.
+  // (과거: 광고비 업로드 없으면 매출×8% 추정치를 폴백으로 썼으나, 라벨이 '광고비'라 오해 → 제거)
   const _now = new Date();
   const _curMonth = _now.getMonth() + 1;
-  const _adThisMonth = (typeof _adCostSumByMonth === 'function') ? _adCostSumByMonth(_curMonth) : 0;
-  if (_adThisMonth > 0) totalFee = _adThisMonth;
+  const _adThisMonth = (typeof _adCostSumByMonth === 'function') ? (_adCostSumByMonth(_curMonth) || 0) : 0;
+  let totalFee = _adThisMonth;
   // 운영비(이번 달 월별 총액 = 반복 + 그 달 일회성) — 4번째 슬롯
   const _opsThisMonth = (typeof _opsMonthlyTotalForMonth === 'function')
     ? _opsMonthlyTotalForMonth(`${_now.getFullYear()}-${String(_curMonth).padStart(2,'0')}`) : 0;
