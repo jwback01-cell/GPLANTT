@@ -1520,8 +1520,8 @@ tailwind.config = {
                   <th class="sortable text-left px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',1,'text')">상품명<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',2,'num')">판매 수량<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',3,'num')">총 매출<span class="sort-icon"></span></th>
-                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',4,'num')">매입 원가<span class="sort-icon"></span></th>
-                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',5,'num')" title="순이익 = 공급가 + 택배비 − 매입원가 − 택배비용">공급가<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',4,'num')" title="순이익 = 공급가 + 택배비 − 매입원가 − 택배비용">공급가<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',5,'num')">매입 원가<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',6,'num')">택배비<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',7,'num')">택배비용<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap text-brand-pink" onclick="sortLedgerTable('product',8,'num')">광고비<span class="sort-icon"></span></th>
@@ -12379,8 +12379,8 @@ function renderProductTab(m, rangeOrIdxs) {
       <td class="px-4 py-4 font-semibold">${escHtml(r.name)}</td>
       <td class="px-4 py-4 text-right text-brand-gray">${_fmtW(r.qty)}</td>
       <td class="px-4 py-4 text-right font-bold">${_fmtW(r.sales)}</td>
-      <td class="px-4 py-4 text-right text-brand-gray">${_fmtW(r.purchase)}</td>
       <td class="px-4 py-4 text-right text-brand-gray">${_fmtW(r.supply || 0)}</td>
+      <td class="px-4 py-4 text-right text-brand-gray">${_fmtW(r.purchase)}</td>
       <td class="px-4 py-4 text-right text-brand-gray">${_fmtW(r.ship || 0)}</td>
       <td class="px-4 py-4 text-right text-brand-gray">${_fmtW(r.shipCost || 0)}</td>
       <td class="px-4 py-4 text-right ${ad ? 'text-brand-pink font-semibold' : 'text-brand-gray'}">${ad ? _fmtW(ad) : '-'}</td>
@@ -12409,8 +12409,8 @@ function filterProductTable() {
     if (visible) {
       qtySum      += _num(tr.children[2]);
       salesSum    += _num(tr.children[3]);
-      purchaseSum += _num(tr.children[4]);
-      supplySum   += _num(tr.children[5]);
+      supplySum   += _num(tr.children[4]);
+      purchaseSum += _num(tr.children[5]);
       shipSum     += _num(tr.children[6]);
       shipCostSum += _num(tr.children[7]);
       adSum       += _num(tr.children[8]);
@@ -12428,8 +12428,8 @@ function filterProductTable() {
         <td class="px-6 py-4 font-bold text-xs text-brand-gray tracking-wide" colspan="2">합계 <span class="text-brand-gray font-medium">(${visibleCount}개 상품)</span></td>
         <td class="px-4 py-4 text-right font-black">${_fmtW(qtySum)}</td>
         <td class="px-4 py-4 text-right font-black">${_fmtW(salesSum)}</td>
-        <td class="px-4 py-4 text-right font-black">${_fmtW(purchaseSum)}</td>
         <td class="px-4 py-4 text-right font-black">${_fmtW(supplySum)}</td>
+        <td class="px-4 py-4 text-right font-black">${_fmtW(purchaseSum)}</td>
         <td class="px-4 py-4 text-right font-black">${_fmtW(shipSum)}</td>
         <td class="px-4 py-4 text-right font-black">${_fmtW(shipCostSum)}</td>
         <td class="px-4 py-4 text-right font-black text-brand-pink">${_fmtW(adSum)}</td>
