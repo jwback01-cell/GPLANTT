@@ -12610,7 +12610,7 @@ function renderAnalysisTab(m, rangeOrIdxs) {
       <span class="w-6 h-6 rounded-full ${i===0?'bg-brand-black text-white':'bg-brand-gray/20 text-brand-gray'} text-xs font-bold inline-flex items-center justify-center shrink-0">${i+1}</span>
       <div class="flex-1 min-w-0">
         <div class="font-semibold text-sm truncate">${escHtml(r.name)}</div>
-        <div class="text-xs text-brand-gray mt-0.5">${_fmtW(r.sales)}</div>
+        <div class="text-xs mt-0.5"><span class="text-brand-gray">순이익</span> <span class="text-brand-green font-bold">${_fmtW(r.profit)}</span></div>
       </div>
       <span class="text-brand-green font-bold text-sm shrink-0">${r.margin}%</span>
     </div>`).join('');
