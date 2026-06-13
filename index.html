@@ -1499,9 +1499,10 @@ tailwind.config = {
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',3,'num')">수수료<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',4,'num')">택배비<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',5,'num')">광고비<span class="sort-icon"></span></th>
-                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',6,'num')">순이익<span class="sort-icon"></span></th>
-                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',7,'num')">실순이익<span class="sort-icon" title="순이익 - 광고비"></span></th>
-                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',8,'num')">수익률<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',6,'num')">운영비<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',7,'num')">순이익<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',8,'num')">실순이익<span class="sort-icon" title="순이익 - 광고비 - 운영비"></span></th>
+                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('period',9,'num')">수익률<span class="sort-icon"></span></th>
                 </tr>
               </thead>
               <tbody id="period-tbody"></tbody>
@@ -12340,7 +12341,7 @@ function renderPeriodChart() {
     document.getElementById('period-bars').innerHTML = '';
     document.getElementById('period-labels').innerHTML = '';
     document.getElementById('period-tbody').innerHTML = `
-      <tr><td colspan="9" class="px-6 py-12 text-center text-brand-gray text-sm">매출 데이터가 없습니다. "장부 업로드"에서 데이터를 추가하면 여기에 집계됩니다.</td></tr>`;
+      <tr><td colspan="10" class="px-6 py-12 text-center text-brand-gray text-sm">매출 데이터가 없습니다. "장부 업로드"에서 데이터를 추가하면 여기에 집계됩니다.</td></tr>`;
     return;
   }
 
@@ -12445,11 +12446,22 @@ function renderPeriodChart() {
   document.getElementById('period-labels').innerHTML =
     data.map(d => `<span class="flex-1 text-center">${d.label}</span>`).join('');
 
+  // 월 라벨 → 그 달 운영비(월별 총액) — 월 단위 라벨일 때만
+  const _periodOps = (label) => {
+    const s = String(label || '');
+    if (!/월/.test(s)) return 0;
+    const m = parseInt(s) || 0;
+    if (m < 1 || m > 12) return 0;
+    return (typeof _opsMonthlyTotalForMonth === 'function') ? _opsMonthlyTotalForMonth(`${new Date().getFullYear()}-${String(m).padStart(2, '0')}`) : 0;
+  };
   // 테이블
+  let totalOps = 0;
   const rows = data.map((d, i) => {
     const profit = _profitOf(d);
     const ad = Number(d.adCost || 0);
-    const real = profit - ad;
+    const ops = _periodOps(d.label);
+    totalOps += ops;
+    const real = profit - ad - ops; // 실순이익 = 순이익 − 광고비 − 운영비
     const realCls = real >= 0 ? 'text-brand-green' : 'text-brand-pink';
     const rate   = d.sales > 0 ? Math.round((profit / d.sales) * 100) : 0;
     const bg     = i % 2 === 0 ? '' : 'bg-brand-bg/40';
@@ -12460,6 +12472,7 @@ function renderPeriodChart() {
       <td class="px-4 py-4 text-right text-brand-gray whitespace-nowrap">${fmt(d.fee)}</td>
       <td class="px-4 py-4 text-right text-brand-gray whitespace-nowrap">${fmt(d.delivery)}</td>
       <td class="px-4 py-4 text-right whitespace-nowrap ${ad ? 'text-brand-pink font-semibold' : 'text-brand-gray'}">${ad ? fmt(ad) : '-'}</td>
+      <td class="px-4 py-4 text-right whitespace-nowrap ${ops ? 'text-brand-orange font-semibold' : 'text-brand-gray'}">${ops ? fmt(ops) : '-'}</td>
       <td class="px-4 py-4 text-right font-bold text-brand-green whitespace-nowrap">${fmt(profit)}</td>
       <td class="px-4 py-4 text-right font-bold ${realCls} whitespace-nowrap">${fmt(real)}</td>
       <td class="px-6 py-4 text-right whitespace-nowrap">
@@ -12471,7 +12484,8 @@ function renderPeriodChart() {
   // 합계 순이익도 totalProfit (uploadProfit 반영) 사용
   const totalProfitFinal = totalProfit;
   const totalRateFinal   = totalSales > 0 ? Math.round((totalProfitFinal / totalSales) * 100) : 0;
-  const totalRealCls = totalReal >= 0 ? 'text-brand-green' : 'text-brand-pink';
+  const totalRealFinal   = totalProfitFinal - totalAd - totalOps; // 운영비까지 차감
+  const totalRealCls = totalRealFinal >= 0 ? 'text-brand-green' : 'text-brand-pink';
   document.getElementById('period-tbody').innerHTML = rows + `
     <tr class="bg-brand-bg font-bold border-t-2 border-brand-black">
       <td class="px-6 py-4 text-sm">합계</td>
@@ -12480,8 +12494,9 @@ function renderPeriodChart() {
       <td class="px-4 py-4 text-right text-brand-gray whitespace-nowrap">${fmt(totalFee)}</td>
       <td class="px-4 py-4 text-right text-brand-gray whitespace-nowrap">${fmt(totalDelivery)}</td>
       <td class="px-4 py-4 text-right text-brand-pink whitespace-nowrap">${fmt(totalAd)}</td>
+      <td class="px-4 py-4 text-right text-brand-orange whitespace-nowrap">${fmt(totalOps)}</td>
       <td class="px-4 py-4 text-right text-brand-green whitespace-nowrap">${fmt(totalProfitFinal)}</td>
-      <td class="px-4 py-4 text-right ${totalRealCls} whitespace-nowrap">${fmt(totalReal)}</td>
+      <td class="px-4 py-4 text-right ${totalRealCls} whitespace-nowrap">${fmt(totalRealFinal)}</td>
       <td class="px-6 py-4 text-right whitespace-nowrap">
         <span class="bg-brand-green-light text-brand-green text-xs font-bold px-2.5 py-1 rounded-lg">${totalRateFinal}%</span>
       </td>
