@@ -478,6 +478,11 @@ tailwind.config = {
   .cal-bar--pink   { background: #D93025; color: #fff; }
   .cal-bar--done   { background: #E8EAED; color: #5F6368; text-decoration: line-through; }
 
+  /* ── 계정 보관함 격자(zebra) 줄무늬 — 값 구분 ── */
+  #account-list > .account-row:nth-child(odd)  { background: #FFFFFF; }
+  #account-list > .account-row:nth-child(even) { background: #F4F7FB; }
+  #account-list > .account-row:hover           { background: #E8F0FE; }
+
   /* ── Keywords page controls ── */
   .kw-toggle { position: relative; display: inline-block; width: 44px; height: 24px; }
   .kw-toggle input { opacity: 0; width: 0; height: 0; }
