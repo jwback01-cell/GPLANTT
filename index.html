@@ -8357,6 +8357,7 @@ function renderSellerLauncher() {
         ${endedCount ? stat('판매종료', endedCount, '#EF4444') : ''}
       </div>
       <div class="flex items-center gap-2 flex-wrap">
+        <button onclick="_sellerLoginAllTabs()" class="text-xs font-extrabold px-3 py-1.5 rounded-full bg-brand-green text-white hover:opacity-90" title="지금 열려 있는 모든 탭을 저장된 계정과 도메인 매칭해 한 번에 자동로그인">⚡ 열린 탭 전체 로그인</button>
         <span id="sl-ext-status" class="text-xs font-bold ${_slExtReady ? 'text-brand-green' : 'text-brand-orange'}">${_slExtReady ? '✅ 확장 연결됨' : '⚠ 확장 미설치'}</span>
         <label class="sl-muted flex items-center gap-1.5 text-xs font-bold cursor-pointer"><input type="checkbox" ${showEnded ? 'checked' : ''} onchange="_sellerToggleShowEnded()" class="w-3.5 h-3.5">판매종료 표시</label>
         <button onclick="_sellerToggleTheme()" class="text-xs font-bold px-3 py-1.5 rounded-full ${dark ? 'bg-white/15 text-white' : 'bg-brand-bg text-brand-black'} hover:opacity-80" title="다크/라이트 전환">${dark ? '☀ 라이트' : '🌙 다크'}</button>
@@ -8404,6 +8405,17 @@ function _sellerAutoLogin(i) {
   }
   window.postMessage({ source: 'SELLER_LAUNCHER', type: 'LOGIN', url: a.url, id: a.id || '', pw: a.pw || '', site: a.site || '' }, '*');
   _sellerToast('자동로그인 실행 — 새 탭을 확인하세요');
+}
+// 지금 열려 있는 모든 탭을 저장된 계정과 매칭해 일괄 자동로그인
+function _sellerLoginAllTabs() {
+  if (!_slExtReady) {
+    if (typeof showAppAlert === 'function') showAppAlert('자동로그인 확장 필요', '「셀러런처 자동로그인」 크롬 확장을 먼저 설치해 주세요.\n(chrome://extensions → 개발자 모드 → 압축해제된 확장 로드 → Desktop\\seller-launcher-extension)', 'warn');
+    return;
+  }
+  const accounts = _getAccountsData().filter(a => a.url && (a.id || a.pw));
+  if (!accounts.length) { _sellerToast('URL이 있는 계정이 없습니다'); return; }
+  window.postMessage({ source: 'SELLER_LAUNCHER', type: 'LOGIN_ALL_TABS', accounts }, '*');
+  _sellerToast('열려 있는 탭들에 일괄 자동로그인 시도 중…');
 }
 // 저장된 보기 복원
 document.addEventListener('DOMContentLoaded', () => { try { if (localStorage.getItem('gplan_acct_view') === 'launcher') setTimeout(() => setAccountView('launcher'), 400); } catch (_) {} });
