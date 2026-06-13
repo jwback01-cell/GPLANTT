@@ -8084,7 +8084,8 @@ function openEditAccountDrawer(btn) {
   accountDrawerMode  = 'edit';
 
   // data 속성에서 직접 가져옴 (행 갱신 시 data 속성 유지)
-  const site = (item.querySelector('.font-bold')?.textContent || '').trim();
+  // ※ .font-bold 로 읽으면 분류 배지(쇼핑몰 등)가 먼저 잡혀 사이트명이 카테고리로 바뀌던 버그 → dataset.name 사용
+  const site = item.dataset.name || '';
   const cat  = item.dataset.cat || '쇼핑몰';
   const id   = item.dataset.idval || '';
   const url  = item.dataset.url || '';
