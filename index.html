@@ -6153,22 +6153,33 @@ async function submitTodoModal() {
     const item = todos.find(t => t.id === _editingTodoId);
     if (item) {
       const mo = startDate.getMonth() + 1, dd = startDate.getDate();
-      item.title  = title;
-      item.team   = team || '미지정';
-      item.accent = todoPriority;
-      item.memo   = memo;
-      if (due) {
-        item.dateKey = _makeDateKey(startDate);
-        if (endDate) {
-          item.endDateKey = _makeDateKey(endDate);
-          const eM = endDate.getMonth()+1, eD = endDate.getDate();
-          item.dueText = `${mo}/${dd} ~ ${eM}/${eD}`;
-        } else {
-          item.endDateKey = undefined;
-          item.dueText = `${mo}/${dd} 마감`;
+      // 반복 업무면 같은 시리즈(제목+반복+팀, 변경 전 키) 전체에 공통 필드(제목/팀/우선순위/메모) 전파
+      const isRecurring = !!item.repeatLabel;
+      const oldKey = `${item.title}|${item.repeatLabel || ''}|${item.team || ''}`;
+      const members = isRecurring
+        ? todos.filter(t => t.repeatLabel && `${t.title}|${t.repeatLabel}|${t.team || ''}` === oldKey)
+        : [item];
+      const _tasks = [];
+      members.forEach(m => {
+        m.title  = title;
+        m.team   = team || '미지정';
+        m.accent = todoPriority;
+        m.memo   = memo;
+        // 날짜는 편집한 그 인스턴스만 변경 — 반복 occurrence 날짜는 각자 유지
+        if (m.id === item.id && due) {
+          m.dateKey = _makeDateKey(startDate);
+          if (endDate) {
+            m.endDateKey = _makeDateKey(endDate);
+            const eM = endDate.getMonth()+1, eD = endDate.getDate();
+            m.dueText = `${mo}/${dd} ~ ${eM}/${eD}`;
+          } else {
+            m.endDateKey = undefined;
+            m.dueText = `${mo}/${dd} 마감`;
+          }
         }
-      }
-      await updateTodoDB(item.id, item);
+        _tasks.push(updateTodoDB(m.id, m));
+      });
+      await Promise.allSettled(_tasks);
     }
   } else if (_todoRepeat === 'none' && endDate) {
     // 기간 업무
