@@ -8431,6 +8431,13 @@ function _sellerLoginAllTabs() {
   if (btn) { btn.disabled = true; btn.textContent = '⏳ 진행중…'; }
   window.postMessage({ source: 'SELLER_LAUNCHER', type: 'LOGIN_ALL_TABS', accounts }, '*');
   _sellerToast('⏳ 열려 있는 탭들에 일괄 자동로그인 진행중…', 0);
+  // 안전장치: 완료 신호가 안 와도 18초 후 버튼 자동 해제 (확장 구버전/신호 누락 대비)
+  clearTimeout(_slAllBtnTimer);
+  _slAllBtnTimer = setTimeout(() => {
+    const b = document.getElementById('sl-all-login-btn');
+    if (b) { b.disabled = false; b.textContent = '⚡ 열린 탭 전체 로그인'; }
+    _sellerToast('자동로그인 시도함 — 각 탭을 확인하세요 (완료 신호 미수신: 확장 새로고침 권장)');
+  }, 18000);
 }
 // 저장된 보기 복원
 document.addEventListener('DOMContentLoaded', () => { try { if (localStorage.getItem('gplan_acct_view') === 'launcher') setTimeout(() => setAccountView('launcher'), 400); } catch (_) {} });
