@@ -2384,7 +2384,11 @@ tailwind.config = {
           <h1 class="text-[1.8rem] md:text-[2.25rem] font-bold tracking-tight mb-2">계정 보관함 🔐</h1>
           <p class="text-brand-gray text-base md:text-[1.1rem]">사이트별 아이디와 비밀번호를 안전하게 저장하고 관리하세요.</p>
         </div>
-        <div class="flex flex-wrap gap-2 md:gap-3">
+        <div class="flex flex-wrap gap-2 md:gap-3 items-center">
+          <div class="flex rounded-full bg-brand-bg p-1 border border-brand-border shrink-0">
+            <button id="acct-view-table" onclick="setAccountView('table')" class="px-4 py-2 rounded-full text-sm font-bold bg-brand-black text-white">표</button>
+            <button id="acct-view-launcher" onclick="setAccountView('launcher')" class="px-4 py-2 rounded-full text-sm font-bold text-brand-gray">🚀 런처</button>
+          </div>
           <button onclick="openAccountImportModal()" class="px-4 py-2.5 rounded-full bg-white border border-brand-border text-sm font-semibold hover:bg-brand-bg flex items-center gap-2">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 15 12 10 17 15"/><line x1="12" y1="10" x2="12" y2="22"/></svg>
             엑셀 가져오기
@@ -2428,6 +2432,8 @@ tailwind.config = {
           </div>
         </div>
 
+        <!-- ── 표 보기 ── -->
+        <div id="account-table-view">
         <!-- Column header (table 식 헤더) -->
         <div class="hidden md:grid items-center gap-3 px-3 py-2 border-y border-brand-border bg-brand-bg text-[11px] font-bold text-brand-gray uppercase tracking-wider" style="grid-template-columns: 24px 95px 1fr 1.2fr 1.3fr 1fr 60px;">
           <div></div>
@@ -2438,7 +2444,7 @@ tailwind.config = {
           <div>URL</div>
           <div></div>
         </div>
-        <!-- Account list -->
+        <!-- Account list (표 데이터 소스) -->
         <div id="account-list" class="flex flex-col"></div>
         <!-- 검색 결과 없음 -->
         <div id="account-no-result" class="hidden flex-col items-center justify-center py-14 gap-3 text-center">
@@ -2447,6 +2453,9 @@ tailwind.config = {
           <p id="account-no-result-msg" class="text-sm text-brand-gray"></p>
         </div>
         <div id="account-pagination" class="p-4 border-t border-brand-border flex justify-center gap-2"></div>
+        </div><!-- /account-table-view -->
+        <!-- ── 런처(카드) 보기 ── -->
+        <div id="seller-launcher-view" class="hidden flex flex-col gap-6"></div>
       </div>
     </main>
   </div>
@@ -7971,6 +7980,8 @@ function filterAccounts() {
 
   renderAccountPagination(totalPages);
   updateAccountSelectLabel();
+  // 런처(카드) 보기일 땐 카드도 같이 갱신
+  if (typeof _accountView !== 'undefined' && _accountView === 'launcher' && typeof renderSellerLauncher === 'function') renderSellerLauncher();
 }
 
 function renderAccountPagination(totalPages) {
@@ -8244,6 +8255,85 @@ function _loadAccountsFromStorage() {
 
 // 페이지 로드 시 자동 복원
 document.addEventListener('DOMContentLoaded', _loadAccountsFromStorage);
+
+// ═══════════════ 셀러런처 (계정 카드 보기) ═══════════════
+let _accountView = 'table';
+function setAccountView(v) {
+  _accountView = (v === 'launcher') ? 'launcher' : 'table';
+  const tv = document.getElementById('account-table-view');
+  const lv = document.getElementById('seller-launcher-view');
+  const setBtn = (id, on) => { const b = document.getElementById(id); if (!b) return;
+    b.classList.toggle('bg-brand-black', on); b.classList.toggle('text-white', on); b.classList.toggle('text-brand-gray', !on); };
+  setBtn('acct-view-table', _accountView === 'table');
+  setBtn('acct-view-launcher', _accountView === 'launcher');
+  if (tv) tv.classList.toggle('hidden', _accountView !== 'table');
+  if (lv) lv.classList.toggle('hidden', _accountView !== 'launcher');
+  try { localStorage.setItem('gplan_acct_view', _accountView); } catch (_) {}
+  if (_accountView === 'launcher') renderSellerLauncher();
+}
+function _getAccountsData() {
+  const rows = [...document.querySelectorAll('#account-list > .account-row')];
+  if (rows.length) return rows.map(it => ({ site: it.dataset.name || '', id: it.dataset.idval || '', pw: it.dataset.pw || '', url: it.dataset.url || '', memo: it.dataset.memo || '', cat: it.dataset.cat || '기타' }));
+  try { return JSON.parse(localStorage.getItem('gplan_accounts_v1') || '[]') || []; } catch (_) { return []; }
+}
+const _SELLER_FAVS_KEY = 'gplan_seller_favs';
+function _loadSellerFavs() { try { return new Set(JSON.parse(localStorage.getItem(_SELLER_FAVS_KEY) || '[]')); } catch (_) { return new Set(); } }
+function _saveSellerFavs(s) { try { localStorage.setItem(_SELLER_FAVS_KEY, JSON.stringify([...s])); } catch (_) {} }
+function _favKey(a) { return `${a.site}|${a.id}`; }
+let _sellerCards = [];
+function renderSellerLauncher() {
+  const wrap = document.getElementById('seller-launcher-view');
+  if (!wrap) return;
+  let data = _getAccountsData();
+  const q = (document.getElementById('account-search')?.value || '').trim().toLowerCase();
+  if (q) data = data.filter(a => (a.site || '').toLowerCase().includes(q) || (a.id || '').toLowerCase().includes(q) || (a.memo || '').toLowerCase().includes(q));
+  const cat = (typeof activeAccountCat !== 'undefined') ? activeAccountCat : '전체';
+  if (cat && cat !== '전체') data = data.filter(a => (a.cat || '기타') === cat);
+  _sellerCards = data;
+  const favs = _loadSellerFavs();
+  const _CATC = { '쇼핑몰': '#1E40AF', '유틸사이트': '#9A3412', '판매처': '#065F46', '기타': '#374151' };
+  const cardHtml = (a, i) => {
+    const fav = favs.has(_favKey(a));
+    const c = _CATC[a.cat] || _CATC['기타'];
+    return `<div class="border border-brand-border rounded-2xl p-3.5 flex flex-col gap-2 bg-white hover:shadow-md hover:-translate-y-0.5 transition-all">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0"><div class="font-bold text-[14px] truncate">${escHtml(a.site || '(이름없음)')}</div><div class="text-[11px] truncate text-brand-gray">${escHtml(a.id || '-')}</div></div>
+        <button onclick="_sellerFav(${i})" title="즐겨찾기" class="shrink-0 text-lg leading-none ${fav ? 'text-yellow-400' : 'text-brand-gray/40 hover:text-yellow-400'}">${fav ? '★' : '☆'}</button>
+      </div>
+      <div><span class="text-[10px] font-bold px-1.5 py-0.5 rounded" style="background:${c}1A;color:${c}">${escHtml(a.cat || '기타')}</span></div>
+      <div class="flex gap-1.5">
+        <button onclick="_sellerOpen(${i})" ${a.url ? '' : 'disabled'} class="flex-1 px-2 py-1.5 rounded-lg text-xs font-bold ${a.url ? 'bg-brand-black text-white hover:opacity-90' : 'bg-brand-bg text-brand-gray cursor-not-allowed'}">🔓 사이트 열기</button>
+        <button onclick="_sellerCopyField(${i},'id')" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-brand-bg hover:bg-brand-border" title="아이디 복사">ID</button>
+        <button onclick="_sellerCopyField(${i},'pw')" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-brand-bg hover:bg-brand-border" title="비밀번호 복사">PW</button>
+      </div>
+    </div>`;
+  };
+  const grid = items => `<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">${items.map(({ a, i }) => cardHtml(a, i)).join('')}</div>`;
+  const indexed = data.map((a, i) => ({ a, i }));
+  const favItems = indexed.filter(({ a }) => favs.has(_favKey(a)));
+  let html = '';
+  if (!data.length) {
+    html = `<div class="py-14 text-center text-brand-gray text-sm">표시할 계정이 없습니다. (표 보기에서 계정을 추가하거나 엑셀로 가져오세요)</div>`;
+  } else {
+    if (favItems.length) html += `<div><div class="font-bold text-sm mb-2">⭐ 즐겨찾기 <span class="text-brand-gray font-normal">(${favItems.length})</span></div>${grid(favItems)}</div>`;
+    ['쇼핑몰', '판매처', '유틸사이트', '기타'].forEach(catName => {
+      const items = indexed.filter(({ a }) => (a.cat || '기타') === catName);
+      if (items.length) html += `<div><div class="font-bold text-sm mb-2">${catName} <span class="text-brand-gray font-normal">(${items.length})</span></div>${grid(items)}</div>`;
+    });
+  }
+  wrap.innerHTML = html;
+}
+function _sellerOpen(i) { const a = _sellerCards[i]; if (a && a.url) { let u = a.url; if (!/^https?:\/\//i.test(u)) u = 'https://' + u; window.open(u, '_blank', 'noopener'); } }
+function _sellerFav(i) { const a = _sellerCards[i]; if (!a) return; const f = _loadSellerFavs(); const k = _favKey(a); if (f.has(k)) f.delete(k); else f.add(k); _saveSellerFavs(f); renderSellerLauncher(); }
+function _sellerCopyField(i, field) { const a = _sellerCards[i]; if (!a) return; const v = field === 'id' ? (a.id || '') : (a.pw || ''); try { navigator.clipboard.writeText(v); } catch (_) {} _sellerToast((field === 'id' ? '아이디' : '비밀번호') + ' 복사됨'); }
+let _sellerToastTimer = null;
+function _sellerToast(msg) {
+  let t = document.getElementById('seller-toast');
+  if (!t) { t = document.createElement('div'); t.id = 'seller-toast'; t.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#1A1A1A;color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:700;z-index:99999;opacity:0;transition:opacity .15s;pointer-events:none;'; document.body.appendChild(t); }
+  t.textContent = msg; t.style.opacity = '1'; clearTimeout(_sellerToastTimer); _sellerToastTimer = setTimeout(() => { t.style.opacity = '0'; }, 1200);
+}
+// 저장된 보기 복원
+document.addEventListener('DOMContentLoaded', () => { try { if (localStorage.getItem('gplan_acct_view') === 'launcher') setTimeout(() => setAccountView('launcher'), 400); } catch (_) {} });
 
 // 한 행의 inner HTML 생성 (재사용용)
 function _accountRowInnerHtml({ site, id, pw, url, memo, cat, cc }) {
