@@ -483,6 +483,17 @@ tailwind.config = {
   #account-list > .account-row:nth-child(even) { background: #F4F7FB; }
   #account-list > .account-row:hover           { background: #E8F0FE; }
 
+  /* ── 셀러런처 카드: 판매종료 흐리게 ── */
+  .sl-card.sl-ended { opacity: .45; }
+  /* ── 셀러런처 다크 모드 (런처 영역만) ── */
+  #seller-launcher-view.sl-dark { background:#16161C; border-radius:20px; padding:18px; }
+  #seller-launcher-view.sl-dark .sl-sec-title { color:#E5E7EB; }
+  #seller-launcher-view.sl-dark .sl-muted     { color:#9CA3AF; }
+  #seller-launcher-view.sl-dark .sl-card      { background:#262630 !important; border-color:#3A3A46 !important; color:#E5E7EB; }
+  #seller-launcher-view.sl-dark .sl-card .sl-name { color:#F3F4F6; }
+  #seller-launcher-view.sl-dark .sl-btn-sub   { background:#363643 !important; color:#D1D5DB !important; }
+  #seller-launcher-view.sl-dark .sl-btn-sub:hover { background:#424252 !important; }
+
   /* ── Keywords page controls ── */
   .kw-toggle { position: relative; display: inline-block; width: 44px; height: 24px; }
   .kw-toggle input { opacity: 0; width: 0; height: 0; }
@@ -8281,6 +8292,15 @@ const _SELLER_FAVS_KEY = 'gplan_seller_favs';
 function _loadSellerFavs() { try { return new Set(JSON.parse(localStorage.getItem(_SELLER_FAVS_KEY) || '[]')); } catch (_) { return new Set(); } }
 function _saveSellerFavs(s) { try { localStorage.setItem(_SELLER_FAVS_KEY, JSON.stringify([...s])); } catch (_) {} }
 function _favKey(a) { return `${a.site}|${a.id}`; }
+// 판매종료(PC별), 다크 테마, 판매종료 표시 토글
+const _SELLER_ENDED_KEY = 'gplan_seller_ended', _SELLER_THEME_KEY = 'gplan_seller_theme', _SELLER_SHOWENDED_KEY = 'gplan_seller_showended';
+function _loadSellerEnded() { try { return new Set(JSON.parse(localStorage.getItem(_SELLER_ENDED_KEY) || '[]')); } catch (_) { return new Set(); } }
+function _saveSellerEnded(s) { try { localStorage.setItem(_SELLER_ENDED_KEY, JSON.stringify([...s])); } catch (_) {} }
+function _sellerTheme() { try { return localStorage.getItem(_SELLER_THEME_KEY) || 'light'; } catch (_) { return 'light'; } }
+function _sellerShowEnded() { try { return localStorage.getItem(_SELLER_SHOWENDED_KEY) === '1'; } catch (_) { return false; } }
+function _sellerToggleTheme() { try { localStorage.setItem(_SELLER_THEME_KEY, _sellerTheme() === 'dark' ? 'light' : 'dark'); } catch (_) {} renderSellerLauncher(); }
+function _sellerToggleShowEnded() { try { localStorage.setItem(_SELLER_SHOWENDED_KEY, _sellerShowEnded() ? '0' : '1'); } catch (_) {} renderSellerLauncher(); }
+function _sellerToggleEnded(i) { const a = _sellerCards[i]; if (!a) return; const s = _loadSellerEnded(); const k = _favKey(a); if (s.has(k)) s.delete(k); else s.add(k); _saveSellerEnded(s); renderSellerLauncher(); }
 let _sellerCards = [];
 function renderSellerLauncher() {
   const wrap = document.getElementById('seller-launcher-view');
@@ -8290,40 +8310,65 @@ function renderSellerLauncher() {
   if (q) data = data.filter(a => (a.site || '').toLowerCase().includes(q) || (a.id || '').toLowerCase().includes(q) || (a.memo || '').toLowerCase().includes(q));
   const cat = (typeof activeAccountCat !== 'undefined') ? activeAccountCat : '전체';
   if (cat && cat !== '전체') data = data.filter(a => (a.cat || '기타') === cat);
+  const ended = _loadSellerEnded();
+  const showEnded = _sellerShowEnded();
+  const dark = _sellerTheme() === 'dark';
+  wrap.classList.toggle('sl-dark', dark);
+  // 판매종료 숨김 (표시 토글 OFF 면 종료 계정 제외)
+  if (!showEnded) data = data.filter(a => !ended.has(_favKey(a)));
   _sellerCards = data;
   const favs = _loadSellerFavs();
   const _CATC = { '쇼핑몰': '#1E40AF', '유틸사이트': '#9A3412', '판매처': '#065F46', '기타': '#374151' };
   const cardHtml = (a, i) => {
     const fav = favs.has(_favKey(a));
+    const isEnded = ended.has(_favKey(a));
     const c = _CATC[a.cat] || _CATC['기타'];
-    return `<div class="border border-brand-border rounded-2xl p-3.5 flex flex-col gap-2 bg-white hover:shadow-md hover:-translate-y-0.5 transition-all">
+    return `<div class="sl-card border border-brand-border rounded-2xl p-3.5 flex flex-col gap-2 bg-white hover:shadow-md hover:-translate-y-0.5 transition-all ${isEnded ? 'sl-ended' : ''}">
       <div class="flex items-start justify-between gap-2">
-        <div class="min-w-0"><div class="font-bold text-[14px] truncate">${escHtml(a.site || '(이름없음)')}</div><div class="text-[11px] truncate text-brand-gray">${escHtml(a.id || '-')}</div></div>
+        <div class="min-w-0"><div class="sl-name font-bold text-[14px] truncate">${escHtml(a.site || '(이름없음)')}${isEnded ? ' <span class="text-[9px] font-bold text-brand-pink">판매종료</span>' : ''}</div><div class="sl-muted text-[11px] truncate text-brand-gray">${escHtml(a.id || '-')}</div></div>
         <button onclick="_sellerFav(${i})" title="즐겨찾기" class="shrink-0 text-lg leading-none ${fav ? 'text-yellow-400' : 'text-brand-gray/40 hover:text-yellow-400'}">${fav ? '★' : '☆'}</button>
       </div>
-      <div><span class="text-[10px] font-bold px-1.5 py-0.5 rounded" style="background:${c}1A;color:${c}">${escHtml(a.cat || '기타')}</span></div>
+      <div class="flex items-center justify-between">
+        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded" style="background:${c}1A;color:${c}">${escHtml(a.cat || '기타')}</span>
+        <button onclick="_sellerToggleEnded(${i})" class="sl-muted text-[10px] font-bold text-brand-gray hover:text-brand-pink" title="판매종료 표시 전환">${isEnded ? '↩ 판매재개' : '⊘ 판매종료'}</button>
+      </div>
       <button onclick="_sellerAutoLogin(${i})" ${a.url ? '' : 'disabled'} class="w-full px-2 py-2 rounded-lg text-xs font-extrabold ${a.url ? 'bg-brand-blue text-white hover:opacity-90' : 'bg-brand-bg text-brand-gray cursor-not-allowed'}" title="확장이 사이트를 열고 ID/PW 자동입력 후 로그인">🔑 자동로그인 →</button>
       <div class="flex gap-1.5">
-        <button onclick="_sellerOpen(${i})" ${a.url ? '' : 'disabled'} class="flex-1 px-2 py-1.5 rounded-lg text-xs font-bold ${a.url ? 'bg-brand-bg hover:bg-brand-border' : 'bg-brand-bg text-brand-gray cursor-not-allowed'}">🔓 열기</button>
-        <button onclick="_sellerCopyField(${i},'id')" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-brand-bg hover:bg-brand-border" title="아이디 복사">ID</button>
-        <button onclick="_sellerCopyField(${i},'pw')" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-brand-bg hover:bg-brand-border" title="비밀번호 복사">PW</button>
+        <button onclick="_sellerOpen(${i})" ${a.url ? '' : 'disabled'} class="sl-btn-sub flex-1 px-2 py-1.5 rounded-lg text-xs font-bold ${a.url ? 'bg-brand-bg hover:bg-brand-border' : 'bg-brand-bg text-brand-gray cursor-not-allowed'}">🔓 열기</button>
+        <button onclick="_sellerCopyField(${i},'id')" class="sl-btn-sub px-2.5 py-1.5 rounded-lg text-xs font-bold bg-brand-bg hover:bg-brand-border" title="아이디 복사">ID</button>
+        <button onclick="_sellerCopyField(${i},'pw')" class="sl-btn-sub px-2.5 py-1.5 rounded-lg text-xs font-bold bg-brand-bg hover:bg-brand-border" title="비밀번호 복사">PW</button>
       </div>
     </div>`;
   };
   const grid = items => `<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">${items.map(({ a, i }) => cardHtml(a, i)).join('')}</div>`;
   const indexed = data.map((a, i) => ({ a, i }));
   const favItems = indexed.filter(({ a }) => favs.has(_favKey(a)));
-  let html = `<div class="flex items-center justify-between flex-wrap gap-2 -mb-2">
-      <div class="text-xs text-brand-gray">카드에서 <b>자동로그인</b> · 사이트 열기 · ID/PW 복사 · ⭐즐겨찾기</div>
-      <span id="sl-ext-status" class="text-xs font-bold ${_slExtReady ? 'text-brand-green' : 'text-brand-orange'}">${_slExtReady ? '✅ 자동로그인 확장 연결됨' : '⚠ 자동로그인 확장 미설치 — 열기·복사만 가능'}</span>
+  const endedCount = data.filter(a => ended.has(_favKey(a))).length;
+  // 통계 요약
+  const catCount = cn => data.filter(a => (a.cat || '기타') === cn).length;
+  const stat = (lbl, n, color) => `<span class="sl-muted text-xs"><b style="color:${color||'inherit'}">${n}</b> ${lbl}</span>`;
+  let html = `<div class="flex items-center justify-between flex-wrap gap-3 -mb-2">
+      <div class="flex items-center gap-3 flex-wrap">
+        ${stat('전체', data.length, dark ? '#fff' : '#111')}
+        ${stat('⭐즐겨찾기', favItems.length, '#EAB308')}
+        ${stat('쇼핑몰', catCount('쇼핑몰'), '#3B82F6')}
+        ${stat('판매처', catCount('판매처'), '#10B981')}
+        ${stat('유틸', catCount('유틸사이트'), '#F97316')}
+        ${endedCount ? stat('판매종료', endedCount, '#EF4444') : ''}
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <span id="sl-ext-status" class="text-xs font-bold ${_slExtReady ? 'text-brand-green' : 'text-brand-orange'}">${_slExtReady ? '✅ 확장 연결됨' : '⚠ 확장 미설치'}</span>
+        <label class="sl-muted flex items-center gap-1.5 text-xs font-bold cursor-pointer"><input type="checkbox" ${showEnded ? 'checked' : ''} onchange="_sellerToggleShowEnded()" class="w-3.5 h-3.5">판매종료 표시</label>
+        <button onclick="_sellerToggleTheme()" class="text-xs font-bold px-3 py-1.5 rounded-full ${dark ? 'bg-white/15 text-white' : 'bg-brand-bg text-brand-black'} hover:opacity-80" title="다크/라이트 전환">${dark ? '☀ 라이트' : '🌙 다크'}</button>
+      </div>
     </div>`;
   if (!data.length) {
-    html += `<div class="py-14 text-center text-brand-gray text-sm">표시할 계정이 없습니다. (표 보기에서 계정을 추가하거나 엑셀로 가져오세요)</div>`;
+    html += `<div class="sl-muted py-14 text-center text-brand-gray text-sm">표시할 계정이 없습니다. (표 보기에서 계정을 추가하거나 엑셀로 가져오세요)</div>`;
   } else {
-    if (favItems.length) html += `<div><div class="font-bold text-sm mb-2">⭐ 즐겨찾기 <span class="text-brand-gray font-normal">(${favItems.length})</span></div>${grid(favItems)}</div>`;
+    if (favItems.length) html += `<div><div class="sl-sec-title font-bold text-sm mb-2">⭐ 즐겨찾기 <span class="sl-muted text-brand-gray font-normal">(${favItems.length})</span></div>${grid(favItems)}</div>`;
     ['쇼핑몰', '판매처', '유틸사이트', '기타'].forEach(catName => {
       const items = indexed.filter(({ a }) => (a.cat || '기타') === catName);
-      if (items.length) html += `<div><div class="font-bold text-sm mb-2">${catName} <span class="text-brand-gray font-normal">(${items.length})</span></div>${grid(items)}</div>`;
+      if (items.length) html += `<div><div class="sl-sec-title font-bold text-sm mb-2">${catName} <span class="sl-muted text-brand-gray font-normal">(${items.length})</span></div>${grid(items)}</div>`;
     });
   }
   wrap.innerHTML = html;
