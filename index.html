@@ -14010,6 +14010,19 @@ function renderCalendar() {
   const today     = new Date();
   const todayKey  = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
 
+  // 반복 시리즈별 '마지막 회차' id 계산 — 그 회차 바에 "반복 마지막" 표시
+  const _lastRecurIds = new Set();
+  try {
+    const _seriesMax = new Map();
+    todos.forEach(t => {
+      if (!t.repeatLabel || !t.dateKey) return;
+      const key = `${t.title}|${t.repeatLabel}|${t.team || ''}`;
+      const cur = _seriesMax.get(key);
+      if (!cur || t.dateKey > cur.dateKey) _seriesMax.set(key, { id: t.id, dateKey: t.dateKey });
+    });
+    _seriesMax.forEach(v => _lastRecurIds.add(v.id));
+  } catch (_) {}
+
   // 주(week) 단위 셀 구성
   const weeks = [];
   let curWeek = [];
@@ -14133,10 +14146,13 @@ function renderCalendar() {
       const colStart = t.startCol + 1;
       const colEnd   = t.endCol + 2; // grid-column end는 exclusive
       const row      = t.lane + 2;   // row 1은 날짜 셀 영역
-      const label    = t.showTitle ? escHtml(t.title) : '';
+      const _isLastRecur = _lastRecurIds.has(t.id);
+      const _lastBadge = _isLastRecur ? '<span style="flex-shrink:0;margin-left:4px;font-size:9px;font-weight:800;background:rgba(255,255,255,.9);color:#D93025;padding:0 4px;border-radius:6px;white-space:nowrap;">반복 마지막</span>' : '';
+      const label    = t.showTitle ? (`<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;">${escHtml(t.title)}</span>` + _lastBadge) : '';
       const teamColor = (!t.completed && t.team) ? _teamColor(t.team) : null;
       const teamStyle = teamColor ? `background:${teamColor};color:#fff;` : '';
-      html += `<div class="cal-bar ${baseCls}" draggable="true" onclick="event.stopPropagation();todoEdit(${t.id})" ondragstart="calBarDragStart(event,${t.id})" ondragend="calBarDragEnd()" style="grid-column:${colStart} / ${colEnd}; grid-row:${row}; cursor:pointer;${teamStyle}" title="클릭하면 상세 보기/수정">${label}</div>`;
+      const _ttl = _isLastRecur ? '반복 업무 마지막 회차입니다 — 다음 회차가 없으니 필요하면 새로 등록하세요. (클릭=상세/수정)' : '클릭하면 상세 보기/수정';
+      html += `<div class="cal-bar ${baseCls}" draggable="true" onclick="event.stopPropagation();todoEdit(${t.id})" ondragstart="calBarDragStart(event,${t.id})" ondragend="calBarDragEnd()" style="grid-column:${colStart} / ${colEnd}; grid-row:${row}; cursor:pointer;${teamStyle}" title="${_ttl}">${label}</div>`;
     });
 
     html += `</div>`;
