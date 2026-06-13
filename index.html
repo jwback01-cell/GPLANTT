@@ -8269,7 +8269,7 @@ function setAccountView(v) {
   if (tv) tv.classList.toggle('hidden', _accountView !== 'table');
   if (lv) lv.classList.toggle('hidden', _accountView !== 'launcher');
   try { localStorage.setItem('gplan_acct_view', _accountView); } catch (_) {}
-  if (_accountView === 'launcher') renderSellerLauncher();
+  if (_accountView === 'launcher') { renderSellerLauncher(); if (typeof _slPing === 'function') _slPing(); }
 }
 function _getAccountsData() {
   const rows = [...document.querySelectorAll('#account-list > .account-row')];
@@ -8301,8 +8301,9 @@ function renderSellerLauncher() {
         <button onclick="_sellerFav(${i})" title="즐겨찾기" class="shrink-0 text-lg leading-none ${fav ? 'text-yellow-400' : 'text-brand-gray/40 hover:text-yellow-400'}">${fav ? '★' : '☆'}</button>
       </div>
       <div><span class="text-[10px] font-bold px-1.5 py-0.5 rounded" style="background:${c}1A;color:${c}">${escHtml(a.cat || '기타')}</span></div>
+      <button onclick="_sellerAutoLogin(${i})" ${a.url ? '' : 'disabled'} class="w-full px-2 py-2 rounded-lg text-xs font-extrabold ${a.url ? 'bg-brand-blue text-white hover:opacity-90' : 'bg-brand-bg text-brand-gray cursor-not-allowed'}" title="확장이 사이트를 열고 ID/PW 자동입력 후 로그인">🔑 자동로그인 →</button>
       <div class="flex gap-1.5">
-        <button onclick="_sellerOpen(${i})" ${a.url ? '' : 'disabled'} class="flex-1 px-2 py-1.5 rounded-lg text-xs font-bold ${a.url ? 'bg-brand-black text-white hover:opacity-90' : 'bg-brand-bg text-brand-gray cursor-not-allowed'}">🔓 사이트 열기</button>
+        <button onclick="_sellerOpen(${i})" ${a.url ? '' : 'disabled'} class="flex-1 px-2 py-1.5 rounded-lg text-xs font-bold ${a.url ? 'bg-brand-bg hover:bg-brand-border' : 'bg-brand-bg text-brand-gray cursor-not-allowed'}">🔓 열기</button>
         <button onclick="_sellerCopyField(${i},'id')" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-brand-bg hover:bg-brand-border" title="아이디 복사">ID</button>
         <button onclick="_sellerCopyField(${i},'pw')" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-brand-bg hover:bg-brand-border" title="비밀번호 복사">PW</button>
       </div>
@@ -8311,9 +8312,12 @@ function renderSellerLauncher() {
   const grid = items => `<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">${items.map(({ a, i }) => cardHtml(a, i)).join('')}</div>`;
   const indexed = data.map((a, i) => ({ a, i }));
   const favItems = indexed.filter(({ a }) => favs.has(_favKey(a)));
-  let html = '';
+  let html = `<div class="flex items-center justify-between flex-wrap gap-2 -mb-2">
+      <div class="text-xs text-brand-gray">카드에서 <b>자동로그인</b> · 사이트 열기 · ID/PW 복사 · ⭐즐겨찾기</div>
+      <span id="sl-ext-status" class="text-xs font-bold ${_slExtReady ? 'text-brand-green' : 'text-brand-orange'}">${_slExtReady ? '✅ 자동로그인 확장 연결됨' : '⚠ 자동로그인 확장 미설치 — 열기·복사만 가능'}</span>
+    </div>`;
   if (!data.length) {
-    html = `<div class="py-14 text-center text-brand-gray text-sm">표시할 계정이 없습니다. (표 보기에서 계정을 추가하거나 엑셀로 가져오세요)</div>`;
+    html += `<div class="py-14 text-center text-brand-gray text-sm">표시할 계정이 없습니다. (표 보기에서 계정을 추가하거나 엑셀로 가져오세요)</div>`;
   } else {
     if (favItems.length) html += `<div><div class="font-bold text-sm mb-2">⭐ 즐겨찾기 <span class="text-brand-gray font-normal">(${favItems.length})</span></div>${grid(favItems)}</div>`;
     ['쇼핑몰', '판매처', '유틸사이트', '기타'].forEach(catName => {
@@ -8331,6 +8335,29 @@ function _sellerToast(msg) {
   let t = document.getElementById('seller-toast');
   if (!t) { t = document.createElement('div'); t.id = 'seller-toast'; t.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#1A1A1A;color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:700;z-index:99999;opacity:0;transition:opacity .15s;pointer-events:none;'; document.body.appendChild(t); }
   t.textContent = msg; t.style.opacity = '1'; clearTimeout(_sellerToastTimer); _sellerToastTimer = setTimeout(() => { t.style.opacity = '0'; }, 1200);
+}
+// ── 자동로그인 (크롬 확장 연동) ──
+let _slExtReady = false;
+window.addEventListener('message', (e) => {
+  if (e.source !== window) return;
+  const d = e.data;
+  if (d && d.source === 'SELLER_LAUNCHER_EXT' && d.type === 'READY') {
+    _slExtReady = true;
+    const b = document.getElementById('sl-ext-status');
+    if (b) { b.textContent = '✅ 자동로그인 확장 연결됨'; b.className = 'text-xs font-bold text-brand-green'; }
+  }
+});
+function _slPing() { try { window.postMessage({ source: 'SELLER_LAUNCHER', type: 'PING' }, '*'); } catch (_) {} }
+function _sellerAutoLogin(i) {
+  const a = _sellerCards[i]; if (!a) return;
+  if (!a.url) { _sellerToast('URL이 없어 자동로그인 불가'); return; }
+  if (!_slExtReady) {
+    if (typeof showAppAlert === 'function') showAppAlert('자동로그인 확장 필요',
+      '자동로그인은 「셀러런처 자동로그인」 크롬 확장이 설치되어 있어야 합니다.\n\nchrome://extensions → 개발자 모드 ON → "압축해제된 확장 프로그램 로드" → Desktop\\seller-launcher-extension 폴더 선택.\n\n(확장 없이도 「열기 / ID·PW 복사」는 됩니다)', 'warn');
+    return;
+  }
+  window.postMessage({ source: 'SELLER_LAUNCHER', type: 'LOGIN', url: a.url, id: a.id || '', pw: a.pw || '', site: a.site || '' }, '*');
+  _sellerToast('자동로그인 실행 — 새 탭을 확인하세요');
 }
 // 저장된 보기 복원
 document.addEventListener('DOMContentLoaded', () => { try { if (localStorage.getItem('gplan_acct_view') === 'launcher') setTimeout(() => setAccountView('launcher'), 400); } catch (_) {} });
