@@ -1436,8 +1436,7 @@ tailwind.config = {
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',6,'num')">광고비<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',7,'num')">순이익<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',8,'num')">실순이익<span class="sort-icon" title="순이익 - 광고비"></span></th>
-                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',9,'num')">수익률<span class="sort-icon"></span></th>
-                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',10,'num')">전일대비<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('daily',9,'num')">수익률<span class="sort-icon"></span></th>
                 </tr>
               </thead>
               <tbody id="daily-tbody"></tbody>
@@ -12165,7 +12164,7 @@ function renderDailyTab() {
   const tfoot = document.getElementById('daily-tfoot');
   if (tbody) {
     if (!visibleDays.length) {
-      tbody.innerHTML = '<tr><td colspan="11" class="px-6 py-8 text-center text-brand-gray">선택한 기간에 데이터 없음</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" class="px-6 py-8 text-center text-brand-gray">선택한 기간에 데이터 없음</td></tr>';
       if (tfoot) tfoot.innerHTML = '';
     } else {
       tbody.innerHTML = visibleDays.map((d, i) => {
@@ -12196,8 +12195,7 @@ function renderDailyTab() {
           <td class="px-4 py-3 text-right whitespace-nowrap ${d.adCost ? 'text-brand-pink font-semibold' : 'text-brand-gray'}">${d.adCost ? fmtN(d.adCost) : '-'}</td>
           <td class="px-4 py-3 text-right whitespace-nowrap ${profitCls} font-bold">${d._hasProfit ? fmtN(d.profit) : '-'}</td>
           <td class="px-4 py-3 text-right whitespace-nowrap ${realCls} font-bold">${(d._hasProfit || d.adCost) ? fmtN(realDay) : '-'}</td>
-          <td class="px-4 py-3 text-right whitespace-nowrap">${rate}</td>
-          <td class="px-6 py-3 text-right whitespace-nowrap">${diffHtml}</td>
+          <td class="px-6 py-3 text-right whitespace-nowrap">${rate}</td>
         </tr>`;
       }).join('');
       if (tfoot) {
@@ -12210,8 +12208,7 @@ function renderDailyTab() {
           <td class="px-4 py-3 text-right text-brand-pink">${fmtN(kpiSum.adCost)}</td>
           <td class="px-4 py-3 text-right ${kpiSum.profit >= 0 ? 'text-brand-green' : 'text-brand-pink'}">${fmtN(kpiSum.profit)}</td>
           <td class="px-4 py-3 text-right ${realProfit >= 0 ? 'text-brand-green' : 'text-brand-pink'}">${fmtN(realProfit)}</td>
-          <td class="px-4 py-3 text-right">${profitRate === '-' ? '-' : profitRate + '%'}</td>
-          <td class="px-6"></td>
+          <td class="px-6 py-3 text-right">${profitRate === '-' ? '-' : profitRate + '%'}</td>
         </tr>`;
       }
     }
