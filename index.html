@@ -8357,7 +8357,7 @@ function renderSellerLauncher() {
         ${endedCount ? stat('판매종료', endedCount, '#EF4444') : ''}
       </div>
       <div class="flex items-center gap-2 flex-wrap">
-        <button onclick="_sellerLoginAllTabs()" class="text-xs font-extrabold px-3 py-1.5 rounded-full bg-brand-green text-white hover:opacity-90" title="지금 열려 있는 모든 탭을 저장된 계정과 도메인 매칭해 한 번에 자동로그인">⚡ 열린 탭 전체 로그인</button>
+        <button id="sl-all-login-btn" onclick="_sellerLoginAllTabs()" class="text-xs font-extrabold px-3 py-1.5 rounded-full bg-brand-green text-white hover:opacity-90" title="지금 열려 있는 모든 탭을 저장된 계정과 도메인 매칭해 한 번에 자동로그인">⚡ 열린 탭 전체 로그인</button>
         <span id="sl-ext-status" class="text-xs font-bold ${_slExtReady ? 'text-brand-green' : 'text-brand-orange'}">${_slExtReady ? '✅ 확장 연결됨' : '⚠ 확장 미설치'}</span>
         <label class="sl-muted flex items-center gap-1.5 text-xs font-bold cursor-pointer"><input type="checkbox" ${showEnded ? 'checked' : ''} onchange="_sellerToggleShowEnded()" class="w-3.5 h-3.5">판매종료 표시</label>
         <button onclick="_sellerToggleTheme()" class="text-xs font-bold px-3 py-1.5 rounded-full ${dark ? 'bg-white/15 text-white' : 'bg-brand-bg text-brand-black'} hover:opacity-80" title="다크/라이트 전환">${dark ? '☀ 라이트' : '🌙 다크'}</button>
@@ -8381,17 +8381,30 @@ let _sellerToastTimer = null;
 function _sellerToast(msg) {
   let t = document.getElementById('seller-toast');
   if (!t) { t = document.createElement('div'); t.id = 'seller-toast'; t.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#1A1A1A;color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:700;z-index:99999;opacity:0;transition:opacity .15s;pointer-events:none;'; document.body.appendChild(t); }
-  t.textContent = msg; t.style.opacity = '1'; clearTimeout(_sellerToastTimer); _sellerToastTimer = setTimeout(() => { t.style.opacity = '0'; }, 1200);
+  t.textContent = msg; t.style.opacity = '1'; clearTimeout(_sellerToastTimer); if (ms !== 0) _sellerToastTimer = setTimeout(() => { t.style.opacity = '0'; }, ms || 1200);
 }
 // ── 자동로그인 (크롬 확장 연동) ──
 let _slExtReady = false;
+let _slAllBtnTimer = null;
 window.addEventListener('message', (e) => {
   if (e.source !== window) return;
   const d = e.data;
-  if (d && d.source === 'SELLER_LAUNCHER_EXT' && d.type === 'READY') {
+  if (!d || d.source !== 'SELLER_LAUNCHER_EXT') return;
+  if (d.type === 'READY') {
     _slExtReady = true;
     const b = document.getElementById('sl-ext-status');
     if (b) { b.textContent = '✅ 자동로그인 확장 연결됨'; b.className = 'text-xs font-bold text-brand-green'; }
+  } else if (d.type === 'LOGIN_DONE') {
+    _sellerToast('✅ ' + (d.site ? d.site + ' ' : '') + '자동입력 완료');
+  } else if (d.type === 'ALL_DONE') {
+    const btn = document.getElementById('sl-all-login-btn');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = `✅ 완료 (${d.count || 0}개 탭)`;
+      clearTimeout(_slAllBtnTimer);
+      _slAllBtnTimer = setTimeout(() => { const b2 = document.getElementById('sl-all-login-btn'); if (b2) b2.textContent = '⚡ 열린 탭 전체 로그인'; }, 4000);
+    }
+    _sellerToast(`✅ 일괄 자동로그인 완료 — ${d.count || 0}개 탭 처리`);
   }
 });
 function _slPing() { try { window.postMessage({ source: 'SELLER_LAUNCHER', type: 'PING' }, '*'); } catch (_) {} }
@@ -8404,7 +8417,7 @@ function _sellerAutoLogin(i) {
     return;
   }
   window.postMessage({ source: 'SELLER_LAUNCHER', type: 'LOGIN', url: a.url, id: a.id || '', pw: a.pw || '', site: a.site || '' }, '*');
-  _sellerToast('자동로그인 실행 — 새 탭을 확인하세요');
+  _sellerToast('⏳ ' + (a.site ? a.site + ' ' : '') + '자동로그인 진행중…', 0); // 완료 신호 오면 갱신
 }
 // 지금 열려 있는 모든 탭을 저장된 계정과 매칭해 일괄 자동로그인
 function _sellerLoginAllTabs() {
@@ -8414,8 +8427,10 @@ function _sellerLoginAllTabs() {
   }
   const accounts = _getAccountsData().filter(a => a.url && (a.id || a.pw));
   if (!accounts.length) { _sellerToast('URL이 있는 계정이 없습니다'); return; }
+  const btn = document.getElementById('sl-all-login-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 진행중…'; }
   window.postMessage({ source: 'SELLER_LAUNCHER', type: 'LOGIN_ALL_TABS', accounts }, '*');
-  _sellerToast('열려 있는 탭들에 일괄 자동로그인 시도 중…');
+  _sellerToast('⏳ 열려 있는 탭들에 일괄 자동로그인 진행중…', 0);
 }
 // 저장된 보기 복원
 document.addEventListener('DOMContentLoaded', () => { try { if (localStorage.getItem('gplan_acct_view') === 'launcher') setTimeout(() => setAccountView('launcher'), 400); } catch (_) {} });
