@@ -937,7 +937,7 @@ tailwind.config = {
           <button type="button" onclick="shiftTodoListDate(-1)" class="w-8 h-8 rounded-full bg-brand-bg hover:bg-brand-border flex items-center justify-center" title="이전 날짜">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
-          <input type="date" id="todo-list-date" class="drawer-input" style="width:170px;padding:8px 10px;" onchange="setTodoListDate(this.value)">
+          <input type="date" id="todo-list-date" class="drawer-input" style="width:170px;padding:8px 10px;" oninput="if(this.value)setTodoListDate(this.value)" onchange="setTodoListDate(this.value)">
           <button type="button" onclick="shiftTodoListDate(1)" class="w-8 h-8 rounded-full bg-brand-bg hover:bg-brand-border flex items-center justify-center" title="다음 날짜">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
@@ -10930,9 +10930,9 @@ function renderTodoList() {
 
   const _todayKey = _todoListEffectiveDateKey();
 
-  // 날짜 입력/라벨 동기화
+  // 날짜 입력/라벨 동기화 — 단, 사용자가 입력칸을 편집 중(포커스)이면 덮어쓰지 않음(타이핑 보존)
   const dateInput = document.getElementById('todo-list-date');
-  if (dateInput && dateInput.value !== _todayKey) dateInput.value = _todayKey;
+  if (dateInput && document.activeElement !== dateInput && dateInput.value !== _todayKey) dateInput.value = _todayKey;
   const lblEl = document.getElementById('todo-list-date-label');
   if (lblEl) {
     const _realToday = (() => {
