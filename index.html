@@ -12863,11 +12863,11 @@ function renderAnalysisTab(m, rangeOrIdxs) {
     </div>`).join('');
 
   // 순이익 기준 막대(초록) + 광고비 막대(분홍) — 순이익 내림차순 정렬
-  // 광고비는 채널 매출 비례로 안분 (광고 데이터에 채널 정보가 없으므로)
-  const totalChSales = cRows.reduce((s, r) => s + (r.sales || 0), 0);
+  // 광고비는 광고비 업로드의 채널(site)별 실제 금액 사용 (해당 채널에 광고 없으면 0)
+  const _adBySite = (_range && typeof _adCostBySite === 'function') ? _adCostBySite(_range.start, _range.end) : {};
   const chWithAd = cRows.map(r => ({
     ...r,
-    ad: totalChSales > 0 ? Math.round(totalAd * (r.sales || 0) / totalChSales) : 0
+    ad: Number(_adBySite[r.name] || 0)
   }));
   const totalProfitCh = chWithAd.reduce((s, r) => s + (r.profit || 0), 0);
   // 두 막대 공통 스케일 — 채널들의 순이익/광고비 중 최댓값을 100%로
