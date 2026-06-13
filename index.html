@@ -10742,16 +10742,30 @@ async function loadTodosFromDB() {
 }
 
 // 미완료 업무를 오늘로 이동 (단일일은 dateKey 변경, 기간 업무는 endDateKey 연장)
-// 반복 업무(repeatLabel)는 일자별로 별도 생성되므로 제외
+// 반복 업무도 일반 업무와 동일하게 — 해당일에 완료 못 하면 오늘로 이월
+//   (각 occurrence 는 독립된 DB행이므로 미완료분만 오늘로 옮겨짐)
 async function _rolloverOverdueTodos() {
   const now = new Date();
   const todayKey = _makeDateKey(now);
   const todayDue = _makeDueText(now);
   const tasks = [];
+  // 반복 업무: 시리즈(제목+반복+팀)별로 '가장 최근' 미완료 overdue 1건만 오늘로 이월
+  //   (과거 여러 미완료 occurrence 가 오늘에 무더기로 쌓이는 것 방지)
+  const _seriesLatest = new Map();
+  for (const t of todos) {
+    if (t.completed || !t.repeatLabel || !t.dateKey) continue;
+    const ek = t.endDateKey || t.dateKey;
+    if (ek >= todayKey) continue;
+    const key = `${t.title}|${t.repeatLabel}|${t.team || ''}`;
+    const cur = _seriesLatest.get(key);
+    if (!cur || ek > (cur.endDateKey || cur.dateKey)) _seriesLatest.set(key, t);
+  }
+  const _rollRecurIds = new Set([..._seriesLatest.values()].map(t => t.id));
+
   for (const t of todos) {
     if (t.completed) continue;
-    if (t.repeatLabel) continue;
     if (!t.dateKey) continue;
+    if (t.repeatLabel && !_rollRecurIds.has(t.id)) continue; // 반복은 시리즈별 최신 1건만
     const endKey = t.endDateKey || t.dateKey;
     if (endKey >= todayKey) continue; // 오늘 또는 미래에 걸쳐있으면 그대로
     if (!t.endDateKey || t.endDateKey === t.dateKey) {
