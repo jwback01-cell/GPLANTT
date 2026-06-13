@@ -10915,6 +10915,19 @@ function renderTodoList() {
   const compCnt = document.getElementById('todo-completed-count');
   if (!list) return;
 
+  // 반복 시리즈별 '마지막 회차' id — 목록에도 '반복 마지막' 배지 표시
+  const _lastRecurIds = new Set();
+  try {
+    const _sm = new Map();
+    todos.forEach(t => {
+      if (!t.repeatLabel || !t.dateKey) return;
+      const k = `${t.title}|${t.repeatLabel}|${t.team || ''}`;
+      const c = _sm.get(k);
+      if (!c || t.dateKey > c.dateKey) _sm.set(k, { id: t.id, dateKey: t.dateKey });
+    });
+    _sm.forEach(v => _lastRecurIds.add(v.id));
+  } catch (_) {}
+
   const _todayKey = _todoListEffectiveDateKey();
 
   // 날짜 입력/라벨 동기화
@@ -10974,6 +10987,7 @@ function renderTodoList() {
         : '';
       const dueHtml    = item.dueText ? `<span class="${ac.tDue}">${escHtml(item.dueText)}</span>` : '';
       const repeatHtml = item.repeatLabel ? `<span class="flex items-center gap-1 text-xs font-semibold text-brand-gray bg-brand-bg px-2 py-0.5 rounded-full"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>${escHtml(item.repeatLabel)}</span>` : '';
+      const lastHtml = (item.repeatLabel && _lastRecurIds.has(item.id)) ? `<span class="text-xs font-extrabold text-white px-2 py-0.5 rounded-full" style="background:#D93025;" title="반복 업무 마지막 회차 — 다음 회차가 없습니다">반복 마지막</span>` : '';
       return `
         <div class="todo-row flex items-center justify-between p-4 md:p-5 border border-brand-border rounded-[24px] hover:bg-brand-bg transition-all group" data-id="${item.id}" data-accent="${item.accent}">
           <div class="flex items-center gap-4 md:gap-5 min-w-0 flex-1">
@@ -10981,7 +10995,7 @@ function renderTodoList() {
             <div class="w-6 md:w-7 h-6 md:h-7 rounded-full border-2 ${ac.border} flex items-center justify-center cursor-pointer bg-white ${ac.cHov} transition-colors shrink-0" onclick="todoComplete(${item.id},event)"></div>
             <div class="min-w-0 flex-1 cursor-pointer" onclick="todoEdit(${item.id})" title="클릭하여 수정">
               <div class="font-bold text-[1rem] md:text-[1.1rem] mb-1 ${ac.tHov} transition-colors">${escHtml(item.title)}</div>
-              <div class="flex items-center gap-2 md:gap-3 flex-wrap">${teamHtml}${dueHtml}${repeatHtml}</div>
+              <div class="flex items-center gap-2 md:gap-3 flex-wrap">${teamHtml}${dueHtml}${repeatHtml}${lastHtml}</div>
             </div>
           </div>
           <div class="flex items-center gap-2 md:gap-3 shrink-0 ml-3">
