@@ -274,9 +274,21 @@ tailwind.config = {
   /* ── Responsive sidebar ── */
   @media (max-width: 768px) {
     .sidebar { display: none !important; }
-    .sidebar.open { display: flex !important; position: fixed; top:0; left:0; z-index:40; height:100%; width:260px; }
+    .sidebar.open { display: flex !important; position: fixed; top:0; left:0; z-index:40; height:100dvh; width:84vw; max-width:300px; overflow-y:auto; }
     .hamburger { display: flex !important; }
-    .layout-gap { gap: 0 !important; padding-left: 16px !important; padding-right: 16px !important; }
+    .layout-gap { gap: 0 !important; padding-left: 12px !important; padding-right: 12px !important; }
+
+    /* 모바일: 100vh 고정 + 내부 스크롤 → 문서 자연 스크롤 (주소창 가림/빈공간/스크롤불가 해결) */
+    html, body { height: auto !important; min-height: 100%; overflow-x: hidden; }
+    .page { height: auto !important; min-height: 100dvh; overflow: visible !important; }
+    .page.active { display: flex; }
+    .page > .layout-gap { height: auto !important; overflow: visible !important; flex-direction: column; }
+    .page.active main { height: auto !important; overflow: visible !important; }
+    /* 상단 네비(햄버거) 항상 접근 가능하도록 고정 */
+    .page > header { position: sticky; top: 0; z-index: 30; }
+    /* 모바일 여백 축소 */
+    .page > header { padding-top: 10px !important; padding-bottom: 6px !important; }
+    .glass-nav { padding-top: 10px !important; padding-bottom: 10px !important; }
   }
   .hamburger { display: none; }
 
