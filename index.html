@@ -9553,18 +9553,16 @@ async function submitAddProduct() {
 
 // ── Mobile sidebar ───────────────────────────
 function toggleSidebar() {
-  const sidebars = document.querySelectorAll('.sidebar');
   const overlay = document.getElementById('sidebar-overlay');
-  const open = [...sidebars].some(s => s.classList.contains('open'));
-  if (open) { closeSidebar(); }
-  else {
-    sidebars.forEach(s => {
-      if (s.closest('#page-' + currentPage.value)) {
-        s.classList.add('open');
-        overlay.classList.remove('hidden');
-      }
-    });
-  }
+  const open = [...document.querySelectorAll('.sidebar')].some(s => s.classList.contains('open'));
+  if (open) { closeSidebar(); return; }
+  // currentPage.value 와 실제 활성 페이지 id 가 다를 수 있어(예: playauto→#page-upload),
+  // 활성 페이지(.page.active)의 사이드바를 직접 연다.
+  const activePage = document.querySelector('.page.active');
+  if (!activePage) return;
+  let any = false;
+  activePage.querySelectorAll('.sidebar').forEach(s => { s.classList.add('open'); any = true; });
+  if (any && overlay) overlay.classList.remove('hidden');
 }
 function closeSidebar() {
   document.querySelectorAll('.sidebar').forEach(s => s.classList.remove('open'));
