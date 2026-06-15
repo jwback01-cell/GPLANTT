@@ -4030,18 +4030,19 @@ tailwind.config = {
                 <div class="font-bold text-sm mb-1">서울리빙</div>
                 <div class="text-xs text-brand-gray mb-4">배송처가 <b>"서울리빙"</b>인 주문만 양식으로 다운로드 또는 메일 발송합니다.</div>
                 <div class="flex items-center gap-2 flex-wrap">
-                  <button onclick="downloadSeoulLiving('all')" class="bg-brand-black text-white px-5 py-2.5 rounded-full font-bold text-xs hover:bg-[#333] flex items-center gap-1.5">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    서울리빙 엑셀 다운로드
-                  </button>
                   <button onclick="sendSeoulLivingEmail('all')" class="bg-brand-blue text-white px-5 py-2.5 rounded-full font-bold text-xs hover:opacity-90 flex items-center gap-1.5" title="seoulbjs@naver.com 으로 발주서 메일 전송">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                     📧 메일 발송
                   </button>
-                  <button onclick="sendSeoulLivingTestEmail('all')" class="bg-white border border-brand-border text-brand-gray px-5 py-2.5 rounded-full font-bold text-xs hover:bg-brand-bg flex items-center gap-1.5" title="jwback01@nate.com 으로 테스트 메일 전송">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                    🧪 테스트 메일 발송
-                  </button>
+                  <div class="ml-auto flex items-center gap-1.5">
+                    <button onclick="downloadSeoulLiving('all')" class="bg-white border border-brand-border text-brand-gray px-3 py-1.5 rounded-full font-bold text-[11px] hover:bg-brand-bg flex items-center gap-1" title="서울리빙 엑셀 다운로드 (잘 안 쓰는 기능)">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                      엑셀 다운로드
+                    </button>
+                    <button onclick="sendSeoulLivingTestEmail('all')" class="bg-white border border-brand-border text-brand-gray px-3 py-1.5 rounded-full font-bold text-[11px] hover:bg-brand-bg flex items-center gap-1" title="jwback01@nate.com 으로 테스트 메일 전송 (잘 안 쓰는 기능)">
+                      🧪 테스트 메일
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -4052,18 +4053,19 @@ tailwind.config = {
                 <div class="font-bold text-sm mb-1">서울리빙 그외</div>
                 <div class="text-xs text-brand-gray mb-4">배송처가 <b>"서울리빙 그외"</b>인 주문만 양식으로 다운로드 또는 메일 발송합니다.</div>
                 <div class="flex items-center gap-2 flex-wrap">
-                  <button onclick="downloadSeoulLiving('etc')" class="bg-brand-black text-white px-5 py-2.5 rounded-full font-bold text-xs hover:bg-[#333] flex items-center gap-1.5">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    서울리빙 그외 엑셀 다운로드
-                  </button>
                   <button onclick="sendSeoulLivingEmail('etc')" class="bg-brand-blue text-white px-5 py-2.5 rounded-full font-bold text-xs hover:opacity-90 flex items-center gap-1.5" title="seoulbjs@naver.com 으로 발주서 메일 전송">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                     📧 메일 발송
                   </button>
-                  <button onclick="sendSeoulLivingTestEmail('etc')" class="bg-white border border-brand-border text-brand-gray px-5 py-2.5 rounded-full font-bold text-xs hover:bg-brand-bg flex items-center gap-1.5" title="jwback01@nate.com 으로 테스트 메일 전송">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                    🧪 테스트 메일 발송
-                  </button>
+                  <div class="ml-auto flex items-center gap-1.5">
+                    <button onclick="downloadSeoulLiving('etc')" class="bg-white border border-brand-border text-brand-gray px-3 py-1.5 rounded-full font-bold text-[11px] hover:bg-brand-bg flex items-center gap-1" title="서울리빙 그외 엑셀 다운로드 (잘 안 쓰는 기능)">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                      엑셀 다운로드
+                    </button>
+                    <button onclick="sendSeoulLivingTestEmail('etc')" class="bg-white border border-brand-border text-brand-gray px-3 py-1.5 rounded-full font-bold text-[11px] hover:bg-brand-bg flex items-center gap-1" title="jwback01@nate.com 으로 테스트 메일 전송 (잘 안 쓰는 기능)">
+                      🧪 테스트 메일
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -4074,18 +4076,19 @@ tailwind.config = {
                 <div class="font-bold text-sm mb-1">서울리빙 의류</div>
                 <div class="text-xs text-brand-gray mb-4">배송처가 <b>"서울리빙 의류"</b>인 주문만 양식으로 다운로드 또는 메일 발송합니다.</div>
                 <div class="flex items-center gap-2 flex-wrap">
-                  <button onclick="downloadSeoulLiving('cloth')" class="bg-brand-black text-white px-5 py-2.5 rounded-full font-bold text-xs hover:bg-[#333] flex items-center gap-1.5">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    서울리빙 의류 엑셀 다운로드
-                  </button>
                   <button onclick="sendSeoulLivingEmail('cloth')" class="bg-brand-blue text-white px-5 py-2.5 rounded-full font-bold text-xs hover:opacity-90 flex items-center gap-1.5" title="seoulbjs@naver.com 으로 발주서 메일 전송">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                     📧 메일 발송
                   </button>
-                  <button onclick="sendSeoulLivingTestEmail('cloth')" class="bg-white border border-brand-border text-brand-gray px-5 py-2.5 rounded-full font-bold text-xs hover:bg-brand-bg flex items-center gap-1.5" title="jwback01@nate.com 으로 테스트 메일 전송">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                    🧪 테스트 메일 발송
-                  </button>
+                  <div class="ml-auto flex items-center gap-1.5">
+                    <button onclick="downloadSeoulLiving('cloth')" class="bg-white border border-brand-border text-brand-gray px-3 py-1.5 rounded-full font-bold text-[11px] hover:bg-brand-bg flex items-center gap-1" title="서울리빙 의류 엑셀 다운로드 (잘 안 쓰는 기능)">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                      엑셀 다운로드
+                    </button>
+                    <button onclick="sendSeoulLivingTestEmail('cloth')" class="bg-white border border-brand-border text-brand-gray px-3 py-1.5 rounded-full font-bold text-[11px] hover:bg-brand-bg flex items-center gap-1" title="jwback01@nate.com 으로 테스트 메일 전송 (잘 안 쓰는 기능)">
+                      🧪 테스트 메일
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
