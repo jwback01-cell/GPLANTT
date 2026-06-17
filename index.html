@@ -22079,8 +22079,7 @@ async function exportPaClaims() {
   // 오늘 날짜 YYMMDD (로컬 기준)
   const _d = new Date();
   const stamp = String(_d.getFullYear()).slice(2) + String(_d.getMonth() + 1).padStart(2, '0') + String(_d.getDate()).padStart(2, '0');
-  const fileSuffix = selectedOnly ? `_선택${targetRows.length}건` : '';
-  XLSX.writeFile(wb, `CS발주서 (지플랜)_${stamp}${fileSuffix}.xlsx`);
+  XLSX.writeFile(wb, `CS발주서 (지플랜)_${stamp}.xlsx`);
 }
 
 function convertPaClaimsToReturns() {
