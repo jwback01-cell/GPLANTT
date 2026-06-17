@@ -1434,6 +1434,10 @@ tailwind.config = {
               <input type="checkbox" id="pp-a-workday" onchange="ppOnOffsetChange()" class="w-4 h-4 rounded border-brand-border">
               <span>주말/공휴일 출고는 <strong>다음 영업일</strong>로 이동 (한국 기준)</span>
             </label>
+            <label class="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input type="checkbox" id="pp-b-nameonly" onchange="ppOnOffsetChange()" checked class="w-4 h-4 rounded border-brand-border">
+              <span><strong>B 엑셀에 있는 상품명만</strong> 비교 (A에만 있는 상품 제외)</span>
+            </label>
           </div>
         </div>
       </section>
@@ -5833,16 +5837,23 @@ function ppCompare() {
       });
     }
   });
+  // B 엑셀에 있는 상품명만 비교 — A에만 있는 상품(이름이 B에 없음)은 제외
+  let resultFinal = result;
+  const nameOnlyEl = document.getElementById('pp-b-nameonly');
+  if (bHasProduct && nameOnlyEl && nameOnlyEl.checked) {
+    const bNames = new Set(bRows.map(b => b.product).filter(p => p && p !== '*'));
+    resultFinal = result.filter(r => bNames.has(r.product) || r.status === 'onlyB');
+  }
   // 날짜 오름차순 정렬 (A 날짜 우선, 없으면 B 날짜)
-  result.sort((x, y) => {
+  resultFinal.sort((x, y) => {
     const dx = x.dateA || x.dateB;
     const dy = y.dateA || y.dateB;
     return dx.localeCompare(dy);
   });
-  _ppState.result = result;
-  // 통계
+  _ppState.result = resultFinal;
+  // 통계 (필터 적용된 결과 기준)
   let match = 0, qtyMis = 0, orphan = 0, mismatchUnits = 0;
-  result.forEach(r => {
+  resultFinal.forEach(r => {
     if (r.status === 'match') { match++; return; }
     if (r.status === 'qtyMismatch') qtyMis++; else orphan++;
     // 불일치 행의 수량 차이 누적 (없는 쪽은 0)
@@ -5850,7 +5861,7 @@ function ppCompare() {
     const b = r.dateB ? (r.bQty || 0) : 0;
     mismatchUnits += Math.abs(a - b);
   });
-  document.getElementById('pp-stat-total').textContent = result.length;
+  document.getElementById('pp-stat-total').textContent = resultFinal.length;
   document.getElementById('pp-stat-match').textContent = match;
   document.getElementById('pp-stat-mismatch').textContent = qtyMis;
   const muEl = document.getElementById('pp-stat-mismatch-units');
