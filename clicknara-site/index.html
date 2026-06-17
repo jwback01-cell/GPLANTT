@@ -5962,12 +5962,13 @@ function ppDownload() {
     m.cnt++; m.a += a; m.b += b; m.diff += Math.abs(a - b);
   });
   const months = Object.keys(monthly).sort();
-  const mdata = [['월 (B 수불일자)', '건수', 'A 수량합', 'B 수량합', '수량차이합']];
+  // 월합계차이 = |A수량합 − B수량합| (월 총량 기준), 행별차이합 = 상품별 |a−b| 누적(상쇄 전)
+  const mdata = [['월 (B 수불일자)', '건수', 'A 수량합', 'B 수량합', '월합계차이', '행별차이합']];
   let tC = 0, tA = 0, tB = 0, tD = 0;
-  months.forEach(ym => { const m = monthly[ym]; mdata.push([ym, m.cnt, m.a, m.b, m.diff]); tC += m.cnt; tA += m.a; tB += m.b; tD += m.diff; });
-  mdata.push(['합계', tC, tA, tB, tD]);
+  months.forEach(ym => { const m = monthly[ym]; mdata.push([ym, m.cnt, m.a, m.b, Math.abs(m.a - m.b), m.diff]); tC += m.cnt; tA += m.a; tB += m.b; tD += m.diff; });
+  mdata.push(['합계', tC, tA, tB, Math.abs(tA - tB), tD]);
   const wsM = XLSX.utils.aoa_to_sheet(mdata);
-  wsM['!cols'] = [{wch:16},{wch:8},{wch:10},{wch:10},{wch:10}];
+  wsM['!cols'] = [{wch:16},{wch:8},{wch:10},{wch:10},{wch:10},{wch:10}];
   XLSX.utils.book_append_sheet(wb, wsM, '월별합계(B기준)');
 
   const today = new Date();
