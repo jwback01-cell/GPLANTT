@@ -1460,7 +1460,7 @@ tailwind.config = {
         <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
           <div class="rounded-2xl bg-brand-bg px-4 py-3"><div class="text-[11px] text-brand-gray">전체</div><div class="font-black text-xl"><span id="pp-stat-total">0</span></div></div>
           <div class="rounded-2xl bg-green-50 px-4 py-3"><div class="text-[11px] text-green-700">일치</div><div class="font-black text-xl text-green-700"><span id="pp-stat-match">0</span></div></div>
-          <div class="rounded-2xl bg-red-50 px-4 py-3"><div class="text-[11px] text-red-700">수량 불일치</div><div class="font-black text-xl text-red-700"><span id="pp-stat-mismatch">0</span></div></div>
+          <div class="rounded-2xl bg-red-50 px-4 py-3"><div class="text-[11px] text-red-700">수량 불일치</div><div class="font-black text-xl text-red-700"><span id="pp-stat-mismatch">0</span><span class="text-[11px] font-bold text-red-600 ml-1">건</span></div><div class="text-[11px] text-red-700 mt-0.5">수량차 <span id="pp-stat-mismatch-units" class="font-black">0</span>개</div></div>
           <div class="rounded-2xl bg-orange-50 px-4 py-3"><div class="text-[11px] text-orange-700">한쪽만 존재</div><div class="font-black text-xl text-orange-700"><span id="pp-stat-orphan">0</span></div></div>
         </div>
 
@@ -5841,15 +5841,20 @@ function ppCompare() {
   });
   _ppState.result = result;
   // 통계
-  let match = 0, qtyMis = 0, orphan = 0;
+  let match = 0, qtyMis = 0, orphan = 0, mismatchUnits = 0;
   result.forEach(r => {
-    if (r.status === 'match') match++;
-    else if (r.status === 'qtyMismatch') qtyMis++;
-    else orphan++;
+    if (r.status === 'match') { match++; return; }
+    if (r.status === 'qtyMismatch') qtyMis++; else orphan++;
+    // 불일치 행의 수량 차이 누적 (없는 쪽은 0)
+    const a = r.dateA ? (r.qty || 0) : 0;
+    const b = r.dateB ? (r.bQty || 0) : 0;
+    mismatchUnits += Math.abs(a - b);
   });
   document.getElementById('pp-stat-total').textContent = result.length;
   document.getElementById('pp-stat-match').textContent = match;
   document.getElementById('pp-stat-mismatch').textContent = qtyMis;
+  const muEl = document.getElementById('pp-stat-mismatch-units');
+  if (muEl) muEl.textContent = mismatchUnits.toLocaleString('ko-KR');
   document.getElementById('pp-stat-orphan').textContent = orphan;
   document.getElementById('pp-result').classList.remove('hidden');
   ppRender();
@@ -5917,20 +5922,43 @@ function ppDownload() {
   const hasAdjust = offsetOn || workdayOn;
   const statusLabel = { match: '일치', qtyMismatch: '수량 불일치', onlyA: 'B에 없음', onlyB: 'A에 없음' };
   const adjustLabel = [offsetOn && '+1일', workdayOn && '영업일'].filter(Boolean).join('·') || '보정';
+  // 행수(A 행수/B 행수) 컬럼 제거 + 수량차이 컬럼 추가
   const header = hasAdjust
-    ? ['#','상품명','A 수량','B 수량','A 행수','B 행수','A 출고일(원본)',`A 출고일(${adjustLabel})`,'B 수불일자','상태']
-    : ['#','상품명','A 수량','B 수량','A 행수','B 행수','A 출고일','B 수불일자','상태'];
+    ? ['#','상품명','A 수량','B 수량','수량차이','A 출고일(원본)',`A 출고일(${adjustLabel})`,'B 수불일자','상태']
+    : ['#','상품명','A 수량','B 수량','수량차이','A 출고일','B 수불일자','상태'];
   const data = [header];
+  const _diff = (r) => Math.abs((r.dateA ? (r.qty||0) : 0) - (r.dateB ? (r.bQty||0) : 0));
   _ppState.result.forEach((r, i) => {
-    if (hasAdjust) data.push([i+1, r.product, r.dateA?r.qty:'', r.dateB?r.bQty:'', r.aRows||'', r.bRows||'', r.dateAOrig||'', r.dateA||'', r.dateB||'', statusLabel[r.status]||r.status]);
-    else           data.push([i+1, r.product, r.dateA?r.qty:'', r.dateB?r.bQty:'', r.aRows||'', r.bRows||'', r.dateA||'', r.dateB||'', statusLabel[r.status]||r.status]);
+    const diff = r.status === 'match' ? '' : (_diff(r) || '');
+    if (hasAdjust) data.push([i+1, r.product, r.dateA?r.qty:'', r.dateB?r.bQty:'', diff, r.dateAOrig||'', r.dateA||'', r.dateB||'', statusLabel[r.status]||r.status]);
+    else           data.push([i+1, r.product, r.dateA?r.qty:'', r.dateB?r.bQty:'', diff, r.dateA||'', r.dateB||'', statusLabel[r.status]||r.status]);
   });
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws['!cols'] = hasAdjust
-    ? [{wch:5},{wch:36},{wch:8},{wch:8},{wch:7},{wch:7},{wch:14},{wch:14},{wch:12},{wch:12}]
-    : [{wch:5},{wch:36},{wch:8},{wch:8},{wch:7},{wch:7},{wch:12},{wch:12},{wch:12}];
+    ? [{wch:5},{wch:36},{wch:8},{wch:8},{wch:8},{wch:14},{wch:14},{wch:12},{wch:12}]
+    : [{wch:5},{wch:36},{wch:8},{wch:8},{wch:8},{wch:12},{wch:12},{wch:12}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '비교결과');
+
+  // ── 월별 합계 (B 수불일자 기준) ──
+  const monthly = {};
+  _ppState.result.forEach(r => {
+    if (!r.dateB) return;                       // B 수불일자가 있는 행만
+    const ym = String(r.dateB).slice(0, 7);     // YYYY-MM
+    const a = r.dateA ? (r.qty || 0) : 0;
+    const b = r.bQty || 0;
+    const m = monthly[ym] || (monthly[ym] = { cnt: 0, a: 0, b: 0, diff: 0 });
+    m.cnt++; m.a += a; m.b += b; m.diff += Math.abs(a - b);
+  });
+  const months = Object.keys(monthly).sort();
+  const mdata = [['월 (B 수불일자)', '건수', 'A 수량합', 'B 수량합', '수량차이합']];
+  let tC = 0, tA = 0, tB = 0, tD = 0;
+  months.forEach(ym => { const m = monthly[ym]; mdata.push([ym, m.cnt, m.a, m.b, m.diff]); tC += m.cnt; tA += m.a; tB += m.b; tD += m.diff; });
+  mdata.push(['합계', tC, tA, tB, tD]);
+  const wsM = XLSX.utils.aoa_to_sheet(mdata);
+  wsM['!cols'] = [{wch:16},{wch:8},{wch:10},{wch:10},{wch:10}];
+  XLSX.utils.book_append_sheet(wb, wsM, '월별합계(B기준)');
+
   const today = new Date();
   const stamp = today.getFullYear() + String(today.getMonth()+1).padStart(2,'0') + String(today.getDate()).padStart(2,'0');
   XLSX.writeFile(wb, `데이터가공_비교_${stamp}.xlsx`);
