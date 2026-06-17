@@ -3709,9 +3709,9 @@ tailwind.config = {
               </div>
               <div class="text-xs text-brand-gray mt-1">플레이오토에서 주문 데이터를 가져와 매출 장부에 반영합니다.</div>
             </div>
-            <button type="button" onclick="fetchPlayautoNewOrders()" title="플레이오토에 들어온 신규주문을 한 번에 가져옵니다 (플레이오토→지플랜)" class="shrink-0 px-5 py-2.5 rounded-full text-sm font-extrabold bg-brand-blue text-white hover:opacity-90 hover:-translate-y-0.5 transition-all shadow-md flex items-center gap-2">
+            <button type="button" onclick="gplanTriggerPaQuickCollect()" title="플레이오토 사이트의 '퀵수집' 버튼을 자동으로 눌러 쇼핑몰 주문을 수집합니다 (GPLAN 퀵수집 확장 필요)" class="shrink-0 px-5 py-2.5 rounded-full text-sm font-extrabold bg-brand-blue text-white hover:opacity-90 hover:-translate-y-0.5 transition-all shadow-md flex items-center gap-2">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-              퀵수집
+              플레이오토 퀵수집
             </button>
           </div>
           <div class="p-6 flex flex-col gap-4">
@@ -14588,6 +14588,25 @@ function switchUploadTab(tab) {
 }
 
 // 플레이오토 "신규주문" 탭의 주문들을 가져오기 — 상태=신규주문 + 최근 90일로 세팅 후 조회
+// ── 플레이오토 사이트의 '퀵수집' 버튼 자동 클릭 (GPLAN 퀵수집 확장 경유) ──
+// 브라우저 보안상 지플랜 페이지가 플레이오토 탭을 직접 제어할 수 없으므로 확장이 중계함.
+let _paQcAck = false;
+window.addEventListener('message', (e) => {
+  if (e.source !== window) return;
+  const d = e.data;
+  if (d && d.source === 'gplan-ext' && d.type === 'PA_QUICKCOLLECT_ACK') _paQcAck = true;
+});
+function gplanTriggerPaQuickCollect() {
+  _paQcAck = false;
+  try { window.postMessage({ source: 'gplan-page', type: 'GPLAN_TRIGGER_PA_QUICKCOLLECT' }, '*'); } catch (_) {}
+  const notify = (m, t) => { try { (typeof gplanAlert === 'function' ? gplanAlert(m, { type: t || 'info', title: '플레이오토 퀵수집' }) : alert(m)); } catch (_) { alert(m); } };
+  // 확장이 살아있으면 ACK 가 곧 도착 → 성공 안내, 없으면 설치 안내
+  setTimeout(() => {
+    if (_paQcAck) notify('플레이오토에서 퀵수집을 자동 실행했습니다.\n수집이 끝나면 위 "퀵수집(주문 가져오기)"으로 주문을 가져오세요.', 'success');
+    else notify('GPLAN 퀵수집 확장이 설치/활성화되지 않았습니다.\n\n① chrome://extensions 에서 "GPLAN 퀵수집" 확장을 로드/활성화\n② 플레이오토(app.playauto.io) 탭을 한 번 새로고침\n③ 다시 시도', 'warn');
+  }, 1500);
+}
+
 async function fetchPlayautoNewOrders() {
   // 주문 상태를 "신규주문"으로 설정 (PA_STATUS_CANDIDATES에서 ['신규주문','결제완료']로 매핑됨)
   const statusSelect = document.getElementById('pa-order-status');
