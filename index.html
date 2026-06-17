@@ -3769,6 +3769,10 @@ tailwind.config = {
                 엑셀 다운로드
               </button>
             </div>
+            <button type="button" onclick="instructGplanDepot()" title="수집된 주문 중 배송처가 '지플랜'인 건만 플레이오토에 출고지시합니다 (출고 지시 API)" class="w-full bg-white border-2 border-brand-blue text-brand-blue py-2.5 rounded-full font-bold text-sm hover:bg-brand-blue hover:text-white transition-colors flex items-center justify-center gap-2">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              지플랜 배송처 출고지시
+            </button>
             <div id="pa-order-status-msg" class="hidden text-sm font-semibold px-1"></div>
             <!-- 인라인 마이너스 결과 — 주문 수집 시 자동 렌더링 -->
             <div id="pa-order-minus-inline" class="hidden bg-white rounded-2xl border border-brand-pink/30 overflow-hidden">
@@ -16744,6 +16748,46 @@ function _extItemName(o, prod) {
 function _extDepotName(o) {
   const raw = _paPickField(o, ['depot_name', 'depotName', 'warehouse_name', 'depot']);
   return String(raw || '').replace(/\s+/g, ' ').trim();
+}
+
+// 배송처가 '지플랜'인 주문만 출고지시 (플레이오토 출고 지시 API)
+//   PUT /api/order/instruction  { bundle_codes: [묶음번호...], auto_bundle: false }
+async function instructGplanDepot() {
+  const orders = Array.isArray(window._paOrders) ? window._paOrders : (typeof _paOrders !== 'undefined' ? _paOrders : []);
+  if (!orders.length) {
+    gplanAlert('먼저 "주문 수집"으로 주문을 가져오세요.', { type: 'warn', title: '주문 없음' });
+    return;
+  }
+  const norm = s => String(s || '').replace(/\s+/g, '').trim();
+  const target = orders.filter(o => norm(_extDepotName(o)) === '지플랜');
+  if (!target.length) {
+    const depots = [...new Set(orders.map(o => _extDepotName(o)).filter(Boolean))];
+    gplanAlert('배송처가 "지플랜"인 주문이 없습니다.' + (depots.length ? `\n\n(수집된 배송처: ${depots.join(', ')})` : ''), { type: 'warn', title: '대상 없음' });
+    return;
+  }
+  // 묶음번호 수집 (중복 제거)
+  const bundles = [...new Set(target.map(o => String(o.bundle_no || o.pa_bundle_no || o.ori_bundle_no || '').trim()).filter(Boolean))];
+  if (!bundles.length) {
+    gplanAlert('지플랜 주문은 있으나 묶음번호(bundle_no)를 찾지 못했습니다.', { type: 'error', title: '묶음번호 없음' });
+    return;
+  }
+  if (!confirm(`배송처 "지플랜" 주문 ${target.length}건 (묶음 ${bundles.length}개)을 출고지시할까요?\n\n※ 신규주문/출고대기 상태의 주문에만 적용됩니다.`)) return;
+
+  const btn = document.querySelector('button[onclick="instructGplanDepot()"]');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '출고지시 중…'; }
+  try {
+    const res = await _paFetch('/order/instruction', {
+      method: 'PUT',
+      body: JSON.stringify({ bundle_codes: bundles, auto_bundle: false }),
+    });
+    const r = (res && (res.results || res.result)) || (typeof res === 'string' ? res : JSON.stringify(res));
+    gplanAlert(`출고지시 요청 완료\n\n결과: ${r}\n대상: 배송처 지플랜 ${target.length}건 / 묶음 ${bundles.length}개\n\n플레이오토 [출고관리]에서 상태를 확인하세요.`, { type: 'success', title: '지플랜 출고지시' });
+  } catch (e) {
+    gplanAlert('출고지시 실패\n\n' + (e.message || e), { type: 'error', title: '출고지시 실패' });
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+  }
 }
 
 // 스타일 지원 XLSX 라이브러리(xlsx-js-style) 지연 로드 — 색상 채우기/테두리 저장용
