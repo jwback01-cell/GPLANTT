@@ -23996,12 +23996,13 @@ function _doConvertSelectedToReturn(targetRows, reason) {
     // 구매자 귀책일 때 — shipCost 는 그대로(양수) 유지 (우리가 부담)
     // (clone.shipCost 는 ...orig 로 복사된 양수값 그대로)
 
-    // 마진 재계산: 공급가 + 택배비 - 원가 - 택배비용
-    const _supply   = Number(clone.supply)   || 0;
-    const _ship     = Number(clone.ship)     || 0;
-    const _cost     = Number(clone.cost)     || 0;
-    const _shipCost = Number(clone.shipCost) || 0;
-    clone.profit = _supply + _ship - _cost - _shipCost;
+    // 반품 마진 = 원래 행 마진의 반대부호 (이익금만큼만 차감 → 원본 + 반품 = 0)
+    //   예) 원래 마진 4,720 → 반품 마진 -4,720
+    //   (택배비용 컬럼 부호는 귀책별로 유지되지만, 마진은 항상 이익금만 상쇄)
+    const _origMargin = (orig.profit != null && orig.profit !== '')
+      ? Number(orig.profit)
+      : ((Number(orig.supply) || 0) + (Number(orig.ship) || 0) - (Number(orig.cost) || 0) - (Number(orig.shipCost) || 0));
+    clone.profit = -_origMargin;
 
     // 사이트에 '반품-귀책' 표시
     const origSite = String(orig.site || '').trim();
