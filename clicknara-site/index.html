@@ -5970,21 +5970,22 @@ async function ppDownload() {
   const wb = XS.utils.book_new();
   XS.utils.book_append_sheet(wb, ws, '비교결과');
 
-  // ── 월별 합계 (제품별 → B 수불일자 월별) ──
-  //   제품 / 월 / A수량합 / B수량합 / 수량차이합  (건수 제거), 색깔 격자
+  // ── 월별 합계 (제품별) ──
+  //   제품 / 월 / 로이스 수량합 / 장부 수량합 / 수량차이합  (건수 제거), 색깔 격자
+  //   로이스는 '로이스 출고일' 기준, 장부는 '장부 수불일' 기준으로 각각 월 집계
+  //   (장부 기준으로만 묶으면 매칭 안 된 로이스 출고 건이 누락되어 수량이 적게 보임)
   const byProd = {}; const prodOrder = [];
-  _ppState.result.forEach(r => {
-    if (!r.dateB) return;
-    const prod = (String(r.product || '').replace(/<[^>]+>/g, '').trim()) || '(상품명 없음)';
-    const ym = String(r.dateB).slice(0, 7);
-    const a = r.dateA ? (r.qty || 0) : 0;
-    const b = r.bQty || 0;
+  const _ensureM = (prod, ym) => {
     if (!byProd[prod]) { byProd[prod] = {}; prodOrder.push(prod); }
-    const m = byProd[prod][ym] || (byProd[prod][ym] = { a: 0, b: 0 });
-    m.a += a; m.b += b;
+    return byProd[prod][ym] || (byProd[prod][ym] = { a: 0, b: 0 });
+  };
+  _ppState.result.forEach(r => {
+    const prod = (String(r.product || '').replace(/<[^>]+>/g, '').trim()) || '(상품명 없음)';
+    if (r.dateA && (r.qty || 0))  _ensureM(prod, String(r.dateA).slice(0, 7)).a += (r.qty || 0);
+    if (r.dateB && (r.bQty || 0)) _ensureM(prod, String(r.dateB).slice(0, 7)).b += (r.bQty || 0);
   });
   prodOrder.sort();
-  const mhead = ['제품', '월 (장부 수불일자)', '로이스 수량합', '장부 수량합', '수량차이합'];
+  const mhead = ['제품', '월', '로이스 수량합', '장부 수량합', '수량차이합'];
   const mrows = [mhead];
   const merges = [];
   let tA = 0, tB = 0, rowIdx = 1;
