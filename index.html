@@ -6255,6 +6255,11 @@ async function submitTodoModal() {
 
   renderTodoList();
   renderDashboardTodos();
+  // 캘린더 뷰도 즉시 갱신 (새로고침 없이 추가한 업무가 바로 보이도록)
+  try {
+    if (typeof renderCalendar === 'function') renderCalendar();
+    if (typeof renderCalDetail === 'function' && typeof _calSelectedKey !== 'undefined' && _calSelectedKey) renderCalDetail(_calSelectedKey);
+  } catch (_) {}
   closeAddTodoModal();
   _submittingTodo = false;
 }
