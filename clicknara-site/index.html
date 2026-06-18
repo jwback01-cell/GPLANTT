@@ -5926,14 +5926,32 @@ function ppRender() {
 function _ppEsc(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
-function ppDownload() {
+// 색상/테두리 지원 XLSX(xlsx-js-style) 지연 로드 — 기본 XLSX 전역은 보존
+let _ppXlsxStyledP = null;
+function _ppXlsxStyled() {
+  if (window._XLSXStyled) return Promise.resolve(window._XLSXStyled);
+  if (_ppXlsxStyledP) return _ppXlsxStyledP;
+  _ppXlsxStyledP = new Promise((resolve, reject) => {
+    const orig = window.XLSX;
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';
+    s.onload = () => { window._XLSXStyled = window.XLSX; window.XLSX = orig; resolve(window._XLSXStyled); };
+    s.onerror = () => reject(new Error('xlsx-js-style 로드 실패'));
+    document.head.appendChild(s);
+  });
+  return _ppXlsxStyledP;
+}
+
+async function ppDownload() {
   if (!_ppState.result.length) { alert('비교 결과가 없습니다.'); return; }
+  let XS;
+  try { XS = await _ppXlsxStyled(); } catch (_) { XS = XLSX; }  // 스타일 로드 실패 시 일반 XLSX 로 폴백
+
   const offsetOn  = document.getElementById('pp-a-plus1').checked;
   const workdayOn = document.getElementById('pp-a-workday').checked;
   const hasAdjust = offsetOn || workdayOn;
   const statusLabel = { match: '일치', qtyMismatch: '수량 불일치', onlyA: 'B에 없음', onlyB: 'A에 없음' };
   const adjustLabel = [offsetOn && '+1일', workdayOn && '영업일'].filter(Boolean).join('·') || '보정';
-  // 행수(A 행수/B 행수) 컬럼 제거 + 수량차이 컬럼 추가
   const header = hasAdjust
     ? ['#','상품명','A 수량','B 수량','수량차이','A 출고일(원본)',`A 출고일(${adjustLabel})`,'B 수불일자','상태']
     : ['#','상품명','A 수량','B 수량','수량차이','A 출고일','B 수불일자','상태'];
@@ -5944,36 +5962,79 @@ function ppDownload() {
     if (hasAdjust) data.push([i+1, r.product, r.dateA?r.qty:'', r.dateB?r.bQty:'', diff, r.dateAOrig||'', r.dateA||'', r.dateB||'', statusLabel[r.status]||r.status]);
     else           data.push([i+1, r.product, r.dateA?r.qty:'', r.dateB?r.bQty:'', diff, r.dateA||'', r.dateB||'', statusLabel[r.status]||r.status]);
   });
-  const ws = XLSX.utils.aoa_to_sheet(data);
+  const ws = XS.utils.aoa_to_sheet(data);
   ws['!cols'] = hasAdjust
     ? [{wch:5},{wch:36},{wch:8},{wch:8},{wch:8},{wch:14},{wch:14},{wch:12},{wch:12}]
     : [{wch:5},{wch:36},{wch:8},{wch:8},{wch:8},{wch:12},{wch:12},{wch:12}];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '비교결과');
+  const wb = XS.utils.book_new();
+  XS.utils.book_append_sheet(wb, ws, '비교결과');
 
-  // ── 월별 합계 (B 수불일자 기준) ──
-  const monthly = {};
+  // ── 월별 합계 (제품별 → B 수불일자 월별) ──
+  //   제품 / 월 / A수량합 / B수량합 / 수량차이합  (건수 제거), 색깔 격자
+  const byProd = {}; const prodOrder = [];
   _ppState.result.forEach(r => {
-    if (!r.dateB) return;                       // B 수불일자가 있는 행만
-    const ym = String(r.dateB).slice(0, 7);     // YYYY-MM
+    if (!r.dateB) return;
+    const prod = (String(r.product || '').replace(/<[^>]+>/g, '').trim()) || '(상품명 없음)';
+    const ym = String(r.dateB).slice(0, 7);
     const a = r.dateA ? (r.qty || 0) : 0;
     const b = r.bQty || 0;
-    const m = monthly[ym] || (monthly[ym] = { cnt: 0, a: 0, b: 0, diff: 0 });
-    m.cnt++; m.a += a; m.b += b; m.diff += Math.abs(a - b);
+    if (!byProd[prod]) { byProd[prod] = {}; prodOrder.push(prod); }
+    const m = byProd[prod][ym] || (byProd[prod][ym] = { a: 0, b: 0, diff: 0 });
+    m.a += a; m.b += b; m.diff += Math.abs(a - b);
   });
-  const months = Object.keys(monthly).sort();
-  // 월합계차이 = |A수량합 − B수량합| (월 총량 기준), 행별차이합 = 상품별 |a−b| 누적(상쇄 전)
-  const mdata = [['월 (B 수불일자)', '건수', 'A 수량합', 'B 수량합', '월합계차이', '행별차이합']];
-  let tC = 0, tA = 0, tB = 0, tD = 0;
-  months.forEach(ym => { const m = monthly[ym]; mdata.push([ym, m.cnt, m.a, m.b, Math.abs(m.a - m.b), m.diff]); tC += m.cnt; tA += m.a; tB += m.b; tD += m.diff; });
-  mdata.push(['합계', tC, tA, tB, Math.abs(tA - tB), tD]);
-  const wsM = XLSX.utils.aoa_to_sheet(mdata);
-  wsM['!cols'] = [{wch:16},{wch:8},{wch:10},{wch:10},{wch:10},{wch:10}];
-  XLSX.utils.book_append_sheet(wb, wsM, '월별합계(B기준)');
+  prodOrder.sort();
+  const mhead = ['제품', '월 (B 수불일자)', 'A 수량합', 'B 수량합', '수량차이합'];
+  const mrows = [mhead];
+  const merges = [];
+  let tA = 0, tB = 0, tD = 0, rowIdx = 1;
+  prodOrder.forEach(prod => {
+    const months = Object.keys(byProd[prod]).sort();
+    const startRow = rowIdx;
+    months.forEach(ym => {
+      const m = byProd[prod][ym];
+      mrows.push([prod, ym, m.a, m.b, m.diff]);
+      tA += m.a; tB += m.b; tD += m.diff; rowIdx++;
+    });
+    if (months.length > 1) merges.push({ s: { r: startRow, c: 0 }, e: { r: rowIdx - 1, c: 0 } });
+  });
+  mrows.push(['', '합계', tA, tB, tD]);
+  const totalRow = rowIdx;
+  const wsM = XS.utils.aoa_to_sheet(mrows);
+  wsM['!cols'] = [{ wch: 26 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+  if (merges.length) wsM['!merges'] = merges;
+
+  // 스타일 (xlsx-js-style 일 때만 적용됨)
+  if (XS !== XLSX || window._XLSXStyled) {
+    const thin = { style: 'thin', color: { rgb: 'D0D5DD' } };
+    const border = { top: thin, bottom: thin, left: thin, right: thin };
+    const range = XS.utils.decode_range(wsM['!ref']);
+    for (let R = range.s.r; R <= range.e.r; R++) {
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const addr = XS.utils.encode_cell({ r: R, c: C });
+        const cell = wsM[addr];
+        if (!cell) continue;
+        const isHeader = R === 0, isTotal = R === totalRow;
+        const st = { border, alignment: { vertical: 'center', horizontal: C <= 1 ? 'center' : 'right' } };
+        if (isHeader) {
+          st.fill = { patternType: 'solid', fgColor: { rgb: '1F2A44' } };
+          st.font = { bold: true, color: { rgb: 'FFFFFF' } };
+          st.alignment.horizontal = 'center';
+        } else if (isTotal) {
+          st.fill = { patternType: 'solid', fgColor: { rgb: 'FFF3C4' } };
+          st.font = { bold: true };
+        } else {
+          st.fill = { patternType: 'solid', fgColor: { rgb: (R % 2 === 0) ? 'EEF3FB' : 'FFFFFF' } };
+          if (C === 0) st.font = { bold: true };
+        }
+        cell.s = st;
+      }
+    }
+  }
+  XS.utils.book_append_sheet(wb, wsM, '월별합계(B기준)');
 
   const today = new Date();
   const stamp = today.getFullYear() + String(today.getMonth()+1).padStart(2,'0') + String(today.getDate()).padStart(2,'0');
-  XLSX.writeFile(wb, `데이터가공_비교_${stamp}.xlsx`);
+  XS.writeFile(wb, `데이터가공_비교_${stamp}.xlsx`);
 }
 
 </script>
