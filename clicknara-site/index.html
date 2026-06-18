@@ -5953,8 +5953,8 @@ async function ppDownload() {
   const statusLabel = { match: '일치', qtyMismatch: '수량 불일치', onlyA: 'B에 없음', onlyB: 'A에 없음' };
   const adjustLabel = [offsetOn && '+1일', workdayOn && '영업일'].filter(Boolean).join('·') || '보정';
   const header = hasAdjust
-    ? ['#','상품명','A 수량','B 수량','수량차이','A 출고일(원본)',`A 출고일(${adjustLabel})`,'B 수불일자','상태']
-    : ['#','상품명','A 수량','B 수량','수량차이','A 출고일','B 수불일자','상태'];
+    ? ['#','상품명','로이스 수량','장부 수량','수량차이','로이스 출고일(원본)',`로이스 출고일(${adjustLabel})`,'장부 수불일자','상태']
+    : ['#','상품명','로이스 수량','장부 수량','수량차이','로이스 출고일','장부 수불일자','상태'];
   const data = [header];
   const _diff = (r) => Math.abs((r.dateA ? (r.qty||0) : 0) - (r.dateB ? (r.bQty||0) : 0));
   _ppState.result.forEach((r, i) => {
@@ -5983,7 +5983,7 @@ async function ppDownload() {
     m.a += a; m.b += b; m.diff += Math.abs(a - b);
   });
   prodOrder.sort();
-  const mhead = ['제품', '월 (B 수불일자)', 'A 수량합', 'B 수량합', '수량차이합'];
+  const mhead = ['제품', '월 (장부 수불일자)', '로이스 수량합', '장부 수량합', '수량차이합'];
   const mrows = [mhead];
   const merges = [];
   let tA = 0, tB = 0, tD = 0, rowIdx = 1;
