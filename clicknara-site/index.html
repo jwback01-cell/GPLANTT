@@ -5893,8 +5893,8 @@ function ppRender() {
   const statusLabel = {
     match:        { txt: '✓ 일치',         cls: 'text-green-700 bg-green-50' },
     qtyMismatch:  { txt: '⚠ 수량 불일치',  cls: 'text-red-700 bg-red-50' },
-    onlyA:        { txt: 'B에 없음',        cls: 'text-orange-700 bg-orange-50' },
-    onlyB:        { txt: 'A에 없음',        cls: 'text-orange-700 bg-orange-50' },
+    onlyA:        { txt: '장부에 없음',     cls: 'text-orange-700 bg-orange-50' },
+    onlyB:        { txt: '로이스에 없음',   cls: 'text-orange-700 bg-orange-50' },
   };
   tbody.innerHTML = filtered.map((r, i) => {
     const s = statusLabel[r.status] || { txt: r.status, cls: '' };
@@ -5950,15 +5950,16 @@ async function ppDownload() {
   const offsetOn  = document.getElementById('pp-a-plus1').checked;
   const workdayOn = document.getElementById('pp-a-workday').checked;
   const hasAdjust = offsetOn || workdayOn;
-  const statusLabel = { match: '일치', qtyMismatch: '수량 불일치', onlyA: 'B에 없음', onlyB: 'A에 없음' };
+  const statusLabel = { match: '일치', qtyMismatch: '수량 불일치', onlyA: '장부에 없음', onlyB: '로이스에 없음' };
   const adjustLabel = [offsetOn && '+1일', workdayOn && '영업일'].filter(Boolean).join('·') || '보정';
   const header = hasAdjust
     ? ['#','상품명','로이스 수량','장부 수량','수량차이','로이스 출고일(원본)',`로이스 출고일(${adjustLabel})`,'장부 수불일자','상태']
     : ['#','상품명','로이스 수량','장부 수량','수량차이','로이스 출고일','장부 수불일자','상태'];
   const data = [header];
-  const _diff = (r) => Math.abs((r.dateA ? (r.qty||0) : 0) - (r.dateB ? (r.bQty||0) : 0));
+  // 수량차이 = 로이스 수량 − 장부 수량 (부호 유지, 음수 가능)
+  const _diff = (r) => (r.dateA ? (r.qty||0) : 0) - (r.dateB ? (r.bQty||0) : 0);
   _ppState.result.forEach((r, i) => {
-    const diff = r.status === 'match' ? '' : (_diff(r) || '');
+    const diff = r.status === 'match' ? '' : _diff(r);
     if (hasAdjust) data.push([i+1, r.product, r.dateA?r.qty:'', r.dateB?r.bQty:'', diff, r.dateAOrig||'', r.dateA||'', r.dateB||'', statusLabel[r.status]||r.status]);
     else           data.push([i+1, r.product, r.dateA?r.qty:'', r.dateB?r.bQty:'', diff, r.dateA||'', r.dateB||'', statusLabel[r.status]||r.status]);
   });
@@ -5979,25 +5980,25 @@ async function ppDownload() {
     const a = r.dateA ? (r.qty || 0) : 0;
     const b = r.bQty || 0;
     if (!byProd[prod]) { byProd[prod] = {}; prodOrder.push(prod); }
-    const m = byProd[prod][ym] || (byProd[prod][ym] = { a: 0, b: 0, diff: 0 });
-    m.a += a; m.b += b; m.diff += Math.abs(a - b);
+    const m = byProd[prod][ym] || (byProd[prod][ym] = { a: 0, b: 0 });
+    m.a += a; m.b += b;
   });
   prodOrder.sort();
   const mhead = ['제품', '월 (장부 수불일자)', '로이스 수량합', '장부 수량합', '수량차이합'];
   const mrows = [mhead];
   const merges = [];
-  let tA = 0, tB = 0, tD = 0, rowIdx = 1;
+  let tA = 0, tB = 0, rowIdx = 1;
   prodOrder.forEach(prod => {
     const months = Object.keys(byProd[prod]).sort();
     const startRow = rowIdx;
     months.forEach(ym => {
       const m = byProd[prod][ym];
-      mrows.push([prod, ym, m.a, m.b, m.diff]);
-      tA += m.a; tB += m.b; tD += m.diff; rowIdx++;
+      mrows.push([prod, ym, m.a, m.b, m.a - m.b]);   // 수량차이합 = 로이스 − 장부
+      tA += m.a; tB += m.b; rowIdx++;
     });
     if (months.length > 1) merges.push({ s: { r: startRow, c: 0 }, e: { r: rowIdx - 1, c: 0 } });
   });
-  mrows.push(['', '합계', tA, tB, tD]);
+  mrows.push(['', '합계', tA, tB, tA - tB]);
   const totalRow = rowIdx;
   const wsM = XS.utils.aoa_to_sheet(mrows);
   wsM['!cols'] = [{ wch: 26 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
