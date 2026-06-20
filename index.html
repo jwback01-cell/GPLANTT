@@ -23401,8 +23401,18 @@ window._gplanFixDupStock = async function (opts) {
   if ((typeof _allProducts === 'undefined' || !_allProducts.length) && typeof loadProductsFromDB === 'function') { try { await loadProductsFromDB(); } catch (_) {} }
   const data = (typeof _loadUploadData === 'function') ? (_loadUploadData() || []) : [];
   if (!data.length) { console.log('[중복보정] 저장된 업로드 데이터가 없습니다.'); return; }
-  // 1) bundleKey+itemCode 로 그룹핑 → 2번째 이상 등장분이 과차감
-  const _key = r => { const bk = String(r.bundleKey || '').trim(); const ic = String(r.itemCode || '').trim().toLowerCase(); return (bk && ic) ? (bk + '||' + ic) : null; };
+  // 1) 주문 식별키로 그룹핑 → 2번째 이상 등장분이 과차감.
+  //    주문번호(bundleKey) 우선, 없으면 (날짜+수령자+SKU+수량) 복합키로 중복 탐지(주문번호 없는 건 대응)
+  const _key = r => {
+    const ic = String(r.itemCode || '').trim().toLowerCase(); if (!ic) return null;
+    const bk = String(r.bundleKey || '').trim();
+    if (bk) return 'b:' + bk + '||' + ic;
+    const d = String(r.date || '').slice(0, 10);
+    const rc = String(r.receiver || '').trim();
+    const q = String(r.qty || '');
+    if (!d && !rc) return null; // 식별 불가 → 중복판정 제외
+    return 'c:' + d + '|' + rc + '|' + ic + '|' + q;
+  };
   const seen = new Map(); // key -> count
   const prodBySku = new Map();
   (_allProducts || []).forEach(p => { const k = String(p.sku || '').trim().toLowerCase(); if (k) prodBySku.set(k, p); });
@@ -23417,6 +23427,7 @@ window._gplanFixDupStock = async function (opts) {
     const ic = String(r.itemCode || '').trim().toLowerCase();
     const p = prodBySku.get(ic);
     if (!p) { missingSku.set(ic, (missingSku.get(ic) || 0) + qty); continue; }
+    if (String(p.category || '').trim() !== '지플랜') continue; // ★지플랜 카테고리만 보정
     const gk = p.stock_link_group ? ('g_' + p.stock_link_group) : ('p_' + p.id);
     if (!overByGroup.has(gk)) {
       const members = p.stock_link_group ? _allProducts.filter(x => x.stock_link_group === p.stock_link_group) : [p];
@@ -23451,11 +23462,19 @@ window._gplanFixDupStock = async function (opts) {
   }
   // 5) 업로드 데이터에서 중복 행 제거 (선택)
   if (cleanData) {
-    const s2 = new Set(); const cleaned = [];
-    for (const r of data) { const k = _key(r); if (k && s2.has(k)) continue; if (k) s2.add(k); cleaned.push(r); }
-    if (cleaned.length !== data.length) {
+    const s2 = new Set(); const cleaned = []; let removed = 0;
+    for (const r of data) {
+      const k = _key(r);
+      const ic = String(r.itemCode || '').trim().toLowerCase();
+      const p = prodBySku.get(ic);
+      const isGplan = !!(p && String(p.category || '').trim() === '지플랜');
+      if (k && isGplan && s2.has(k)) { removed++; continue; }  // 지플랜 중복행만 제거 (복구한 것과 일치)
+      if (k && isGplan) s2.add(k);
+      cleaned.push(r);
+    }
+    if (removed) {
       try { _saveUploadData(cleaned); if (typeof syncLedgerFromUploadData === 'function') syncLedgerFromUploadData(); } catch (_) {}
-      console.log(`[중복보정] 업로드 데이터 중복행 ${data.length - cleaned.length}건 제거 (장부 합계도 갱신)`);
+      console.log(`[중복보정] 지플랜 중복행 ${removed}건 제거 (장부 합계도 갱신)`);
     }
   }
   if (typeof loadProductsFromDB === 'function') { try { await loadProductsFromDB(); } catch (_) {} }
