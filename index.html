@@ -23635,6 +23635,58 @@ window._gplanShowDupUploads = async function (skuFilter) {
   return rows;
 };
 
+// 수불이력 기준 재고 재계산 — 삭제된(중복) 차감으로 끊긴 재고를 바로잡음.
+//   정답재고 = (첫 거래기록의 이전재고) + (입고/PA출고/반품복원 등 실거래 변동 합).
+//   ※ 보정성 편집수정(중복보정/재계산/수동보정)은 합산에서 제외 → 여러 번 돌려도 결과 동일(멱등).
+//   사용:  _gplanRecomputeStock()             → 미리보기(불일치 목록)
+//          _gplanRecomputeStock({apply:true}) → 실제 재고 바로잡기
+window._gplanRecomputeStock = async function (opts) {
+  opts = opts || {};
+  const apply = opts.apply === true;
+  if ((typeof _allProducts === 'undefined' || !_allProducts.length) && typeof loadProductsFromDB === 'function') { try { await loadProductsFromDB(); } catch (_) {} }
+  const moves = (typeof _loadStockMoves === 'function') ? (_loadStockMoves() || []) : [];
+  const isFix = m => /재고 재계산|중복 차감 보정|중복보정 되돌리기|재고 수동 보정|중복차감/.test(String(m.note || '')); // 보정성(합산 제외)
+  // 상품별 거래기록 모으기
+  const byKey = new Map();
+  moves.forEach(m => { const k = m.productId || ('sku:' + String(m.sku || '').trim().toLowerCase()); if (!byKey.has(k)) byKey.set(k, []); byKey.get(k).push(m); });
+  const gplanProds = (_allProducts || []).filter(p => String(p.category || '').trim() === '지플랜');
+  const plan = [];
+  for (const p of gplanProds) {
+    let ms = byKey.get(p.id) || byKey.get('sku:' + String(p.sku || '').trim().toLowerCase()) || [];
+    ms = ms.filter(m => !isFix(m)).slice().sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+    if (!ms.length) continue;
+    const base = Number(ms[0].prevStock || 0);
+    const sumDelta = ms.reduce((s, m) => s + (Number(m.delta) || (Number(m.newStock || 0) - Number(m.prevStock || 0))), 0);
+    const correct = Math.max(0, base + sumDelta);
+    const cur = Number(p.stock || 0);
+    if (correct === cur) continue;
+    plan.push({ p, sku: p.sku, name: p.name || '', cur, correct, diff: correct - cur, base, moves: ms.length });
+  }
+  plan.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+  if (!plan.length) { console.log('[재고재계산] 수불이력과 어긋난 지플랜 상품이 없습니다 — 모두 일치.'); return []; }
+  const totalUp = plan.filter(x => x.diff > 0).reduce((s, x) => s + x.diff, 0);
+  const totalDn = plan.filter(x => x.diff < 0).reduce((s, x) => s + x.diff, 0);
+  console.log(`%c[재고재계산] ${apply ? '적용' : '미리보기(dry-run)'} — 불일치 ${plan.length}개  (복구 +${totalUp} / 차감 ${totalDn})`, 'font-weight:bold;color:#2563eb');
+  console.table(plan.map(x => ({ SKU: x.sku, 상품: String(x.name).slice(0, 20), 현재: x.cur, '바로잡기→': x.correct, 차이: x.diff, 거래기록수: x.moves })));
+  if (!apply) { console.log('%c▶ 실제 적용:  _gplanRecomputeStock({apply:true})', 'color:#16a34a'); return plan; }
+  for (const x of plan) {
+    const members = x.p.stock_link_group ? _allProducts.filter(p => p.stock_link_group === x.p.stock_link_group) : [x.p];
+    for (const m of members) {
+      const mprev = Number(m.stock || 0);
+      try {
+        const { error } = await _supabase.from('products').update({ stock: x.correct }).eq('id', m.id);
+        if (error) { console.error('[재고재계산] 실패:', m.sku, error); continue; }
+        try { if (typeof _logStockMove === 'function' && x.correct - mprev !== 0) _logStockMove({ productId: m.id, sku: m.sku, productName: m.name, type: '편집수정', delta: x.correct - mprev, prevStock: mprev, newStock: x.correct, note: '재고 재계산 (수불이력 기준)' }); } catch (_) {}
+      } catch (e) { console.error('[재고재계산] 예외:', m.sku, e); }
+    }
+    console.log(`[재고재계산] ${x.sku}: ${x.cur} → ${x.correct} (${x.diff > 0 ? '+' : ''}${x.diff})`);
+  }
+  if (typeof loadProductsFromDB === 'function') { try { await loadProductsFromDB(); } catch (_) {} }
+  if (typeof renderProducts === 'function') { try { renderProducts(); } catch (_) {} }
+  console.log('%c[재고재계산] 완료 ✅ — 수불이력 기준으로 재고를 바로잡았습니다.', 'font-weight:bold;color:#16a34a');
+  return plan;
+};
+
 let _uploadReviewRows = [];
 let _uploadDataPageSize = 100;
 let _uploadDataPage = 1;
