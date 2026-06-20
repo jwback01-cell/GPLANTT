@@ -23466,6 +23466,53 @@ window._gplanFixDupStock = async function (opts) {
   return plan;
 };
 
+// 중복보정 되돌리기 — _gplanFixDupStock({apply:true}) 로 바뀐 재고를 보정 직전 값으로 복원.
+//   보정 시 남긴 '중복 차감 보정' 편집수정 기록의 prevStock(보정 전 값)으로 되돌린다.
+//   사용:  _gplanUndoDupFix()               → 미리보기
+//          _gplanUndoDupFix({apply:true})   → 실제 복원
+window._gplanUndoDupFix = async function (opts) {
+  opts = opts || {};
+  const apply = opts.apply === true;
+  if ((typeof _allProducts === 'undefined' || !_allProducts.length) && typeof loadProductsFromDB === 'function') { try { await loadProductsFromDB(); } catch (_) {} }
+  const moves = (typeof _loadStockMoves === 'function') ? (_loadStockMoves() || []) : [];
+  const corr = moves.filter(m => m.type === '편집수정' && /중복 차감 보정/.test(String(m.note || '')));
+  if (!corr.length) { console.log('[되돌리기] "중복 차감 보정" 기록이 없습니다 — 되돌릴 게 없습니다.'); return; }
+  // 상품별로 가장 이른 보정의 prevStock = 보정 전 원래 값
+  const prodById = new Map((_allProducts || []).map(p => [p.id, p]));
+  const byProd = new Map();
+  corr.forEach(m => { const key = m.productId || m.sku; if (!key) return; if (!byProd.has(key)) byProd.set(key, []); byProd.get(key).push(m); });
+  const plan = [];
+  for (const [, ms] of byProd) {
+    ms.sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+    const target = Number(ms[0].prevStock || 0); // 첫 보정 직전 = 원래(보정 전) 재고
+    const p = prodById.get(ms[0].productId) || (_allProducts || []).find(x => String(x.sku || '').toLowerCase() === String(ms[0].sku || '').toLowerCase());
+    if (!p) continue;
+    const cur = Number(p.stock || 0);
+    if (cur === target) continue;
+    plan.push({ p, sku: p.sku, name: p.name || '', cur, target });
+  }
+  if (!plan.length) { console.log('[되돌리기] 이미 보정 전 값과 동일 — 변경 없음.'); return; }
+  console.log(`%c[되돌리기] ${apply ? '적용' : '미리보기(dry-run)'} — ${plan.length}개 SKU 를 보정 전 재고로 복원`, 'font-weight:bold;color:#b45309');
+  console.table(plan.map(x => ({ SKU: x.sku, 상품: String(x.name).slice(0, 22), 현재: x.cur, '되돌림→': x.target, 차이: x.target - x.cur })));
+  if (!apply) { console.log('%c▶ 미리보기입니다. 실제 복원:  _gplanUndoDupFix({apply:true})', 'color:#16a34a'); return plan; }
+  for (const x of plan) {
+    const members = x.p.stock_link_group ? _allProducts.filter(p => p.stock_link_group === x.p.stock_link_group) : [x.p];
+    for (const m of members) {
+      const mprev = Number(m.stock || 0);
+      try {
+        const { error } = await _supabase.from('products').update({ stock: x.target }).eq('id', m.id);
+        if (error) { console.error('[되돌리기] 실패:', m.sku, error); continue; }
+        try { if (typeof _logStockMove === 'function' && x.target - mprev !== 0) _logStockMove({ productId: m.id, sku: m.sku, productName: m.name, type: '편집수정', delta: x.target - mprev, prevStock: mprev, newStock: x.target, note: '중복보정 되돌리기' }); } catch (_) {}
+      } catch (e) { console.error('[되돌리기] 예외:', m.sku, e); }
+    }
+    console.log(`[되돌리기] ${x.sku}: ${x.cur} → ${x.target}`);
+  }
+  if (typeof loadProductsFromDB === 'function') { try { await loadProductsFromDB(); } catch (_) {} }
+  if (typeof renderProducts === 'function') { try { renderProducts(); } catch (_) {} }
+  console.log('%c[되돌리기] 완료 ✅ — 보정 전 재고로 복원했습니다.', 'font-weight:bold;color:#16a34a');
+  return plan;
+};
+
 let _uploadReviewRows = [];
 let _uploadDataPageSize = 100;
 let _uploadDataPage = 1;
