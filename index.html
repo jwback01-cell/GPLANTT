@@ -23520,6 +23520,49 @@ window._gplanUndoDupFix = async function (opts) {
   return plan;
 };
 
+// 중복 차감 내역 조회(읽기전용, 재고 변경 없음) — 같은 SKU·같은 날·같은 차감량이 2건 이상인 항목을 상세 표시.
+//   _gplanShowDups()          → 지플랜 전체 중복 목록
+//   _gplanShowDups('GB0055')  → 특정 SKU 만
+window._gplanShowDups = async function (skuFilter) {
+  if ((typeof _allProducts === 'undefined' || !_allProducts.length) && typeof loadProductsFromDB === 'function') { try { await loadProductsFromDB(); } catch (_) {} }
+  const moves = (typeof _loadStockMoves === 'function') ? (_loadStockMoves() || []) : [];
+  const gplanBySku = new Map();
+  (_allProducts || []).forEach(p => { if (String(p.category || '').trim() === '지플랜') { const k = String(p.sku || '').trim().toLowerCase(); if (k) gplanBySku.set(k, p); } });
+  const filt = skuFilter ? String(skuFilter).trim().toLowerCase() : null;
+  const grp = new Map();
+  moves.forEach(m => {
+    if (m.type !== 'PA출고') return;
+    const sk = String(m.sku || '').trim().toLowerCase();
+    if (!gplanBySku.has(sk)) return;
+    if (filt && sk !== filt) return;
+    const day = String(m.ts || '').slice(0, 10);
+    const d = Number(m.delta) || 0;
+    const key = sk + '|' + day + '|' + d;
+    if (!grp.has(key)) grp.set(key, []);
+    grp.get(key).push(m);
+  });
+  const rows = [];
+  for (const [key, ms] of grp) {
+    if (ms.length <= 1) continue;
+    const parts = key.split('|'); const sk = parts[0]; const day = parts[1]; const d = Number(parts[2]) || 0;
+    const p = gplanBySku.get(sk);
+    rows.push({
+      SKU: p ? p.sku : sk, 상품: String(p ? p.name : '').slice(0, 20),
+      날짜: day, 차감: d, 건수: ms.length, 과차감: (ms.length - 1) * Math.abs(d),
+      시각: ms.map(m => String(m.ts || '').slice(11, 16)).join(', '),
+    });
+  }
+  rows.sort((a, b) => String(a.SKU).localeCompare(String(b.SKU)) || String(a.날짜).localeCompare(String(b.날짜)));
+  if (!rows.length) { console.log('[중복조회] 같은 날·동일 차감 중복이 없습니다' + (filt ? ' (' + skuFilter + ')' : '')); return rows; }
+  const totalOver = rows.reduce((s, r) => s + r.과차감, 0);
+  const bySku = {}; rows.forEach(r => { bySku[r.SKU] = (bySku[r.SKU] || 0) + r.과차감; });
+  console.log(`%c[중복조회] 지플랜 중복 차감 ${rows.length}건 — 총 과차감 ${totalOver} (재고 변경 없음, 조회만)`, 'font-weight:bold;color:#2563eb');
+  console.table(rows);
+  console.log('[중복조회] SKU별 과차감 합계:', bySku);
+  console.log('▶ 실제 보정: _gplanFixDupStock({apply:true})   ▶ 보정 되돌리기: _gplanUndoDupFix({apply:true})');
+  return rows;
+};
+
 let _uploadReviewRows = [];
 let _uploadDataPageSize = 100;
 let _uploadDataPage = 1;
