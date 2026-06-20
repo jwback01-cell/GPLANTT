@@ -23575,6 +23575,31 @@ window._gplanShowDups = async function (skuFilter) {
   return rows;
 };
 
+// '편집수정' 유형 수불 이력 삭제 — 로그만 지움(실제 재고는 불변).
+//   _gplanDeleteEditMoves()                  → 미리보기(전체 편집수정 건수)
+//   _gplanDeleteEditMoves({apply:true})      → 전체 '편집수정' 기록 삭제
+//   _gplanDeleteEditMoves({apply:true, onlyDupFix:true})  → 중복보정/되돌리기 관련만 삭제
+window._gplanDeleteEditMoves = async function (opts) {
+  opts = opts || {};
+  const apply = opts.apply === true;
+  const onlyDup = opts.onlyDupFix === true;
+  const moves = (typeof _loadStockMoves === 'function') ? (_loadStockMoves() || []) : [];
+  const match = m => m.type === '편집수정' && (!onlyDup || /중복 차감 보정|중복보정 되돌리기/.test(String(m.note || '')));
+  const toDelete = moves.filter(match);
+  if (!toDelete.length) { console.log('[이력삭제] 삭제할 "편집수정" 기록이 없습니다.'); return 0; }
+  const byNote = {}; toDelete.forEach(m => { const n = String(m.note || '(메모없음)').replace(/\s*\([^)]*\)\s*/g, '').trim() || '(메모없음)'; byNote[n] = (byNote[n] || 0) + 1; });
+  console.log(`%c[이력삭제] ${apply ? '삭제 실행' : '미리보기(dry-run)'} — "편집수정" ${toDelete.length}건${onlyDup ? ' (중복보정 관련만)' : ' (전체)'}`, 'font-weight:bold;color:#b45309');
+  console.log('메모별 건수:', byNote);
+  console.log('⚠ 수불 이력(로그)만 삭제됩니다 — 실제 재고 수량은 변하지 않습니다.');
+  if (!apply) { console.log('%c▶ 실제 삭제:  _gplanDeleteEditMoves({apply:true})', 'color:#16a34a'); return toDelete.length; }
+  const ids = new Set(toDelete.map(m => m.id));
+  const kept = moves.filter(m => !ids.has(m.id));
+  if (typeof _saveStockMoves === 'function') _saveStockMoves(kept);
+  console.log(`%c[이력삭제] 완료 ✅ — "편집수정" ${toDelete.length}건 삭제 (재고 불변)`, 'font-weight:bold;color:#16a34a');
+  if (typeof renderProducts === 'function') { try { renderProducts(); } catch (_) {} }
+  return toDelete.length;
+};
+
 let _uploadReviewRows = [];
 let _uploadDataPageSize = 100;
 let _uploadDataPage = 1;
