@@ -23553,7 +23553,19 @@ window._gplanShowDups = async function (skuFilter) {
     });
   }
   rows.sort((a, b) => String(a.SKU).localeCompare(String(b.SKU)) || String(a.날짜).localeCompare(String(b.날짜)));
-  if (!rows.length) { console.log('[중복조회] 같은 날·동일 차감 중복이 없습니다' + (filt ? ' (' + skuFilter + ')' : '')); return rows; }
+  if (!rows.length) {
+    console.log('[중복조회] 현재 수불이력에 같은 날·동일 차감 중복이 없습니다' + (filt ? ' (' + skuFilter + ')' : '') + ' — 이전 보정으로 이미 정리됐을 수 있음.');
+    // 과거 '중복 차감 보정' 기록(=이미 중복으로 판정·처리된 내역)을 대신 표시
+    const corr = moves.filter(m => m.type === '편집수정' && /중복 차감 보정/.test(String(m.note || '')) && (!filt || String(m.sku || '').trim().toLowerCase() === filt));
+    if (corr.length) {
+      const bySku2 = {}; corr.forEach(m => { const k = m.sku || m.productId; bySku2[k] = (bySku2[k] || 0) + (Number(m.delta) || 0); });
+      console.log(`%c[중복조회] ※ 이전에 '중복 차감 보정'으로 처리된 내역 ${corr.length}건 (당시 중복으로 판정된 복구분)`, 'font-weight:bold;color:#b45309');
+      console.table(corr.map(m => ({ SKU: m.sku, 일시: String(m.ts || '').slice(0, 16), '복구(+)': m.delta, '재고변화': `${m.prevStock}→${m.newStock}`, 메모: m.note })));
+      console.log('[중복조회] SKU별 과거 보정 합계:', bySku2);
+      console.log('※ 원본 중복 PA출고 기록은 보정 적용 시 삭제되어 더는 조회되지 않습니다.');
+    }
+    return rows;
+  }
   const totalOver = rows.reduce((s, r) => s + r.과차감, 0);
   const bySku = {}; rows.forEach(r => { bySku[r.SKU] = (bySku[r.SKU] || 0) + r.과차감; });
   console.log(`%c[중복조회] 지플랜 중복 차감 ${rows.length}건 — 총 과차감 ${totalOver} (재고 변경 없음, 조회만)`, 'font-weight:bold;color:#2563eb');
