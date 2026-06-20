@@ -23389,65 +23389,56 @@ window._gplanSetStock = async function (sku, newStock, note) {
   console.log('[보정] 완료 — 화면에서 확인하세요.');
 };
 
-// 중복 차감 일괄 보정 — 저장된 업로드 데이터에서 같은 주문(bundleKey+SKU)이 2번 이상이면 그 초과분이 과차감.
-//   SKU(연동그룹) 별로 과차감량을 합산해 재고를 복구하고, 원하면 중복 행도 제거한다.
-//   사용:  _gplanFixDupStock()                 → 미리보기(변경 안 함)
-//          _gplanFixDupStock({apply:true})      → 실제 보정 + 중복행 제거
-//          _gplanFixDupStock({apply:true, cleanData:false})  → 재고만 보정(데이터 유지)
+// 중복 차감 일괄 보정 — ★수불 이력(실제 차감 기록) 기준★. 지플랜 카테고리만.
+//   원리: 한 번의 "매출 저장"은 SKU당 PA출고 1건만 기록함. 따라서 같은 SKU·같은 시각(분)에
+//         PA출고가 2건 이상이면 = 같은 저장이 중복 실행된 것(확실한 과차감). 첫 1건만 정상으로 보고 나머지를 복구.
+//   사용:  _gplanFixDupStock()              → 미리보기(변경 안 함)
+//          _gplanFixDupStock({apply:true})  → 재고 복구 + 중복 PA출고 이력 제거(재검출 방지)
 window._gplanFixDupStock = async function (opts) {
   opts = opts || {};
   const apply = opts.apply === true;
-  const cleanData = opts.cleanData !== false; // 기본 true (적용 시 중복행 제거)
   if ((typeof _allProducts === 'undefined' || !_allProducts.length) && typeof loadProductsFromDB === 'function') { try { await loadProductsFromDB(); } catch (_) {} }
-  const data = (typeof _loadUploadData === 'function') ? (_loadUploadData() || []) : [];
-  if (!data.length) { console.log('[중복보정] 저장된 업로드 데이터가 없습니다.'); return; }
-  // 1) 주문 식별키로 그룹핑 → 2번째 이상 등장분이 과차감.
-  //    주문번호(bundleKey) 우선, 없으면 (날짜+수령자+SKU+수량) 복합키로 중복 탐지(주문번호 없는 건 대응)
-  const _key = r => {
-    const ic = String(r.itemCode || '').trim().toLowerCase(); if (!ic) return null;
-    const bk = String(r.bundleKey || '').trim();
-    if (bk) return 'b:' + bk + '||' + ic;
-    const d = String(r.date || '').slice(0, 10);
-    const rc = String(r.receiver || '').trim();
-    const q = String(r.qty || '');
-    if (!d && !rc) return null; // 식별 불가 → 중복판정 제외
-    return 'c:' + d + '|' + rc + '|' + ic + '|' + q;
-  };
-  const seen = new Map(); // key -> count
-  const prodBySku = new Map();
-  (_allProducts || []).forEach(p => { const k = String(p.sku || '').trim().toLowerCase(); if (k) prodBySku.set(k, p); });
-  // 2) 과차감을 연동그룹 단위로 합산 (재고 차감이 그룹 단위로 일어나므로 동일하게)
-  const overByGroup = new Map(); // groupKey -> { primary, members, restore, dupCount, skus:Set, missing? }
-  const missingSku = new Map();
-  for (const r of data) {
-    const k = _key(r); if (!k) continue;
-    const c = (seen.get(k) || 0) + 1; seen.set(k, c);
-    if (c === 1) continue; // 첫 등장은 정상 차감
-    const qty = Number(r.qty || 0) || 0; if (!qty) continue;
-    const ic = String(r.itemCode || '').trim().toLowerCase();
-    const p = prodBySku.get(ic);
-    if (!p) { missingSku.set(ic, (missingSku.get(ic) || 0) + qty); continue; }
-    if (String(p.category || '').trim() !== '지플랜') continue; // ★지플랜 카테고리만 보정
+  const moves = (typeof _loadStockMoves === 'function') ? (_loadStockMoves() || []) : [];
+  if (!moves.length) { console.log('[중복보정] 수불 이력이 없습니다.'); return; }
+  // 지플랜 상품 인덱스
+  const gplanBySku = new Map();
+  (_allProducts || []).forEach(p => { if (String(p.category || '').trim() === '지플랜') { const k = String(p.sku || '').trim().toLowerCase(); if (k) gplanBySku.set(k, p); } });
+  // 지플랜 PA출고 → (sku|분) 그룹
+  const grp = new Map();
+  moves.forEach(m => {
+    if (m.type !== 'PA출고') return;
+    const sk = String(m.sku || '').trim().toLowerCase();
+    if (!gplanBySku.has(sk)) return;
+    const key = sk + '|' + String(m.ts || '').slice(0, 16); // YYYY-MM-DDTHH:MM (분 단위)
+    if (!grp.has(key)) grp.set(key, []);
+    grp.get(key).push(m);
+  });
+  // 같은 분에 2건+ = 중복 저장 → 첫 건 빼고 나머지(extras)가 과차감
+  const overBySku = new Map(); // sku -> { restore, dupCount, extraIds[] }
+  for (const [key, ms] of grp) {
+    if (ms.length <= 1) continue;
+    const sk = key.slice(0, key.lastIndexOf('|'));
+    if (!overBySku.has(sk)) overBySku.set(sk, { restore: 0, dupCount: 0, extraIds: [] });
+    const o = overBySku.get(sk);
+    ms.slice(1).forEach(m => { o.restore += Math.abs(Number(m.delta) || 0); o.dupCount++; if (m.id) o.extraIds.push(m.id); });
+  }
+  if (!overBySku.size) { console.log('[중복보정] 같은 시각 중복 차감이 없습니다 — 보정할 항목 없음.'); return; }
+  // 연동그룹 단위로 합산
+  const overByGroup = new Map();
+  for (const [sk, o] of overBySku) {
+    const p = gplanBySku.get(sk); if (!p) continue;
     const gk = p.stock_link_group ? ('g_' + p.stock_link_group) : ('p_' + p.id);
-    if (!overByGroup.has(gk)) {
-      const members = p.stock_link_group ? _allProducts.filter(x => x.stock_link_group === p.stock_link_group) : [p];
-      overByGroup.set(gk, { primary: p, members, restore: 0, dupCount: 0, skus: new Set() });
-    }
-    const g = overByGroup.get(gk); g.restore += qty; g.dupCount += 1; g.skus.add(p.sku);
+    if (!overByGroup.has(gk)) { const members = p.stock_link_group ? _allProducts.filter(x => x.stock_link_group === p.stock_link_group) : [p]; overByGroup.set(gk, { primary: p, members, restore: 0, dupCount: 0, skus: new Set(), extraIds: [] }); }
+    const g = overByGroup.get(gk); g.restore += o.restore; g.dupCount += o.dupCount; g.skus.add(p.sku); g.extraIds.push(...o.extraIds);
   }
-  if (!overByGroup.size && !missingSku.size) { console.log('[중복보정] 중복 차감된 주문이 없습니다 — 보정할 항목 없음.'); return; }
-  // 3) 보정 계획
   const plan = [];
-  for (const [, g] of overByGroup) {
-    const prev = Number(g.primary.stock || 0);
-    plan.push({ g, sku: [...g.skus].join(','), name: g.primary.name || '', prev, restore: g.restore, next: prev + g.restore, dupCount: g.dupCount, members: g.members.length });
-  }
+  for (const [, g] of overByGroup) { const prev = Number(g.primary.stock || 0); plan.push({ g, sku: [...g.skus].join(','), name: g.primary.name || '', prev, restore: g.restore, next: prev + g.restore, dupCount: g.dupCount }); }
   plan.sort((a, b) => b.restore - a.restore);
-  console.log(`%c[중복보정] ${apply ? '적용' : '미리보기(dry-run)'} — 대상 ${plan.length}개 SKU/그룹, 총 복구 +${plan.reduce((s, x) => s + x.restore, 0)}`, 'font-weight:bold;color:#2563eb');
-  console.table(plan.map(x => ({ SKU: x.sku, 상품: String(x.name).slice(0, 22), 현재재고: x.prev, '복구(+)': x.restore, 보정후: x.next, 중복건수: x.dupCount, 그룹: x.members })));
-  if (missingSku.size) console.warn('[중복보정] 상품 미발견 SKU(보정 제외):', Object.fromEntries(missingSku));
+  console.log(`%c[중복보정] ${apply ? '적용' : '미리보기(dry-run)'} — 대상 ${plan.length}개, 총 복구 +${plan.reduce((s, x) => s + x.restore, 0)} (수불이력 같은시각 중복 기준)`, 'font-weight:bold;color:#2563eb');
+  console.table(plan.map(x => ({ SKU: x.sku, 상품: String(x.name).slice(0, 22), 현재재고: x.prev, '복구(+)': x.restore, 보정후: x.next, 중복건수: x.dupCount })));
   if (!apply) { console.log('%c▶ 미리보기입니다. 실제 적용:  _gplanFixDupStock({apply:true})', 'color:#16a34a'); return plan; }
-  // 4) 적용 — 그룹 멤버 전체 같은 newStock 으로
+  // 적용 — 그룹 멤버 전체 같은 newStock 으로
+  const removeIds = new Set();
   for (const x of plan) {
     const newStock = x.next;
     for (const m of x.g.members) {
@@ -23458,24 +23449,14 @@ window._gplanFixDupStock = async function (opts) {
         try { if (typeof _logStockMove === 'function' && newStock - mprev !== 0) _logStockMove({ productId: m.id, sku: m.sku, productName: m.name, type: '편집수정', delta: newStock - mprev, prevStock: mprev, newStock, note: `중복 차감 보정 (+${x.restore}${x.g.members.length > 1 ? `, 그룹 ${x.g.members.length}개` : ''})` }); } catch (_) {}
       } catch (e) { console.error('[중복보정] 예외:', m.sku, e); }
     }
+    x.g.extraIds.forEach(id => removeIds.add(id));
     console.log(`[중복보정] ${x.sku}: ${x.prev} → ${newStock} (+${x.restore})`);
   }
-  // 5) 업로드 데이터에서 중복 행 제거 (선택)
-  if (cleanData) {
-    const s2 = new Set(); const cleaned = []; let removed = 0;
-    for (const r of data) {
-      const k = _key(r);
-      const ic = String(r.itemCode || '').trim().toLowerCase();
-      const p = prodBySku.get(ic);
-      const isGplan = !!(p && String(p.category || '').trim() === '지플랜');
-      if (k && isGplan && s2.has(k)) { removed++; continue; }  // 지플랜 중복행만 제거 (복구한 것과 일치)
-      if (k && isGplan) s2.add(k);
-      cleaned.push(r);
-    }
-    if (removed) {
-      try { _saveUploadData(cleaned); if (typeof syncLedgerFromUploadData === 'function') syncLedgerFromUploadData(); } catch (_) {}
-      console.log(`[중복보정] 지플랜 중복행 ${removed}건 제거 (장부 합계도 갱신)`);
-    }
+  // 중복 PA출고 이력 제거 (재실행 시 같은 건 재검출 방지)
+  if (removeIds.size && typeof _saveStockMoves === 'function') {
+    const kept = (_loadStockMoves() || []).filter(m => !removeIds.has(m.id));
+    _saveStockMoves(kept);
+    console.log(`[중복보정] 중복 PA출고 이력 ${removeIds.size}건 제거 (재검출 방지)`);
   }
   if (typeof loadProductsFromDB === 'function') { try { await loadProductsFromDB(); } catch (_) {} }
   if (typeof renderProducts === 'function') { try { renderProducts(); } catch (_) {} }
