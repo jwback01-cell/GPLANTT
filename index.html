@@ -23367,6 +23367,28 @@ async function _applyStockFromUploadRows(rows, direction, opts) {
   return { updated, missing, totalDelta };
 }
 
+// 관리자 재고 수동 보정 — 콘솔에서 호출:  _gplanSetStock('GB0079', 10, '중복차감 6 복구')
+//   해당 SKU 의 재고를 newStock 으로 설정하고 '편집수정' 수불 이력을 남김. 연동그룹이면 멤버 전체 동기화.
+window._gplanSetStock = async function (sku, newStock, note) {
+  newStock = Number(newStock);
+  if (!sku || !Number.isFinite(newStock) || newStock < 0) { console.warn('[보정] 사용법: _gplanSetStock("SKU", 새재고, "메모")'); return; }
+  if ((typeof _allProducts === 'undefined' || !_allProducts.length) && typeof loadProductsFromDB === 'function') { try { await loadProductsFromDB(); } catch (_) {} }
+  const key = String(sku).trim().toLowerCase();
+  const prod = (_allProducts || []).find(p => String(p.sku || '').trim().toLowerCase() === key);
+  if (!prod) { console.warn('[보정] SKU 미발견:', sku); return; }
+  const members = prod.stock_link_group ? _allProducts.filter(p => p.stock_link_group === prod.stock_link_group) : [prod];
+  for (const m of members) {
+    const prev = Number(m.stock || 0);
+    const { error } = await _supabase.from('products').update({ stock: newStock }).eq('id', m.id);
+    if (error) { console.error('[보정] 실패:', m.sku, error); continue; }
+    try { if (typeof _logStockMove === 'function' && newStock - prev !== 0) _logStockMove({ productId: m.id, sku: m.sku, productName: m.name, type: '편집수정', delta: newStock - prev, prevStock: prev, newStock, note: note || '재고 수동 보정' + (members.length > 1 ? ` (그룹 ${members.length}개)` : '') }); } catch (_) {}
+    console.log(`[보정] ${m.sku}: ${prev} → ${newStock}`);
+  }
+  if (typeof loadProductsFromDB === 'function') { try { await loadProductsFromDB(); } catch (_) {} }
+  if (typeof renderProducts === 'function') { try { renderProducts(); } catch (_) {} }
+  console.log('[보정] 완료 — 화면에서 확인하세요.');
+};
+
 let _uploadReviewRows = [];
 let _uploadDataPageSize = 100;
 let _uploadDataPage = 1;
