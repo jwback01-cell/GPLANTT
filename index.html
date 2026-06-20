@@ -23389,6 +23389,81 @@ window._gplanSetStock = async function (sku, newStock, note) {
   console.log('[보정] 완료 — 화면에서 확인하세요.');
 };
 
+// 중복 차감 일괄 보정 — 저장된 업로드 데이터에서 같은 주문(bundleKey+SKU)이 2번 이상이면 그 초과분이 과차감.
+//   SKU(연동그룹) 별로 과차감량을 합산해 재고를 복구하고, 원하면 중복 행도 제거한다.
+//   사용:  _gplanFixDupStock()                 → 미리보기(변경 안 함)
+//          _gplanFixDupStock({apply:true})      → 실제 보정 + 중복행 제거
+//          _gplanFixDupStock({apply:true, cleanData:false})  → 재고만 보정(데이터 유지)
+window._gplanFixDupStock = async function (opts) {
+  opts = opts || {};
+  const apply = opts.apply === true;
+  const cleanData = opts.cleanData !== false; // 기본 true (적용 시 중복행 제거)
+  if ((typeof _allProducts === 'undefined' || !_allProducts.length) && typeof loadProductsFromDB === 'function') { try { await loadProductsFromDB(); } catch (_) {} }
+  const data = (typeof _loadUploadData === 'function') ? (_loadUploadData() || []) : [];
+  if (!data.length) { console.log('[중복보정] 저장된 업로드 데이터가 없습니다.'); return; }
+  // 1) bundleKey+itemCode 로 그룹핑 → 2번째 이상 등장분이 과차감
+  const _key = r => { const bk = String(r.bundleKey || '').trim(); const ic = String(r.itemCode || '').trim().toLowerCase(); return (bk && ic) ? (bk + '||' + ic) : null; };
+  const seen = new Map(); // key -> count
+  const prodBySku = new Map();
+  (_allProducts || []).forEach(p => { const k = String(p.sku || '').trim().toLowerCase(); if (k) prodBySku.set(k, p); });
+  // 2) 과차감을 연동그룹 단위로 합산 (재고 차감이 그룹 단위로 일어나므로 동일하게)
+  const overByGroup = new Map(); // groupKey -> { primary, members, restore, dupCount, skus:Set, missing? }
+  const missingSku = new Map();
+  for (const r of data) {
+    const k = _key(r); if (!k) continue;
+    const c = (seen.get(k) || 0) + 1; seen.set(k, c);
+    if (c === 1) continue; // 첫 등장은 정상 차감
+    const qty = Number(r.qty || 0) || 0; if (!qty) continue;
+    const ic = String(r.itemCode || '').trim().toLowerCase();
+    const p = prodBySku.get(ic);
+    if (!p) { missingSku.set(ic, (missingSku.get(ic) || 0) + qty); continue; }
+    const gk = p.stock_link_group ? ('g_' + p.stock_link_group) : ('p_' + p.id);
+    if (!overByGroup.has(gk)) {
+      const members = p.stock_link_group ? _allProducts.filter(x => x.stock_link_group === p.stock_link_group) : [p];
+      overByGroup.set(gk, { primary: p, members, restore: 0, dupCount: 0, skus: new Set() });
+    }
+    const g = overByGroup.get(gk); g.restore += qty; g.dupCount += 1; g.skus.add(p.sku);
+  }
+  if (!overByGroup.size && !missingSku.size) { console.log('[중복보정] 중복 차감된 주문이 없습니다 — 보정할 항목 없음.'); return; }
+  // 3) 보정 계획
+  const plan = [];
+  for (const [, g] of overByGroup) {
+    const prev = Number(g.primary.stock || 0);
+    plan.push({ g, sku: [...g.skus].join(','), name: g.primary.name || '', prev, restore: g.restore, next: prev + g.restore, dupCount: g.dupCount, members: g.members.length });
+  }
+  plan.sort((a, b) => b.restore - a.restore);
+  console.log(`%c[중복보정] ${apply ? '적용' : '미리보기(dry-run)'} — 대상 ${plan.length}개 SKU/그룹, 총 복구 +${plan.reduce((s, x) => s + x.restore, 0)}`, 'font-weight:bold;color:#2563eb');
+  console.table(plan.map(x => ({ SKU: x.sku, 상품: String(x.name).slice(0, 22), 현재재고: x.prev, '복구(+)': x.restore, 보정후: x.next, 중복건수: x.dupCount, 그룹: x.members })));
+  if (missingSku.size) console.warn('[중복보정] 상품 미발견 SKU(보정 제외):', Object.fromEntries(missingSku));
+  if (!apply) { console.log('%c▶ 미리보기입니다. 실제 적용:  _gplanFixDupStock({apply:true})', 'color:#16a34a'); return plan; }
+  // 4) 적용 — 그룹 멤버 전체 같은 newStock 으로
+  for (const x of plan) {
+    const newStock = x.next;
+    for (const m of x.g.members) {
+      const mprev = Number(m.stock || 0);
+      try {
+        const { error } = await _supabase.from('products').update({ stock: newStock }).eq('id', m.id);
+        if (error) { console.error('[중복보정] 실패:', m.sku, error); continue; }
+        try { if (typeof _logStockMove === 'function' && newStock - mprev !== 0) _logStockMove({ productId: m.id, sku: m.sku, productName: m.name, type: '편집수정', delta: newStock - mprev, prevStock: mprev, newStock, note: `중복 차감 보정 (+${x.restore}${x.g.members.length > 1 ? `, 그룹 ${x.g.members.length}개` : ''})` }); } catch (_) {}
+      } catch (e) { console.error('[중복보정] 예외:', m.sku, e); }
+    }
+    console.log(`[중복보정] ${x.sku}: ${x.prev} → ${newStock} (+${x.restore})`);
+  }
+  // 5) 업로드 데이터에서 중복 행 제거 (선택)
+  if (cleanData) {
+    const s2 = new Set(); const cleaned = [];
+    for (const r of data) { const k = _key(r); if (k && s2.has(k)) continue; if (k) s2.add(k); cleaned.push(r); }
+    if (cleaned.length !== data.length) {
+      try { _saveUploadData(cleaned); if (typeof syncLedgerFromUploadData === 'function') syncLedgerFromUploadData(); } catch (_) {}
+      console.log(`[중복보정] 업로드 데이터 중복행 ${data.length - cleaned.length}건 제거 (장부 합계도 갱신)`);
+    }
+  }
+  if (typeof loadProductsFromDB === 'function') { try { await loadProductsFromDB(); } catch (_) {} }
+  if (typeof renderProducts === 'function') { try { renderProducts(); } catch (_) {} }
+  console.log('%c[중복보정] 완료 ✅', 'font-weight:bold;color:#16a34a');
+  return plan;
+};
+
 let _uploadReviewRows = [];
 let _uploadDataPageSize = 100;
 let _uploadDataPage = 1;
