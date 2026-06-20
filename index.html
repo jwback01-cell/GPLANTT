@@ -23600,6 +23600,41 @@ window._gplanDeleteEditMoves = async function (opts) {
   return toDelete.length;
 };
 
+// 매출/장부 데이터의 중복 등록 조회(읽기전용) — 같은 주문(주문번호 또는 날짜+수령자+SKU+수량)이 2번 이상 등록된 것.
+//   _gplanShowDupUploads()          → 지플랜 전체
+//   _gplanShowDupUploads('GB0055')  → 특정 SKU
+window._gplanShowDupUploads = async function (skuFilter) {
+  if ((typeof _allProducts === 'undefined' || !_allProducts.length) && typeof loadProductsFromDB === 'function') { try { await loadProductsFromDB(); } catch (_) {} }
+  const data = (typeof _loadUploadData === 'function') ? (_loadUploadData() || []) : [];
+  if (!data.length) { console.log('[중복등록조회] 저장된 매출/장부 데이터가 없습니다.'); return []; }
+  const prodBySku = new Map(); (_allProducts || []).forEach(p => { const k = String(p.sku || '').trim().toLowerCase(); if (k) prodBySku.set(k, p); });
+  const filt = skuFilter ? String(skuFilter).trim().toLowerCase() : null;
+  const _key = r => {
+    const ic = String(r.itemCode || '').trim().toLowerCase(); if (!ic) return null;
+    const bk = String(r.bundleKey || '').trim();
+    if (bk) return 'b:' + bk + '||' + ic;
+    const d = String(r.date || '').slice(0, 10); const rc = String(r.receiver || '').trim(); const q = String(r.qty || '');
+    if (!d && !rc) return null;
+    return 'c:' + d + '|' + rc + '|' + ic + '|' + q;
+  };
+  const grp = new Map();
+  data.forEach(r => { const ic = String(r.itemCode || '').trim().toLowerCase(); if (filt && ic !== filt) return; const k = _key(r); if (!k) return; if (!grp.has(k)) grp.set(k, []); grp.get(k).push(r); });
+  const rows = [];
+  for (const [, rs] of grp) {
+    if (rs.length <= 1) continue;
+    const r0 = rs[0]; const ic = String(r0.itemCode || '').trim().toLowerCase(); const p = prodBySku.get(ic);
+    if (!p || String(p.category || '').trim() !== '지플랜') continue; // 지플랜만
+    rows.push({ SKU: p.sku, 상품: String(p.name || '').slice(0, 18), 날짜: String(r0.date || '').slice(0, 10), 수령자: String(r0.receiver || '').slice(0, 8), 수량: Number(r0.qty || 0), 등록건수: rs.length, 중복: rs.length - 1, 주문번호: String(r0.bundleKey || '(없음)').slice(0, 22) });
+  }
+  rows.sort((a, b) => String(a.SKU).localeCompare(String(b.SKU)) || String(a.날짜).localeCompare(String(b.날짜)));
+  if (!rows.length) { console.log('[중복등록조회] 지플랜 중복 등록(같은 주문 여러 번)이 없습니다' + (filt ? ' (' + skuFilter + ')' : '')); return rows; }
+  const bySku = {}; rows.forEach(r => { bySku[r.SKU] = (bySku[r.SKU] || 0) + r.중복 * r.수량; });
+  console.log(`%c[중복등록조회] 지플랜 매출데이터 중복 등록 ${rows.length}건 (재고 변경 없음, 조회만)`, 'font-weight:bold;color:#2563eb');
+  console.table(rows);
+  console.log('[중복등록조회] SKU별 과등록 수량 합계:', bySku);
+  return rows;
+};
+
 let _uploadReviewRows = [];
 let _uploadDataPageSize = 100;
 let _uploadDataPage = 1;
