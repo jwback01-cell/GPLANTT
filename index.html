@@ -23390,8 +23390,8 @@ window._gplanSetStock = async function (sku, newStock, note) {
 };
 
 // 중복 차감 일괄 보정 — ★수불 이력(실제 차감 기록) 기준★. 지플랜 카테고리만.
-//   원리: 한 번의 "매출 저장"은 SKU당 PA출고 1건만 기록함. 따라서 같은 SKU·같은 시각(분)에
-//         PA출고가 2건 이상이면 = 같은 저장이 중복 실행된 것(확실한 과차감). 첫 1건만 정상으로 보고 나머지를 복구.
+//   원리: 같은 매출을 그날 여러 번 저장하면 같은 차감이 반복됨. 따라서 같은 SKU·같은 날(일)·같은 차감량의
+//         PA출고가 2건 이상이면 = 중복 저장(과차감). 그 중 1건만 정상으로 보고 나머지를 복구.
 //   사용:  _gplanFixDupStock()              → 미리보기(변경 안 함)
 //          _gplanFixDupStock({apply:true})  → 재고 복구 + 중복 PA출고 이력 제거(재검출 방지)
 window._gplanFixDupStock = async function (opts) {
@@ -23403,21 +23403,23 @@ window._gplanFixDupStock = async function (opts) {
   // 지플랜 상품 인덱스
   const gplanBySku = new Map();
   (_allProducts || []).forEach(p => { if (String(p.category || '').trim() === '지플랜') { const k = String(p.sku || '').trim().toLowerCase(); if (k) gplanBySku.set(k, p); } });
-  // 지플랜 PA출고 → (sku|분) 그룹
+  // 지플랜 PA출고 → (sku|날짜|차감량) 그룹 — 같은 날 동일 차감이 여러 번이면 중복 저장
   const grp = new Map();
   moves.forEach(m => {
     if (m.type !== 'PA출고') return;
     const sk = String(m.sku || '').trim().toLowerCase();
     if (!gplanBySku.has(sk)) return;
-    const key = sk + '|' + String(m.ts || '').slice(0, 16); // YYYY-MM-DDTHH:MM (분 단위)
+    const day = String(m.ts || '').slice(0, 10);          // YYYY-MM-DD (일 단위)
+    const d = Number(m.delta) || 0;
+    const key = sk + '|' + day + '|' + d;
     if (!grp.has(key)) grp.set(key, []);
     grp.get(key).push(m);
   });
-  // 같은 분에 2건+ = 중복 저장 → 첫 건 빼고 나머지(extras)가 과차감
+  // 같은 날·같은 차감량이 2건+ = 중복 저장 → 첫 건 빼고 나머지(extras)가 과차감
   const overBySku = new Map(); // sku -> { restore, dupCount, extraIds[] }
   for (const [key, ms] of grp) {
     if (ms.length <= 1) continue;
-    const sk = key.slice(0, key.lastIndexOf('|'));
+    const sk = key.split('|')[0];
     if (!overBySku.has(sk)) overBySku.set(sk, { restore: 0, dupCount: 0, extraIds: [] });
     const o = overBySku.get(sk);
     ms.slice(1).forEach(m => { o.restore += Math.abs(Number(m.delta) || 0); o.dupCount++; if (m.id) o.extraIds.push(m.id); });
@@ -23434,7 +23436,7 @@ window._gplanFixDupStock = async function (opts) {
   const plan = [];
   for (const [, g] of overByGroup) { const prev = Number(g.primary.stock || 0); plan.push({ g, sku: [...g.skus].join(','), name: g.primary.name || '', prev, restore: g.restore, next: prev + g.restore, dupCount: g.dupCount }); }
   plan.sort((a, b) => b.restore - a.restore);
-  console.log(`%c[중복보정] ${apply ? '적용' : '미리보기(dry-run)'} — 대상 ${plan.length}개, 총 복구 +${plan.reduce((s, x) => s + x.restore, 0)} (수불이력 같은시각 중복 기준)`, 'font-weight:bold;color:#2563eb');
+  console.log(`%c[중복보정] ${apply ? '적용' : '미리보기(dry-run)'} — 대상 ${plan.length}개, 총 복구 +${plan.reduce((s, x) => s + x.restore, 0)} (같은 날·동일 차감 중복 기준)`, 'font-weight:bold;color:#2563eb');
   console.table(plan.map(x => ({ SKU: x.sku, 상품: String(x.name).slice(0, 22), 현재재고: x.prev, '복구(+)': x.restore, 보정후: x.next, 중복건수: x.dupCount })));
   if (!apply) { console.log('%c▶ 미리보기입니다. 실제 적용:  _gplanFixDupStock({apply:true})', 'color:#16a34a'); return plan; }
   // 적용 — 그룹 멤버 전체 같은 newStock 으로
