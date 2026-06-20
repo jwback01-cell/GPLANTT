@@ -22845,13 +22845,26 @@ async function savePlayautoOrdersToLedger(silent) {
       model_no: _paOrders[0].model_no, shop_sale_no: _paOrders[0].shop_sale_no
     } : null);
   }
-  _saveUploadData(existing.concat(rows));
+  // ★ 중복 차감 방지 — 이미 저장된 주문(주문번호 bundleKey + SKU itemCode)은 다시 저장/차감하지 않음.
+  //   (같은 매출/기간을 여러 번 수집·저장해도 재고가 중복 차감되지 않도록)
+  const _rowKey = r => (String(r.bundleKey || '').trim() + '||' + String(r.itemCode || '').trim().toLowerCase());
+  const _existKeys = new Set((existing || []).map(_rowKey).filter(k => k !== '||'));
+  const newRows = [];
+  for (const r of rows) {
+    const k = _rowKey(r);
+    if (k !== '||' && _existKeys.has(k)) continue; // 이미 저장·차감된 주문 — 건너뜀
+    if (k !== '||') _existKeys.add(k);             // 같은 배치 내 중복도 1회만
+    newRows.push(r);
+  }
+  const dupSkipped = rows.length - newRows.length;
+  _saveUploadData(existing.concat(newRows));
   syncLedgerFromUploadData();
-  // ★ 매출(PA 주문) → 상품 재고 자동 차감
-  const stockRes = await _applyStockFromUploadRows(rows, -1);
-  const saved = rows.length;
+  // ★ 매출(PA 주문) → 상품 재고 자동 차감 (새 주문만)
+  const stockRes = await _applyStockFromUploadRows(newRows, -1);
+  const saved = newRows.length;
   if (!silent) {
     let msg = `${saved}건의 주문이 매출 장부에 저장되었습니다.`;
+    if (dupSkipped > 0) msg += `\n♻ 이미 저장된 주문 ${dupSkipped}건은 중복 제외 (재고 재차감 안 함)`;
     if (stockRes.updated > 0) msg += `\n📦 재고 자동 차감: ${stockRes.updated}개 SKU (총 ${Math.abs(stockRes.totalDelta)}개)`;
     if (stockRes.missing.length > 0) msg += `\n⚠ SKU 미매칭 ${stockRes.missing.length}건 (콘솔 확인)`;
     showAppAlert('매출 장부 저장 완료', msg, stockRes.missing.length > 0 ? 'warn' : 'success');
@@ -27908,14 +27921,21 @@ function confirmUpload() {
     const now = new Date();
     const stamp = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
     const existing = _loadUploadData();
-    const toSave = toSaveRows.map(r => ({ ...r, savedAt: stamp }));
+    let toSave = toSaveRows.map(r => ({ ...r, savedAt: stamp }));
+    // ★ 중복 차감 방지 — 주문번호(bundleKey)+SKU 가 이미 저장된 행은 재저장/재차감 안 함.
+    //   (주문번호 없는 수동 행은 키가 '||' 라 그대로 통과 — 무회귀)
+    const _rowKey = r => (String(r.bundleKey || '').trim() + '||' + String(r.itemCode || '').trim().toLowerCase());
+    const _existKeys = new Set((existing || []).map(_rowKey).filter(k => k !== '||'));
+    toSave = toSave.filter(r => { const k = _rowKey(r); if (k !== '||' && _existKeys.has(k)) return false; if (k !== '||') _existKeys.add(k); return true; });
+    const dupSkipped = toSaveRows.length - toSave.length;
     _saveUploadData(existing.concat(toSave));
     syncLedgerFromUploadData();
-    // ★ 매출 → 상품 재고 자동 차감
+    // ★ 매출 → 상품 재고 자동 차감 (새 행만)
     const stockRes = await _applyStockFromUploadRows(toSave, -1);
     let baseMsg = errN === 0
       ? toSaveRows.length + '건의 데이터가 저장되었습니다.'
       : toSaveRows.length + '건 저장 완료 · ' + errN + '건 경고/오류 포함.';
+    if (dupSkipped > 0) baseMsg += `\n♻ 이미 저장된 주문 ${dupSkipped}건 중복 제외 (재고 재차감 안 함)`;
     if (stockRes.updated > 0) baseMsg += `\n\n📦 상품 재고 자동 차감: ${stockRes.updated}개 SKU (총 ${Math.abs(stockRes.totalDelta)}개 감소)`;
     if (stockRes.missing.length > 0) baseMsg += `\n⚠ SKU 미매칭 ${stockRes.missing.length}건 (콘솔 확인)`;
     showAppAlert(errN === 0 ? '업로드 완료' : '업로드 일부 경고', baseMsg, errN === 0 ? 'success' : 'warn');
