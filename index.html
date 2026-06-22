@@ -6467,7 +6467,7 @@ function openStockMovementModal(productId) {
       </div>
       ${moves.length === 0 ? '' : `
       <div style="padding:10px 22px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;gap:8px;background:#FAFAFA;">
-        <div style="font-size:11px;color:#666;">⚠ 이력 삭제는 기록만 지웁니다 — 실제 재고는 변경되지 않습니다.</div>
+        <div style="font-size:11px;color:#666;">⚠ 이력 삭제는 기록만 지웁니다(재고 불변). 단 <b>'편집수정'</b> 기록을 지우면 그 변동만큼 재고가 되돌아갑니다(예: -6 → +6).</div>
         <button onclick="_deleteSelectedStockMoves()" style="padding:6px 14px;border-radius:14px;border:1px solid #FECACA;background:white;color:#DC2626;cursor:pointer;font-size:12px;font-weight:bold;">선택 삭제 <span id="stock-move-sel-count" style="color:#888;font-weight:normal;">(0)</span></button>
       </div>
       `}
@@ -6510,19 +6510,62 @@ function _updateStockMoveSelCount() {
 }
 // 모달 — 선택 삭제
 // (showAppConfirm 의 z-index 가 stock-move-modal 보다 낮아 가려지므로 native confirm 사용)
-function _deleteSelectedStockMoves() {
+async function _deleteSelectedStockMoves() {
   const checked = [...document.querySelectorAll('#stock-move-modal .stock-move-cb:checked')];
   if (!checked.length) { alert('삭제할 이력을 먼저 선택하세요.'); return; }
   const ids = new Set(checked.map(cb => cb.dataset.moveId));
-  const ok = confirm(
-    `선택한 ${ids.size}건의 수불 이력을 삭제할까요?\n\n` +
-    `⚠ 이력 기록만 지워지며 실제 상품 재고는 변경되지 않습니다.\n` +
-    `이 작업은 되돌릴 수 없습니다.`
-  );
-  if (!ok) return;
   const all = (typeof _loadStockMoves === 'function') ? _loadStockMoves() : [];
-  const next = all.filter(m => !ids.has(m.id));
+  const toDelete = all.filter(m => ids.has(m.id));
+  // '편집수정' 기록은 삭제 시 그 변동을 재고에서 되돌림 (예: -6 삭제 → +6 복구). 그 외(PA출고 등)는 기록만 삭제.
+  const editMoves = toDelete.filter(m => m.type === '편집수정' && Number(m.delta));
+  const editSum = editMoves.reduce((s, m) => s + Number(m.delta || 0), 0);
+  let reverse = false;
+  if (editMoves.length) {
+    reverse = confirm(
+      `선택 항목에 '편집수정' ${editMoves.length}건(합계 ${editSum > 0 ? '+' : ''}${editSum})이 있습니다.\n\n` +
+      `[확인] 이력을 삭제하고 그 변동을 재고에서 되돌립니다 (예: -6 삭제 → +6 복구)\n` +
+      `[취소] 아무것도 하지 않음`
+    );
+    if (!reverse) return;
+  } else {
+    if (!confirm(`선택한 ${ids.size}건의 수불 이력을 삭제할까요?\n\n⚠ 기록만 지워지며 실제 재고는 변경되지 않습니다.\n되돌릴 수 없습니다.`)) return;
+  }
+
+  // 1) '편집수정' 변동 되돌리기 — 상품별 -Σdelta 적용 (연동그룹이면 멤버 전체 동기화)
+  if (reverse && editMoves.length) {
+    if ((typeof _allProducts === 'undefined' || !_allProducts.length) && typeof loadProductsFromDB === 'function') { try { await loadProductsFromDB(); } catch (_) {} }
+    const byProd = new Map();
+    editMoves.forEach(m => {
+      const k = (m.productId != null) ? ('id:' + m.productId) : ('sku:' + String(m.sku || '').trim().toLowerCase());
+      byProd.set(k, (byProd.get(k) || 0) + Number(m.delta || 0));
+    });
+    for (const [k, sumDelta] of byProd) {
+      if (!sumDelta) continue;
+      const prod = (_allProducts || []).find(p =>
+        (k.startsWith('id:') && p.id === Number(k.slice(3))) ||
+        (k.startsWith('sku:') && String(p.sku || '').trim().toLowerCase() === k.slice(4)));
+      if (!prod) { console.warn('[이력삭제 복구] 상품 미발견:', k); continue; }
+      const members = prod.stock_link_group ? _allProducts.filter(p => p.stock_link_group === prod.stock_link_group) : [prod];
+      const reverseDelta = -sumDelta;   // 편집수정 -6 → +6
+      for (const mem of members) {
+        const prev = Number(mem.stock || 0);
+        const newStock = Math.max(0, prev + reverseDelta);
+        try {
+          const { error } = await _supabase.from('products').update({ stock: newStock }).eq('id', mem.id);
+          if (error) { console.error('[이력삭제 복구] 실패:', mem.sku, error); continue; }
+          if (typeof _logStockMove === 'function' && newStock - prev !== 0) _logStockMove({ productId: mem.id, sku: mem.sku, productName: mem.name, type: '편집수정', delta: newStock - prev, prevStock: prev, newStock, note: `'편집수정' 이력 삭제 — 재고 되돌림${members.length > 1 ? ` (그룹 ${members.length}개)` : ''}` });
+        } catch (e) { console.error('[이력삭제 복구] 예외:', mem.sku, e); }
+      }
+    }
+    if (typeof loadProductsFromDB === 'function') { try { await loadProductsFromDB(); } catch (_) {} }
+    if (typeof renderProducts === 'function') { try { renderProducts(); } catch (_) {} }
+  }
+
+  // 2) 선택한 이력 삭제 (위에서 추가한 '되돌림' 로그는 새 id 라 보존됨)
+  const all2 = (typeof _loadStockMoves === 'function') ? _loadStockMoves() : all;
+  const next = all2.filter(m => !ids.has(m.id));
   if (typeof _saveStockMoves === 'function') _saveStockMoves(next);
+
   // 모달 다시 열기
   const modal = document.getElementById('stock-move-modal');
   const productId = modal ? Number(modal.dataset.productId) : null;
