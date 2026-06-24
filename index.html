@@ -684,6 +684,7 @@ tailwind.config = {
         <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="normal" onclick="_goToProdTab('normal')">상품관리</a>
         <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="receive" onclick="_goToProdTab('receive')">입고하기</a>
         <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="import" onclick="_goToProdTab('import')">수입관리</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="impsaved" onclick="_goToProdTab('impsaved')">수입 저장내역</a>
       </div>
         <a href="#" data-page="accounts" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px] transition-colors">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -1250,6 +1251,7 @@ tailwind.config = {
         <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="normal" onclick="_goToProdTab('normal')">상품관리</a>
         <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="receive" onclick="_goToProdTab('receive')">입고하기</a>
         <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="import" onclick="_goToProdTab('import')">수입관리</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="impsaved" onclick="_goToProdTab('impsaved')">수입 저장내역</a>
       </div>
         <a href="#" data-page="accounts" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>계정 보관함</a>
         <a href="#" data-page="upload" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>장부 업로드</a>
@@ -1779,6 +1781,7 @@ tailwind.config = {
         <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="normal" onclick="_goToProdTab('normal')">상품관리</a>
         <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="receive" onclick="_goToProdTab('receive')">입고하기</a>
         <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="import" onclick="_goToProdTab('import')">수입관리</a>
+        <a class="nav-sub text-sm py-1 cursor-pointer" data-prod-tab="impsaved" onclick="_goToProdTab('impsaved')">수입 저장내역</a>
       </div>
         <a href="#" data-page="accounts" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>계정 보관함</a>
         <a href="#" data-page="upload" class="nav-item flex items-center gap-3.5 px-4 py-3.5 rounded-full font-medium text-[15px]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>장부 업로드</a>
@@ -2259,6 +2262,10 @@ tailwind.config = {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 7h18"/><path d="M6 12h12"/><path d="M9 17h6"/></svg>
               묶음 비용 배분
             </button>
+            <button onclick="saveImpSnapshot()" class="px-4 py-2 rounded-full bg-brand-blue text-white text-sm font-bold hover:opacity-90 flex items-center gap-1.5" title="현재 표(또는 체크한 행)를 저장내역으로 보관">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              저장
+            </button>
             <button onclick="addImpRow()" class="px-4 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333] flex items-center gap-1.5">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               새 행
@@ -2315,6 +2322,67 @@ tailwind.config = {
           </div>
         </section>
       </div><!-- /products-view-import -->
+
+      <!-- ───── 수입 저장내역 영역 ───── -->
+      <div id="products-view-impsaved" class="hidden flex flex-col gap-5 md:gap-6">
+        <section class="flex items-end justify-between flex-wrap gap-3">
+          <div>
+            <h1 class="text-[1.8rem] md:text-[2rem] font-bold tracking-tight">수입 저장내역 🗂️</h1>
+            <p class="text-brand-gray text-sm mt-1">수입관리에서 <b>저장</b>한 단가표 스냅샷입니다. 행을 클릭하면 그때의 표를 다시 볼 수 있어요.</p>
+          </div>
+        </section>
+        <!-- 저장 목록 -->
+        <section class="bg-white rounded-3xl panel overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm border-collapse">
+              <thead>
+                <tr class="bg-brand-bg">
+                  <th class="px-4 py-3 text-left font-bold border-b-2 border-brand-border">저장명</th>
+                  <th class="px-4 py-3 text-center font-bold border-b-2 border-brand-border w-[160px]">저장일시</th>
+                  <th class="px-4 py-3 text-right font-bold border-b-2 border-brand-border w-[90px]">품목수</th>
+                  <th class="px-4 py-3 text-right font-bold border-b-2 border-brand-border w-[120px]">총 수량</th>
+                  <th class="px-4 py-3 text-right font-bold border-b-2 border-brand-border w-[140px]">총 합계(원)</th>
+                  <th class="px-4 py-3 text-center font-bold border-b-2 border-brand-border w-[120px]">관리</th>
+                </tr>
+              </thead>
+              <tbody id="impsaved-tbody"></tbody>
+            </table>
+          </div>
+          <div id="impsaved-empty" class="text-center py-12 text-brand-gray text-sm hidden">저장된 내역이 없습니다. 수입관리에서 "저장"을 눌러 보관하세요.</div>
+        </section>
+        <!-- 상세 보기 -->
+        <section id="impsaved-detail" class="hidden bg-white rounded-3xl panel overflow-hidden">
+          <div class="flex items-center justify-between flex-wrap gap-2 px-4 py-3 border-b border-brand-border">
+            <h3 id="impsaved-detail-title" class="font-bold"></h3>
+            <div class="flex items-center gap-2">
+              <button onclick="exportImpSavedExcel()" class="px-3 py-1.5 rounded-full border border-brand-border text-xs font-bold hover:bg-brand-bg">엑셀 다운로드</button>
+              <button onclick="closeImpSavedDetail()" class="px-3 py-1.5 rounded-full border border-brand-border text-xs font-bold hover:bg-brand-bg">닫기</button>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm border-collapse">
+              <thead>
+                <tr class="bg-brand-bg text-xs">
+                  <th class="px-3 py-2.5 text-center font-bold border-b-2 border-brand-border">입항일</th>
+                  <th class="px-3 py-2.5 text-center font-bold border-b-2 border-brand-border">폴더코드</th>
+                  <th class="px-3 py-2.5 text-center font-bold border-b-2 border-brand-border">상품코드</th>
+                  <th class="px-3 py-2.5 text-center font-bold border-b-2 border-brand-border">중판코드</th>
+                  <th class="px-3 py-2.5 text-left font-bold border-b-2 border-brand-border">제품명</th>
+                  <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">위안화</th>
+                  <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">환율</th>
+                  <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">원화</th>
+                  <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">중판비용</th>
+                  <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">관세</th>
+                  <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">합계</th>
+                  <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">수량</th>
+                  <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">1개금액</th>
+                </tr>
+              </thead>
+              <tbody id="impsaved-detail-tbody"></tbody>
+            </table>
+          </div>
+        </section>
+      </div><!-- /products-view-impsaved -->
     </main>
   </div>
 </div>
@@ -9818,25 +9886,29 @@ function _saveSetProducts(list) {
 
 // 일반/세트 탭 전환
 function switchProductTab(which) {
-  // 'normal' | 'set' | 'receive' | 'stockvalue' | 'import'
-  const valid = ['normal','set','receive','stockvalue','import'];
+  // 'normal' | 'set' | 'receive' | 'stockvalue' | 'import' | 'impsaved'
+  const valid = ['normal','set','receive','stockvalue','import','impsaved'];
   _activeProductTab = valid.indexOf(which) !== -1 ? which : 'normal';
   const isImport = _activeProductTab === 'import';
+  const isImpSaved = _activeProductTab === 'impsaved';
+  const fullView = isImport || isImpSaved;   // 자체 헤더를 쓰는 풀뷰
   const vN = document.getElementById('products-view-normal');
   const vS = document.getElementById('products-view-set');
   const vR = document.getElementById('products-view-receive');
   const vV = document.getElementById('products-view-stockvalue');
   const vI = document.getElementById('products-view-import');
-  if (vN) vN.classList.toggle('hidden', isImport || _activeProductTab !== 'normal');
-  if (vS) vS.classList.toggle('hidden', isImport || _activeProductTab !== 'set');
-  if (vR) vR.classList.toggle('hidden', isImport || _activeProductTab !== 'receive');
-  if (vV) vV.classList.toggle('hidden', isImport || _activeProductTab !== 'stockvalue');
+  const vP = document.getElementById('products-view-impsaved');
+  if (vN) vN.classList.toggle('hidden', fullView || _activeProductTab !== 'normal');
+  if (vS) vS.classList.toggle('hidden', fullView || _activeProductTab !== 'set');
+  if (vR) vR.classList.toggle('hidden', fullView || _activeProductTab !== 'receive');
+  if (vV) vV.classList.toggle('hidden', fullView || _activeProductTab !== 'stockvalue');
   if (vI) vI.classList.toggle('hidden', !isImport);
-  // 수입관리 모드면 상품관리의 헤더(제목·이카운트·플레이오토·엑셀·중복정리·안전재고 버튼)와 4탭 바 숨김
+  if (vP) vP.classList.toggle('hidden', !isImpSaved);
+  // 수입관리/저장내역 모드면 상품관리의 헤더와 4탭 바 숨김
   const hdr = document.getElementById('prod-header-section');
   const tabBar = document.getElementById('prod-tab-bar');
-  if (hdr)    hdr.classList.toggle('hidden', isImport);
-  if (tabBar) tabBar.classList.toggle('hidden', isImport);
+  if (hdr)    hdr.classList.toggle('hidden', fullView);
+  if (tabBar) tabBar.classList.toggle('hidden', fullView);
   const tabs = [
     { btn: 'prod-tab-normal',     active: _activeProductTab === 'normal' },
     { btn: 'prod-tab-set',        active: _activeProductTab === 'set' },
@@ -9854,8 +9926,9 @@ function switchProductTab(which) {
   if (_activeProductTab === 'receive') _initReceivingTab();
   if (_activeProductTab === 'stockvalue') renderStockValueView();
   if (_activeProductTab === 'import') renderImpTab();
-  // 사이드바 하위 메뉴 활성 표시 동기화 — 입고하기/수입관리는 자기 항목, 그 외(일반/세트/재고금액)는 상품관리
-  const sidebarTab = isImport ? 'import' : (_activeProductTab === 'receive' ? 'receive' : 'normal');
+  if (_activeProductTab === 'impsaved') renderImpSavedTab();
+  // 사이드바 하위 메뉴 활성 표시 동기화
+  const sidebarTab = isImpSaved ? 'impsaved' : (isImport ? 'import' : (_activeProductTab === 'receive' ? 'receive' : 'normal'));
   document.querySelectorAll('[data-prod-tab]').forEach(a => a.classList.toggle('active', a.dataset.prodTab === sidebarTab));
 }
 
@@ -10128,6 +10201,139 @@ function applyImpGroupCost() {
         (vendor ? `\n· 중판코드 ${vendor}` : '') +
         (feeAlloc ? `\n· 총 중판비용 ${_impFmt(totFee)}원 (원화 비율 배분)` : '') +
         (taxAlloc ? `\n· 총 관세 ${_impFmt(totTax)}원 (원화 비율 배분)` : ''));
+}
+
+// ── 수입 저장내역 (단가표 스냅샷) ─────────────────────────────
+const IMP_SAVED_KEY = 'gplan_import_saved_v1';
+function _impLoadSaved() {
+  try { const a = JSON.parse(localStorage.getItem(IMP_SAVED_KEY) || '[]'); return Array.isArray(a) ? a : []; }
+  catch (_) { return []; }
+}
+function _impSaveSaved(list) {
+  try { localStorage.setItem(IMP_SAVED_KEY, JSON.stringify(list)); } catch (e) { alert('저장 실패: ' + (e.message || e)); }
+}
+function _impNowStamp() {
+  const t = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `${t.getFullYear()}.${p(t.getMonth()+1)}.${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}`;
+}
+// 현재 수입관리 표(또는 체크한 행)를 저장
+function saveImpSnapshot() {
+  _impLoad();
+  const checked = _impSelectedIds();
+  const src = checked.length ? _impState.rows.filter(r => checked.includes(r.id)) : _impState.rows;
+  if (!src.length) { alert('저장할 행이 없습니다.'); return; }
+  const dflt = `${_impTodayStr()} 수입 (${src.length}품목)`;
+  const name = prompt(`저장명을 입력하세요.\n(체크한 ${checked.length ? checked.length + '개 행' : '전체'} 저장)`, dflt);
+  if (name == null) return;
+  const rows = src.map(r => ({
+    date: r.date || '', folder: r.folder || '', code: r.code || '', vendorCode: r.vendorCode || '',
+    name: r.name || '', cny: Number(r.cny) || 0, rate: Number(r.rate) || 0,
+    fee: Number(r.fee) || 0, tax: Number(r.tax) || 0, qty: Number(r.qty) || 0,
+  }));
+  const list = _impLoadSaved();
+  list.unshift({ id: 'imps_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: String(name).trim() || dflt, savedAt: _impNowStamp(), rows });
+  _impSaveSaved(list);
+  alert(`✅ 저장완료 — "${String(name).trim() || dflt}" (${rows.length}품목)\n좌측 "수입 저장내역"에서 볼 수 있습니다.`);
+}
+function _impSavedTotals(rec) {
+  let qty = 0, total = 0;
+  (rec.rows || []).forEach(r => {
+    const krw = (Number(r.cny) || 0) * (Number(r.rate) || 0);
+    total += krw + (Number(r.fee) || 0) + (Number(r.tax) || 0);
+    qty += Number(r.qty) || 0;
+  });
+  return { qty, total, count: (rec.rows || []).length };
+}
+function renderImpSavedTab() {
+  const tbody = document.getElementById('impsaved-tbody');
+  const empty = document.getElementById('impsaved-empty');
+  const list = _impLoadSaved();
+  closeImpSavedDetail();
+  if (!list.length) { if (tbody) tbody.innerHTML = ''; if (empty) empty.classList.remove('hidden'); return; }
+  if (empty) empty.classList.add('hidden');
+  tbody.innerHTML = list.map(rec => {
+    const t = _impSavedTotals(rec);
+    return `<tr class="border-b border-brand-border hover:bg-brand-bg/40">
+      <td class="px-4 py-2.5 font-semibold cursor-pointer" onclick="viewImpSaved('${rec.id}')">${_impEsc(rec.name)}</td>
+      <td class="px-4 py-2.5 text-center text-xs text-brand-gray">${_impEsc(rec.savedAt)}</td>
+      <td class="px-4 py-2.5 text-right">${_impFmt(t.count)}</td>
+      <td class="px-4 py-2.5 text-right">${_impFmt(t.qty)}</td>
+      <td class="px-4 py-2.5 text-right font-bold">${_impFmt(t.total)}</td>
+      <td class="px-4 py-2.5 text-center whitespace-nowrap">
+        <button onclick="viewImpSaved('${rec.id}')" class="px-2.5 py-1 rounded-full bg-brand-blue-light text-brand-blue text-[11px] font-bold hover:opacity-80">보기</button>
+        <button onclick="deleteImpSaved('${rec.id}')" class="ml-1 text-brand-gray hover:text-brand-pink text-base leading-none align-middle" title="삭제">×</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+let _impSavedViewId = null;
+function viewImpSaved(id) {
+  const rec = _impLoadSaved().find(r => r.id === id);
+  if (!rec) return;
+  _impSavedViewId = id;
+  const sec = document.getElementById('impsaved-detail');
+  document.getElementById('impsaved-detail-title').textContent = `${rec.name}  ·  ${rec.savedAt}`;
+  const tb = document.getElementById('impsaved-detail-tbody');
+  let sCny = 0, sKrw = 0, sFee = 0, sTax = 0, sTot = 0, sQty = 0;
+  tb.innerHTML = (rec.rows || []).map(r => {
+    const cny = Number(r.cny) || 0, rate = Number(r.rate) || 0, krw = cny * rate;
+    const fee = Number(r.fee) || 0, tax = Number(r.tax) || 0, total = krw + fee + tax;
+    const qty = Number(r.qty) || 0, unit = qty > 0 ? total / qty : 0;
+    sCny += cny; sKrw += krw; sFee += fee; sTax += tax; sTot += total; sQty += qty;
+    return `<tr class="border-b border-brand-border">
+      <td class="px-3 py-1.5 text-center text-xs">${_impEsc(r.date)}</td>
+      <td class="px-3 py-1.5 text-center text-xs font-mono">${_impEsc(r.folder)}</td>
+      <td class="px-3 py-1.5 text-center text-xs font-mono">${_impEsc(r.code)}</td>
+      <td class="px-3 py-1.5 text-center text-xs font-mono">${_impEsc(r.vendorCode)}</td>
+      <td class="px-3 py-1.5 text-sm font-semibold">${_impEsc(r.name)}</td>
+      <td class="px-3 py-1.5 text-right text-sm">${cny ? _impFmt(cny) : ''}</td>
+      <td class="px-3 py-1.5 text-right text-xs text-brand-gray">${rate ? _impFmt(rate) : ''}</td>
+      <td class="px-3 py-1.5 text-right text-sm">${_impFmt(krw)}</td>
+      <td class="px-3 py-1.5 text-right text-sm">${_impFmt(fee)}</td>
+      <td class="px-3 py-1.5 text-right text-sm">${_impFmt(tax)}</td>
+      <td class="px-3 py-1.5 text-right text-sm font-bold">${_impFmt(total)}</td>
+      <td class="px-3 py-1.5 text-right text-sm">${qty ? _impFmt(qty) : ''}</td>
+      <td class="px-3 py-1.5 text-right text-sm text-brand-pink font-bold">${_impFmt(unit)}</td>
+    </tr>`;
+  }).join('') + `<tr class="bg-brand-bg/50 font-bold">
+      <td colspan="5" class="px-3 py-2 text-right text-brand-gray text-xs">합계</td>
+      <td class="px-3 py-2 text-right">${_impFmt(sCny)}</td><td></td>
+      <td class="px-3 py-2 text-right">${_impFmt(sKrw)}</td>
+      <td class="px-3 py-2 text-right">${_impFmt(sFee)}</td>
+      <td class="px-3 py-2 text-right">${_impFmt(sTax)}</td>
+      <td class="px-3 py-2 text-right">${_impFmt(sTot)}</td>
+      <td class="px-3 py-2 text-right">${_impFmt(sQty)}</td><td></td>
+    </tr>`;
+  sec.classList.remove('hidden');
+  sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function closeImpSavedDetail() {
+  _impSavedViewId = null;
+  const sec = document.getElementById('impsaved-detail');
+  if (sec) sec.classList.add('hidden');
+}
+function deleteImpSaved(id) {
+  if (!confirm('이 저장내역을 삭제할까요?')) return;
+  _impSaveSaved(_impLoadSaved().filter(r => r.id !== id));
+  if (_impSavedViewId === id) closeImpSavedDetail();
+  renderImpSavedTab();
+}
+function exportImpSavedExcel() {
+  const rec = _impLoadSaved().find(r => r.id === _impSavedViewId);
+  if (!rec) { alert('먼저 저장내역을 선택하세요.'); return; }
+  if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 로드 실패'); return; }
+  const head = ['입항일','폴더코드','상품코드','중판코드','제품명','위안화','환율','원화','중판비용','관세','합계','수량','1개금액'];
+  const aoa = [head];
+  (rec.rows || []).forEach(r => {
+    const cny = Number(r.cny) || 0, rate = Number(r.rate) || 0, krw = cny * rate;
+    const fee = Number(r.fee) || 0, tax = Number(r.tax) || 0, total = krw + fee + tax;
+    const qty = Number(r.qty) || 0, unit = qty > 0 ? Math.round(total / qty) : 0;
+    aoa.push([r.date, r.folder, r.code, r.vendorCode, r.name, cny, rate, Math.round(krw), fee, tax, Math.round(total), qty, unit]);
+  });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), '수입단가표');
+  XLSX.writeFile(wb, `수입저장_${rec.name}.xlsx`);
 }
 
 // ── 송금/환율 저장 이력 ─────────────────────────────
