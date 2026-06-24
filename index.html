@@ -2324,6 +2324,8 @@ tailwind.config = {
   <div class="todo-modal" style="max-width:420px;padding:24px;">
     <h3 class="text-lg font-bold mb-1">묶음 비용 배분 📦</h3>
     <p id="imp-gc-count" class="text-brand-gray text-sm mb-4"></p>
+    <label class="block text-sm font-bold mb-1">중판코드 <span class="text-brand-gray font-normal">(선택 — 입력 시 묶음 전체에 적용)</span></label>
+    <input id="imp-gc-vendor" type="text" placeholder="예) 2606010060" class="w-full mb-3 px-3 py-2 rounded-xl border border-brand-border focus:outline-none focus:border-brand-black font-mono">
     <label class="block text-sm font-bold mb-1">총 중판비용 (원)</label>
     <input id="imp-gc-fee" type="text" inputmode="numeric" placeholder="0" class="w-full mb-3 px-3 py-2 rounded-xl border border-brand-border focus:outline-none focus:border-brand-black text-right">
     <label class="block text-sm font-bold mb-1">총 관세 (원)</label>
@@ -10083,6 +10085,9 @@ function openImpGroupCostModal() {
   document.getElementById('imp-gc-count').textContent = `선택 ${rows.length}개 · 원화 합계 ${_impFmt(sumKrw)}원`;
   document.getElementById('imp-gc-fee').value = '';
   document.getElementById('imp-gc-tax').value = '';
+  // 중판코드 — 선택 행이 모두 같은 코드면 미리 채움, 아니면 빈칸
+  const vendors = new Set(rows.map(r => String(r.vendorCode || '').trim()).filter(Boolean));
+  document.getElementById('imp-gc-vendor').value = vendors.size === 1 ? [...vendors][0] : '';
   document.getElementById('imp-gc-backdrop').classList.add('open');
 }
 function closeImpGroupCostModal() {
@@ -10095,7 +10100,8 @@ function applyImpGroupCost() {
   const rows = _impState.rows.filter(r => ids.includes(r.id));
   const totFee = _impAmtParse(document.getElementById('imp-gc-fee').value);
   const totTax = _impAmtParse(document.getElementById('imp-gc-tax').value);
-  if (totFee <= 0 && totTax <= 0) { alert('총 중판비용 또는 총 관세를 입력하세요.'); return; }
+  const vendor = document.getElementById('imp-gc-vendor').value.trim();
+  if (totFee <= 0 && totTax <= 0 && !vendor) { alert('중판코드 또는 총 중판비용·관세를 입력하세요.'); return; }
   const krwArr = rows.map(_impRowKrw);
   const sumKrw = krwArr.reduce((a, b) => a + b, 0);
   // 원화 비율 배분 (합계 0이면 균등). 반올림 오차는 마지막 행에서 보정.
@@ -10111,15 +10117,17 @@ function applyImpGroupCost() {
   };
   const feeAlloc = alloc(totFee), taxAlloc = alloc(totTax);
   rows.forEach((r, i) => {
+    if (vendor) r.vendorCode = vendor;
     if (feeAlloc) r.fee = feeAlloc[i];
     if (taxAlloc) r.tax = taxAlloc[i];
   });
   _impSave();
   closeImpGroupCostModal();
   renderImpTab();
-  alert(`✅ ${rows.length}개 상품에 원화 비율로 배분 완료` +
-        (feeAlloc ? `\n· 총 중판비용 ${_impFmt(totFee)}원` : '') +
-        (taxAlloc ? `\n· 총 관세 ${_impFmt(totTax)}원` : ''));
+  alert(`✅ ${rows.length}개 상품에 적용 완료` +
+        (vendor ? `\n· 중판코드 ${vendor}` : '') +
+        (feeAlloc ? `\n· 총 중판비용 ${_impFmt(totFee)}원 (원화 비율 배분)` : '') +
+        (taxAlloc ? `\n· 총 관세 ${_impFmt(totTax)}원 (원화 비율 배분)` : ''));
 }
 
 // ── 송금/환율 저장 이력 ─────────────────────────────
