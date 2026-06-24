@@ -2284,7 +2284,6 @@ tailwind.config = {
               <thead>
                 <tr class="bg-brand-bg">
                   <th class="px-2 py-3 text-center border-b-2 border-brand-border w-[36px]"><input type="checkbox" id="imp-select-all" onchange="_impToggleSelectAll(this.checked)" title="전체 선택"></th>
-                  <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[110px]">합계</th>
                   <th class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[110px]">입항일</th>
                   <th class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[90px]">폴더코드</th>
                   <th class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[100px]">상품코드</th>
@@ -2297,6 +2296,7 @@ tailwind.config = {
                   <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[90px]">관세</th>
                   <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[70px]">수량</th>
                   <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[90px]">1개금액</th>
+                  <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[110px]">합계</th>
                   <th class="px-3 py-3 text-center border-b-2 border-brand-border w-[40px]"></th>
                 </tr>
               </thead>
@@ -2304,8 +2304,7 @@ tailwind.config = {
               <tfoot>
                 <tr class="bg-brand-bg/50 font-bold">
                   <td class="px-3 py-2.5"></td>
-                  <td class="px-3 py-2.5 text-right" id="imp-sum-total">0</td>
-                  <td colspan="5" class="px-3 py-2.5 text-right text-brand-gray text-xs">합계</td>
+                  <td colspan="5" class="px-3 py-2.5 text-left text-brand-gray text-xs">합계</td>
                   <td class="px-3 py-2.5"></td>
                   <td class="px-3 py-2.5 text-right" id="imp-sum-cny">0</td>
                   <td class="px-3 py-2.5 text-right" id="imp-sum-krw">0</td>
@@ -2313,6 +2312,7 @@ tailwind.config = {
                   <td class="px-3 py-2.5 text-right" id="imp-sum-tax">0</td>
                   <td class="px-3 py-2.5 text-right" id="imp-sum-qty">0</td>
                   <td class="px-3 py-2.5"></td>
+                  <td class="px-3 py-2.5 text-right" id="imp-sum-total">0</td>
                   <td></td>
                 </tr>
               </tfoot>
@@ -2364,7 +2364,6 @@ tailwind.config = {
             <table class="w-full text-sm border-collapse">
               <thead>
                 <tr class="bg-brand-bg text-xs">
-                  <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">합계</th>
                   <th class="px-3 py-2.5 text-center font-bold border-b-2 border-brand-border">입항일</th>
                   <th class="px-3 py-2.5 text-center font-bold border-b-2 border-brand-border">폴더코드</th>
                   <th class="px-3 py-2.5 text-center font-bold border-b-2 border-brand-border">상품코드</th>
@@ -2377,6 +2376,7 @@ tailwind.config = {
                   <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">관세</th>
                   <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">수량</th>
                   <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">1개금액</th>
+                  <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">합계</th>
                 </tr>
               </thead>
               <tbody id="impsaved-detail-tbody"></tbody>
@@ -10102,7 +10102,6 @@ function renderImpTab() {
       const rateCellCls = rateDiff ? 'text-brand-orange' : 'text-brand-gray';
       return `<tr class="border-b border-brand-border hover:bg-brand-bg/40" data-id="${r.id}">
         <td class="px-2 py-1 text-center"><input type="checkbox" class="imp-row-cb" data-id="${r.id}" ${_impSelected.has(r.id) ? 'checked' : ''} onchange="_impOnRowCheck('${r.id}',this.checked)"></td>
-        <td class="px-3 py-1 text-right text-sm font-bold">${_impFmt(total)}</td>
         <td class="px-1 py-1"><input type="text" value="${_impEsc(r.date)}" onchange="_onImpEdit('${r.id}','date',this.value)" class="${inp} text-xs text-center"></td>
         <td class="px-1 py-1"><input type="text" value="${_impEsc(r.folder)}" onchange="_onImpEdit('${r.id}','folder',this.value)" class="${inp} text-xs font-mono text-center" placeholder="폴더"></td>
         <td class="px-1 py-1"><input type="text" value="${_impEsc(r.code)}" onchange="_onImpEdit('${r.id}','code',this.value)" class="${inp} text-xs font-mono text-center" placeholder="상품코드"></td>
@@ -10118,6 +10117,7 @@ function renderImpTab() {
         <td class="px-1 py-1"><input type="number" value="${tax || ''}" onchange="_onImpEdit('${r.id}','tax',this.value)" class="${inp} text-sm text-right"></td>
         <td class="px-1 py-1"><input type="number" value="${qty || ''}" onchange="_onImpEdit('${r.id}','qty',this.value)" class="${inp} text-sm text-right"></td>
         <td class="px-3 py-1 text-right text-sm text-brand-pink font-bold">${_impFmt(unit)}</td>
+        <td class="px-3 py-1 text-right text-sm font-bold">${_impFmt(total)}</td>
         <td class="px-1 py-1 text-center"><button onclick="deleteImpRow('${r.id}')" title="삭제" class="text-brand-gray hover:text-brand-pink text-lg leading-none">×</button></td>
       </tr>`;
     }).join('');
@@ -10312,7 +10312,6 @@ function viewImpSaved(id) {
     const qty = Number(r.qty) || 0, unit = qty > 0 ? total / qty : 0;
     sCny += cny; sKrw += krw; sFee += fee; sTax += tax; sTot += total; sQty += qty;
     return `<tr class="border-b border-brand-border">
-      <td class="px-3 py-1.5 text-right text-sm font-bold">${_impFmt(total)}</td>
       <td class="px-3 py-1.5 text-center text-xs">${_impEsc(r.date)}</td>
       <td class="px-3 py-1.5 text-center text-xs font-mono">${_impEsc(r.folder)}</td>
       <td class="px-3 py-1.5 text-center text-xs font-mono">${_impEsc(r.code)}</td>
@@ -10325,16 +10324,17 @@ function viewImpSaved(id) {
       <td class="px-3 py-1.5 text-right text-sm">${_impFmt(tax)}</td>
       <td class="px-3 py-1.5 text-right text-sm">${qty ? _impFmt(qty) : ''}</td>
       <td class="px-3 py-1.5 text-right text-sm text-brand-pink font-bold">${_impFmt(unit)}</td>
+      <td class="px-3 py-1.5 text-right text-sm font-bold">${_impFmt(total)}</td>
     </tr>`;
   }).join('') + `<tr class="bg-brand-bg/50 font-bold">
-      <td class="px-3 py-2 text-right">${_impFmt(sTot)}</td>
-      <td colspan="5" class="px-3 py-2 text-right text-brand-gray text-xs">합계</td>
+      <td colspan="5" class="px-3 py-2 text-left text-brand-gray text-xs">합계</td>
       <td></td>
       <td class="px-3 py-2 text-right">${_impFmt(sCny)}</td>
       <td class="px-3 py-2 text-right">${_impFmt(sKrw)}</td>
       <td class="px-3 py-2 text-right">${_impFmt(sFee)}</td>
       <td class="px-3 py-2 text-right">${_impFmt(sTax)}</td>
       <td class="px-3 py-2 text-right">${_impFmt(sQty)}</td><td></td>
+      <td class="px-3 py-2 text-right">${_impFmt(sTot)}</td>
     </tr>`;
   sec.classList.remove('hidden');
   sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -10354,13 +10354,13 @@ function exportImpSavedExcel() {
   const rec = _impLoadSaved().find(r => r.id === _impSavedViewId);
   if (!rec) { alert('먼저 저장내역을 선택하세요.'); return; }
   if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 로드 실패'); return; }
-  const head = ['합계','입항일','폴더코드','상품코드','중판코드','제품명','환율','위안화','원화','중판비용','관세','수량','1개금액'];
+  const head = ['입항일','폴더코드','상품코드','중판코드','제품명','환율','위안화','원화','중판비용','관세','수량','1개금액','합계'];
   const aoa = [head];
   (rec.rows || []).forEach(r => {
     const cny = Number(r.cny) || 0, rate = Math.round(Number(r.rate) || 0), krw = cny * rate;
     const fee = Number(r.fee) || 0, tax = Number(r.tax) || 0, total = krw + fee + tax;
     const qty = Number(r.qty) || 0, unit = qty > 0 ? Math.round(total / qty) : 0;
-    aoa.push([Math.round(total), r.date, r.folder, r.code, r.vendorCode, r.name, rate, cny, Math.round(krw), fee, tax, qty, unit]);
+    aoa.push([r.date, r.folder, r.code, r.vendorCode, r.name, rate, cny, Math.round(krw), fee, tax, qty, unit, Math.round(total)]);
   });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), '수입단가표');
@@ -10511,7 +10511,7 @@ function deleteImpRow(id) {
 async function exportImpExcel() {
   _impLoad();
   _impMigrateRows();
-  const headers = ['합계','입항일','폴더코드','상품코드','중판코드','제품명','환율(1위안)','위안화','원화','중판비용','관세','수량','1개금액'];
+  const headers = ['입항일','폴더코드','상품코드','중판코드','제품명','환율(1위안)','위안화','원화','중판비용','관세','수량','1개금액','합계'];
   const rows = _impState.rows.map(r => {
     const cny = Number(r.cny) || 0;
     const rowRate = Math.round(Number(r.rate) || 0);
@@ -10521,7 +10521,7 @@ async function exportImpExcel() {
     const total = krw + fee + tax;
     const qty = Number(r.qty) || 0;
     const unit = qty > 0 ? total / qty : 0;
-    return [Math.round(total), r.date, r.folder || '', r.code, r.vendorCode || '', r.name, rowRate, cny, Math.round(krw), fee, tax, qty, Math.round(unit)];
+    return [r.date, r.folder || '', r.code, r.vendorCode || '', r.name, rowRate, cny, Math.round(krw), fee, tax, qty, Math.round(unit), Math.round(total)];
   });
   const aoa = [
     ['현재 원화', _impState.krw],
