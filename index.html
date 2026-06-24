@@ -10388,17 +10388,66 @@ async function sendImpSavedToReceiving(id) {
   const rows = (rec.rows || []).filter(r => (Number(r.qty) || 0) > 0);
   if (!rows.length) { showAppAlert('입고 불가', '수량이 입력된 행이 없습니다.', 'warn'); return; }
   const warnReceived = rec.received ? '\n\n⚠ 이미 입고 처리된 내역입니다. 다시 보내면 재고가 또 늘어납니다.' : '';
-  if (!confirm(`"${rec.name}" 의 ${rows.length}개 품목을 입고 처리할까요?\n· 상품코드(SKU)로 재고가 늘어나고 원가가 가중평균으로 갱신됩니다.\n· 단가 = 1개금액(원), 수량 = 저장된 수량${warnReceived}`)) return;
+  if (!confirm(`"${rec.name}" 의 ${rows.length}개 품목을 입고 처리할까요?\n· 상품코드(SKU)로 재고가 늘고 원가가 가중평균으로 갱신됩니다.\n· 등록되지 않은 상품은 자동으로 새 상품으로 등록됩니다.\n· 단가 = 1개금액(원), 수량 = 저장된 수량${warnReceived}`)) return;
+  const { data: { session } } = await _supabase.auth.getSession();
+  if (!session) { showAppAlert('로그인 필요', '다시 로그인 후 시도해 주세요.', 'error'); return; }
   const today = (() => { const t = new Date(); return t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0'); })();
-  let done = 0; const skipped = [];
+  const anyBySku = (code) => { const c = String(code || '').trim().toLowerCase(); if (!c) return null; return (Array.isArray(_allProducts) ? _allProducts : []).find(p => String(p.sku || '').trim().toLowerCase() === c) || null; };
+  const createdBySku = new Map();   // 이번 처리 중 새로 만든 상품(같은 코드 중복 행 대비)
+  let done = 0, registered = 0; const skipped = [];
   for (const r of rows) {
-    const product = _rcvFindProduct(r.code) || _rcvFindProduct(r.name);
-    if (!product) { skipped.push(`${r.code || r.name}: 상품 없음`); continue; }
     const qty = Number(r.qty) || 0;
     const rate = Math.round(Number(r.rate) || 0);
     const total = (Number(r.cny) || 0) * rate + (Number(r.fee) || 0) + (Number(r.tax) || 0);
     const unit = qty > 0 ? Math.round(total / qty) : 0;
     if (qty <= 0 || unit <= 0) { skipped.push(`${r.code || r.name}: 수량/단가 0`); continue; }
+    const skuKey = String(r.code || '').trim().toLowerCase();
+    let product = (skuKey && createdBySku.get(skuKey)) || _rcvFindProduct(r.code) || _rcvFindProduct(r.name) || anyBySku(r.code);
+
+    // ── 상품이 없으면 신규 등록 후 입고 ──
+    if (!product) {
+      if (!skuKey) { skipped.push(`${r.name || '(이름없음)'}: 상품코드 없음 — 등록 불가`); continue; }
+      const newRow = {
+        user_id: session.user.id, name: r.name || r.code, sku: r.code, category: '지플랜',
+        stock: qty, safety_stock: 0, cost: unit, supply_price: 0, shipping_fee: 0, shipping_cost: 0,
+        folder_code: r.folder || '',
+      };
+      let created = null;
+      try {
+        const { data, error } = await _supabase.from('products').insert(newRow).select().single();
+        if (error) throw error;
+        created = data;
+      } catch (e) {
+        // folder_code 등 없는 컬럼이면 빼고 재시도
+        try {
+          const { folder_code, ...slim } = newRow;
+          const { data, error } = await _supabase.from('products').insert(slim).select().single();
+          if (error) throw error;
+          created = data;
+        } catch (e2) { skipped.push(`${r.code || r.name}: 등록오류 ${(e2.message || e2).toString().slice(0,40)}`); continue; }
+      }
+      createdBySku.set(skuKey, created);
+      try {
+        if (typeof _logStockMove === 'function') _logStockMove({
+          productId: created.id, sku: r.code, productName: newRow.name,
+          type: '입고', delta: qty, prevStock: 0, newStock: qty,
+          note: `수입저장 "${rec.name}" 신규등록+입고, 단가 ${unit.toLocaleString('ko-KR')}원`
+        });
+      } catch (_) {}
+      const histN = _loadReceivingHistory();
+      histN.unshift({
+        id: Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+        date: r.date || today, sku: r.code, productId: created.id, productName: newRow.name,
+        qty, unitPrice: unit, total: qty * unit, memo: `수입저장 ${rec.name} (신규등록)`,
+        prevStock: 0, newStock: qty, prevCost: 0, newCost: unit, inboundUnit: unit, createdAt: new Date().toISOString(),
+      });
+      if (histN.length > 10000) histN.length = 10000;
+      _saveReceivingHistory(histN);
+      registered++; done++;
+      continue;
+    }
+
+    // ── 기존 상품 입고 (가중평균) ──
     const prevStock = Number(product.stock) || 0, prevCost = Number(product.cost) || 0;
     const newStock = prevStock + qty;
     const avgCost = newStock > 0 ? Math.round((prevStock * prevCost + qty * unit) / newStock) : unit;
@@ -10407,6 +10456,7 @@ async function sendImpSavedToReceiving(id) {
       if (error) throw error;
     } catch (e) { skipped.push(`${r.code || r.name}: 저장오류`); continue; }
     try { await _syncLinkedFields(product.id, { stock: newStock, cost: avgCost }); } catch (_) {}
+    if (skuKey && createdBySku.has(skuKey)) { const c = createdBySku.get(skuKey); c.stock = newStock; c.cost = avgCost; }
     try {
       if (typeof _logStockMove === 'function') _logStockMove({
         productId: product.id, sku: product.sku, productName: product.name,
@@ -10430,7 +10480,8 @@ async function sendImpSavedToReceiving(id) {
   await loadProductsFromDB();
   renderImpSavedTab();
   showAppAlert('입고 처리 완료',
-    `${done}개 품목 입고 완료.` + (skipped.length ? `\n\n건너뜀 ${skipped.length}건:\n${skipped.slice(0, 12).join('\n')}` : ''),
+    `${done}개 품목 입고 완료` + (registered ? ` (신규등록 ${registered}건 포함)` : '') + '.' +
+    (skipped.length ? `\n\n건너뜀 ${skipped.length}건:\n${skipped.slice(0, 12).join('\n')}` : ''),
     skipped.length ? 'warn' : 'success');
 }
 
