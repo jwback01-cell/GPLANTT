@@ -2187,21 +2187,21 @@ tailwind.config = {
           <div class="bg-white p-4 md:p-5 rounded-3xl panel">
             <div class="text-brand-gray text-xs font-medium mb-2">원화 (입금/송금)</div>
             <div class="flex items-baseline gap-1">
-              <input id="imp-krw" type="number" oninput="_impRecalcAll()" class="bg-brand-bg border border-brand-border focus:border-brand-black focus:bg-white rounded-xl px-3 py-2 text-lg md:text-xl font-bold tracking-tight focus:outline-none w-full placeholder:text-brand-gray/40 placeholder:font-normal" placeholder="0">
+              <input id="imp-krw" type="text" inputmode="numeric" oninput="_impAmtInput(this,'krw')" onblur="_impAmtBlur(this,'krw')" onfocus="_impAmtFocus(this)" class="bg-brand-bg border border-brand-border focus:border-brand-black focus:bg-white rounded-xl px-3 py-2 text-lg md:text-xl font-bold tracking-tight focus:outline-none w-full placeholder:text-brand-gray/40 placeholder:font-normal" placeholder="0">
               <span class="text-brand-gray text-xs shrink-0">원</span>
             </div>
           </div>
           <div class="bg-white p-4 md:p-5 rounded-3xl panel">
             <div class="text-brand-gray text-xs font-medium mb-2">중판수수료</div>
             <div class="flex items-baseline gap-1">
-              <input id="imp-feekrw" type="number" oninput="_impRecalcAll()" class="bg-brand-bg border border-brand-border focus:border-brand-black focus:bg-white rounded-xl px-3 py-2 text-lg md:text-xl font-bold tracking-tight focus:outline-none w-full placeholder:text-brand-gray/40 placeholder:font-normal" placeholder="0">
+              <input id="imp-feekrw" type="text" inputmode="numeric" oninput="_impAmtInput(this,'fee')" onblur="_impAmtBlur(this,'fee')" onfocus="_impAmtFocus(this)" class="bg-brand-bg border border-brand-border focus:border-brand-black focus:bg-white rounded-xl px-3 py-2 text-lg md:text-xl font-bold tracking-tight focus:outline-none w-full placeholder:text-brand-gray/40 placeholder:font-normal" placeholder="0">
               <span class="text-brand-gray text-xs shrink-0">원</span>
             </div>
           </div>
           <div class="bg-white p-4 md:p-5 rounded-3xl panel">
             <div class="text-brand-gray text-xs font-medium mb-2">충전위안화</div>
             <div class="flex items-baseline gap-1">
-              <input id="imp-cny" type="number" step="0.01" oninput="_impRecalcAll()" class="bg-brand-bg border border-brand-border focus:border-brand-black focus:bg-white rounded-xl px-3 py-2 text-lg md:text-xl font-bold tracking-tight focus:outline-none w-full placeholder:text-brand-gray/40 placeholder:font-normal" placeholder="0">
+              <input id="imp-cny" type="text" inputmode="decimal" oninput="_impAmtInput(this,'cny')" onblur="_impAmtBlur(this,'cny')" onfocus="_impAmtFocus(this)" class="bg-brand-bg border border-brand-border focus:border-brand-black focus:bg-white rounded-xl px-3 py-2 text-lg md:text-xl font-bold tracking-tight focus:outline-none w-full placeholder:text-brand-gray/40 placeholder:font-normal" placeholder="0">
               <span class="text-brand-gray text-xs shrink-0">위안</span>
             </div>
           </div>
@@ -2213,6 +2213,33 @@ tailwind.config = {
             </div>
             <div class="text-[10px] text-brand-gray mt-1">= (원화 + 충판수수료) ÷ 충전위안화</div>
           </div>
+        </section>
+
+        <!-- 송금/환율 저장 이력 -->
+        <section class="bg-white rounded-3xl panel p-4 md:p-5">
+          <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div class="font-bold text-sm">💱 송금 / 환율 저장 이력
+              <span class="text-brand-gray font-normal text-[11px]">— 송금할 때마다 위 금액을 저장하면 날짜와 함께 기록됩니다. [적용]을 누르면 그 환율로 새 입항 행을 계산합니다.</span>
+            </div>
+            <button onclick="saveImpRemit()" class="px-3 py-1.5 rounded-full bg-brand-blue text-white text-xs font-bold hover:opacity-90 flex items-center gap-1.5 shrink-0">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              현재 금액 저장
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm border-collapse">
+              <thead><tr class="bg-brand-bg text-xs">
+                <th class="px-3 py-2 text-center font-bold border-b border-brand-border w-[120px]">저장일</th>
+                <th class="px-3 py-2 text-right font-bold border-b border-brand-border">원화 (송금)</th>
+                <th class="px-3 py-2 text-right font-bold border-b border-brand-border">충판수수료</th>
+                <th class="px-3 py-2 text-right font-bold border-b border-brand-border">충전위안화</th>
+                <th class="px-3 py-2 text-right font-bold border-b border-brand-border">1위안 환율</th>
+                <th class="px-3 py-2 text-center font-bold border-b border-brand-border w-[120px]"></th>
+              </tr></thead>
+              <tbody id="imp-remit-tbody"></tbody>
+            </table>
+          </div>
+          <div id="imp-remit-empty" class="text-center text-brand-gray text-xs py-4 hidden">저장된 송금 내역이 없습니다. 위 금액 입력 후 "현재 금액 저장"을 누르세요.</div>
         </section>
 
         <!-- 액션 -->
@@ -9810,9 +9837,33 @@ let _impState = null;   // { krw, feeKrw, cny, rows: [...] }
 function _impLoad() {
   try { _impState = JSON.parse(localStorage.getItem(IMP_LS_KEY) || 'null'); } catch (_) { _impState = null; }
   if (!_impState || typeof _impState !== 'object') {
-    _impState = { krw: 0, feeKrw: 0, cny: 0, rows: [] };
+    _impState = { krw: 0, feeKrw: 0, cny: 0, rows: [], remits: [] };
   }
   if (!Array.isArray(_impState.rows)) _impState.rows = [];
+  if (!Array.isArray(_impState.remits)) _impState.remits = [];   // 송금/환율 저장 이력
+}
+// 상단 금액 입력 — 콤마 표시 (입력 중엔 파싱·저장만, 포커스 아웃 시 콤마 포맷)
+function _impAmtParse(s) { return Number(String(s == null ? '' : s).replace(/[^0-9.]/g, '')) || 0; }
+function _impAmtInput(el, field) {
+  _impLoad();
+  const v = _impAmtParse(el.value);
+  if (field === 'krw') _impState.krw = v;
+  else if (field === 'fee') _impState.feeKrw = v;
+  else if (field === 'cny') _impState.cny = v;
+  _impSave();
+  const re = document.getElementById('imp-rate'); if (re) re.textContent = _impFmt(_impRate());
+}
+function _impAmtFocus(el) { el.value = (el.value || '').replace(/,/g, ''); }
+function _impAmtBlur(el, field) {
+  const v = _impAmtParse(el.value);
+  el.value = v ? (field === 'cny' ? v.toLocaleString('ko-KR', { maximumFractionDigits: 2 }) : Math.round(v).toLocaleString('ko-KR')) : '';
+  renderImpTab();
+}
+// 콤마 포함 표시값
+function _impAmtDisplay(v, isCny) {
+  v = Number(v) || 0;
+  if (!v) return '';
+  return isCny ? v.toLocaleString('ko-KR', { maximumFractionDigits: 2 }) : Math.round(v).toLocaleString('ko-KR');
 }
 function _impSave() {
   try { localStorage.setItem(IMP_LS_KEY, JSON.stringify(_impState)); } catch (_) {}
@@ -9858,11 +9909,12 @@ function _impEsc(s) {
 function renderImpTab() {
   _impLoad();
   _impMigrateRows();
-  // 헤더 input 값 복원
-  document.getElementById('imp-krw').value = _impState.krw || '';
-  document.getElementById('imp-feekrw').value = _impState.feeKrw || '';
-  document.getElementById('imp-cny').value = _impState.cny || '';
+  // 헤더 input 값 복원 (콤마 표시)
+  document.getElementById('imp-krw').value = _impAmtDisplay(_impState.krw, false);
+  document.getElementById('imp-feekrw').value = _impAmtDisplay(_impState.feeKrw, false);
+  document.getElementById('imp-cny').value = _impAmtDisplay(_impState.cny, true);
   document.getElementById('imp-rate').textContent = _impFmt(_impRate());
+  _impRenderRemits();
 
   const tbody = document.getElementById('imp-tbody');
   const empty = document.getElementById('imp-empty');
@@ -9916,11 +9968,65 @@ function renderImpTab() {
 }
 function _impRecalcAll() {
   _impLoad();
-  _impState.krw = Number(document.getElementById('imp-krw').value || 0) || 0;
-  _impState.feeKrw = Number(document.getElementById('imp-feekrw').value || 0) || 0;
-  _impState.cny = Number(document.getElementById('imp-cny').value || 0) || 0;
+  _impState.krw = _impAmtParse(document.getElementById('imp-krw').value);
+  _impState.feeKrw = _impAmtParse(document.getElementById('imp-feekrw').value);
+  _impState.cny = _impAmtParse(document.getElementById('imp-cny').value);
   _impSave();
   document.getElementById('imp-rate').textContent = _impFmt(_impRate());
+  renderImpTab();
+}
+// ── 송금/환율 저장 이력 ─────────────────────────────
+function _impTodayStr() {
+  const t = new Date();
+  return `${t.getFullYear()}.${String(t.getMonth()+1).padStart(2,'0')}.${String(t.getDate()).padStart(2,'0')}`;
+}
+function _impRenderRemits() {
+  const tbody = document.getElementById('imp-remit-tbody');
+  const empty = document.getElementById('imp-remit-empty');
+  if (!tbody) return;
+  const list = _impState.remits || [];
+  if (!list.length) { tbody.innerHTML = ''; if (empty) empty.classList.remove('hidden'); return; }
+  if (empty) empty.classList.add('hidden');
+  tbody.innerHTML = list.map(r => `
+    <tr class="border-b border-brand-border hover:bg-brand-bg/40">
+      <td class="px-3 py-2 text-center text-xs text-brand-gray">${_impEsc(r.date)}</td>
+      <td class="px-3 py-2 text-right text-sm">${_impFmt(r.krw)}<span class="text-[10px] text-brand-gray"> 원</span></td>
+      <td class="px-3 py-2 text-right text-sm">${_impFmt(r.fee)}<span class="text-[10px] text-brand-gray"> 원</span></td>
+      <td class="px-3 py-2 text-right text-sm">${_impAmtDisplay(r.cny, true)}<span class="text-[10px] text-brand-gray"> 위안</span></td>
+      <td class="px-3 py-2 text-right text-sm font-bold text-brand-blue">${_impFmt(r.rate)}<span class="text-[10px] text-brand-gray font-normal"> 원</span></td>
+      <td class="px-3 py-2 text-center whitespace-nowrap">
+        <button onclick="applyImpRemit('${r.id}')" class="px-2.5 py-1 rounded-full bg-brand-blue-light text-brand-blue text-[11px] font-bold hover:opacity-80" title="이 환율을 상단에 적용 (새 입항 행에 사용)">적용</button>
+        <button onclick="deleteImpRemit('${r.id}')" class="ml-1 text-brand-gray hover:text-brand-pink text-base leading-none align-middle" title="삭제">×</button>
+      </td>
+    </tr>`).join('');
+}
+function saveImpRemit() {
+  _impLoad();
+  const krw = Number(_impState.krw) || 0, fee = Number(_impState.feeKrw) || 0, cny = Number(_impState.cny) || 0;
+  if (!krw && !cny) { alert('저장할 금액을 먼저 입력하세요. (원화·충전위안화)'); return; }
+  _impState.remits.unshift({
+    id: 'rm_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    date: _impTodayStr(), krw, fee, cny, rate: _impRate(),
+  });
+  _impSave();
+  renderImpTab();
+}
+function applyImpRemit(id) {
+  _impLoad();
+  const r = (_impState.remits || []).find(x => x.id === id);
+  if (!r) return;
+  _impState.krw = Number(r.krw) || 0;
+  _impState.feeKrw = Number(r.fee) || 0;
+  _impState.cny = Number(r.cny) || 0;
+  _impSave();
+  renderImpTab();
+  try { if (typeof showAppToast === 'function') showAppToast(`${r.date} 환율(${_impFmt(r.rate)}원) 적용됨`); } catch (_) {}
+}
+function deleteImpRemit(id) {
+  if (!confirm('이 저장 내역을 삭제할까요?')) return;
+  _impLoad();
+  _impState.remits = (_impState.remits || []).filter(x => x.id !== id);
+  _impSave();
   renderImpTab();
 }
 function _onImpEdit(id, field, val) {
