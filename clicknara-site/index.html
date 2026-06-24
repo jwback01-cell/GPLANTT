@@ -1617,8 +1617,8 @@ tailwind.config = {
           <table class="w-full text-sm border-collapse">
             <thead><tr class="bg-brand-bg text-xs">
               <th class="text-left px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">상품명</th>
-              <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">건수</th>
-              <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">수량합</th>
+              <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">수량</th>
+              <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">공급액(단가)</th>
               <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">공급액 합계</th>
             </tr></thead>
             <tbody id="lo-supply-body"></tbody>
@@ -1777,12 +1777,12 @@ function _loRenderSupply(){
   const list=[..._loSupply.values()].sort((a,b)=>b.supply-a.supply);
   const total=list.reduce((s,p)=>s+p.supply,0);
   document.getElementById('lo-supply-total').textContent = '총 공급액 ' + _loFmt(total) + ' 원';
-  body.innerHTML=list.map(p=>`<tr class="border-b border-brand-border hover:bg-brand-bg/40">
+  body.innerHTML=list.map(p=>{ const unit = p.qty ? Math.round(p.supply/p.qty) : 0; return `<tr class="border-b border-brand-border hover:bg-brand-bg/40">
     <td class="px-3 py-1.5 text-xs max-w-[420px] truncate" title="${_loEsc(p.name)}">${_loEsc(p.name)}</td>
-    <td class="px-3 py-1.5 text-xs text-right">${_loFmt(p.cnt)}</td>
     <td class="px-3 py-1.5 text-xs text-right">${_loFmt(p.qty)}</td>
+    <td class="px-3 py-1.5 text-xs text-right">${_loFmt(unit)}</td>
     <td class="px-3 py-1.5 text-xs text-right font-bold">${_loFmt(p.supply)}</td>
-  </tr>`).join('');
+  </tr>`; }).join('');
   wrap.classList.remove('hidden');
 }
 function _loSetFilter(f){ _loFilter=f; document.querySelectorAll('.lo-fbtn').forEach(b=>{ const on=b.dataset.f===f; b.classList.toggle('bg-brand-black',on); b.classList.toggle('text-white',on); b.classList.toggle('text-brand-gray',!on); }); _loRenderResult(); }
@@ -1825,7 +1825,7 @@ function _loDownload(){
   // 상품별 공급액 합계 시트
   if(_loSupply && _loSupply.size){
     const list=[..._loSupply.values()].sort((a,b)=>b.supply-a.supply);
-    const sAoa=[['상품명','건수','수량합','공급액 합계'], ...list.map(p=>[p.name,p.cnt,p.qty,p.supply])];
+    const sAoa=[['상품명','수량','공급액(단가)','공급액 합계'], ...list.map(p=>[p.name, p.qty, (p.qty?Math.round(p.supply/p.qty):0), p.supply])];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sAoa), '상품별공급액');
   }
   const t=new Date(); const stamp=`${t.getFullYear()}${String(t.getMonth()+1).padStart(2,'0')}${String(t.getDate()).padStart(2,'0')}`;
