@@ -9860,6 +9860,7 @@ function switchProductTab(which) {
 const IMP_LS_KEY = 'gplan_import_v1';   // 클라우드 동기화 키
 let _impState = null;   // { krw, feeKrw, cny, rows: [...] }
 let _impSearch = '';    // 표 검색어
+let _impSelected = new Set();   // 체크된 행 id (검색/재렌더에도 유지)
 function _impOnSearch(v) { _impSearch = v || ''; renderImpTab(); }
 
 function _impLoad() {
@@ -9996,7 +9997,7 @@ function renderImpTab() {
       const rateDiff = curRate > 0 && Math.abs(rowRate - curRate) > 0.5;
       const rateCellCls = rateDiff ? 'text-brand-orange' : 'text-brand-gray';
       return `<tr class="border-b border-brand-border hover:bg-brand-bg/40" data-id="${r.id}">
-        <td class="px-2 py-1 text-center"><input type="checkbox" class="imp-row-cb" data-id="${r.id}"></td>
+        <td class="px-2 py-1 text-center"><input type="checkbox" class="imp-row-cb" data-id="${r.id}" ${_impSelected.has(r.id) ? 'checked' : ''} onchange="_impOnRowCheck('${r.id}',this.checked)"></td>
         <td class="px-1 py-1"><input type="text" value="${_impEsc(r.date)}" onchange="_onImpEdit('${r.id}','date',this.value)" class="${inp} text-xs text-center"></td>
         <td class="px-1 py-1"><input type="text" value="${_impEsc(r.folder)}" onchange="_onImpEdit('${r.id}','folder',this.value)" class="${inp} text-xs font-mono text-center" placeholder="폴더"></td>
         <td class="px-1 py-1"><input type="text" value="${_impEsc(r.code)}" onchange="_onImpEdit('${r.id}','code',this.value)" class="${inp} text-xs font-mono text-center" placeholder="상품코드"></td>
@@ -10023,6 +10024,14 @@ function renderImpTab() {
     set('imp-sum-tax', sTax);
     set('imp-sum-total', sTotal);
     set('imp-sum-qty', sQty);
+    // 전체선택 체크박스 상태 — 현재 보이는 행 모두 선택돼 있으면 체크
+    const selAll = document.getElementById('imp-select-all');
+    if (selAll) {
+      const visIds = viewRows.map(r => r.id);
+      const allSel = visIds.length > 0 && visIds.every(id => _impSelected.has(id));
+      selAll.checked = allSel;
+      selAll.indeterminate = !allSel && visIds.some(id => _impSelected.has(id));
+    }
   }
 }
 function _impRecalcAll() {
@@ -10035,17 +10044,26 @@ function _impRecalcAll() {
   renderImpTab();
 }
 // ── 묶음 비용 배분 (체크한 상품들의 총 중판비용·관세를 원화 비율로 나눔) ──
+function _impOnRowCheck(id, checked) {
+  if (checked) _impSelected.add(id); else _impSelected.delete(id);
+}
 function _impSelectedIds() {
-  return [...document.querySelectorAll('.imp-row-cb:checked')].map(cb => cb.dataset.id);
+  // 실제 존재하는 행만 (검색으로 숨겨진 체크도 유지됨)
+  const exist = new Set((_impState.rows || []).map(r => r.id));
+  return [..._impSelected].filter(id => exist.has(id));
 }
 function _impToggleSelectAll(checked) {
-  document.querySelectorAll('.imp-row-cb').forEach(cb => { cb.checked = checked; });
+  // 현재 보이는(검색 결과) 행만 토글
+  document.querySelectorAll('.imp-row-cb').forEach(cb => {
+    cb.checked = checked;
+    if (checked) _impSelected.add(cb.dataset.id); else _impSelected.delete(cb.dataset.id);
+  });
 }
 function _impRowKrw(r) { return (Number(r.cny) || 0) * (Number(r.rate) || 0); }
 function openImpGroupCostModal() {
+  _impLoad();
   const ids = _impSelectedIds();
   if (ids.length < 1) { alert('먼저 묶을 상품의 체크박스를 선택하세요.'); return; }
-  _impLoad();
   const rows = _impState.rows.filter(r => ids.includes(r.id));
   const sumKrw = rows.reduce((s, r) => s + _impRowKrw(r), 0);
   document.getElementById('imp-gc-count').textContent = `선택 ${rows.length}개 · 원화 합계 ${_impFmt(sumKrw)}원`;
@@ -10057,9 +10075,9 @@ function closeImpGroupCostModal() {
   document.getElementById('imp-gc-backdrop').classList.remove('open');
 }
 function applyImpGroupCost() {
+  _impLoad();
   const ids = _impSelectedIds();
   if (!ids.length) { closeImpGroupCostModal(); return; }
-  _impLoad();
   const rows = _impState.rows.filter(r => ids.includes(r.id));
   const totFee = _impAmtParse(document.getElementById('imp-gc-fee').value);
   const totTax = _impAmtParse(document.getElementById('imp-gc-tax').value);
