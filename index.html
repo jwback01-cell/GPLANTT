@@ -2262,10 +2262,6 @@ tailwind.config = {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 7h18"/><path d="M6 12h12"/><path d="M9 17h6"/></svg>
               묶음 비용 배분
             </button>
-            <button onclick="clearImpValues()" class="px-4 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg flex items-center gap-1.5" title="체크한 행(없으면 전체)의 위안화·중판비용·관세·수량을 비웁니다">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-              값 비우기
-            </button>
             <button onclick="saveImpSnapshot()" class="px-4 py-2 rounded-full bg-brand-blue text-white text-sm font-bold hover:opacity-90 flex items-center gap-1.5" title="현재 표(또는 체크한 행)를 저장내역으로 보관">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
               저장
@@ -10280,18 +10276,6 @@ function confirmImpSnapshot() {
   closeImpSaveModal();
   renderImpTab();
   try { if (typeof showAppToast === 'function') showAppToast(`저장완료 — "${name}" (${rows.length}품목) · 입력값 초기화됨`); else alert(`✅ 저장완료 — "${name}" (${rows.length}품목)\n입력값(위안화·중판비용·관세·수량)이 초기화되었습니다.`); } catch (_) { alert(`✅ 저장완료 — "${name}"`); }
-}
-// 체크한 행(없으면 전체)의 위안화·중판비용·관세·수량 비우기 (저장 없이)
-function clearImpValues() {
-  _impLoad();
-  const checked = _impSelectedIds();
-  const targets = checked.length ? _impState.rows.filter(r => checked.includes(r.id)) : _impState.rows;
-  if (!targets.length) { alert('비울 행이 없습니다.'); return; }
-  if (!confirm(`${checked.length ? '체크한 ' + checked.length + '개' : '전체 ' + targets.length + '개'} 행의 위안화·중판비용·관세·수량을 비울까요?\n(제품명·코드·환율은 유지됩니다)`)) return;
-  targets.forEach(r => { r.cny = 0; r.fee = 0; r.tax = 0; r.qty = 0; });
-  _impSave();
-  _impSelected.clear();
-  renderImpTab();
 }
 function _impSavedTotals(rec) {
   let qty = 0, total = 0;
