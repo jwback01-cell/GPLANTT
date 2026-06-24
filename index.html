@@ -6277,13 +6277,13 @@ async function submitTodoModal() {
       dateKey: _makeDateKey(startDate), endDateKey: _makeDateKey(endDate),
       dueText: `${sM}/${sD} ~ ${eM}/${eD}` };
     const dbRow = await insertTodoDB(newItem);
-    if (dbRow) { newItem.id = dbRow.id; todos.push(newItem); }
+    if (dbRow) { newItem.id = dbRow.id; newItem.createdAt = dbRow.created_at; todos.push(newItem); }
   } else {
     // 단건 or 반복
     const newItems = _generateRepeatTodos(base, startDate);
     for (const it of newItems) {
       const dbRow = await insertTodoDB(it);
-      if (dbRow) { it.id = dbRow.id; todos.push(it); }
+      if (dbRow) { it.id = dbRow.id; it.createdAt = dbRow.created_at; todos.push(it); }
     }
   }
 
@@ -11177,7 +11177,8 @@ function _dbRowToTodo(r) {
   return {
     id: r.id, title: r.title, team: r.team, dueText: r.due_text, accent: r.accent,
     completed: r.completed, completedAt: r.completed_at, dateKey: r.date_key,
-    endDateKey: r.end_date_key, memo: r.memo, repeatLabel: r.repeat_label
+    endDateKey: r.end_date_key, memo: r.memo, repeatLabel: r.repeat_label,
+    createdAt: r.created_at
   };
 }
 
@@ -11358,6 +11359,17 @@ function shiftTodoListDate(delta) {
 }
 
 // ── Render: 할 일 목록 페이지 ─────────────────
+// 등록일 표시 — 올해면 'M/D', 다른 해면 'YYYY.M.D'
+function _fmtTodoReg(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso).slice(0, 10);
+  const now = new Date();
+  return (d.getFullYear() === now.getFullYear())
+    ? `${d.getMonth()+1}/${d.getDate()}`
+    : `${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()}`;
+}
+
 function renderTodoList() {
   const list    = document.getElementById('todo-list');
   const empty   = document.getElementById('todo-empty');
@@ -11440,6 +11452,7 @@ function renderTodoList() {
       const dueHtml    = item.dueText ? `<span class="${ac.tDue}">${escHtml(item.dueText)}</span>` : '';
       const repeatHtml = item.repeatLabel ? `<span class="flex items-center gap-1 text-xs font-semibold text-brand-gray bg-brand-bg px-2 py-0.5 rounded-full"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>${escHtml(item.repeatLabel)}</span>` : '';
       const lastHtml = (item.repeatLabel && _lastRecurIds.has(item.id)) ? `<span class="text-xs font-extrabold text-white px-2 py-0.5 rounded-full" style="background:#D93025;" title="반복 업무 마지막 회차 — 다음 회차가 없습니다">반복 마지막</span>` : '';
+      const regHtml = item.createdAt ? `<span class="text-xs font-medium text-brand-gray">등록 ${escHtml(_fmtTodoReg(item.createdAt))}</span>` : '';
       return `
         <div class="todo-row flex items-center justify-between p-4 md:p-5 border border-brand-border rounded-[24px] hover:bg-brand-bg transition-all group" data-id="${item.id}" data-accent="${item.accent}">
           <div class="flex items-center gap-4 md:gap-5 min-w-0 flex-1">
@@ -11447,7 +11460,7 @@ function renderTodoList() {
             <div class="w-6 md:w-7 h-6 md:h-7 rounded-full border-2 ${ac.border} flex items-center justify-center cursor-pointer bg-white ${ac.cHov} transition-colors shrink-0" onclick="todoComplete(${item.id},event)"></div>
             <div class="min-w-0 flex-1 cursor-pointer" onclick="todoEdit(${item.id})" title="클릭하여 수정">
               <div class="font-bold text-[1rem] md:text-[1.1rem] mb-1 ${ac.tHov} transition-colors">${escHtml(item.title)}</div>
-              <div class="flex items-center gap-2 md:gap-3 flex-wrap">${teamHtml}${dueHtml}${repeatHtml}${lastHtml}</div>
+              <div class="flex items-center gap-2 md:gap-3 flex-wrap">${teamHtml}${dueHtml}${repeatHtml}${lastHtml}${regHtml}</div>
             </div>
           </div>
           <div class="flex items-center gap-2 md:gap-3 shrink-0 ml-3">
