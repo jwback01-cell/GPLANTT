@@ -2406,6 +2406,20 @@ tailwind.config = {
   </div>
 </div>
 
+<!-- 수입 저장 모달 -->
+<div id="imp-save-backdrop" class="todo-modal-backdrop" onclick="if(event.target===this)closeImpSaveModal()">
+  <div class="todo-modal" style="max-width:420px;padding:24px;">
+    <h3 class="text-lg font-bold mb-1">수입내역 저장 💾</h3>
+    <p id="imp-save-info" class="text-brand-gray text-sm mb-4"></p>
+    <label class="block text-sm font-bold mb-1">저장명</label>
+    <input id="imp-save-name" type="text" placeholder="저장명을 입력하세요" class="w-full mb-4 px-3 py-2 rounded-xl border border-brand-border focus:outline-none focus:border-brand-black" onkeydown="if(event.key==='Enter')confirmImpSnapshot()">
+    <div class="flex gap-2 justify-end">
+      <button onclick="closeImpSaveModal()" class="px-4 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg">취소</button>
+      <button onclick="confirmImpSnapshot()" class="px-4 py-2 rounded-full bg-brand-blue text-white text-sm font-bold hover:opacity-90">저장</button>
+    </div>
+  </div>
+</div>
+
 <!-- 세트 상품 추가/수정 드로어 -->
 <div id="add-set-backdrop" class="product-drawer-backdrop" onclick="closeAddSetDrawer()"></div>
 <div id="add-set-drawer" class="product-drawer" style="max-width: 640px;">
@@ -10217,24 +10231,39 @@ function _impNowStamp() {
   const p = n => String(n).padStart(2, '0');
   return `${t.getFullYear()}.${p(t.getMonth()+1)}.${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}`;
 }
-// 현재 수입관리 표(또는 체크한 행)를 저장
+// 현재 수입관리 표(또는 체크한 행)를 저장 — 모달 열기
+let _impSavePending = null;   // 저장 대기 행 스냅샷
 function saveImpSnapshot() {
   _impLoad();
   const checked = _impSelectedIds();
   const src = checked.length ? _impState.rows.filter(r => checked.includes(r.id)) : _impState.rows;
   if (!src.length) { alert('저장할 행이 없습니다.'); return; }
-  const dflt = `${_impTodayStr()} 수입 (${src.length}품목)`;
-  const name = prompt(`저장명을 입력하세요.\n(체크한 ${checked.length ? checked.length + '개 행' : '전체'} 저장)`, dflt);
-  if (name == null) return;
-  const rows = src.map(r => ({
+  _impSavePending = src.map(r => ({
     date: r.date || '', folder: r.folder || '', code: r.code || '', vendorCode: r.vendorCode || '',
     name: r.name || '', cny: Number(r.cny) || 0, rate: Number(r.rate) || 0,
     fee: Number(r.fee) || 0, tax: Number(r.tax) || 0, qty: Number(r.qty) || 0,
   }));
+  const dflt = `${_impTodayStr()} 수입 (${src.length}품목)`;
+  document.getElementById('imp-save-info').textContent = checked.length ? `체크한 ${checked.length}개 행을 저장합니다.` : `전체 ${src.length}개 행을 저장합니다.`;
+  const nameEl = document.getElementById('imp-save-name');
+  nameEl.value = dflt;
+  document.getElementById('imp-save-backdrop').classList.add('open');
+  setTimeout(() => { nameEl.focus(); nameEl.select(); }, 60);
+}
+function closeImpSaveModal() {
+  document.getElementById('imp-save-backdrop').classList.remove('open');
+  _impSavePending = null;
+}
+function confirmImpSnapshot() {
+  if (!_impSavePending || !_impSavePending.length) { closeImpSaveModal(); return; }
+  const dflt = `${_impTodayStr()} 수입 (${_impSavePending.length}품목)`;
+  const name = String(document.getElementById('imp-save-name').value || '').trim() || dflt;
+  const rows = _impSavePending;
   const list = _impLoadSaved();
-  list.unshift({ id: 'imps_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: String(name).trim() || dflt, savedAt: _impNowStamp(), rows });
+  list.unshift({ id: 'imps_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, savedAt: _impNowStamp(), rows });
   _impSaveSaved(list);
-  alert(`✅ 저장완료 — "${String(name).trim() || dflt}" (${rows.length}품목)\n좌측 "수입 저장내역"에서 볼 수 있습니다.`);
+  closeImpSaveModal();
+  try { if (typeof showAppToast === 'function') showAppToast(`저장완료 — "${name}" (${rows.length}품목)`); else alert(`✅ 저장완료 — "${name}" (${rows.length}품목)`); } catch (_) { alert(`✅ 저장완료 — "${name}"`); }
 }
 function _impSavedTotals(rec) {
   let qty = 0, total = 0;
