@@ -1610,16 +1610,18 @@ tailwind.config = {
 
       <section id="lo-supply-wrap" class="hidden bg-white rounded-4xl panel p-4 md:p-6">
         <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-          <h3 class="font-bold">상품별 공급액 합계 <span class="text-brand-gray font-normal text-xs">(B 매출이익 기준 · 취소/반품 차감 순액)</span></h3>
+          <h3 class="font-bold">상품·단가별 양식 <span class="text-brand-gray font-normal text-xs">(B 매출이익 기준 · 상품→단가별 분할 · 취소/반품 차감 순수량)</span></h3>
           <span id="lo-supply-total" class="text-sm font-bold text-brand-blue"></span>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm border-collapse">
             <thead><tr class="bg-brand-bg text-xs">
-              <th class="text-left px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">상품명</th>
+              <th class="text-left px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">코드</th>
+              <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">단가</th>
               <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">수량</th>
-              <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">공급액(단가)</th>
-              <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">공급액 합계</th>
+              <th class="text-center px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">창고코드</th>
+              <th class="text-center px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">수불코드</th>
+              <th class="text-left px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">비고</th>
             </tr></thead>
             <tbody id="lo-supply-body"></tbody>
           </table>
@@ -1718,9 +1720,10 @@ function _loAgg(file, kind){
   const ai = kind==='A' ? _loIdx(names, ['판매금액'], []) : _loIdx(names, ['금액'], []);
   const ni = kind==='A' ? _loIdx(names, ['판매자상품명'], ['상품명']) : _loIdx(names, ['기본상품명','주문상품명'], ['상품명']);
   const mvi = kind==='B' ? _loFindMoveCol(rows, hi) : -1;
-  const gi  = kind==='B' ? _loIdx(names, ['공급액'], ['공급']) : -1;
+  const gi  = kind==='B' ? _loIdx(names, ['공급액'], ['공급']) : -1;   // AV열
+  const ci  = kind==='B' ? _loIdx(names, ['상품코드'], []) : -1;        // W열
   const map = new Map();
-  const productMap = new Map();   // B 전용 — 상품명별 공급액 합계
+  const groupMap = new Map();   // B 전용 — (상품코드|단가)별 수량 합계
   for(let r=hi+1;r<rows.length;r++){ const row=rows[r]||[]; const ord=String(row[oi]||'').trim().replace(/\s+/g,''); if(!ord || !/\d{6,}/.test(ord)) continue;
     const rowName = ni>=0 ? String(row[ni]||'').trim() : '';
     if(kind==='A' && _loExcluded(rowName)) continue;   // A: 제외 키워드 상품명은 비교 제외
@@ -1730,14 +1733,16 @@ function _loAgg(file, kind){
     if(kind==='A'){ m.qty+=qty; m.amt+=amt; }
     else { const mv = mvi>=0?String(row[mvi]||''):''; const isCancel = /취소|반품/.test(mv) || amt<0 || qty<0;
       if(isCancel){ m.cancelAmt+=amt; m.cancelQty+=qty; } else { m.saleAmt+=amt; m.saleQty+=qty; }
-      // 상품별 공급액 합계 (취소/반품은 음수라 자동 차감)
-      const pn = rowName || '(이름없음)';
-      if(!productMap.has(pn)) productMap.set(pn,{name:pn,supply:0,qty:0,cnt:0});
-      const pm=productMap.get(pn); pm.supply += (gi>=0?_loNum(row[gi]):0); pm.qty += qty; pm.cnt++;
+      // (상품코드 W | 단가) 별 수량(AQ) 합계 — 단가 = 공급액(AV) ÷ 수량(AQ). 취소/반품은 음수라 같은 단가군에서 자동 차감
+      const supply = gi>=0?_loNum(row[gi]):0, code = ci>=0?String(row[ci]||'').trim():'';
+      if(qty!==0){ const unit = Math.round(supply/qty); const key = code+'|'+unit;
+        if(!groupMap.has(key)) groupMap.set(key,{code, unit, qty:0, name:rowName});
+        const g=groupMap.get(key); g.qty += qty; if(!g.name) g.name=rowName;
+      }
     }
     if(!m.name) m.name=rowName;
   }
-  return { map, productMap, idx:{oi,qi,ai,ni,mvi,gi}, headerRow:hi };
+  return { map, groupMap, idx:{oi,qi,ai,ni,mvi,gi,ci}, headerRow:hi };
 }
 function _loProcess(){
   if(!(_loA && _loB)){ alert('A·B 파일을 모두 업로드하세요.'); return; }
@@ -1757,7 +1762,7 @@ function _loProcess(){
   });
   const rank=x=> x.status!=='both'?0 : (x.verdict==='불일치'?1:2);
   res.sort((x,y)=> rank(x)-rank(y) || String(x.o).localeCompare(String(y.o)));
-  _loResult=res; _loFilter='all'; _loSupply=B.productMap;
+  _loResult=res; _loFilter='all'; _loSupply=B.groupMap;
   _loRenderSummary(); _loRenderResult(); _loRenderSupply();
   document.getElementById('lo-download-btn').disabled = !res.length;
   document.getElementById('lo-result-wrap').classList.remove('hidden');
@@ -1771,18 +1776,27 @@ function _loRenderSummary(){
   const sum=document.getElementById('lo-summary'); sum.classList.remove('hidden');
   sum.innerHTML = card('표시 주문', _loResult.length) + card('일치', match, 'text-green-600') + card('불일치(금액·수량)', diff, 'text-brand-pink') + card('B만(매출O 정산X)', onlyB, 'text-brand-blue');
 }
+const _LO_WAREHOUSE = '101';   // 창고코드(고정)
+const _LO_MOVECODE  = '212';   // 수불코드(고정)
+function _loSupplyRows(){   // 양식 행 — 상품(코드)별 우선, 단가별 추가 분할. 순수량 0 제외.
+  if(!_loSupply) return [];
+  return [..._loSupply.values()].filter(g=>g.qty!==0)
+    .sort((a,b)=> String(a.name).localeCompare(String(b.name)) || (b.unit-a.unit));
+}
 function _loRenderSupply(){
   const wrap=document.getElementById('lo-supply-wrap'); const body=document.getElementById('lo-supply-body');
-  if(!_loSupply || !_loSupply.size){ if(wrap) wrap.classList.add('hidden'); return; }
-  const list=[..._loSupply.values()].sort((a,b)=>b.supply-a.supply);
-  const total=list.reduce((s,p)=>s+p.supply,0);
-  document.getElementById('lo-supply-total').textContent = '총 공급액 ' + _loFmt(total) + ' 원';
-  body.innerHTML=list.map(p=>{ const unit = p.qty ? Math.round(p.supply/p.qty) : 0; return `<tr class="border-b border-brand-border hover:bg-brand-bg/40">
-    <td class="px-3 py-1.5 text-xs max-w-[420px] truncate" title="${_loEsc(p.name)}">${_loEsc(p.name)}</td>
-    <td class="px-3 py-1.5 text-xs text-right">${_loFmt(p.qty)}</td>
-    <td class="px-3 py-1.5 text-xs text-right">${_loFmt(unit)}</td>
-    <td class="px-3 py-1.5 text-xs text-right font-bold">${_loFmt(p.supply)}</td>
-  </tr>`; }).join('');
+  const list=_loSupplyRows();
+  if(!list.length){ if(wrap) wrap.classList.add('hidden'); return; }
+  const totQty=list.reduce((s,g)=>s+g.qty,0);
+  document.getElementById('lo-supply-total').textContent = `${list.length}행 · 총수량 ${_loFmt(totQty)}`;
+  body.innerHTML=list.map(g=>`<tr class="border-b border-brand-border hover:bg-brand-bg/40">
+    <td class="px-3 py-1.5 text-xs whitespace-nowrap font-mono">${_loEsc(g.code)}</td>
+    <td class="px-3 py-1.5 text-xs text-right">${_loFmt(g.unit)}</td>
+    <td class="px-3 py-1.5 text-xs text-right">${_loFmt(g.qty)}</td>
+    <td class="px-3 py-1.5 text-xs text-center">${_LO_WAREHOUSE}</td>
+    <td class="px-3 py-1.5 text-xs text-center">${_LO_MOVECODE}</td>
+    <td class="px-3 py-1.5 text-xs"></td>
+  </tr>`).join('');
   wrap.classList.remove('hidden');
 }
 function _loSetFilter(f){ _loFilter=f; document.querySelectorAll('.lo-fbtn').forEach(b=>{ const on=b.dataset.f===f; b.classList.toggle('bg-brand-black',on); b.classList.toggle('text-white',on); b.classList.toggle('text-brand-gray',!on); }); _loRenderResult(); }
@@ -1823,10 +1837,10 @@ function _loDownload(){
   const aoa=[head, ..._loResult.map(r=>[r.o, stTxt[r.status], r.name, nz(r.aQty), nz(r.bNetQty), nz(r.aAmt), nz(r.bSaleAmt), nz(r.bCancelAmt), nz(r.bNetAmt), nz(r.amtDiff), r.verdict])];
   const ws=XLSX.utils.aoa_to_sheet(aoa); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'주문번호비교');
   // 상품별 공급액 합계 시트
-  if(_loSupply && _loSupply.size){
-    const list=[..._loSupply.values()].sort((a,b)=>b.supply-a.supply);
-    const sAoa=[['상품명','수량','공급액(단가)','공급액 합계'], ...list.map(p=>[p.name, p.qty, (p.qty?Math.round(p.supply/p.qty):0), p.supply])];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sAoa), '상품별공급액');
+  const sList=_loSupplyRows();
+  if(sList.length){
+    const sAoa=[['코드','단가','수량','창고코드','수불코드','비고'], ...sList.map(g=>[g.code, g.unit, g.qty, _LO_WAREHOUSE, _LO_MOVECODE, ''])];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sAoa), '상품단가별양식');
   }
   const t=new Date(); const stamp=`${t.getFullYear()}${String(t.getMonth()+1).padStart(2,'0')}${String(t.getDate()).padStart(2,'0')}`;
   XLSX.writeFile(wb, `롯데온_주문대사_${stamp}.xlsx`);
