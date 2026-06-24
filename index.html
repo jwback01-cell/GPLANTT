@@ -8582,9 +8582,6 @@ function _accountRowInnerHtml({ site, id, pw, url, memo, cat, cc }) {
     </div>
     <div class="flex items-center gap-1.5 min-w-0">
       <code class="bg-brand-bg px-2.5 py-1.5 rounded font-mono text-xs text-brand-black flex-1 truncate js-pw-display" data-pw="${pwAttr}" data-showing="1" title="${safePw}">${safePw || '—'}</code>
-      <button class="p-1 hover:bg-white rounded shrink-0" title="비밀번호 가리기/보이기" onclick="toggleAccountRowPw(this, '${pwAttr}')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-      </button>
       <button class="p-1 hover:bg-white rounded shrink-0" title="비밀번호 복사" onclick="copyAccountId(this, '${pwAttr}')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
       </button>
