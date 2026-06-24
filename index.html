@@ -9847,6 +9847,29 @@ function _impLoad() {
   }
   if (!Array.isArray(_impState.rows)) _impState.rows = [];
   if (!Array.isArray(_impState.remits)) _impState.remits = [];   // 송금/환율 저장 이력
+  _impDedupBlanks();   // 상품코드는 있는데 제품명이 빈 중복행 정리
+}
+// 같은 상품코드인데 제품명이 비어있는 중복행 제거 (제품명 있는 행이 따로 있을 때만).
+// 사용자가 새로 추가한 완전 빈 행(코드도 없음)은 건드리지 않음.
+function _impDedupBlanks() {
+  if (!_impState || !Array.isArray(_impState.rows)) return false;
+  const namedCodes = new Set();
+  _impState.rows.forEach(r => {
+    const code = String(r.code || '').trim();
+    const name = String(r.name || '').trim();
+    if (code && name) namedCodes.add(code.toLowerCase());
+  });
+  const before = _impState.rows.length;
+  _impState.rows = _impState.rows.filter(r => {
+    const code = String(r.code || '').trim();
+    const name = String(r.name || '').trim();
+    // 코드 있음 + 제품명 빈칸 + 같은 코드의 제품명 있는 행 존재 → 제거
+    if (code && !name && namedCodes.has(code.toLowerCase())) return false;
+    return true;
+  });
+  const changed = _impState.rows.length !== before;
+  if (changed) { try { localStorage.setItem(IMP_LS_KEY, JSON.stringify(_impState)); } catch (_) {} }
+  return changed;
 }
 // 상단 금액 입력 — 콤마 표시 (입력 중엔 파싱·저장만, 포커스 아웃 시 콤마 포맷)
 function _impAmtParse(s) { return Number(String(s == null ? '' : s).replace(/[^0-9.]/g, '')) || 0; }
@@ -10069,16 +10092,21 @@ async function importImpFromImageHost() {
     return;
   }
   _impLoad();
+  // 소스 상품 중 '제품명 빈 행'은 같은 코드의 이름 있는 행이 있으면 제외 (빈값 중복 방지)
+  const srcNamedCodes = new Set();
+  products.forEach(p => { const c = String(p.code || '').trim().toLowerCase(); const n = String(p.name || '').trim(); if (c && n) srcNamedCodes.add(c); });
   // (상품코드|제품명) 기준 — 이미 있으면 폴더코드만 보완, 없으면 새로 추가 (중복 없이 재가져오기 가능)
   const byKey = new Map();
   (_impState.rows || []).forEach(r => byKey.set(String(r.code || '').trim() + '|' + String(r.name || '').trim(), r));
   const newRows = [];
-  let updated = 0;
+  let updated = 0, skippedBlank = 0;
   products.forEach(p => {
     const name = String(p.name || '').trim();
     const code = String(p.code || '').trim();
     const folder = String(p.folder || '').trim();
     if (!name && !code) return;
+    // 제품명 빈 행: 같은 코드의 이름 있는 행이 있으면 건너뜀
+    if (!name && code && srcNamedCodes.has(code.toLowerCase())) { skippedBlank++; return; }
     const k = code + '|' + name;
     const ex = byKey.get(k);
     if (ex) {   // 이미 있는 행 — 폴더코드 비어있으면 채워줌
