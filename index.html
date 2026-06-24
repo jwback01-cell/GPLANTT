@@ -2254,6 +2254,7 @@ tailwind.config = {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
               이미지호스팅 상품 가져오기
             </button>
+            <button id="imp-show-selected" onclick="_impToggleSelectedOnly()" class="px-4 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg flex items-center gap-1.5" title="체크한 행만 보기 / 전체 보기 전환">체크만 보기 (0)</button>
             <button onclick="openImpGroupCostModal()" class="px-4 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg flex items-center gap-1.5" title="체크한 상품들의 총 중판비용·관세를 원화 금액 비율로 배분">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 7h18"/><path d="M6 12h12"/><path d="M9 17h6"/></svg>
               묶음 비용 배분
@@ -9861,7 +9862,12 @@ const IMP_LS_KEY = 'gplan_import_v1';   // 클라우드 동기화 키
 let _impState = null;   // { krw, feeKrw, cny, rows: [...] }
 let _impSearch = '';    // 표 검색어
 let _impSelected = new Set();   // 체크된 행 id (검색/재렌더에도 유지)
+let _impShowSelectedOnly = false;   // 체크한 행만 보기
 function _impOnSearch(v) { _impSearch = v || ''; renderImpTab(); }
+function _impToggleSelectedOnly() {
+  _impShowSelectedOnly = !_impShowSelectedOnly;
+  renderImpTab();
+}
 
 function _impLoad() {
   try { _impState = JSON.parse(localStorage.getItem(IMP_LS_KEY) || 'null'); } catch (_) { _impState = null; }
@@ -9972,12 +9978,20 @@ function renderImpTab() {
   const empty = document.getElementById('imp-empty');
   // 검색 필터 (제품명/폴더코드/상품코드/중판코드)
   const term = String(_impSearch || '').trim().toLowerCase();
-  const viewRows = term
+  let viewRows = term
     ? _impState.rows.filter(r => [r.name, r.folder, r.code, r.vendorCode].some(x => String(x || '').toLowerCase().includes(term)))
     : _impState.rows;
+  if (_impShowSelectedOnly) viewRows = viewRows.filter(r => _impSelected.has(r.id));
+  // 토글 버튼 상태 반영
+  const soBtn = document.getElementById('imp-show-selected');
+  if (soBtn) {
+    soBtn.classList.toggle('bg-brand-black', _impShowSelectedOnly);
+    soBtn.classList.toggle('text-white', _impShowSelectedOnly);
+    soBtn.textContent = _impShowSelectedOnly ? `전체 보기 (${_impSelected.size})` : `체크만 보기 (${_impSelected.size})`;
+  }
   if (!viewRows.length) {
     if (tbody) tbody.innerHTML = '';
-    if (empty) { empty.classList.remove('hidden'); empty.textContent = term ? `"${_impSearch}" 검색 결과가 없습니다.` : '수입 기록이 없습니다. "+ 새 행" 으로 추가하세요.'; }
+    if (empty) { empty.classList.remove('hidden'); empty.textContent = _impShowSelectedOnly ? '체크한 행이 없습니다. 먼저 체크하세요.' : (term ? `"${_impSearch}" 검색 결과가 없습니다.` : '수입 기록이 없습니다. "+ 새 행" 으로 추가하세요.'); }
   } else {
     if (empty) empty.classList.add('hidden');
     const curRate = _impRate();
