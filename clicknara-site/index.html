@@ -1622,6 +1622,7 @@ tailwind.config = {
               <th class="text-center px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">창고코드</th>
               <th class="text-center px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">수불코드</th>
               <th class="text-left px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">비고</th>
+              <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">공급액</th>
             </tr></thead>
             <tbody id="lo-supply-body"></tbody>
           </table>
@@ -1721,6 +1722,7 @@ function _loAgg(file, kind){
   const ni = kind==='A' ? _loIdx(names, ['판매자상품명'], ['상품명']) : _loIdx(names, ['기본상품명','주문상품명'], ['상품명']);
   const mvi = kind==='B' ? _loFindMoveCol(rows, hi) : -1;
   const gi  = kind==='B' ? _loIdx(names, ['공급액'], ['공급']) : -1;   // AV열
+  const ari = kind==='B' ? _loIdx(names, ['매출단가'], []) : -1;        // AR열 (단가)
   const ci  = kind==='B' ? _loIdx(names, ['상품코드'], []) : -1;        // W열
   const map = new Map();
   const groupMap = new Map();   // B 전용 — (상품코드|단가)별 수량 합계
@@ -1733,11 +1735,12 @@ function _loAgg(file, kind){
     if(kind==='A'){ m.qty+=qty; m.amt+=amt; }
     else { const mv = mvi>=0?String(row[mvi]||''):''; const isCancel = /취소|반품/.test(mv) || amt<0 || qty<0;
       if(isCancel){ m.cancelAmt+=amt; m.cancelQty+=qty; } else { m.saleAmt+=amt; m.saleQty+=qty; }
-      // (상품코드 W | 단가) 별 수량(AQ) 합계 — 단가 = 공급액(AV) ÷ 수량(AQ). 취소/반품은 음수라 같은 단가군에서 자동 차감
+      // (상품코드 W | 단가 AR) 별 수량(AQ) 합계 + 공급액(AV) 합계. 취소/반품은 음수라 같은 단가군에서 자동 차감
       const supply = gi>=0?_loNum(row[gi]):0, code = ci>=0?String(row[ci]||'').trim():'';
-      if(qty!==0){ const unit = Math.round(supply/qty); const key = code+'|'+unit;
-        if(!groupMap.has(key)) groupMap.set(key,{code, unit, qty:0, name:rowName});
-        const g=groupMap.get(key); g.qty += qty; if(!g.name) g.name=rowName;
+      const arUnit = ari>=0?Math.round(_loNum(row[ari])):0;   // 단가 = AR(매출단가)
+      if(qty!==0){ const key = code+'|'+arUnit;
+        if(!groupMap.has(key)) groupMap.set(key,{code, unit:arUnit, qty:0, supply:0, name:rowName});
+        const g=groupMap.get(key); g.qty += qty; g.supply += supply; if(!g.name) g.name=rowName;
       }
     }
     if(!m.name) m.name=rowName;
@@ -1789,14 +1792,15 @@ function _loRenderSupply(){
   if(!list.length){ if(wrap) wrap.classList.add('hidden'); return; }
   const totQty=list.reduce((s,g)=>s+g.qty,0);
   document.getElementById('lo-supply-total').textContent = `${list.length}행 · 총수량 ${_loFmt(totQty)}`;
-  body.innerHTML=list.map(g=>`<tr class="border-b border-brand-border hover:bg-brand-bg/40">
+  body.innerHTML=list.map(g=>{ const sup = g.qty ? Math.round(g.supply/g.qty) : 0; return `<tr class="border-b border-brand-border hover:bg-brand-bg/40">
     <td class="px-3 py-1.5 text-xs whitespace-nowrap font-mono">${_loEsc(g.code)}</td>
     <td class="px-3 py-1.5 text-xs text-right">${_loFmt(g.unit)}</td>
     <td class="px-3 py-1.5 text-xs text-right">${_loFmt(g.qty)}</td>
     <td class="px-3 py-1.5 text-xs text-center">${_LO_WAREHOUSE}</td>
     <td class="px-3 py-1.5 text-xs text-center">${_LO_MOVECODE}</td>
     <td class="px-3 py-1.5 text-xs"></td>
-  </tr>`).join('');
+    <td class="px-3 py-1.5 text-xs text-right">${_loFmt(sup)}</td>
+  </tr>`; }).join('');
   wrap.classList.remove('hidden');
 }
 function _loSetFilter(f){ _loFilter=f; document.querySelectorAll('.lo-fbtn').forEach(b=>{ const on=b.dataset.f===f; b.classList.toggle('bg-brand-black',on); b.classList.toggle('text-white',on); b.classList.toggle('text-brand-gray',!on); }); _loRenderResult(); }
@@ -1839,7 +1843,7 @@ function _loDownload(){
   // 상품별 공급액 합계 시트
   const sList=_loSupplyRows();
   if(sList.length){
-    const sAoa=[['코드','단가','수량','창고코드','수불코드','비고'], ...sList.map(g=>[g.code, g.unit, g.qty, _LO_WAREHOUSE, _LO_MOVECODE, ''])];
+    const sAoa=[['코드','단가','수량','창고코드','수불코드','비고','공급액'], ...sList.map(g=>[g.code, g.unit, g.qty, _LO_WAREHOUSE, _LO_MOVECODE, '', (g.qty?Math.round(g.supply/g.qty):0)])];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sAoa), '상품단가별양식');
   }
   const t=new Date(); const stamp=`${t.getFullYear()}${String(t.getMonth()+1).padStart(2,'0')}${String(t.getDate()).padStart(2,'0')}`;
