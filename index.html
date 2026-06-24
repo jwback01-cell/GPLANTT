@@ -10685,15 +10685,12 @@ function _onImpCellPaste(e, el) {
   if (startIdx < 0) return;
   const numFields = new Set(['rate','cny','fee','tax','qty']);
   const curRate = Math.round(_impRate());
-  let inserted = 0;
   for (let r = 0; r < matrix.length; r++) {
-    let item;
-    if (r === 0) {
-      item = _impState.rows[startIdx];
-    } else {
+    // 시작 행부터 아래로 기존 행에 채움. 행이 모자라면 그때만 새 행 추가.
+    let item = _impState.rows[startIdx + r];
+    if (!item) {
       item = _impNewRow();
-      _impState.rows.splice(startIdx + 1 + inserted, 0, item);
-      inserted++;
+      _impState.rows.splice(startIdx + r, 0, item);
     }
     const cols = matrix[r];
     for (let c = 0; c < cols.length; c++) {
