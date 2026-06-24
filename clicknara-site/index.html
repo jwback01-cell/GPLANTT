@@ -1542,33 +1542,62 @@ tailwind.config = {
     <main class="flex-1 overflow-y-auto pr-0 md:pr-2 pb-10 flex flex-col gap-6">
       <section class="mt-2 pl-1 md:pl-2">
         <h1 class="text-[1.8rem] md:text-[2.25rem] font-bold tracking-tight mb-2">롯데온 데이터 가공 🟥</h1>
-        <p class="text-brand-gray text-base md:text-[1.1rem]">롯데온에서 받은 엑셀을 업로드하면 가공합니다. 먼저 파일을 올리면 <strong>감지된 컬럼과 미리보기</strong>가 표시됩니다.</p>
+        <p class="text-brand-gray text-base md:text-[1.1rem]">두 엑셀을 <strong>주문번호</strong> 기준으로 비교합니다. 한쪽에만 있는 주문(누락)과, 양쪽에 있는 주문의 <strong>수량·금액 일치 여부</strong>를 표로 보여주고 엑셀로 내려받습니다.</p>
       </section>
 
       <section class="bg-white rounded-4xl panel p-6 md:p-8">
-        <label for="lo-file" class="block cursor-pointer border-2 border-dashed border-brand-border rounded-3xl py-12 text-center hover:border-brand-blue hover:bg-brand-blue-light/10 transition-colors">
-          <div class="flex flex-col items-center gap-2">
-            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="text-brand-gray"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14a2 2 0 0 0 2-2v-4"/></svg>
-            <div class="font-bold">롯데온 엑셀 선택</div>
-            <div class="text-xs text-brand-gray">.xlsx / .xls / .csv</div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <div class="flex items-center gap-2 mb-2"><div class="w-8 h-8 rounded-[10px] flex items-center justify-center bg-brand-blue-light shrink-0 text-brand-blue font-black text-sm">A</div><h3 class="font-bold">엑셀 A — 롯데온 정산</h3></div>
+            <p class="text-brand-gray text-xs mb-3">필요 컬럼: <strong>주문번호 · 판매수량 · 판매금액</strong> (롯데온 정산 export)</p>
+            <label for="lo-fileA" class="block cursor-pointer border-2 border-dashed border-brand-border rounded-3xl py-10 text-center hover:border-brand-blue hover:bg-brand-blue-light/10 transition-colors">
+              <div class="flex flex-col items-center gap-2"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="text-brand-gray"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14a2 2 0 0 0 2-2v-4"/></svg><div class="font-bold text-sm">엑셀 A 선택</div><div class="text-xs text-brand-gray">.xlsx / .xls / .csv</div></div>
+              <input id="lo-fileA" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="_loOnFile(event,'A')">
+            </label>
+            <div id="lo-infoA" class="hidden mt-3 text-xs text-brand-gray"></div>
           </div>
-          <input id="lo-file" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="_loOnFile(event)">
-        </label>
-        <div id="lo-fileinfo" class="hidden mt-4 text-sm text-brand-gray"></div>
-        <div class="flex items-center gap-2 mt-4">
-          <button id="lo-process-btn" onclick="_loProcess()" class="px-5 py-2.5 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333] disabled:opacity-40" disabled>가공 실행</button>
+          <div>
+            <div class="flex items-center gap-2 mb-2"><div class="w-8 h-8 rounded-[10px] flex items-center justify-center bg-green-100 shrink-0 text-green-600 font-black text-sm">B</div><h3 class="font-bold">엑셀 B — 매출이익 리스트(이카운트)</h3></div>
+            <p class="text-brand-gray text-xs mb-3">필요 컬럼: <strong>주문번호 · 수량 · 금액</strong> (이카운트 매출이익 export)</p>
+            <label for="lo-fileB" class="block cursor-pointer border-2 border-dashed border-brand-border rounded-3xl py-10 text-center hover:border-brand-blue hover:bg-brand-blue-light/10 transition-colors">
+              <div class="flex flex-col items-center gap-2"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="text-brand-gray"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14a2 2 0 0 0 2-2v-4"/></svg><div class="font-bold text-sm">엑셀 B 선택</div><div class="text-xs text-brand-gray">.xlsx / .xls / .csv</div></div>
+              <input id="lo-fileB" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="_loOnFile(event,'B')">
+            </label>
+            <div id="lo-infoB" class="hidden mt-3 text-xs text-brand-gray"></div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 mt-5">
+          <button id="lo-process-btn" onclick="_loProcess()" class="px-5 py-2.5 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333] disabled:opacity-40" disabled>주문번호로 비교</button>
           <button id="lo-download-btn" onclick="_loDownload()" class="px-5 py-2.5 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg disabled:opacity-40" disabled>엑셀 다운로드</button>
           <button onclick="_loReset()" class="px-4 py-2.5 rounded-full text-sm font-bold text-brand-gray hover:text-brand-black">초기화</button>
         </div>
       </section>
 
-      <section id="lo-preview-wrap" class="hidden bg-white rounded-4xl panel p-6 md:p-8">
-        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-          <h3 class="font-bold">미리보기 <span id="lo-preview-count" class="text-brand-gray font-normal text-sm"></span></h3>
-          <div class="text-[11px] text-brand-gray">※ 어떤 컬럼을 어떻게 가공할지 알려주시면 변환 로직을 채워드립니다.</div>
+      <section id="lo-summary" class="hidden grid grid-cols-2 md:grid-cols-4 gap-3"></section>
+
+      <section id="lo-result-wrap" class="hidden bg-white rounded-4xl panel p-4 md:p-6">
+        <div class="flex items-center gap-2 mb-3 flex-wrap">
+          <h3 class="font-bold mr-2">비교 결과</h3>
+          <button class="lo-fbtn px-3 py-1 rounded-full text-xs font-bold bg-brand-black text-white" data-f="all" onclick="_loSetFilter('all')">전체</button>
+          <button class="lo-fbtn px-3 py-1 rounded-full text-xs font-bold text-brand-gray hover:text-brand-black" data-f="diff" onclick="_loSetFilter('diff')">불일치</button>
+          <button class="lo-fbtn px-3 py-1 rounded-full text-xs font-bold text-brand-gray hover:text-brand-black" data-f="onlyA" onclick="_loSetFilter('onlyA')">A만(정산)</button>
+          <button class="lo-fbtn px-3 py-1 rounded-full text-xs font-bold text-brand-gray hover:text-brand-black" data-f="onlyB" onclick="_loSetFilter('onlyB')">B만(매출)</button>
         </div>
         <div class="overflow-x-auto">
-          <table class="w-full text-sm border-collapse"><thead id="lo-preview-head"></thead><tbody id="lo-preview-body"></tbody></table>
+          <table class="w-full text-sm border-collapse">
+            <thead><tr class="bg-brand-bg text-xs">
+              <th class="text-left px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">주문번호</th>
+              <th class="text-center px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">상태</th>
+              <th class="text-left px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">상품명</th>
+              <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">A수량</th>
+              <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">B수량</th>
+              <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">A금액(판매)</th>
+              <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">B금액(매출)</th>
+              <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">금액차이</th>
+              <th class="text-center px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">판정</th>
+            </tr></thead>
+            <tbody id="lo-result-body"></tbody>
+          </table>
         </div>
       </section>
     </main>
@@ -1605,10 +1634,14 @@ const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const PAGES = ['login','dashboard','clicknara','coupang','refine','process','lotteon'];
 const currentPage = { value: 'login' };
 
-// ───── 롯데온 데이터 가공 ─────
-let _loRows = [];   // 업로드한 엑셀(aoa) — [0]=헤더행
+// ───── 롯데온 데이터 가공 (A 롯데온 정산 ↔ B 이카운트 매출이익, 주문번호 매칭) ─────
+let _loA = null, _loB = null;   // { name, rows(aoa) }
+let _loResult = [];             // 비교 결과 행
+let _loFilter = 'all';
 function _loEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function _loOnFile(ev) {
+function _loNum(v){ const n = Number(String(v==null?'':v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; }
+function _loFmt(n){ return (Number(n)||0).toLocaleString('ko-KR'); }
+function _loOnFile(ev, which) {
   const file = ev.target.files && ev.target.files[0];
   if (!file) return;
   const reader = new FileReader();
@@ -1616,49 +1649,107 @@ function _loOnFile(ev) {
     try {
       const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-      _loRows = rows.filter(r => Array.isArray(r) && r.some(c => String(c).trim() !== ''));
-      const fi = document.getElementById('lo-fileinfo');
-      fi.classList.remove('hidden');
-      fi.textContent = `파일: ${file.name} — 데이터 ${Math.max(0, _loRows.length - 1)}행`;
-      _loRenderPreview();
-      document.getElementById('lo-process-btn').disabled = _loRows.length <= 1;
-      document.getElementById('lo-download-btn').disabled = _loRows.length <= 1;
+      const rows = (XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) || []).filter(r => Array.isArray(r) && r.some(c => String(c).trim() !== ''));
+      const obj = { name: file.name, rows };
+      if (which === 'A') _loA = obj; else _loB = obj;
+      const info = document.getElementById(which === 'A' ? 'lo-infoA' : 'lo-infoB');
+      info.classList.remove('hidden');
+      info.textContent = `${file.name} — ${Math.max(0, rows.length - 1)}행`;
+      document.getElementById('lo-process-btn').disabled = !(_loA && _loB);
     } catch (err) { alert('엑셀을 읽지 못했습니다: ' + (err.message || err)); }
   };
   reader.readAsArrayBuffer(file);
 }
-function _loRenderPreview() {
-  const wrap = document.getElementById('lo-preview-wrap');
-  const head = document.getElementById('lo-preview-head');
-  const body = document.getElementById('lo-preview-body');
-  if (!_loRows.length) { wrap.classList.add('hidden'); return; }
-  wrap.classList.remove('hidden');
-  const header = _loRows[0] || [];
-  document.getElementById('lo-preview-count').textContent = `(컬럼 ${header.length}개 · 데이터 ${Math.max(0, _loRows.length - 1)}행)`;
-  head.innerHTML = '<tr class="bg-brand-bg">' + header.map((h, i) => `<th class="text-left px-3 py-2 font-bold text-xs whitespace-nowrap border-b border-brand-border">${i + 1}. ${_loEsc(h)}</th>`).join('') + '</tr>';
-  body.innerHTML = _loRows.slice(1, 11).map(r => '<tr class="border-b border-brand-border">' + header.map((_, i) => `<td class="px-3 py-1.5 text-xs whitespace-nowrap">${_loEsc(r[i])}</td>`).join('') + '</tr>').join('');
+// 헤더행 자동 탐지(주문번호 포함 행) + 헤더 비면 윗줄(그룹헤더)로 보완
+function _loHeaderRow(rows){ for(let i=0;i<Math.min(rows.length,20);i++){ if((rows[i]||[]).some(c=>/주문\s*번호/.test(String(c)))) return i; } return 0; }
+function _loColNames(rows, hi){ const h=rows[hi]||[]; const g=hi>0?(rows[hi-1]||[]):[]; const n=Math.max(h.length,g.length); const out=[]; for(let i=0;i<n;i++){ out.push((String(h[i]||'').trim()) || (String(g[i]||'').trim())); } return out; }
+function _loIdx(names, exact, contains){ for(const e of exact){ const i=names.findIndex(n=>n===e); if(i>=0) return i; } for(const c of (contains||[])){ const i=names.findIndex(n=>n.includes(c)); if(i>=0) return i; } return -1; }
+// 파일 → 주문번호별 합계 {order:{qty,amt,cnt,name}}
+function _loAgg(file, kind){
+  const rows = file.rows, hi = _loHeaderRow(rows), names = _loColNames(rows, hi);
+  const oi = _loIdx(names, ['주문번호'], ['주문번호']);
+  const qi = kind==='A' ? _loIdx(names, ['판매수량'], ['수량']) : _loIdx(names, ['수량'], ['수량']);
+  const ai = kind==='A' ? _loIdx(names, ['판매금액'], []) : _loIdx(names, ['금액'], []);
+  const ni = kind==='A' ? _loIdx(names, ['판매자상품명'], ['상품명']) : _loIdx(names, ['주문상품명','기본상품명'], ['상품명']);
+  const map = new Map();
+  for(let r=hi+1;r<rows.length;r++){ const row=rows[r]||[]; const ord=String(row[oi]||'').trim().replace(/\s+/g,''); if(!ord || !/\d{6,}/.test(ord)) continue;
+    if(!map.has(ord)) map.set(ord,{order:ord,qty:0,amt:0,cnt:0,name:''});
+    const m=map.get(ord); if(qi>=0) m.qty+=_loNum(row[qi]); if(ai>=0) m.amt+=_loNum(row[ai]); m.cnt++; if(!m.name && ni>=0) m.name=String(row[ni]||'').trim();
+  }
+  return { map, idx:{oi,qi,ai,ni}, headerRow:hi };
 }
-function _loProcess() {
-  if (_loRows.length <= 1) { alert('먼저 롯데온 엑셀을 업로드하세요.'); return; }
-  alert('가공 규칙이 아직 설정되지 않았습니다.\n\n어떤 컬럼을 어떻게 바꿔야 하는지(입력 → 출력)를 알려주시면 변환 로직을 넣어드립니다.\n예) "상품주문번호·상품명·수량 컬럼만 뽑아 ○○양식으로", "특정 컬럼 합치기/나누기" 등.');
+function _loProcess(){
+  if(!(_loA && _loB)){ alert('A·B 파일을 모두 업로드하세요.'); return; }
+  const A=_loAgg(_loA,'A'), B=_loAgg(_loB,'B');
+  if(A.idx.oi<0 || B.idx.oi<0){ alert('주문번호 컬럼을 찾지 못했습니다.\nA 주문번호: '+(A.idx.oi>=0?'O':'X')+' / B 주문번호: '+(B.idx.oi>=0?'O':'X')); return; }
+  const orders=new Set([...A.map.keys(), ...B.map.keys()]);
+  const res=[];
+  orders.forEach(o=>{ const a=A.map.get(o), b=B.map.get(o);
+    const status = (a&&b)?'both':(a?'onlyA':'onlyB');
+    const aAmt=a?a.amt:null, bAmt=b?b.amt:null, aQty=a?a.qty:null, bQty=b?b.qty:null;
+    const amtDiff=(a&&b)?(a.amt-b.amt):null;
+    const verdict=(a&&b)?((a.amt===b.amt && a.qty===b.qty)?'일치':'불일치'):'';
+    res.push({o,status,name:(a&&a.name)||(b&&b.name)||'',aQty,bQty,aAmt,bAmt,amtDiff,verdict});
+  });
+  const rank=x=> x.status!=='both'?0 : (x.verdict==='불일치'?1:2);
+  res.sort((x,y)=> rank(x)-rank(y) || String(x.o).localeCompare(String(y.o)));
+  _loResult=res; _loFilter='all';
+  _loRenderSummary(A,B); _loRenderResult();
+  document.getElementById('lo-download-btn').disabled = !res.length;
+  document.getElementById('lo-result-wrap').classList.remove('hidden');
 }
-function _loDownload() {
-  if (_loRows.length <= 1) { alert('내보낼 데이터가 없습니다.'); return; }
-  const ws = XLSX.utils.aoa_to_sheet(_loRows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '롯데온');
-  const t = new Date();
-  const stamp = `${t.getFullYear()}${String(t.getMonth() + 1).padStart(2, '0')}${String(t.getDate()).padStart(2, '0')}`;
-  XLSX.writeFile(wb, `롯데온_가공_${stamp}.xlsx`);
+function _loRenderSummary(A,B){
+  const both=_loResult.filter(r=>r.status==='both');
+  const diff=both.filter(r=>r.verdict==='불일치').length;
+  const onlyA=_loResult.filter(r=>r.status==='onlyA').length;
+  const onlyB=_loResult.filter(r=>r.status==='onlyB').length;
+  const card=(label,val,cls)=>`<div class="bg-white rounded-3xl panel p-4 text-center"><div class="text-xs text-brand-gray font-bold mb-1">${label}</div><div class="text-2xl font-black ${cls||''}">${val}</div></div>`;
+  const sum=document.getElementById('lo-summary'); sum.classList.remove('hidden');
+  sum.innerHTML = card('전체 주문', _loResult.length) + card('불일치(금액·수량)', diff, 'text-brand-pink') + card('A만(정산O 매출X)', onlyA, 'text-orange-500') + card('B만(매출O 정산X)', onlyB, 'text-brand-blue');
 }
-function _loReset() {
-  _loRows = [];
-  const fi = document.getElementById('lo-file'); if (fi) fi.value = '';
-  document.getElementById('lo-fileinfo').classList.add('hidden');
-  document.getElementById('lo-preview-wrap').classList.add('hidden');
-  document.getElementById('lo-process-btn').disabled = true;
-  document.getElementById('lo-download-btn').disabled = true;
+function _loSetFilter(f){ _loFilter=f; document.querySelectorAll('.lo-fbtn').forEach(b=>{ const on=b.dataset.f===f; b.classList.toggle('bg-brand-black',on); b.classList.toggle('text-white',on); b.classList.toggle('text-brand-gray',!on); }); _loRenderResult(); }
+function _loRenderResult(){
+  const body=document.getElementById('lo-result-body');
+  let rows=_loResult;
+  if(_loFilter==='diff') rows=rows.filter(r=>r.status==='both'&&r.verdict==='불일치');
+  else if(_loFilter==='onlyA') rows=rows.filter(r=>r.status==='onlyA');
+  else if(_loFilter==='onlyB') rows=rows.filter(r=>r.status==='onlyB');
+  if(!rows.length){ body.innerHTML='<tr><td colspan="9" class="px-3 py-8 text-center text-brand-gray text-sm">해당 항목이 없습니다.</td></tr>'; return; }
+  const stTxt={both:'양쪽',onlyA:'A만',onlyB:'B만'};
+  const stCls={both:'text-brand-gray',onlyA:'text-orange-500',onlyB:'text-brand-blue'};
+  body.innerHTML=rows.map(r=>{
+    const vc = r.verdict==='불일치'?'text-brand-pink font-bold':(r.verdict==='일치'?'text-green-600':'text-brand-gray');
+    const dc = (r.amtDiff!=null && r.amtDiff!==0)?'text-brand-pink font-bold':'';
+    return `<tr class="border-b border-brand-border hover:bg-brand-bg/40">
+      <td class="px-3 py-1.5 text-xs whitespace-nowrap font-mono">${_loEsc(r.o)}</td>
+      <td class="px-3 py-1.5 text-xs text-center font-bold ${stCls[r.status]}">${stTxt[r.status]}</td>
+      <td class="px-3 py-1.5 text-xs max-w-[280px] truncate" title="${_loEsc(r.name)}">${_loEsc(r.name)}</td>
+      <td class="px-3 py-1.5 text-xs text-right">${r.aQty==null?'-':_loFmt(r.aQty)}</td>
+      <td class="px-3 py-1.5 text-xs text-right">${r.bQty==null?'-':_loFmt(r.bQty)}</td>
+      <td class="px-3 py-1.5 text-xs text-right">${r.aAmt==null?'-':_loFmt(r.aAmt)}</td>
+      <td class="px-3 py-1.5 text-xs text-right">${r.bAmt==null?'-':_loFmt(r.bAmt)}</td>
+      <td class="px-3 py-1.5 text-xs text-right ${dc}">${r.amtDiff==null?'-':_loFmt(r.amtDiff)}</td>
+      <td class="px-3 py-1.5 text-xs text-center ${vc}">${r.verdict||'-'}</td>
+    </tr>`;
+  }).join('');
+}
+function _loDownload(){
+  if(!_loResult.length){ alert('먼저 비교를 실행하세요.'); return; }
+  const head=['주문번호','상태','상품명','A수량','B수량','A금액(판매)','B금액(매출)','금액차이','판정'];
+  const stTxt={both:'양쪽',onlyA:'A만(정산)',onlyB:'B만(매출)'};
+  const aoa=[head, ..._loResult.map(r=>[r.o, stTxt[r.status], r.name, r.aQty==null?'':r.aQty, r.bQty==null?'':r.bQty, r.aAmt==null?'':r.aAmt, r.bAmt==null?'':r.bAmt, r.amtDiff==null?'':r.amtDiff, r.verdict])];
+  const ws=XLSX.utils.aoa_to_sheet(aoa); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'주문번호비교');
+  const t=new Date(); const stamp=`${t.getFullYear()}${String(t.getMonth()+1).padStart(2,'0')}${String(t.getDate()).padStart(2,'0')}`;
+  XLSX.writeFile(wb, `롯데온_주문대사_${stamp}.xlsx`);
+}
+function _loReset(){
+  _loA=_loB=null; _loResult=[]; _loFilter='all';
+  ['lo-fileA','lo-fileB'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
+  ['lo-infoA','lo-infoB'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));
+  document.getElementById('lo-summary')?.classList.add('hidden');
+  document.getElementById('lo-result-wrap')?.classList.add('hidden');
+  document.getElementById('lo-process-btn').disabled=true;
+  document.getElementById('lo-download-btn').disabled=true;
 }
 
 function navigate(page) {
