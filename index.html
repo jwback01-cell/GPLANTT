@@ -2211,7 +2211,7 @@ tailwind.config = {
               <span id="imp-rate" class="text-lg md:text-xl font-bold tracking-tight text-brand-blue">0</span>
               <span class="text-brand-gray text-xs">원 / 위안</span>
             </div>
-            <div class="text-[10px] text-brand-gray mt-1">= (원화 - 중판수수료) ÷ 충전위안화</div>
+            <div class="text-[10px] text-brand-gray mt-1">= (원화 + 충판수수료) ÷ 충전위안화</div>
           </div>
         </section>
 
@@ -9834,7 +9834,7 @@ function _impRate() {
   const krw = Number(_impState.krw) || 0;
   const fee = Number(_impState.feeKrw) || 0;
   const cny = Number(_impState.cny) || 0;
-  return cny > 0 ? (krw - fee) / cny : 0;
+  return cny > 0 ? (krw + fee) / cny : 0;   // 실제 단가 = (원화 + 충판수수료) ÷ 충전위안화
 }
 // 기존 행에 환율 스냅샷이 없으면 현재 글로벌 환율로 채움 (마이그레이션)
 function _impMigrateRows() {
