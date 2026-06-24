@@ -1596,9 +1596,11 @@ tailwind.config = {
               <th class="text-center px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">상태</th>
               <th class="text-left px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">상품명</th>
               <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">A수량</th>
-              <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">B수량</th>
+              <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">B순수량</th>
               <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">A금액(판매)</th>
-              <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">B금액(매출)</th>
+              <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">B출고금액</th>
+              <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">B취소금액</th>
+              <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">B순액(매출)</th>
               <th class="text-right px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">금액차이</th>
               <th class="text-center px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">판정</th>
             </tr></thead>
@@ -1680,19 +1682,32 @@ function _loLoadFile(file, which) {
 function _loHeaderRow(rows){ for(let i=0;i<Math.min(rows.length,20);i++){ if((rows[i]||[]).some(c=>/주문\s*번호/.test(String(c)))) return i; } return 0; }
 function _loColNames(rows, hi){ const h=rows[hi]||[]; const g=hi>0?(rows[hi-1]||[]):[]; const n=Math.max(h.length,g.length); const out=[]; for(let i=0;i<n;i++){ out.push((String(h[i]||'').trim()) || (String(g[i]||'').trim())); } return out; }
 function _loIdx(names, exact, contains){ for(const e of exact){ const i=names.findIndex(n=>n===e); if(i>=0) return i; } for(const c of (contains||[])){ const i=names.findIndex(n=>n.includes(c)); if(i>=0) return i; } return -1; }
-// 파일 → 주문번호별 합계 {order:{qty,amt,cnt,name}}
+// B(매출이익)에서 수불구분 컬럼(출고/취소/반품/입고 값) 자동 탐지
+function _loFindMoveCol(rows, hi){
+  const sample = rows.slice(hi+1, hi+40); let ncol=0; sample.forEach(r=>{ if((r||[]).length>ncol) ncol=(r||[]).length; });
+  let best=-1, bestN=0;
+  for(let c=0;c<ncol;c++){ let n=0; for(const r of sample){ if(/출고|취소|반품|입고/.test(String((r||[])[c]||''))) n++; } if(n>bestN){ bestN=n; best=c; } }
+  return bestN>=2 ? best : -1;
+}
+// 파일 → 주문번호별 합계. A:{qty,amt,name} / B:{saleQty,cancelQty,saleAmt,cancelAmt,name}
 function _loAgg(file, kind){
   const rows = file.rows, hi = _loHeaderRow(rows), names = _loColNames(rows, hi);
   const oi = _loIdx(names, ['주문번호'], ['주문번호']);
   const qi = kind==='A' ? _loIdx(names, ['판매수량'], ['수량']) : _loIdx(names, ['수량'], ['수량']);
   const ai = kind==='A' ? _loIdx(names, ['판매금액'], []) : _loIdx(names, ['금액'], []);
   const ni = kind==='A' ? _loIdx(names, ['판매자상품명'], ['상품명']) : _loIdx(names, ['주문상품명','기본상품명'], ['상품명']);
+  const mvi = kind==='B' ? _loFindMoveCol(rows, hi) : -1;
   const map = new Map();
   for(let r=hi+1;r<rows.length;r++){ const row=rows[r]||[]; const ord=String(row[oi]||'').trim().replace(/\s+/g,''); if(!ord || !/\d{6,}/.test(ord)) continue;
-    if(!map.has(ord)) map.set(ord,{order:ord,qty:0,amt:0,cnt:0,name:''});
-    const m=map.get(ord); if(qi>=0) m.qty+=_loNum(row[qi]); if(ai>=0) m.amt+=_loNum(row[ai]); m.cnt++; if(!m.name && ni>=0) m.name=String(row[ni]||'').trim();
+    const amt = ai>=0?_loNum(row[ai]):0, qty = qi>=0?_loNum(row[qi]):0;
+    if(!map.has(ord)) map.set(ord, kind==='A' ? {order:ord,qty:0,amt:0,name:''} : {order:ord,saleQty:0,cancelQty:0,saleAmt:0,cancelAmt:0,name:''});
+    const m=map.get(ord);
+    if(kind==='A'){ m.qty+=qty; m.amt+=amt; }
+    else { const mv = mvi>=0?String(row[mvi]||''):''; const isCancel = /취소|반품/.test(mv) || amt<0 || qty<0;
+      if(isCancel){ m.cancelAmt+=amt; m.cancelQty+=qty; } else { m.saleAmt+=amt; m.saleQty+=qty; } }
+    if(!m.name && ni>=0) m.name=String(row[ni]||'').trim();
   }
-  return { map, idx:{oi,qi,ai,ni}, headerRow:hi };
+  return { map, idx:{oi,qi,ai,ni,mvi}, headerRow:hi };
 }
 function _loProcess(){
   if(!(_loA && _loB)){ alert('A·B 파일을 모두 업로드하세요.'); return; }
@@ -1702,21 +1717,22 @@ function _loProcess(){
   const res=[];
   orders.forEach(o=>{ const a=A.map.get(o), b=B.map.get(o);
     const status = (a&&b)?'both':(a?'onlyA':'onlyB');
-    const aAmt=a?a.amt:null, bAmt=b?b.amt:null, aQty=a?a.qty:null, bQty=b?b.qty:null;
-    const amtDiff=(a&&b)?(a.amt-b.amt):null;
-    const verdict=(a&&b)?((a.amt===b.amt && a.qty===b.qty)?'일치':'불일치'):'';
-    res.push({o,status,name:(a&&a.name)||(b&&b.name)||'',aQty,bQty,aAmt,bAmt,amtDiff,verdict});
+    const aQty=a?a.qty:null, aAmt=a?a.amt:null;
+    const bSaleAmt=b?b.saleAmt:null, bCancelAmt=b?b.cancelAmt:null;
+    const bNetAmt=b?(b.saleAmt+b.cancelAmt):null, bNetQty=b?(b.saleQty+b.cancelQty):null;
+    const amtDiff=(a&&b)?(a.amt-bNetAmt):null;
+    const verdict=(a&&b)?((a.amt===bNetAmt && a.qty===bNetQty)?'일치':'불일치'):'';
+    res.push({o,status,name:(a&&a.name)||(b&&b.name)||'', aQty,aAmt, bSaleAmt,bCancelAmt,bNetAmt,bNetQty, amtDiff,verdict});
   });
   const rank=x=> x.status!=='both'?0 : (x.verdict==='불일치'?1:2);
   res.sort((x,y)=> rank(x)-rank(y) || String(x.o).localeCompare(String(y.o)));
   _loResult=res; _loFilter='all';
-  _loRenderSummary(A,B); _loRenderResult();
+  _loRenderSummary(); _loRenderResult();
   document.getElementById('lo-download-btn').disabled = !res.length;
   document.getElementById('lo-result-wrap').classList.remove('hidden');
 }
-function _loRenderSummary(A,B){
-  const both=_loResult.filter(r=>r.status==='both');
-  const diff=both.filter(r=>r.verdict==='불일치').length;
+function _loRenderSummary(){
+  const diff=_loResult.filter(r=>r.status==='both'&&r.verdict==='불일치').length;
   const onlyA=_loResult.filter(r=>r.status==='onlyA').length;
   const onlyB=_loResult.filter(r=>r.status==='onlyB').length;
   const card=(label,val,cls)=>`<div class="bg-white rounded-3xl panel p-4 text-center"><div class="text-xs text-brand-gray font-bold mb-1">${label}</div><div class="text-2xl font-black ${cls||''}">${val}</div></div>`;
@@ -1730,30 +1746,35 @@ function _loRenderResult(){
   if(_loFilter==='diff') rows=rows.filter(r=>r.status==='both'&&r.verdict==='불일치');
   else if(_loFilter==='onlyA') rows=rows.filter(r=>r.status==='onlyA');
   else if(_loFilter==='onlyB') rows=rows.filter(r=>r.status==='onlyB');
-  if(!rows.length){ body.innerHTML='<tr><td colspan="9" class="px-3 py-8 text-center text-brand-gray text-sm">해당 항목이 없습니다.</td></tr>'; return; }
+  if(!rows.length){ body.innerHTML='<tr><td colspan="11" class="px-3 py-8 text-center text-brand-gray text-sm">해당 항목이 없습니다.</td></tr>'; return; }
   const stTxt={both:'양쪽',onlyA:'A만',onlyB:'B만'};
   const stCls={both:'text-brand-gray',onlyA:'text-orange-500',onlyB:'text-brand-blue'};
+  const cell=(v,extra)=>`<td class="px-3 py-1.5 text-xs text-right ${extra||''}">${v==null?'-':_loFmt(v)}</td>`;
   body.innerHTML=rows.map(r=>{
     const vc = r.verdict==='불일치'?'text-brand-pink font-bold':(r.verdict==='일치'?'text-green-600':'text-brand-gray');
     const dc = (r.amtDiff!=null && r.amtDiff!==0)?'text-brand-pink font-bold':'';
+    const cc = (r.bCancelAmt!=null && r.bCancelAmt!==0)?'text-brand-pink':'';
     return `<tr class="border-b border-brand-border hover:bg-brand-bg/40">
       <td class="px-3 py-1.5 text-xs whitespace-nowrap font-mono">${_loEsc(r.o)}</td>
       <td class="px-3 py-1.5 text-xs text-center font-bold ${stCls[r.status]}">${stTxt[r.status]}</td>
-      <td class="px-3 py-1.5 text-xs max-w-[280px] truncate" title="${_loEsc(r.name)}">${_loEsc(r.name)}</td>
-      <td class="px-3 py-1.5 text-xs text-right">${r.aQty==null?'-':_loFmt(r.aQty)}</td>
-      <td class="px-3 py-1.5 text-xs text-right">${r.bQty==null?'-':_loFmt(r.bQty)}</td>
-      <td class="px-3 py-1.5 text-xs text-right">${r.aAmt==null?'-':_loFmt(r.aAmt)}</td>
-      <td class="px-3 py-1.5 text-xs text-right">${r.bAmt==null?'-':_loFmt(r.bAmt)}</td>
-      <td class="px-3 py-1.5 text-xs text-right ${dc}">${r.amtDiff==null?'-':_loFmt(r.amtDiff)}</td>
+      <td class="px-3 py-1.5 text-xs max-w-[260px] truncate" title="${_loEsc(r.name)}">${_loEsc(r.name)}</td>
+      ${cell(r.aQty)}
+      ${cell(r.bNetQty)}
+      ${cell(r.aAmt)}
+      ${cell(r.bSaleAmt)}
+      ${cell(r.bCancelAmt, cc)}
+      ${cell(r.bNetAmt)}
+      ${cell(r.amtDiff, dc)}
       <td class="px-3 py-1.5 text-xs text-center ${vc}">${r.verdict||'-'}</td>
     </tr>`;
   }).join('');
 }
 function _loDownload(){
   if(!_loResult.length){ alert('먼저 비교를 실행하세요.'); return; }
-  const head=['주문번호','상태','상품명','A수량','B수량','A금액(판매)','B금액(매출)','금액차이','판정'];
+  const head=['주문번호','상태','상품명','A수량','B순수량','A금액(판매)','B출고금액','B취소금액','B순액(매출)','금액차이(A-B순)','판정'];
   const stTxt={both:'양쪽',onlyA:'A만(정산)',onlyB:'B만(매출)'};
-  const aoa=[head, ..._loResult.map(r=>[r.o, stTxt[r.status], r.name, r.aQty==null?'':r.aQty, r.bQty==null?'':r.bQty, r.aAmt==null?'':r.aAmt, r.bAmt==null?'':r.bAmt, r.amtDiff==null?'':r.amtDiff, r.verdict])];
+  const nz=v=>v==null?'':v;
+  const aoa=[head, ..._loResult.map(r=>[r.o, stTxt[r.status], r.name, nz(r.aQty), nz(r.bNetQty), nz(r.aAmt), nz(r.bSaleAmt), nz(r.bCancelAmt), nz(r.bNetAmt), nz(r.amtDiff), r.verdict])];
   const ws=XLSX.utils.aoa_to_sheet(aoa); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'주문번호비교');
   const t=new Date(); const stamp=`${t.getFullYear()}${String(t.getMonth()+1).padStart(2,'0')}${String(t.getDate()).padStart(2,'0')}`;
   XLSX.writeFile(wb, `롯데온_주문대사_${stamp}.xlsx`);
