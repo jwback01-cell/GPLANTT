@@ -1682,6 +1682,9 @@ function _loLoadFile(file, which) {
 function _loHeaderRow(rows){ for(let i=0;i<Math.min(rows.length,20);i++){ if((rows[i]||[]).some(c=>/주문\s*번호/.test(String(c)))) return i; } return 0; }
 function _loColNames(rows, hi){ const h=rows[hi]||[]; const g=hi>0?(rows[hi-1]||[]):[]; const n=Math.max(h.length,g.length); const out=[]; for(let i=0;i<n;i++){ out.push((String(h[i]||'').trim()) || (String(g[i]||'').trim())); } return out; }
 function _loIdx(names, exact, contains){ for(const e of exact){ const i=names.findIndex(n=>n===e); if(i>=0) return i; } for(const c of (contains||[])){ const i=names.findIndex(n=>n.includes(c)); if(i>=0) return i; } return -1; }
+// 엑셀 A 제외 키워드 — 상품명에 포함되면 비교 대상에서 제외 (대소문자 무시)
+const _LO_EXCLUDE = ['EPSON','시놀로지','삼성','인스타','한경희','지클릭커','비스포크','서울우유','GIGABYTE','아이프리','오라이트','춘식이'];
+function _loExcluded(name){ const s=String(name||'').toUpperCase(); return _LO_EXCLUDE.some(k=> s.includes(k.toUpperCase())); }
 // B(매출이익)에서 수불구분 컬럼(출고/취소/반품/입고 값) 자동 탐지
 function _loFindMoveCol(rows, hi){
   const sample = rows.slice(hi+1, hi+40); let ncol=0; sample.forEach(r=>{ if((r||[]).length>ncol) ncol=(r||[]).length; });
@@ -1699,13 +1702,15 @@ function _loAgg(file, kind){
   const mvi = kind==='B' ? _loFindMoveCol(rows, hi) : -1;
   const map = new Map();
   for(let r=hi+1;r<rows.length;r++){ const row=rows[r]||[]; const ord=String(row[oi]||'').trim().replace(/\s+/g,''); if(!ord || !/\d{6,}/.test(ord)) continue;
+    const rowName = ni>=0 ? String(row[ni]||'').trim() : '';
+    if(kind==='A' && _loExcluded(rowName)) continue;   // A: 제외 키워드 상품명은 비교 제외
     const amt = ai>=0?_loNum(row[ai]):0, qty = qi>=0?_loNum(row[qi]):0;
     if(!map.has(ord)) map.set(ord, kind==='A' ? {order:ord,qty:0,amt:0,name:''} : {order:ord,saleQty:0,cancelQty:0,saleAmt:0,cancelAmt:0,name:''});
     const m=map.get(ord);
     if(kind==='A'){ m.qty+=qty; m.amt+=amt; }
     else { const mv = mvi>=0?String(row[mvi]||''):''; const isCancel = /취소|반품/.test(mv) || amt<0 || qty<0;
       if(isCancel){ m.cancelAmt+=amt; m.cancelQty+=qty; } else { m.saleAmt+=amt; m.saleQty+=qty; } }
-    if(!m.name && ni>=0) m.name=String(row[ni]||'').trim();
+    if(!m.name) m.name=rowName;
   }
   return { map, idx:{oi,qi,ai,ni,mvi}, headerRow:hi };
 }
