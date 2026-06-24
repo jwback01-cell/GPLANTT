@@ -10093,12 +10093,13 @@ async function importImpFromImageHost() {
     byKey.set(k, row);
     newRows.push(row);
   });
-  if (!newRows.length && !updated) { alert(`이미지호스팅 상품 ${products.length}개 — 가져올 새 상품이 없습니다 (이미 모두 반영됨).`); return; }
-  if (!confirm(`이미지호스팅 상품 가져오기\n· 새로 추가: ${newRows.length}개\n· 폴더코드 보완: ${updated}개\n\n진행할까요? (폴더코드·상품코드·제품명만 채워지고, 위안·수량은 직접 입력)`)) return;
+  console.log('[IH import] 클라우드에서 읽은 상품 수:', products.length);
+  if (!newRows.length && !updated) { alert(`클라우드에서 읽은 상품: ${products.length}개\n가져올 새 상품이 없습니다 (이미 모두 반영됨).`); return; }
+  if (!confirm(`이미지호스팅 상품 가져오기\n\n· 클라우드에서 읽은 상품(색상 포함 전체): ${products.length}개\n· 새로 추가: ${newRows.length}개\n· 폴더코드 보완: ${updated}개\n\n진행할까요? (폴더코드·상품코드·제품명만 채워지고, 위안·수량은 직접 입력)`)) return;
   if (newRows.length) _impState.rows = newRows.concat(_impState.rows);
   _impSave();
   renderImpTab();
-  alert(`✅ 완료 — 새로 ${newRows.length}개 추가, 폴더코드 ${updated}개 보완.`);
+  alert(`✅ 완료 — 클라우드 ${products.length}개 중 새로 ${newRows.length}개 추가, 폴더코드 ${updated}개 보완.`);
 }
 function _onImpEdit(id, field, val) {
   _impLoad();
