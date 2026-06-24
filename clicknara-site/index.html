@@ -1716,7 +1716,7 @@ function _loAgg(file, kind){
   const oi = _loIdx(names, ['주문번호'], ['주문번호']);
   const qi = kind==='A' ? _loIdx(names, ['판매수량'], ['수량']) : _loIdx(names, ['수량'], ['수량']);
   const ai = kind==='A' ? _loIdx(names, ['판매금액'], []) : _loIdx(names, ['금액'], []);
-  const ni = kind==='A' ? _loIdx(names, ['판매자상품명'], ['상품명']) : _loIdx(names, ['주문상품명','기본상품명'], ['상품명']);
+  const ni = kind==='A' ? _loIdx(names, ['판매자상품명'], ['상품명']) : _loIdx(names, ['기본상품명','주문상품명'], ['상품명']);
   const mvi = kind==='B' ? _loFindMoveCol(rows, hi) : -1;
   const gi  = kind==='B' ? _loIdx(names, ['공급액'], ['공급']) : -1;
   const map = new Map();
