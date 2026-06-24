@@ -2990,7 +2990,7 @@ tailwind.config = {
       <div class="flex flex-col gap-2">
         <label class="text-sm font-bold">비밀번호 <span class="text-brand-pink">*</span></label>
         <div class="relative">
-          <input id="new-account-pw" type="password" placeholder="비밀번호를 입력해주세요" class="drawer-input pr-12">
+          <input id="new-account-pw" type="text" placeholder="비밀번호를 입력해주세요" class="drawer-input pr-12">
           <button type="button" onclick="toggleAccountPw()" class="absolute right-4 top-1/2 -translate-y-1/2 text-brand-gray hover:text-brand-black transition-colors">
             <svg id="new-account-pw-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
@@ -8190,7 +8190,7 @@ function openAddAccountDrawer() {
   document.getElementById('new-account-id').value = '';
   document.getElementById('new-account-url').value = '';
   document.getElementById('new-account-pw').value = '';
-  document.getElementById('new-account-pw').type = 'password';
+  document.getElementById('new-account-pw').type = 'text';
   document.getElementById('new-account-memo').value = '';
   document.getElementById('account-drawer-error').classList.add('hidden');
   document.getElementById('add-account-backdrop').classList.add('open');
@@ -8222,7 +8222,7 @@ function openEditAccountDrawer(btn) {
   document.getElementById('new-account-id').value       = id;
   document.getElementById('new-account-url').value      = url;
   document.getElementById('new-account-pw').value       = pw;
-  document.getElementById('new-account-pw').type        = 'password';
+  document.getElementById('new-account-pw').type        = 'text';
   document.getElementById('new-account-memo').value     = memo;
   document.getElementById('account-drawer-error').classList.add('hidden');
   document.getElementById('add-account-backdrop').classList.add('open');
