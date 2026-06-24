@@ -1727,7 +1727,7 @@ function _loProcess(){
     const bNetAmt=b?(b.saleAmt+b.cancelAmt):null, bNetQty=b?(b.saleQty+b.cancelQty):null;
     const amtDiff=(a&&b)?(a.amt-bNetAmt):null;
     const verdict=(a&&b)?((a.amt===bNetAmt && a.qty===bNetQty)?'일치':'불일치'):'';
-    res.push({o,status,name:(a&&a.name)||(b&&b.name)||'', aQty,aAmt, bSaleAmt,bCancelAmt,bNetAmt,bNetQty, amtDiff,verdict});
+    res.push({o,status,name:(b&&b.name)||(a&&a.name)||'', aQty,aAmt, bSaleAmt,bCancelAmt,bNetAmt,bNetQty, amtDiff,verdict});
   });
   const rank=x=> x.status!=='both'?0 : (x.verdict==='불일치'?1:2);
   res.sort((x,y)=> rank(x)-rank(y) || String(x.o).localeCompare(String(y.o)));
