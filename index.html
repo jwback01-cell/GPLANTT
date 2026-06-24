@@ -2422,6 +2422,24 @@ tailwind.config = {
   </div>
 </div>
 
+<!-- 수입 저장내역 → 입고 확인 모달 -->
+<div id="imp-recv-backdrop" class="todo-modal-backdrop" onclick="if(event.target===this)closeImpReceivingModal()">
+  <div class="todo-modal" style="max-width:460px;padding:24px;">
+    <h3 class="text-lg font-bold mb-1">입고하기로 보내기 📥</h3>
+    <p id="imp-recv-title" class="text-sm font-semibold mb-3"></p>
+    <ul class="text-[13px] text-brand-gray leading-relaxed mb-2 list-disc pl-5">
+      <li>상품코드(SKU)로 재고가 늘고 원가가 <b>가중평균</b>으로 갱신됩니다.</li>
+      <li>등록되지 않은 상품은 <b>자동으로 새 상품으로 등록</b>됩니다.</li>
+      <li>단가 = 1개금액(원), 수량 = 저장된 수량</li>
+    </ul>
+    <p id="imp-recv-warn" class="hidden text-[13px] text-brand-pink font-bold mb-2">⚠ 이미 입고 처리된 내역입니다. 다시 보내면 재고가 또 늘어납니다.</p>
+    <div class="flex gap-2 justify-end mt-4">
+      <button onclick="closeImpReceivingModal()" class="px-4 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg">취소</button>
+      <button id="imp-recv-confirm-btn" onclick="confirmImpReceiving()" class="px-4 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333]">입고 처리</button>
+    </div>
+  </div>
+</div>
+
 <!-- 세트 상품 추가/수정 드로어 -->
 <div id="add-set-backdrop" class="product-drawer-backdrop" onclick="closeAddSetDrawer()"></div>
 <div id="add-set-drawer" class="product-drawer" style="max-width: 640px;">
@@ -10380,15 +10398,31 @@ function exportImpSavedExcel() {
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), '수입단가표');
   XLSX.writeFile(wb, `수입저장_${rec.name}.xlsx`);
 }
-// 저장내역을 입고하기로 보내 입고 처리 — 상품코드(SKU)별 재고 증가 + 원가 가중평균
-async function sendImpSavedToReceiving(id) {
+// 저장내역을 입고하기로 보내 입고 처리 — 확인 모달 열기
+let _impRecvPendingId = null;
+function sendImpSavedToReceiving(id) {
+  const rec = _impLoadSaved().find(r => r.id === id);
+  if (!rec) return;
+  const rows = (rec.rows || []).filter(r => (Number(r.qty) || 0) > 0);
+  if (!rows.length) { showAppAlert('입고 불가', '수량이 입력된 행이 없습니다.', 'warn'); return; }
+  _impRecvPendingId = id;
+  document.getElementById('imp-recv-title').textContent = `"${rec.name}" 의 ${rows.length}개 품목을 입고 처리합니다.`;
+  document.getElementById('imp-recv-warn').classList.toggle('hidden', !rec.received);
+  document.getElementById('imp-recv-backdrop').classList.add('open');
+}
+function closeImpReceivingModal() {
+  document.getElementById('imp-recv-backdrop').classList.remove('open');
+  _impRecvPendingId = null;
+}
+async function confirmImpReceiving() {
+  const id = _impRecvPendingId;
+  closeImpReceivingModal();
+  if (!id) return;
   const list = _impLoadSaved();
   const rec = list.find(r => r.id === id);
   if (!rec) return;
   const rows = (rec.rows || []).filter(r => (Number(r.qty) || 0) > 0);
   if (!rows.length) { showAppAlert('입고 불가', '수량이 입력된 행이 없습니다.', 'warn'); return; }
-  const warnReceived = rec.received ? '\n\n⚠ 이미 입고 처리된 내역입니다. 다시 보내면 재고가 또 늘어납니다.' : '';
-  if (!confirm(`"${rec.name}" 의 ${rows.length}개 품목을 입고 처리할까요?\n· 상품코드(SKU)로 재고가 늘고 원가가 가중평균으로 갱신됩니다.\n· 등록되지 않은 상품은 자동으로 새 상품으로 등록됩니다.\n· 단가 = 1개금액(원), 수량 = 저장된 수량${warnReceived}`)) return;
   const { data: { session } } = await _supabase.auth.getSession();
   if (!session) { showAppAlert('로그인 필요', '다시 로그인 후 시도해 주세요.', 'error'); return; }
   const today = (() => { const t = new Date(); return t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0'); })();
