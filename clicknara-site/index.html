@@ -1546,6 +1546,12 @@ tailwind.config = {
       </section>
 
       <section class="bg-white rounded-4xl panel p-6 md:p-8">
+        <div class="flex items-center gap-2 mb-4 flex-wrap">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-brand-gray"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span class="text-xs font-bold text-brand-gray">비밀번호 걸린 엑셀이면 비밀번호 입력</span>
+          <input id="lo-pw" type="text" value="1234" placeholder="비밀번호" class="px-3 py-1.5 rounded-full border border-brand-border text-sm w-[140px] focus:outline-none focus:border-brand-black">
+          <span class="text-[11px] text-brand-gray">(암호 없으면 무시됨)</span>
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <div class="flex items-center gap-2 mb-2"><div class="w-8 h-8 rounded-[10px] flex items-center justify-center bg-brand-blue-light shrink-0 text-brand-blue font-black text-sm">A</div><h3 class="font-bold">엑셀 A — 롯데온 정산</h3></div>
@@ -1654,7 +1660,10 @@ function _loLoadFile(file, which) {
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
-      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      const pw = (document.getElementById('lo-pw')?.value || '').trim();
+      const opts = { type: 'array', cellDates: true };
+      if (pw) opts.password = pw;   // 비밀번호 걸린(암호화) 엑셀 복호화
+      const wb = XLSX.read(e.target.result, opts);
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = (XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) || []).filter(r => Array.isArray(r) && r.some(c => String(c).trim() !== ''));
       const obj = { name: file.name, rows };
