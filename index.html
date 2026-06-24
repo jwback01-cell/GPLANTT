@@ -2271,6 +2271,8 @@ tailwind.config = {
               <thead>
                 <tr class="bg-brand-bg">
                   <th class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[110px]">입항일</th>
+                  <th class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[90px]">폴더코드</th>
+                  <th class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[100px]">상품코드</th>
                   <th class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[120px]">중판코드</th>
                   <th class="px-3 py-3 text-left   font-bold border-b-2 border-brand-border min-w-[220px]">제품명</th>
                   <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[90px]">위안화</th>
@@ -2287,7 +2289,7 @@ tailwind.config = {
               <tbody id="imp-tbody"></tbody>
               <tfoot>
                 <tr class="bg-brand-bg/50 font-bold">
-                  <td colspan="3" class="px-3 py-2.5 text-right text-brand-gray text-xs">합계</td>
+                  <td colspan="5" class="px-3 py-2.5 text-right text-brand-gray text-xs">합계</td>
                   <td class="px-3 py-2.5 text-right" id="imp-sum-cny">0</td>
                   <td class="px-3 py-2.5"></td>
                   <td class="px-3 py-2.5 text-right" id="imp-sum-krw">0</td>
@@ -9877,7 +9879,7 @@ function _impNewRow() {
   const today = `${t.getFullYear()}.${String(t.getMonth()+1).padStart(2,'0')}.${String(t.getDate()).padStart(2,'0')}`;
   return {
     id: 'imp_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-    date: today, code: '', name: '', cny: 0, fee: 0, tax: 0, qty: 0,
+    date: today, folder: '', code: '', vendorCode: '', name: '', cny: 0, fee: 0, tax: 0, qty: 0,
     // 환율 스냅샷 — 행 추가 시점의 현재 환율을 그대로 보존 (이후 상단 입력이 바뀌어도 영향 없음)
     rate: _impRate(),
     krwAtEntry: Number(_impState.krw) || 0,
@@ -9945,7 +9947,9 @@ function renderImpTab() {
       const rateCellCls = rateDiff ? 'text-brand-orange' : 'text-brand-gray';
       return `<tr class="border-b border-brand-border hover:bg-brand-bg/40" data-id="${r.id}">
         <td class="px-1 py-1"><input type="text" value="${_impEsc(r.date)}" oninput="_onImpEdit('${r.id}','date',this.value)" class="${inp} text-xs text-center"></td>
-        <td class="px-1 py-1"><input type="text" value="${_impEsc(r.code)}" oninput="_onImpEdit('${r.id}','code',this.value)" class="${inp} text-xs font-mono text-center"></td>
+        <td class="px-1 py-1"><input type="text" value="${_impEsc(r.folder)}" oninput="_onImpEdit('${r.id}','folder',this.value)" class="${inp} text-xs font-mono text-center" placeholder="폴더"></td>
+        <td class="px-1 py-1"><input type="text" value="${_impEsc(r.code)}" oninput="_onImpEdit('${r.id}','code',this.value)" class="${inp} text-xs font-mono text-center" placeholder="상품코드"></td>
+        <td class="px-1 py-1"><input type="text" value="${_impEsc(r.vendorCode)}" oninput="_onImpEdit('${r.id}','vendorCode',this.value)" class="${inp} text-xs font-mono text-center" placeholder="중판"></td>
         <td class="px-1 py-1"><input type="text" value="${_impEsc(r.name)}" oninput="_onImpEdit('${r.id}','name',this.value)" class="${inp} text-sm font-semibold"></td>
         <td class="px-1 py-1"><input type="number" step="0.01" value="${cny || ''}" oninput="_onImpEdit('${r.id}','cny',this.value)" class="${inp} text-sm text-right"></td>
         <td class="px-1 py-1">
@@ -10060,26 +10064,33 @@ async function importImpFromImageHost() {
     return;
   }
   _impLoad();
-  // 중복 방지 — 이미 수입관리에 있는 (상품코드|제품명) 제외
-  const existKeys = new Set((_impState.rows || []).map(r => (String(r.code || '').trim() + '|' + String(r.name || '').trim())));
+  // (상품코드|제품명) 기준 — 이미 있으면 폴더코드만 보완, 없으면 새로 추가 (중복 없이 재가져오기 가능)
+  const byKey = new Map();
+  (_impState.rows || []).forEach(r => byKey.set(String(r.code || '').trim() + '|' + String(r.name || '').trim(), r));
   const newRows = [];
+  let updated = 0;
   products.forEach(p => {
     const name = String(p.name || '').trim();
     const code = String(p.code || '').trim();
+    const folder = String(p.folder || '').trim();
     if (!name && !code) return;
     const k = code + '|' + name;
-    if (existKeys.has(k)) return;
-    existKeys.add(k);
+    const ex = byKey.get(k);
+    if (ex) {   // 이미 있는 행 — 폴더코드 비어있으면 채워줌
+      if (!String(ex.folder || '').trim() && folder) { ex.folder = folder; updated++; }
+      return;
+    }
     const row = _impNewRow();
-    row.name = name; row.code = code;
+    row.name = name; row.code = code; row.folder = folder;   // 중판코드(vendorCode)는 비워둠 — 직접 입력
+    byKey.set(k, row);
     newRows.push(row);
   });
-  if (!newRows.length) { alert(`이미지호스팅 상품 ${products.length}개 — 가져올 새 상품이 없습니다 (이미 모두 추가됨).`); return; }
-  if (!confirm(`이미지호스팅 상품 ${newRows.length}개를 수입관리에 추가할까요?\n(제품명·상품코드만 채워지고, 위안·수량은 직접 입력)`)) return;
-  _impState.rows = newRows.concat(_impState.rows);
+  if (!newRows.length && !updated) { alert(`이미지호스팅 상품 ${products.length}개 — 가져올 새 상품이 없습니다 (이미 모두 반영됨).`); return; }
+  if (!confirm(`이미지호스팅 상품 가져오기\n· 새로 추가: ${newRows.length}개\n· 폴더코드 보완: ${updated}개\n\n진행할까요? (폴더코드·상품코드·제품명만 채워지고, 위안·수량은 직접 입력)`)) return;
+  if (newRows.length) _impState.rows = newRows.concat(_impState.rows);
   _impSave();
   renderImpTab();
-  alert(`✅ ${newRows.length}개를 가져왔습니다.`);
+  alert(`✅ 완료 — 새로 ${newRows.length}개 추가, 폴더코드 ${updated}개 보완.`);
 }
 function _onImpEdit(id, field, val) {
   _impLoad();
@@ -10110,7 +10121,7 @@ function deleteImpRow(id) {
 async function exportImpExcel() {
   _impLoad();
   _impMigrateRows();
-  const headers = ['입항일','중판코드','제품명','위안화','환율(1위안)','원화','중판비용','관세','합계','수량','1개금액'];
+  const headers = ['입항일','폴더코드','상품코드','중판코드','제품명','위안화','환율(1위안)','원화','중판비용','관세','합계','수량','1개금액'];
   const rows = _impState.rows.map(r => {
     const cny = Number(r.cny) || 0;
     const rowRate = Number(r.rate) || 0;
@@ -10120,7 +10131,7 @@ async function exportImpExcel() {
     const total = krw + fee + tax;
     const qty = Number(r.qty) || 0;
     const unit = qty > 0 ? total / qty : 0;
-    return [r.date, r.code, r.name, cny, Math.round(rowRate), Math.round(krw), fee, tax, Math.round(total), qty, Math.round(unit)];
+    return [r.date, r.folder || '', r.code, r.vendorCode || '', r.name, cny, Math.round(rowRate), Math.round(krw), fee, tax, Math.round(total), qty, Math.round(unit)];
   });
   const aoa = [
     ['현재 원화', _impState.krw],
