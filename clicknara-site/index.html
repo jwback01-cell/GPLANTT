@@ -1550,7 +1550,7 @@ tailwind.config = {
           <div>
             <div class="flex items-center gap-2 mb-2"><div class="w-8 h-8 rounded-[10px] flex items-center justify-center bg-brand-blue-light shrink-0 text-brand-blue font-black text-sm">A</div><h3 class="font-bold">엑셀 A — 롯데온 정산</h3></div>
             <p class="text-brand-gray text-xs mb-3">필요 컬럼: <strong>주문번호 · 판매수량 · 판매금액</strong> (롯데온 정산 export)</p>
-            <label for="lo-fileA" class="block cursor-pointer border-2 border-dashed border-brand-border rounded-3xl py-10 text-center hover:border-brand-blue hover:bg-brand-blue-light/10 transition-colors">
+            <label for="lo-fileA" ondragover="event.preventDefault();this.classList.add('border-brand-blue','bg-brand-blue-light/10')" ondragleave="this.classList.remove('border-brand-blue','bg-brand-blue-light/10')" ondrop="this.classList.remove('border-brand-blue','bg-brand-blue-light/10');_loDrop(event,'A')" class="block cursor-pointer border-2 border-dashed border-brand-border rounded-3xl py-10 text-center hover:border-brand-blue hover:bg-brand-blue-light/10 transition-colors">
               <div class="flex flex-col items-center gap-2"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="text-brand-gray"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14a2 2 0 0 0 2-2v-4"/></svg><div class="font-bold text-sm">엑셀 A 선택</div><div class="text-xs text-brand-gray">.xlsx / .xls / .csv</div></div>
               <input id="lo-fileA" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="_loOnFile(event,'A')">
             </label>
@@ -1559,7 +1559,7 @@ tailwind.config = {
           <div>
             <div class="flex items-center gap-2 mb-2"><div class="w-8 h-8 rounded-[10px] flex items-center justify-center bg-green-100 shrink-0 text-green-600 font-black text-sm">B</div><h3 class="font-bold">엑셀 B — 매출이익 리스트(이카운트)</h3></div>
             <p class="text-brand-gray text-xs mb-3">필요 컬럼: <strong>주문번호 · 수량 · 금액</strong> (이카운트 매출이익 export)</p>
-            <label for="lo-fileB" class="block cursor-pointer border-2 border-dashed border-brand-border rounded-3xl py-10 text-center hover:border-brand-blue hover:bg-brand-blue-light/10 transition-colors">
+            <label for="lo-fileB" ondragover="event.preventDefault();this.classList.add('border-brand-blue','bg-brand-blue-light/10')" ondragleave="this.classList.remove('border-brand-blue','bg-brand-blue-light/10')" ondrop="this.classList.remove('border-brand-blue','bg-brand-blue-light/10');_loDrop(event,'B')" class="block cursor-pointer border-2 border-dashed border-brand-border rounded-3xl py-10 text-center hover:border-brand-blue hover:bg-brand-blue-light/10 transition-colors">
               <div class="flex flex-col items-center gap-2"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="text-brand-gray"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14a2 2 0 0 0 2-2v-4"/></svg><div class="font-bold text-sm">엑셀 B 선택</div><div class="text-xs text-brand-gray">.xlsx / .xls / .csv</div></div>
               <input id="lo-fileB" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="_loOnFile(event,'B')">
             </label>
@@ -1642,7 +1642,14 @@ function _loEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/<
 function _loNum(v){ const n = Number(String(v==null?'':v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; }
 function _loFmt(n){ return (Number(n)||0).toLocaleString('ko-KR'); }
 function _loOnFile(ev, which) {
-  const file = ev.target.files && ev.target.files[0];
+  _loLoadFile(ev.target.files && ev.target.files[0], which);
+}
+function _loDrop(ev, which) {
+  ev.preventDefault();
+  const f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+  if (f) _loLoadFile(f, which);
+}
+function _loLoadFile(file, which) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = (e) => {
