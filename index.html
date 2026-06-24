@@ -2356,6 +2356,7 @@ tailwind.config = {
           <div class="flex items-center justify-between flex-wrap gap-2 px-4 py-3 border-b border-brand-border">
             <h3 id="impsaved-detail-title" class="font-bold"></h3>
             <div class="flex items-center gap-2">
+              <button onclick="if(_impSavedViewId)sendImpSavedToReceiving(_impSavedViewId)" class="px-3 py-1.5 rounded-full bg-brand-black text-white text-xs font-bold hover:opacity-90">입고하기로 보내기</button>
               <button onclick="exportImpSavedExcel()" class="px-3 py-1.5 rounded-full border border-brand-border text-xs font-bold hover:bg-brand-bg">엑셀 다운로드</button>
               <button onclick="closeImpSavedDetail()" class="px-3 py-1.5 rounded-full border border-brand-border text-xs font-bold hover:bg-brand-bg">닫기</button>
             </div>
@@ -10295,14 +10296,16 @@ function renderImpSavedTab() {
   if (empty) empty.classList.add('hidden');
   tbody.innerHTML = list.map(rec => {
     const t = _impSavedTotals(rec);
+    const recvBadge = rec.received ? `<span class="ml-2 text-[10px] font-bold text-green-600" title="${_impEsc(rec.receivedAt||'')} 입고">입고완료</span>` : '';
     return `<tr class="border-b border-brand-border hover:bg-brand-bg/40">
-      <td class="px-4 py-2.5 font-semibold cursor-pointer" onclick="viewImpSaved('${rec.id}')">${_impEsc(rec.name)}</td>
+      <td class="px-4 py-2.5 font-semibold cursor-pointer" onclick="viewImpSaved('${rec.id}')">${_impEsc(rec.name)}${recvBadge}</td>
       <td class="px-4 py-2.5 text-center text-xs text-brand-gray">${_impEsc(rec.savedAt)}</td>
       <td class="px-4 py-2.5 text-right">${_impFmt(t.count)}</td>
       <td class="px-4 py-2.5 text-right">${_impFmt(t.qty)}</td>
       <td class="px-4 py-2.5 text-right font-bold">${_impFmt(t.total)}</td>
       <td class="px-4 py-2.5 text-center whitespace-nowrap">
-        <button onclick="viewImpSaved('${rec.id}')" class="px-2.5 py-1 rounded-full bg-brand-blue-light text-brand-blue text-[11px] font-bold hover:opacity-80">보기</button>
+        <button onclick="sendImpSavedToReceiving('${rec.id}')" class="px-2.5 py-1 rounded-full ${rec.received ? 'bg-brand-bg text-brand-gray' : 'bg-brand-black text-white'} text-[11px] font-bold hover:opacity-80" title="이 내역을 입고하기로 보내 재고 반영">입고</button>
+        <button onclick="viewImpSaved('${rec.id}')" class="ml-1 px-2.5 py-1 rounded-full bg-brand-blue-light text-brand-blue text-[11px] font-bold hover:opacity-80">보기</button>
         <button onclick="deleteImpSaved('${rec.id}')" class="ml-1 text-brand-gray hover:text-brand-pink text-base leading-none align-middle" title="삭제">×</button>
       </td>
     </tr>`;
@@ -10376,6 +10379,59 @@ function exportImpSavedExcel() {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), '수입단가표');
   XLSX.writeFile(wb, `수입저장_${rec.name}.xlsx`);
+}
+// 저장내역을 입고하기로 보내 입고 처리 — 상품코드(SKU)별 재고 증가 + 원가 가중평균
+async function sendImpSavedToReceiving(id) {
+  const list = _impLoadSaved();
+  const rec = list.find(r => r.id === id);
+  if (!rec) return;
+  const rows = (rec.rows || []).filter(r => (Number(r.qty) || 0) > 0);
+  if (!rows.length) { showAppAlert('입고 불가', '수량이 입력된 행이 없습니다.', 'warn'); return; }
+  const warnReceived = rec.received ? '\n\n⚠ 이미 입고 처리된 내역입니다. 다시 보내면 재고가 또 늘어납니다.' : '';
+  if (!confirm(`"${rec.name}" 의 ${rows.length}개 품목을 입고 처리할까요?\n· 상품코드(SKU)로 재고가 늘어나고 원가가 가중평균으로 갱신됩니다.\n· 단가 = 1개금액(원), 수량 = 저장된 수량${warnReceived}`)) return;
+  const today = (() => { const t = new Date(); return t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0'); })();
+  let done = 0; const skipped = [];
+  for (const r of rows) {
+    const product = _rcvFindProduct(r.code) || _rcvFindProduct(r.name);
+    if (!product) { skipped.push(`${r.code || r.name}: 상품 없음`); continue; }
+    const qty = Number(r.qty) || 0;
+    const rate = Math.round(Number(r.rate) || 0);
+    const total = (Number(r.cny) || 0) * rate + (Number(r.fee) || 0) + (Number(r.tax) || 0);
+    const unit = qty > 0 ? Math.round(total / qty) : 0;
+    if (qty <= 0 || unit <= 0) { skipped.push(`${r.code || r.name}: 수량/단가 0`); continue; }
+    const prevStock = Number(product.stock) || 0, prevCost = Number(product.cost) || 0;
+    const newStock = prevStock + qty;
+    const avgCost = newStock > 0 ? Math.round((prevStock * prevCost + qty * unit) / newStock) : unit;
+    try {
+      const { error } = await _supabase.from('products').update({ stock: newStock, cost: avgCost }).eq('id', product.id);
+      if (error) throw error;
+    } catch (e) { skipped.push(`${r.code || r.name}: 저장오류`); continue; }
+    try { await _syncLinkedFields(product.id, { stock: newStock, cost: avgCost }); } catch (_) {}
+    try {
+      if (typeof _logStockMove === 'function') _logStockMove({
+        productId: product.id, sku: product.sku, productName: product.name,
+        type: '입고', delta: qty, prevStock, newStock,
+        note: `수입저장 "${rec.name}" 입고, 단가 ${unit.toLocaleString('ko-KR')}원`
+      });
+    } catch (_) {}
+    const hist = _loadReceivingHistory();
+    hist.unshift({
+      id: Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+      date: r.date || today, sku: product.sku, productId: product.id, productName: product.name,
+      qty, unitPrice: unit, total: qty * unit, memo: `수입저장 ${rec.name}`,
+      prevStock, newStock, prevCost, newCost: avgCost, inboundUnit: unit, createdAt: new Date().toISOString(),
+    });
+    if (hist.length > 10000) hist.length = 10000;
+    _saveReceivingHistory(hist);
+    done++;
+  }
+  rec.received = true; rec.receivedAt = _impNowStamp();
+  _impSaveSaved(list);
+  await loadProductsFromDB();
+  renderImpSavedTab();
+  showAppAlert('입고 처리 완료',
+    `${done}개 품목 입고 완료.` + (skipped.length ? `\n\n건너뜀 ${skipped.length}건:\n${skipped.slice(0, 12).join('\n')}` : ''),
+    skipped.length ? 'warn' : 'success');
 }
 
 // ── 송금/환율 저장 이력 ─────────────────────────────
