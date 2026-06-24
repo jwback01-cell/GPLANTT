@@ -2249,6 +2249,10 @@ tailwind.config = {
             <br><span class="text-[11px]">새 행을 추가하면 그 시점의 환율이 자동으로 박혀, 시간이 지나도 옛 원가를 정확히 볼 수 있습니다.</span>
           </div>
           <div class="flex items-center gap-2">
+            <button onclick="importImpFromImageHost()" class="px-4 py-2 rounded-full bg-brand-blue text-white text-sm font-bold hover:opacity-90 flex items-center gap-1.5" title="이미지호스팅 상품관리의 제품명·상품코드를 가져옵니다">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              이미지호스팅 상품 가져오기
+            </button>
             <button onclick="addImpRow()" class="px-4 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333] flex items-center gap-1.5">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               새 행
@@ -10028,6 +10032,54 @@ function deleteImpRemit(id) {
   _impState.remits = (_impState.remits || []).filter(x => x.id !== id);
   _impSave();
   renderImpTab();
+}
+
+// ── 이미지호스팅(Web-Hosting) 상품관리 → 수입관리 가져오기 (제품명·상품코드만) ──
+//   이미지호스팅은 별도 Supabase 프로젝트(ktqqibjkwpocnxrtsvpd)의 ih_kv 테이블, 키 'ih_products_v1' 에 상품 저장.
+const _IH_IMPORT_URL = 'https://ktqqibjkwpocnxrtsvpd.supabase.co';
+const _IH_IMPORT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0cXFpYmprd3BvY254cnRzdnBkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3NDI2NjIsImV4cCI6MjA5NDMxODY2Mn0.ix3dhqOhJI_ll-G1ki8AniUo5ZS2eW_OUbiPZzUqPL8';
+let _ihImportClient = null;
+function _ihImportSb() {
+  if (_ihImportClient) return _ihImportClient;
+  try { if (window.supabase && window.supabase.createClient) _ihImportClient = window.supabase.createClient(_IH_IMPORT_URL, _IH_IMPORT_KEY); } catch (_) { _ihImportClient = null; }
+  return _ihImportClient;
+}
+async function importImpFromImageHost() {
+  const sb2 = _ihImportSb();
+  if (!sb2) { alert('연동 클라이언트를 만들 수 없습니다. (Supabase 라이브러리 로드 확인)'); return; }
+  let products = [];
+  try {
+    const { data, error } = await sb2.from('ih_kv').select('data').eq('key', 'ih_products_v1').maybeSingle();
+    if (error) { console.warn('[IH import]', error); }
+    if (data && data.data != null) {
+      products = (typeof data.data === 'string') ? JSON.parse(data.data) : data.data;
+    }
+  } catch (e) { console.warn('[IH import]', e); }
+  if (!Array.isArray(products) || !products.length) {
+    alert('이미지호스팅 상품을 불러오지 못했습니다.\n\n· 이미지호스팅에 상품이 없거나\n· 권한(RLS)으로 외부 읽기가 막혀 있을 수 있습니다.\n(콘솔의 [IH import] 오류 확인)');
+    return;
+  }
+  _impLoad();
+  // 중복 방지 — 이미 수입관리에 있는 (상품코드|제품명) 제외
+  const existKeys = new Set((_impState.rows || []).map(r => (String(r.code || '').trim() + '|' + String(r.name || '').trim())));
+  const newRows = [];
+  products.forEach(p => {
+    const name = String(p.name || '').trim();
+    const code = String(p.code || '').trim();
+    if (!name && !code) return;
+    const k = code + '|' + name;
+    if (existKeys.has(k)) return;
+    existKeys.add(k);
+    const row = _impNewRow();
+    row.name = name; row.code = code;
+    newRows.push(row);
+  });
+  if (!newRows.length) { alert(`이미지호스팅 상품 ${products.length}개 — 가져올 새 상품이 없습니다 (이미 모두 추가됨).`); return; }
+  if (!confirm(`이미지호스팅 상품 ${newRows.length}개를 수입관리에 추가할까요?\n(제품명·상품코드만 채워지고, 위안·수량은 직접 입력)`)) return;
+  _impState.rows = newRows.concat(_impState.rows);
+  _impSave();
+  renderImpTab();
+  alert(`✅ ${newRows.length}개를 가져왔습니다.`);
 }
 function _onImpEdit(id, field, val) {
   _impLoad();
