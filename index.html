@@ -2287,8 +2287,8 @@ tailwind.config = {
                   <th class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[110px]">입항일</th>
                   <th class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[90px]">폴더코드</th>
                   <th class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[100px]">상품코드</th>
-                  <th class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[120px]">중판코드</th>
                   <th class="px-3 py-3 text-left   font-bold border-b-2 border-brand-border min-w-[220px]">제품명</th>
+                  <th class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[120px]">중판코드</th>
                   <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[80px]" title="이 행이 저장한 1위안 환율 (행 추가 시 자동 입력, 직접 수정 가능)">환율</th>
                   <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[90px]">위안화</th>
                   <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[110px]">원화</th>
@@ -2367,8 +2367,8 @@ tailwind.config = {
                   <th class="px-3 py-2.5 text-center font-bold border-b-2 border-brand-border">입항일</th>
                   <th class="px-3 py-2.5 text-center font-bold border-b-2 border-brand-border">폴더코드</th>
                   <th class="px-3 py-2.5 text-center font-bold border-b-2 border-brand-border">상품코드</th>
-                  <th class="px-3 py-2.5 text-center font-bold border-b-2 border-brand-border">중판코드</th>
                   <th class="px-3 py-2.5 text-left font-bold border-b-2 border-brand-border">제품명</th>
+                  <th class="px-3 py-2.5 text-center font-bold border-b-2 border-brand-border">중판코드</th>
                   <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">환율</th>
                   <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">위안화</th>
                   <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">원화</th>
@@ -10105,8 +10105,8 @@ function renderImpTab() {
         <td class="px-1 py-1"><input type="text" value="${_impEsc(r.date)}" onchange="_onImpEdit('${r.id}','date',this.value)" class="${inp} text-xs text-center"></td>
         <td class="px-1 py-1"><input type="text" value="${_impEsc(r.folder)}" onchange="_onImpEdit('${r.id}','folder',this.value)" class="${inp} text-xs font-mono text-center" placeholder="폴더"></td>
         <td class="px-1 py-1"><input type="text" value="${_impEsc(r.code)}" onchange="_onImpEdit('${r.id}','code',this.value)" class="${inp} text-xs font-mono text-center" placeholder="상품코드"></td>
-        <td class="px-1 py-1"><input type="text" value="${_impEsc(r.vendorCode)}" onchange="_onImpEdit('${r.id}','vendorCode',this.value)" class="${inp} text-xs font-mono text-center" placeholder="중판"></td>
         <td class="px-1 py-1"><input type="text" value="${_impEsc(r.name)}" onchange="_onImpEdit('${r.id}','name',this.value)" class="${inp} text-sm font-semibold"></td>
+        <td class="px-1 py-1"><input type="text" value="${_impEsc(r.vendorCode)}" onchange="_onImpEdit('${r.id}','vendorCode',this.value)" class="${inp} text-xs font-mono text-center" placeholder="중판"></td>
         <td class="px-1 py-1">
           <input type="number" step="1" value="${rowRate || ''}" onchange="_onImpEdit('${r.id}','rate',this.value)"
                  class="${inp} text-xs text-right ${rateCellCls}" title="저장된 환율 (행 추가 시점의 1위안 가격, 정수)">
@@ -10234,11 +10234,13 @@ function _impNowStamp() {
 }
 // 현재 수입관리 표(또는 체크한 행)를 저장 — 모달 열기
 let _impSavePending = null;   // 저장 대기 행 스냅샷
+let _impSavePendingIds = [];  // 저장 대상 행 id (저장 후 값 비우기용)
 function saveImpSnapshot() {
   _impLoad();
   const checked = _impSelectedIds();
   const src = checked.length ? _impState.rows.filter(r => checked.includes(r.id)) : _impState.rows;
   if (!src.length) { alert('저장할 행이 없습니다.'); return; }
+  _impSavePendingIds = src.map(r => r.id);
   _impSavePending = src.map(r => ({
     date: r.date || '', folder: r.folder || '', code: r.code || '', vendorCode: r.vendorCode || '',
     name: r.name || '', cny: Number(r.cny) || 0, rate: Number(r.rate) || 0,
@@ -10254,17 +10256,26 @@ function saveImpSnapshot() {
 function closeImpSaveModal() {
   document.getElementById('imp-save-backdrop').classList.remove('open');
   _impSavePending = null;
+  _impSavePendingIds = [];
 }
 function confirmImpSnapshot() {
   if (!_impSavePending || !_impSavePending.length) { closeImpSaveModal(); return; }
   const dflt = `${_impTodayStr()} 수입 (${_impSavePending.length}품목)`;
   const name = String(document.getElementById('imp-save-name').value || '').trim() || dflt;
   const rows = _impSavePending;
+  const clearIds = _impSavePendingIds.slice();
   const list = _impLoadSaved();
   list.unshift({ id: 'imps_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, savedAt: _impNowStamp(), rows });
   _impSaveSaved(list);
+  // 저장한 원본 행의 값(위안화·중판비용·관세·수량) 비우기 — 제품/코드/날짜·환율은 유지
+  _impLoad();
+  const idset = new Set(clearIds);
+  _impState.rows.forEach(r => { if (idset.has(r.id)) { r.cny = 0; r.fee = 0; r.tax = 0; r.qty = 0; } });
+  _impSave();
+  _impSelected.clear();
   closeImpSaveModal();
-  try { if (typeof showAppToast === 'function') showAppToast(`저장완료 — "${name}" (${rows.length}품목)`); else alert(`✅ 저장완료 — "${name}" (${rows.length}품목)`); } catch (_) { alert(`✅ 저장완료 — "${name}"`); }
+  renderImpTab();
+  try { if (typeof showAppToast === 'function') showAppToast(`저장완료 — "${name}" (${rows.length}품목) · 입력값 초기화됨`); else alert(`✅ 저장완료 — "${name}" (${rows.length}품목)\n입력값(위안화·중판비용·관세·수량)이 초기화되었습니다.`); } catch (_) { alert(`✅ 저장완료 — "${name}"`); }
 }
 function _impSavedTotals(rec) {
   let qty = 0, total = 0;
@@ -10315,8 +10326,8 @@ function viewImpSaved(id) {
       <td class="px-3 py-1.5 text-center text-xs">${_impEsc(r.date)}</td>
       <td class="px-3 py-1.5 text-center text-xs font-mono">${_impEsc(r.folder)}</td>
       <td class="px-3 py-1.5 text-center text-xs font-mono">${_impEsc(r.code)}</td>
-      <td class="px-3 py-1.5 text-center text-xs font-mono">${_impEsc(r.vendorCode)}</td>
       <td class="px-3 py-1.5 text-sm font-semibold">${_impEsc(r.name)}</td>
+      <td class="px-3 py-1.5 text-center text-xs font-mono">${_impEsc(r.vendorCode)}</td>
       <td class="px-3 py-1.5 text-right text-xs text-brand-gray">${rate ? _impFmt(rate) : ''}</td>
       <td class="px-3 py-1.5 text-right text-sm">${cny ? _impFmt(cny) : ''}</td>
       <td class="px-3 py-1.5 text-right text-sm">${_impFmt(krw)}</td>
@@ -10354,13 +10365,13 @@ function exportImpSavedExcel() {
   const rec = _impLoadSaved().find(r => r.id === _impSavedViewId);
   if (!rec) { alert('먼저 저장내역을 선택하세요.'); return; }
   if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 로드 실패'); return; }
-  const head = ['입항일','폴더코드','상품코드','중판코드','제품명','환율','위안화','원화','중판비용','관세','수량','1개금액','합계'];
+  const head = ['입항일','폴더코드','상품코드','제품명','중판코드','환율','위안화','원화','중판비용','관세','수량','1개금액','합계'];
   const aoa = [head];
   (rec.rows || []).forEach(r => {
     const cny = Number(r.cny) || 0, rate = Math.round(Number(r.rate) || 0), krw = cny * rate;
     const fee = Number(r.fee) || 0, tax = Number(r.tax) || 0, total = krw + fee + tax;
     const qty = Number(r.qty) || 0, unit = qty > 0 ? Math.round(total / qty) : 0;
-    aoa.push([r.date, r.folder, r.code, r.vendorCode, r.name, rate, cny, Math.round(krw), fee, tax, qty, unit, Math.round(total)]);
+    aoa.push([r.date, r.folder, r.code, r.name, r.vendorCode, rate, cny, Math.round(krw), fee, tax, qty, unit, Math.round(total)]);
   });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), '수입단가표');
@@ -10511,7 +10522,7 @@ function deleteImpRow(id) {
 async function exportImpExcel() {
   _impLoad();
   _impMigrateRows();
-  const headers = ['입항일','폴더코드','상품코드','중판코드','제품명','환율(1위안)','위안화','원화','중판비용','관세','수량','1개금액','합계'];
+  const headers = ['입항일','폴더코드','상품코드','제품명','중판코드','환율(1위안)','위안화','원화','중판비용','관세','수량','1개금액','합계'];
   const rows = _impState.rows.map(r => {
     const cny = Number(r.cny) || 0;
     const rowRate = Math.round(Number(r.rate) || 0);
@@ -10521,7 +10532,7 @@ async function exportImpExcel() {
     const total = krw + fee + tax;
     const qty = Number(r.qty) || 0;
     const unit = qty > 0 ? total / qty : 0;
-    return [r.date, r.folder || '', r.code, r.vendorCode || '', r.name, rowRate, cny, Math.round(krw), fee, tax, qty, Math.round(unit), Math.round(total)];
+    return [r.date, r.folder || '', r.code, r.name, r.vendorCode || '', rowRate, cny, Math.round(krw), fee, tax, qty, Math.round(unit), Math.round(total)];
   });
   const aoa = [
     ['현재 원화', _impState.krw],
