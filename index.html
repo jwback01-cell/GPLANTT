@@ -2248,7 +2248,8 @@ tailwind.config = {
             행마다 <b>환율</b>이 따로 저장됩니다. 상단 값을 바꿔도 이전에 저장된 행의 원화는 그대로 유지돼요.
             <br><span class="text-[11px]">새 행을 추가하면 그 시점의 환율이 자동으로 박혀, 시간이 지나도 옛 원가를 정확히 볼 수 있습니다.</span>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
+            <input id="imp-search" type="text" oninput="_impOnSearch(this.value)" placeholder="🔍 제품명·폴더·상품·중판코드 검색" class="px-4 py-2 rounded-full border border-brand-border text-sm focus:outline-none focus:border-brand-black w-[230px]">
             <button onclick="importImpFromImageHost()" class="px-4 py-2 rounded-full bg-brand-blue text-white text-sm font-bold hover:opacity-90 flex items-center gap-1.5" title="이미지호스팅 상품관리의 제품명·상품코드를 가져옵니다">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
               이미지호스팅 상품 가져오기
@@ -9839,6 +9840,8 @@ function switchProductTab(which) {
 // ═══════════════════ 수입관리 (중국 1688/위안화 입항 단가표) ════════════
 const IMP_LS_KEY = 'gplan_import_v1';   // 클라우드 동기화 키
 let _impState = null;   // { krw, feeKrw, cny, rows: [...] }
+let _impSearch = '';    // 표 검색어
+function _impOnSearch(v) { _impSearch = v || ''; renderImpTab(); }
 
 function _impLoad() {
   try { _impState = JSON.parse(localStorage.getItem(IMP_LS_KEY) || 'null'); } catch (_) { _impState = null; }
@@ -9924,14 +9927,19 @@ function renderImpTab() {
 
   const tbody = document.getElementById('imp-tbody');
   const empty = document.getElementById('imp-empty');
-  if (!_impState.rows.length) {
+  // 검색 필터 (제품명/폴더코드/상품코드/중판코드)
+  const term = String(_impSearch || '').trim().toLowerCase();
+  const viewRows = term
+    ? _impState.rows.filter(r => [r.name, r.folder, r.code, r.vendorCode].some(x => String(x || '').toLowerCase().includes(term)))
+    : _impState.rows;
+  if (!viewRows.length) {
     if (tbody) tbody.innerHTML = '';
-    if (empty) empty.classList.remove('hidden');
+    if (empty) { empty.classList.remove('hidden'); empty.textContent = term ? `"${_impSearch}" 검색 결과가 없습니다.` : '수입 기록이 없습니다. "+ 새 행" 으로 추가하세요.'; }
   } else {
     if (empty) empty.classList.add('hidden');
     const curRate = _impRate();
     let sCny = 0, sKrw = 0, sFee = 0, sTax = 0, sTotal = 0, sQty = 0;
-    tbody.innerHTML = _impState.rows.map(r => {
+    tbody.innerHTML = viewRows.map(r => {
       const cny = Number(r.cny) || 0;
       const rowRate = Number(r.rate) || 0;   // 행마다 저장된 환율 사용
       const krw = cny * rowRate;
