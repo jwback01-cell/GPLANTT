@@ -1753,9 +1753,9 @@ function _loAgg(file, kind){
     const rowName = ni>=0 ? String(row[ni]||'').trim() : '';
     if(kind==='A' && _loExcluded(rowName)) continue;   // A: 제외 키워드 상품명은 비교 제외
     const amt = ai>=0?_loNum(row[ai]):0, qty = qi>=0?_loNum(row[qi]):0;
-    if(!map.has(ord)) map.set(ord, kind==='A' ? {order:ord,qty:0,amt:0,name:'',ax:''} : {order:ord,saleQty:0,cancelQty:0,saleAmt:0,cancelAmt:0,name:''});
+    if(!map.has(ord)) map.set(ord, kind==='A' ? {order:ord,qty:0,amt:0,name:'',ax:'',ay:0} : {order:ord,saleQty:0,cancelQty:0,saleAmt:0,cancelAmt:0,name:''});
     const m=map.get(ord);
-    if(kind==='A'){ m.qty+=qty; m.amt+=amt; if(!m.ax){ const axv=String(row[49]||'').trim(); if(axv) m.ax=axv; } }   // AX열(49) — 양쪽 표시용
+    if(kind==='A'){ m.qty+=qty; m.amt+=amt; m.ay+=_loNum(row[24]); if(!m.ax){ const axv=String(row[49]||'').trim(); if(axv) m.ax=axv; } }   // Y열(24) 판매수량 · AX열(49) 양쪽 표시용
     else { const mv = mvi>=0?String(row[mvi]||''):''; const isCancel = /취소|반품/.test(mv) || amt<0 || qty<0;
       if(isCancel){ m.cancelAmt+=amt; m.cancelQty+=qty; } else { m.saleAmt+=amt; m.saleQty+=qty; }
       // (상품코드 W | 단가 AR) 별 수량(AQ) 합계 + 공급액(AV) 합계. 취소/반품은 음수라 같은 단가군에서 자동 차감
@@ -1784,7 +1784,7 @@ function _loProcess(){
     const bNetAmt=b?(b.saleAmt+b.cancelAmt):null, bNetQty=b?(b.saleQty+b.cancelQty):null;
     const amtDiff=(a&&b)?(a.amt-bNetAmt):null;
     const verdict=(a&&b)?((a.amt===bNetAmt && a.qty===bNetQty)?'일치':'불일치'):'';
-    res.push({o,status,name:(b&&b.name)||(a&&a.name)||'', aQty,aAmt, bSaleAmt,bCancelAmt,bNetAmt,bNetQty, amtDiff,verdict, ax:(a?(a.ax||''):'')});
+    res.push({o,status,name:(b&&b.name)||(a&&a.name)||'', aQty,aAmt, bSaleAmt,bCancelAmt,bNetAmt,bNetQty, amtDiff,verdict, ax:(a?(a.ax||''):''), ay:(a?(a.ay||0):0)});
   });
   const rank=x=> x.status!=='both'?0 : (x.verdict==='불일치'?1:2);
   res.sort((x,y)=> rank(x)-rank(y) || String(x.o).localeCompare(String(y.o)));
@@ -1797,7 +1797,7 @@ function _loProcess(){
   res.forEach(r=>{ if(r.status!=='both') return; const ax=String(r.ax||'').trim(); if(!ax) return;
     const key=r.name+''+ax;
     if(!axMap.has(key)) axMap.set(key,{name:r.name, ax, qty:0, code:nameToCode.get(r.name)||'', orders:[]});
-    const e=axMap.get(key); e.qty++; e.orders.push(r.o);
+    const e=axMap.get(key); e.qty += (_loNum(r.ay)||1); e.orders.push(r.o);   // 수량 = A엑셀 Y열 합계
   });
   _loAxData=[...axMap.values()].sort((a,b)=> String(a.name).localeCompare(String(b.name)) || (_loNum(b.ax)-_loNum(a.ax)));
   _loRenderSummary(); _loRenderResult(); _loRenderSupply(); _loRenderAx();
