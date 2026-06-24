@@ -1683,7 +1683,7 @@ function _loHeaderRow(rows){ for(let i=0;i<Math.min(rows.length,20);i++){ if((ro
 function _loColNames(rows, hi){ const h=rows[hi]||[]; const g=hi>0?(rows[hi-1]||[]):[]; const n=Math.max(h.length,g.length); const out=[]; for(let i=0;i<n;i++){ out.push((String(h[i]||'').trim()) || (String(g[i]||'').trim())); } return out; }
 function _loIdx(names, exact, contains){ for(const e of exact){ const i=names.findIndex(n=>n===e); if(i>=0) return i; } for(const c of (contains||[])){ const i=names.findIndex(n=>n.includes(c)); if(i>=0) return i; } return -1; }
 // 엑셀 A 제외 키워드 — 상품명에 포함되면 비교 대상에서 제외 (대소문자 무시)
-const _LO_EXCLUDE = ['EPSON','시놀로지','삼성','인스타','한경희','지클릭커','비스포크','서울우유','GIGABYTE','아이프리','오라이트','춘식이'];
+const _LO_EXCLUDE = ['EPSON','시놀로지','삼성','인스타','한경희','지클릭커','비스포크','서울우유','GIGABYTE','아이프리','오라이트','춘식이','소싱','잘만','잉크','메모리','샌디스크','()'];
 function _loExcluded(name){ const s=String(name||'').toUpperCase(); return _LO_EXCLUDE.some(k=> s.includes(k.toUpperCase())); }
 // B(매출이익)에서 수불구분 컬럼(출고/취소/반품/입고 값) 자동 탐지
 function _loFindMoveCol(rows, hi){
