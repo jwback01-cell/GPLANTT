@@ -2254,6 +2254,10 @@ tailwind.config = {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
               이미지호스팅 상품 가져오기
             </button>
+            <button onclick="openImpGroupCostModal()" class="px-4 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg flex items-center gap-1.5" title="체크한 상품들의 총 중판비용·관세를 원화 금액 비율로 배분">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 7h18"/><path d="M6 12h12"/><path d="M9 17h6"/></svg>
+              묶음 비용 배분
+            </button>
             <button onclick="addImpRow()" class="px-4 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333] flex items-center gap-1.5">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               새 행
@@ -2271,6 +2275,7 @@ tailwind.config = {
             <table class="w-full text-sm border-collapse">
               <thead>
                 <tr class="bg-brand-bg">
+                  <th class="px-2 py-3 text-center border-b-2 border-brand-border w-[36px]"><input type="checkbox" id="imp-select-all" onchange="_impToggleSelectAll(this.checked)" title="전체 선택"></th>
                   <th class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[110px]">입항일</th>
                   <th class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[90px]">폴더코드</th>
                   <th class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[100px]">상품코드</th>
@@ -2290,7 +2295,7 @@ tailwind.config = {
               <tbody id="imp-tbody"></tbody>
               <tfoot>
                 <tr class="bg-brand-bg/50 font-bold">
-                  <td colspan="5" class="px-3 py-2.5 text-right text-brand-gray text-xs">합계</td>
+                  <td colspan="6" class="px-3 py-2.5 text-right text-brand-gray text-xs">합계</td>
                   <td class="px-3 py-2.5 text-right" id="imp-sum-cny">0</td>
                   <td class="px-3 py-2.5"></td>
                   <td class="px-3 py-2.5 text-right" id="imp-sum-krw">0</td>
@@ -2310,6 +2315,23 @@ tailwind.config = {
         </section>
       </div><!-- /products-view-import -->
     </main>
+  </div>
+</div>
+
+<!-- 수입관리 묶음 비용 배분 모달 -->
+<div id="imp-gc-backdrop" class="todo-modal-backdrop" onclick="if(event.target===this)closeImpGroupCostModal()">
+  <div class="todo-modal" style="max-width:420px;padding:24px;">
+    <h3 class="text-lg font-bold mb-1">묶음 비용 배분 📦</h3>
+    <p id="imp-gc-count" class="text-brand-gray text-sm mb-4"></p>
+    <label class="block text-sm font-bold mb-1">총 중판비용 (원)</label>
+    <input id="imp-gc-fee" type="text" inputmode="numeric" placeholder="0" class="w-full mb-3 px-3 py-2 rounded-xl border border-brand-border focus:outline-none focus:border-brand-black text-right">
+    <label class="block text-sm font-bold mb-1">총 관세 (원)</label>
+    <input id="imp-gc-tax" type="text" inputmode="numeric" placeholder="0" class="w-full mb-3 px-3 py-2 rounded-xl border border-brand-border focus:outline-none focus:border-brand-black text-right">
+    <p class="text-[11px] text-brand-gray mb-4">선택한 상품들의 <b>원화 금액 비율</b>로 자동 배분됩니다. (빈칸은 변경하지 않음)</p>
+    <div class="flex gap-2 justify-end">
+      <button onclick="closeImpGroupCostModal()" class="px-4 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg">취소</button>
+      <button onclick="applyImpGroupCost()" class="px-4 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333]">배분</button>
+    </div>
   </div>
 </div>
 
@@ -9974,6 +9996,7 @@ function renderImpTab() {
       const rateDiff = curRate > 0 && Math.abs(rowRate - curRate) > 0.5;
       const rateCellCls = rateDiff ? 'text-brand-orange' : 'text-brand-gray';
       return `<tr class="border-b border-brand-border hover:bg-brand-bg/40" data-id="${r.id}">
+        <td class="px-2 py-1 text-center"><input type="checkbox" class="imp-row-cb" data-id="${r.id}"></td>
         <td class="px-1 py-1"><input type="text" value="${_impEsc(r.date)}" onchange="_onImpEdit('${r.id}','date',this.value)" class="${inp} text-xs text-center"></td>
         <td class="px-1 py-1"><input type="text" value="${_impEsc(r.folder)}" onchange="_onImpEdit('${r.id}','folder',this.value)" class="${inp} text-xs font-mono text-center" placeholder="폴더"></td>
         <td class="px-1 py-1"><input type="text" value="${_impEsc(r.code)}" onchange="_onImpEdit('${r.id}','code',this.value)" class="${inp} text-xs font-mono text-center" placeholder="상품코드"></td>
@@ -10011,6 +10034,62 @@ function _impRecalcAll() {
   document.getElementById('imp-rate').textContent = _impFmt(_impRate());
   renderImpTab();
 }
+// ── 묶음 비용 배분 (체크한 상품들의 총 중판비용·관세를 원화 비율로 나눔) ──
+function _impSelectedIds() {
+  return [...document.querySelectorAll('.imp-row-cb:checked')].map(cb => cb.dataset.id);
+}
+function _impToggleSelectAll(checked) {
+  document.querySelectorAll('.imp-row-cb').forEach(cb => { cb.checked = checked; });
+}
+function _impRowKrw(r) { return (Number(r.cny) || 0) * (Number(r.rate) || 0); }
+function openImpGroupCostModal() {
+  const ids = _impSelectedIds();
+  if (ids.length < 1) { alert('먼저 묶을 상품의 체크박스를 선택하세요.'); return; }
+  _impLoad();
+  const rows = _impState.rows.filter(r => ids.includes(r.id));
+  const sumKrw = rows.reduce((s, r) => s + _impRowKrw(r), 0);
+  document.getElementById('imp-gc-count').textContent = `선택 ${rows.length}개 · 원화 합계 ${_impFmt(sumKrw)}원`;
+  document.getElementById('imp-gc-fee').value = '';
+  document.getElementById('imp-gc-tax').value = '';
+  document.getElementById('imp-gc-backdrop').classList.add('open');
+}
+function closeImpGroupCostModal() {
+  document.getElementById('imp-gc-backdrop').classList.remove('open');
+}
+function applyImpGroupCost() {
+  const ids = _impSelectedIds();
+  if (!ids.length) { closeImpGroupCostModal(); return; }
+  _impLoad();
+  const rows = _impState.rows.filter(r => ids.includes(r.id));
+  const totFee = _impAmtParse(document.getElementById('imp-gc-fee').value);
+  const totTax = _impAmtParse(document.getElementById('imp-gc-tax').value);
+  if (totFee <= 0 && totTax <= 0) { alert('총 중판비용 또는 총 관세를 입력하세요.'); return; }
+  const krwArr = rows.map(_impRowKrw);
+  const sumKrw = krwArr.reduce((a, b) => a + b, 0);
+  // 원화 비율 배분 (합계 0이면 균등). 반올림 오차는 마지막 행에서 보정.
+  const alloc = (total) => {
+    if (total <= 0) return null;
+    let acc = 0;
+    const out = rows.map((r, i) => {
+      const share = sumKrw > 0 ? Math.round(total * krwArr[i] / sumKrw) : Math.round(total / rows.length);
+      acc += share; return share;
+    });
+    if (out.length) out[out.length - 1] += (total - acc);
+    return out;
+  };
+  const feeAlloc = alloc(totFee), taxAlloc = alloc(totTax);
+  rows.forEach((r, i) => {
+    if (feeAlloc) r.fee = feeAlloc[i];
+    if (taxAlloc) r.tax = taxAlloc[i];
+  });
+  _impSave();
+  closeImpGroupCostModal();
+  renderImpTab();
+  alert(`✅ ${rows.length}개 상품에 원화 비율로 배분 완료` +
+        (feeAlloc ? `\n· 총 중판비용 ${_impFmt(totFee)}원` : '') +
+        (taxAlloc ? `\n· 총 관세 ${_impFmt(totTax)}원` : ''));
+}
+
 // ── 송금/환율 저장 이력 ─────────────────────────────
 function _impTodayStr() {
   const t = new Date();
