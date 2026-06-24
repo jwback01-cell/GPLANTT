@@ -1644,6 +1644,7 @@ tailwind.config = {
               <th class="text-center px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">수불코드</th>
               <th class="text-left px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">비고</th>
               <th class="text-left px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">상품명</th>
+              <th class="text-left px-3 py-2 font-bold whitespace-nowrap border-b border-brand-border">주문번호</th>
             </tr></thead>
             <tbody id="lo-ax-body"></tbody>
           </table>
@@ -1795,8 +1796,8 @@ function _loProcess(){
   const axMap=new Map();
   res.forEach(r=>{ if(r.status!=='both') return; const ax=String(r.ax||'').trim(); if(!ax) return;
     const key=r.name+''+ax;
-    if(!axMap.has(key)) axMap.set(key,{name:r.name, ax, qty:0, code:nameToCode.get(r.name)||''});
-    axMap.get(key).qty++;
+    if(!axMap.has(key)) axMap.set(key,{name:r.name, ax, qty:0, code:nameToCode.get(r.name)||'', orders:[]});
+    const e=axMap.get(key); e.qty++; e.orders.push(r.o);
   });
   _loAxData=[...axMap.values()].sort((a,b)=> String(a.name).localeCompare(String(b.name)) || (_loNum(b.ax)-_loNum(a.ax)));
   _loRenderSummary(); _loRenderResult(); _loRenderSupply(); _loRenderAx();
@@ -1883,6 +1884,7 @@ function _loRenderAx(){
     <td class="px-3 py-1.5 text-xs text-center">${_LO_AX_MOVECODE}</td>
     <td class="px-3 py-1.5 text-xs"></td>
     <td class="px-3 py-1.5 text-xs max-w-[360px] truncate text-brand-gray" title="${_loEsc(g.name)}">${_loEsc(g.name)}</td>
+    <td class="px-3 py-1.5 text-xs whitespace-nowrap font-mono text-brand-gray" title="${_loEsc((g.orders||[]).join(', '))}">${_loEsc((g.orders||[]).join(', '))}</td>
   </tr>`).join('');
   wrap.classList.remove('hidden');
 }
@@ -1900,7 +1902,7 @@ function _loDownload(){
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sAoa), '상품단가별양식');
   }
   if(_loAxData.length){
-    const axAoa=[['코드','단가','수량','창고코드','수불코드','비고','상품명'], ..._loAxData.map(g=>[g.code, (g.qty?Math.round(_loNum(g.ax)/g.qty):_loNum(g.ax)), g.qty, _LO_WAREHOUSE, _LO_AX_MOVECODE, '', g.name])];
+    const axAoa=[['코드','단가','수량','창고코드','수불코드','비고','상품명','주문번호'], ..._loAxData.map(g=>[g.code, (g.qty?Math.round(_loNum(g.ax)/g.qty):_loNum(g.ax)), g.qty, _LO_WAREHOUSE, _LO_AX_MOVECODE, '', g.name, (g.orders||[]).join(', ')])];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(axAoa), '양쪽_AX양식');
   }
   const t=new Date(); const stamp=`${t.getFullYear()}${String(t.getMonth()+1).padStart(2,'0')}${String(t.getDate()).padStart(2,'0')}`;
