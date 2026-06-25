@@ -1681,7 +1681,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── Navigation ──────────────────────────────
-const PAGES = ['login','dashboard','clicknara','coupang','refine','process','lotteon'];
+const PAGES = ['login','dashboard','event','clicknara','coupang','refine','process','lotteon'];
 const currentPage = { value: 'login' };
 
 // ───── 롯데온 데이터 가공 (A 롯데온 정산 ↔ B 이카운트 매출이익, 주문번호 매칭) ─────
@@ -1948,6 +1948,7 @@ function navigate(page) {
     // switchClicknaraTab이 현재 채널명(_cnChannel)에 맞춰 타이틀/설명을 자동으로 바꿔줌
     try { switchClicknaraTab('upload'); } catch(_) {}
   }
+  if (page === 'event') { try { renderEventCalc(); } catch(_) {} }
 }
 
 function updateNavItems(activePage) {
@@ -2092,6 +2093,174 @@ async function logout() {
   _cnCloudPullDone = false;  // 다음 로그인 때 클라우드 데이터 다시 가져오도록
   navigate('login');
 }
+
+// ════════════════ 행사 정산 계산기 ════════════════
+const EV_KEY = 'cn_events_v1';
+function _evDefaultRates() { return { md: 3, sel: 14, card: 5, cat: 7, cpnFee: 20, seller: 50 }; }
+function _evUid() { return 'ev_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function _evLoad() {
+  let o = null;
+  try { o = JSON.parse(localStorage.getItem(EV_KEY) || 'null'); } catch (_) {}
+  if (!o || !Array.isArray(o.list) || !o.list.length) {
+    o = { activeId: '', list: [{ id: _evUid(), name: '새 행사', period: '', rates: _evDefaultRates(), rows: [] }] };
+    o.activeId = o.list[0].id;
+  }
+  if (!o.activeId || !o.list.some(e => e.id === o.activeId)) o.activeId = o.list[0].id;
+  o.list.forEach(e => { e.rates = Object.assign(_evDefaultRates(), e.rates || {}); if (!Array.isArray(e.rows)) e.rows = []; });
+  return o;
+}
+function _evSave(o) { try { localStorage.setItem(EV_KEY, JSON.stringify(o)); } catch (_) {} }
+function _evActive(o) { return (o || _evLoad()).list.find(e => e.id === (o || _evLoad()).activeId); }
+function _evNum(v) { return Number(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')) || 0; }
+function _evFmt(n) { return Math.round(Number(n) || 0).toLocaleString('ko-KR'); }
+function _evR10(n) { return Math.round(n / 10) * 10; }
+function _evCalcRow(row, r) {
+  const orig = _evNum(row.orig), disp = _evNum(row.disp), promo = _evNum(row.promo);
+  const md = (r.md || 0) / 100, sel = (r.sel || 0) / 100, card = (r.card || 0) / 100;
+  const cat = (r.cat || 0) / 100, cpnFeeP = (r.cpnFee || 0) / 100, sellerP = (r.seller || 0) / 100;
+  const listing = md < 1 && md > 0 ? _evR10(disp / (1 - md)) : disp;   // 등재가
+  const selCpn = _evR10(listing * sel);                                // 선택쿠폰할인액
+  const first = listing - selCpn;                                      // 1차할인액
+  const cardDc = _evR10(first * card);                                 // 카드할인액
+  const benefit = first - cardDc;                                      // 최종혜택가
+  const catFee = Math.round(listing * cat);                            // Cat수수료
+  const cpnFee = Math.round(catFee * cpnFeeP);                         // 쿠폰수수료(Cat의 %)
+  const selSeller = Math.round(selCpn * sellerP);                      // 선택쿠폰 셀러부담
+  const cardSeller = Math.round(cardDc * sellerP);                     // 카드할인 셀러부담
+  const settle = listing - catFee - cpnFee - selSeller - cardSeller;   // ESM+ 정산예상
+  const feel = benefit - promo;                                        // 최종체감가
+  return { orig, disp, promo, listing, selCpn, first, cardDc, benefit, catFee, cpnFee, selSeller, cardSeller, settle, feel };
+}
+function _evCalcHtml() {
+  return `
+    <section class="mt-2 pl-1 md:pl-2">
+      <h1 class="text-[1.8rem] md:text-[2.25rem] font-bold tracking-tight mb-2">행사 정산 계산기 🎉</h1>
+      <p class="text-brand-gray text-base md:text-[1.1rem]">사이트별 행사에서 쿠폰·카드 할인을 입력하면 최종 혜택가와 정산 예상금액을 자동 계산합니다.</p>
+    </section>
+    <section class="bg-white rounded-3xl panel p-5 flex flex-col gap-4">
+      <div class="flex flex-wrap items-center gap-2">
+        <select id="ev-select" onchange="evSwitchEvent(this.value)" class="px-3 py-2 rounded-xl border border-brand-border text-sm font-bold bg-white"></select>
+        <button onclick="evNewEvent()" class="px-3 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333]">+ 새 행사</button>
+        <button onclick="evDeleteEvent()" class="px-3 py-2 rounded-full border border-brand-pink text-brand-pink text-sm font-bold hover:bg-red-50">행사 삭제</button>
+        <input id="ev-name" oninput="evSetField('name',this.value)" placeholder="행사/사이트명 (예: 11번가)" class="px-3 py-2 rounded-xl border border-brand-border text-sm w-[200px]">
+        <input id="ev-period" oninput="evSetField('period',this.value)" placeholder="기간 (예: 3/30~4/8)" class="px-3 py-2 rounded-xl border border-brand-border text-sm w-[180px]">
+      </div>
+      <div class="flex flex-wrap gap-3 text-sm bg-brand-bg rounded-2xl p-3">
+        ${[['md','MD쿠폰%'],['sel','선택쿠폰%(행사)'],['card','카드%'],['cat','Cat수수료%'],['cpnFee','쿠폰수수료(Cat의%)'],['seller','셀러부담%']].map(([k,label])=>`
+          <label class="flex items-center gap-1.5"><span class="text-brand-gray font-semibold whitespace-nowrap">${label}</span>
+            <input type="number" step="0.1" id="ev-rate-${k}" oninput="evSetRate('${k}',this.value)" class="w-20 px-2 py-1.5 rounded-lg border border-brand-border text-right"></label>
+        `).join('')}
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <button onclick="evAddRow()" class="px-3 py-2 rounded-full bg-brand-blue text-white text-sm font-bold hover:opacity-90">+ 행 추가</button>
+        <button onclick="evDownloadExcel()" class="px-3 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg">엑셀 다운로드</button>
+        <span class="text-xs text-brand-gray">엑셀에서 <b>모델명·기존가·노출가</b>를 복사해 모델명 칸에 붙여넣으면 여러 행이 자동 입력됩니다.</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs border-collapse whitespace-nowrap">
+          <thead><tr class="bg-brand-bg">
+            ${['모델명','기존가','노출가','등재가','선택쿠폰할인액','1차할인액','카드할인액','최종혜택가','Cat수수료','쿠폰수수료','선택쿠폰셀러부담','카드셀러부담','ESM+정산예상','프로모션','최종체감가',''].map((h,i)=>`<th class="px-2 py-2.5 font-bold border-b-2 border-brand-border ${i===0?'text-left':'text-right'} ${i===15?'text-center':''}">${h}</th>`).join('')}
+          </tr></thead>
+          <tbody id="ev-tbody"></tbody>
+          <tfoot id="ev-tfoot"></tfoot>
+        </table>
+      </div>
+    </section>`;
+}
+function renderEventCalc() {
+  const o = _evLoad(); const ev = _evActive(o);
+  const sel = document.getElementById('ev-select');
+  if (sel) sel.innerHTML = o.list.map(e => `<option value="${e.id}" ${e.id===o.activeId?'selected':''}>${_evEsc(e.name||'(이름없음)')}</option>`).join('');
+  const nameEl = document.getElementById('ev-name'); if (nameEl && document.activeElement!==nameEl) nameEl.value = ev.name || '';
+  const perEl = document.getElementById('ev-period'); if (perEl && document.activeElement!==perEl) perEl.value = ev.period || '';
+  Object.keys(_evDefaultRates()).forEach(k => { const el = document.getElementById('ev-rate-'+k); if (el && document.activeElement!==el) el.value = ev.rates[k]; });
+  const tbody = document.getElementById('ev-tbody'); if (!tbody) return;
+  const inp = 'w-full bg-transparent focus:outline-none focus:bg-white border border-transparent hover:border-brand-border rounded px-1.5 py-1';
+  const cell = v => `<td class="px-2 py-1 text-right tabular-nums">${_evFmt(v)}</td>`;
+  tbody.innerHTML = ev.rows.map((row, i) => {
+    const c = _evCalcRow(row, ev.rates);
+    return `<tr class="border-b border-brand-border hover:bg-brand-bg/40">
+      <td class="px-2 py-1"><input type="text" value="${_evEsc(row.model||'')}" data-evf="model" onpaste="evPaste(event,${i})" onchange="evEditRow(${i},'model',this.value)" class="${inp} text-left font-semibold min-w-[150px]"></td>
+      <td class="px-2 py-1"><input type="text" inputmode="numeric" value="${row.orig?_evFmt(row.orig):''}" onchange="evEditRow(${i},'orig',this.value)" class="${inp} text-right w-20"></td>
+      <td class="px-2 py-1"><input type="text" inputmode="numeric" value="${row.disp?_evFmt(row.disp):''}" onchange="evEditRow(${i},'disp',this.value)" class="${inp} text-right w-20"></td>
+      ${cell(c.listing)}${cell(c.selCpn)}${cell(c.first)}${cell(c.cardDc)}
+      <td class="px-2 py-1 text-right font-bold text-brand-blue tabular-nums">${_evFmt(c.benefit)}</td>
+      ${cell(c.catFee)}${cell(c.cpnFee)}${cell(c.selSeller)}${cell(c.cardSeller)}
+      <td class="px-2 py-1 text-right font-bold tabular-nums">${_evFmt(c.settle)}</td>
+      <td class="px-2 py-1"><input type="text" inputmode="numeric" value="${row.promo?_evFmt(row.promo):''}" onchange="evEditRow(${i},'promo',this.value)" class="${inp} text-right w-16"></td>
+      <td class="px-2 py-1 text-right font-bold text-brand-pink tabular-nums">${_evFmt(c.feel)}</td>
+      <td class="px-2 py-1 text-center"><button onclick="evDelRow(${i})" class="text-brand-gray hover:text-brand-pink text-base leading-none">×</button></td>
+    </tr>`;
+  }).join('');
+  const tfoot = document.getElementById('ev-tfoot');
+  if (tfoot) {
+    if (!ev.rows.length) { tfoot.innerHTML = ''; tbody.innerHTML = '<tr><td colspan="16" class="px-3 py-8 text-center text-brand-gray">"+ 행 추가" 또는 엑셀 붙여넣기로 모델을 추가하세요.</td></tr>'; return; }
+    const s = ev.rows.reduce((a, row) => { const c = _evCalcRow(row, ev.rates); a.benefit += c.benefit; a.settle += c.settle; a.feel += c.feel; return a; }, { benefit: 0, settle: 0, feel: 0 });
+    tfoot.innerHTML = `<tr class="bg-brand-bg/60 font-bold"><td class="px-2 py-2 text-right" colspan="7">합계 (${ev.rows.length}개)</td>
+      <td class="px-2 py-2 text-right text-brand-blue tabular-nums">${_evFmt(s.benefit)}</td><td colspan="4"></td>
+      <td class="px-2 py-2 text-right tabular-nums">${_evFmt(s.settle)}</td><td></td>
+      <td class="px-2 py-2 text-right text-brand-pink tabular-nums">${_evFmt(s.feel)}</td><td></td></tr>`;
+  }
+}
+function _evEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function evSwitchEvent(id){ const o=_evLoad(); o.activeId=id; _evSave(o); renderEventCalc(); }
+function evNewEvent(){ const o=_evLoad(); const e={id:_evUid(),name:'새 행사 '+(o.list.length+1),period:'',rates:_evDefaultRates(),rows:[]}; o.list.push(e); o.activeId=e.id; _evSave(o); renderEventCalc(); }
+function evDeleteEvent(){ const o=_evLoad(); if(o.list.length<=1){ alert('마지막 행사는 삭제할 수 없습니다.'); return; } if(!confirm('이 행사를 삭제할까요?')) return; o.list=o.list.filter(e=>e.id!==o.activeId); o.activeId=o.list[0].id; _evSave(o); renderEventCalc(); }
+function evSetField(f,v){ const o=_evLoad(); const e=_evActive(o); e[f]=v; _evSave(o); if(f==='name') renderEventCalc(); }
+function evSetRate(k,v){ const o=_evLoad(); const e=_evActive(o); e.rates[k]=_evNum(v); _evSave(o); renderEventCalc(); }
+function evAddRow(){ const o=_evLoad(); _evActive(o).rows.push({model:'',orig:0,disp:0,promo:0}); _evSave(o); renderEventCalc(); }
+function evDelRow(i){ const o=_evLoad(); _evActive(o).rows.splice(i,1); _evSave(o); renderEventCalc(); }
+function evEditRow(i,field,val){ const o=_evLoad(); const e=_evActive(o); if(!e.rows[i]) return; e.rows[i][field] = (field==='model')?val:_evNum(val); _evSave(o); renderEventCalc(); }
+function evPaste(e, startIdx){
+  const cd=e.clipboardData||window.clipboardData; if(!cd) return; const text=cd.getData('text'); if(!text) return;
+  if(!text.includes('\t') && !text.includes('\n')) return;
+  e.preventDefault();
+  const matrix=text.replace(/\r/g,'').split('\n').map(r=>r.split('\t')); while(matrix.length && matrix[matrix.length-1].join('').trim()==='') matrix.pop();
+  if(!matrix.length) return;
+  const o=_evLoad(); const ev=_evActive(o);
+  matrix.forEach((cols,r)=>{
+    let row=ev.rows[startIdx+r]; if(!row){ row={model:'',orig:0,disp:0,promo:0}; ev.rows[startIdx+r]=row; }
+    if(cols[0]!=null) row.model=String(cols[0]).trim();
+    if(cols[1]!=null && String(cols[1]).trim()!=='') row.orig=_evNum(cols[1]);
+    if(cols[2]!=null && String(cols[2]).trim()!=='') row.disp=_evNum(cols[2]);
+  });
+  for(let i=0;i<ev.rows.length;i++){ if(!ev.rows[i]) ev.rows[i]={model:'',orig:0,disp:0,promo:0}; }
+  _evSave(o); renderEventCalc();
+}
+function evDownloadExcel(){
+  if(typeof XLSX==='undefined'){ alert('엑셀 라이브러리 로드 실패'); return; }
+  const o=_evLoad(); const ev=_evActive(o);
+  const head=['모델명','기존가','노출가','등재가','선택쿠폰할인액','1차할인액','카드할인액','최종혜택가','Cat수수료','쿠폰수수료','선택쿠폰셀러부담','카드셀러부담','ESM+정산예상','프로모션','최종체감가'];
+  const aoa=[head, ...ev.rows.map(row=>{ const c=_evCalcRow(row,ev.rates); return [row.model||'',c.orig,c.disp,c.listing,c.selCpn,c.first,c.cardDc,c.benefit,c.catFee,c.cpnFee,c.selSeller,c.cardSeller,c.settle,c.promo,c.feel]; })];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), (ev.name||'행사').slice(0,28));
+  XLSX.writeFile(wb, `행사정산_${(ev.name||'행사')}.xlsx`);
+}
+// 행사 페이지(대시보드 복제) + 사이드바 메뉴 주입
+(function _initEventPage(){
+  try {
+    const dash = document.getElementById('page-dashboard');
+    if (dash && !document.getElementById('page-event')) {
+      const ev = dash.cloneNode(true);
+      ev.id = 'page-event';
+      ev.classList.remove('active');
+      ev.querySelectorAll('[id]').forEach(el => { if (el.id && el.id !== 'page-event') el.id = el.id + '-ev'; });
+      const main = ev.querySelector('main');
+      if (main) main.innerHTML = _evCalcHtml();
+      dash.parentNode.insertBefore(ev, dash.nextSibling);
+    }
+    document.querySelectorAll('.sidebar nav').forEach(nav => {
+      if (nav.querySelector('[data-page="event"]')) return;
+      const dashA = nav.querySelector('[data-page="dashboard"]');
+      if (!dashA) return;
+      const a = document.createElement('a');
+      a.href = '#'; a.setAttribute('data-page', 'event');
+      a.className = dashA.className;
+      a.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11h16M4 11l1.5-5h13L20 11M4 11v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8M9 16h6"/></svg>행사';
+      dashA.insertAdjacentElement('afterend', a);
+      a.onclick = (e) => { e.preventDefault(); navigate('event'); };
+    });
+  } catch (e) { console.warn('[event page init]', e); }
+})();
 
 // ── Init ─────────────────────────────────────
 try { updateNavItems('login'); } catch(_) {}
