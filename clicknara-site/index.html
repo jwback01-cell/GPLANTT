@@ -2347,8 +2347,11 @@ async function _evProcessFile(file){
       for(const r of rows){
         const cells = (r||[]).map(x=>String(x==null?'':x));
         const joined = cells.map(norm);
-        // 제목 추출 (헤더 전, 첫 텍스트 행 — 예: "롯데온 6월 자이언츠 데이")
-        if(!title && !cols){ const first=(cells[0]||'').trim(); if(first && !/기간/.test(first) && joined.findIndex(c=>c==='model'||c.includes('모델'))<0) title=first.slice(0,60); }
+        // 제목 추출 (헤더 전, 모든 칸 스캔 — 예: "롯데온 6월 자이언츠 데이")
+        if(!title && !cols){
+          const txt = cells.map(c=>String(c||'').trim()).find(c => c && c.length>=3 && !/^기간/.test(c) && !/^\*?기간/.test(c) && !/^\d/.test(c) && norm(c)!=='model' && !norm(c).includes('모델') && !norm(c).includes('대리점'));
+          if(txt) title = txt.slice(0,60);
+        }
         // 기간 추출
         if(!period){ const pj = cells.join(' '); const m = pj.match(/기간[^0-9]*([0-9].*)/); if(m) period = m[1].trim().slice(0,40); }
         // 헤더행 감지 (Model + SRP/기존/세팅)
@@ -2402,20 +2405,22 @@ async function evDownloadForm(){
   const isImport = ev.viewMode==='import';
   const wb=new ExcelJS.Workbook();
   const ws=wb.addWorksheet('기본');
-  ws.columns=[{width:34},{width:13},{width:13},{width:12},{width:15},{width:18}];
-  const thin={top:{style:'thin',color:{argb:'FF9CA3AF'}},left:{style:'thin',color:{argb:'FF9CA3AF'}},bottom:{style:'thin',color:{argb:'FF9CA3AF'}},right:{style:'thin',color:{argb:'FF9CA3AF'}}};
-  // 제목
-  ws.mergeCells('A1:F1');
-  const t=ws.getCell('A1'); t.value=ev.title||ev.name||'행사'; t.font={bold:true,size:20}; t.alignment={vertical:'middle'}; ws.getRow(1).height=30;
-  // 기간
+  ws.columns=[{width:36},{width:13},{width:13},{width:12},{width:15},{width:20}];
+  const bd={style:'thin',color:{argb:'FF808080'}};
+  const thin={top:bd,left:bd,bottom:bd,right:bd};
+  // 제목 (2행) + 기간 (3행) — 위 여백
+  ws.getRow(1).height=8;
   ws.mergeCells('A2:F2');
-  const p=ws.getCell('A2'); p.value=ev.period?('*기간: '+ev.period):''; p.font={bold:true,size:12,color:{argb:'FF333333'}};
-  // 헤더 (4행)
-  const HR=4; const heads=['상품명','기존가','할인가','포토리뷰','최종 체감가','비고'];
+  const t=ws.getCell('A2'); t.value=ev.title||ev.name||'행사'; t.font={bold:true,size:22}; t.alignment={vertical:'middle'}; ws.getRow(2).height=34;
+  ws.mergeCells('A3:F3');
+  const p=ws.getCell('A3'); p.value=ev.period?('*기간: '+ev.period):''; p.font={bold:true,size:13,color:{argb:'FF333333'}}; ws.getRow(3).height=22;
+  ws.getRow(4).height=8;   // 간격
+  // 헤더 (5행)
+  const HR=5; const heads=['상품명','기존가','할인가','포토리뷰','최종 체감가','비고'];
   const hr=ws.getRow(HR);
   heads.forEach((h,i)=>{ const c=hr.getCell(i+1); c.value=h; c.font={bold:true,size:11,color:i===4?{argb:'FFFF0000'}:{argb:'FF1F2937'}};
-    c.alignment={horizontal:'center',vertical:'middle'}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFDCE6F1'}}; c.border=thin; });
-  hr.height=24;
+    c.alignment={horizontal:'center',vertical:'middle'}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFB8CCE4'}}; c.border=thin; });
+  hr.height=34;
   // 데이터
   ev.rows.forEach((row,idx)=>{
     let disc,feel; if(isImport){ const m=row.imp||{}; disc=Number(m.finalBuy)||0; feel=Number(m.feel)||0; } else { const cc=_evCalcRow(row,ev.rates); disc=cc.benefit; feel=cc.feel; }
@@ -2428,7 +2433,7 @@ async function evDownloadForm(){
       else { c.alignment={horizontal:'center',vertical:'middle'}; if(typeof v==='number') c.numFmt='#,##0'; }
       if(i===4){ c.font={bold:true,size:11,color:{argb:'FFFF0000'}}; c.numFmt='#,##0'; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFCE4D6'}}; c.alignment={horizontal:'center',vertical:'middle'}; }
     });
-    r.height=20;
+    r.height=22;
   });
   const buf=await wb.xlsx.writeBuffer();
   const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
