@@ -2258,6 +2258,10 @@ tailwind.config = {
               이미지호스팅 상품 가져오기
             </button>
             <button id="imp-show-selected" onclick="_impToggleSelectedOnly()" class="px-4 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg flex items-center gap-1.5" title="체크한 행만 보기 / 전체 보기 전환">체크만 보기 (0)</button>
+            <button onclick="deleteSelectedImpRows()" class="px-4 py-2 rounded-full border border-brand-pink text-brand-pink text-sm font-bold hover:bg-brand-pink-light/30 flex items-center gap-1.5" title="체크한 행을 삭제합니다">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+              선택 삭제
+            </button>
             <button onclick="openImpGroupCostModal()" class="px-4 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg flex items-center gap-1.5" title="체크한 상품들의 총 중판비용·관세를 원화 금액 비율로 배분">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 7h18"/><path d="M6 12h12"/><path d="M9 17h6"/></svg>
               묶음 비용 배분
@@ -2284,7 +2288,7 @@ tailwind.config = {
               <thead>
                 <tr class="bg-brand-bg">
                   <th class="px-2 py-3 text-center border-b-2 border-brand-border w-[36px]"><input type="checkbox" id="imp-select-all" onchange="_impToggleSelectAll(this.checked)" title="전체 선택"></th>
-                  <th onclick="_impSetSort('date')" data-impsort="date" class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[110px] cursor-pointer select-none hover:text-brand-blue">입항일<span class="imp-sort-ind"></span></th>
+                  <th onclick="_impSetSort('date')" data-impsort="date" class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[110px] cursor-pointer select-none hover:text-brand-blue">등록일<span class="imp-sort-ind"></span></th>
                   <th onclick="_impSetSort('folder')" data-impsort="folder" class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[90px] cursor-pointer select-none hover:text-brand-blue">폴더코드<span class="imp-sort-ind"></span></th>
                   <th onclick="_impSetSort('code')" data-impsort="code" class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[100px] cursor-pointer select-none hover:text-brand-blue">상품코드<span class="imp-sort-ind"></span></th>
                   <th onclick="_impSetSort('name')" data-impsort="name" class="px-3 py-3 text-left   font-bold border-b-2 border-brand-border min-w-[220px] cursor-pointer select-none hover:text-brand-blue">제품명<span class="imp-sort-ind"></span></th>
@@ -10159,7 +10163,7 @@ function renderImpTab() {
       const rateCellCls = rateDiff ? 'text-brand-orange' : 'text-brand-gray';
       return `<tr class="border-b border-brand-border hover:bg-brand-bg/40" data-id="${r.id}">
         <td class="px-2 py-1 text-center"><input type="checkbox" class="imp-row-cb" data-id="${r.id}" ${_impSelected.has(r.id) ? 'checked' : ''} onchange="_impOnRowCheck('${r.id}',this.checked)"></td>
-        <td class="px-1 py-1"><input type="text" data-field="date" onpaste="_onImpCellPaste(event,this)" value="${_impEsc(r.date)}" onchange="_onImpEdit('${r.id}','date',this.value)" class="${inp} text-xs text-center"></td>
+        <td class="px-2 py-1 text-xs text-center text-brand-gray whitespace-nowrap" title="등록일(자동)">${_impEsc(r.date || '')}</td>
         <td class="px-1 py-1"><input type="text" data-field="folder" onpaste="_onImpCellPaste(event,this)" value="${_impEsc(r.folder)}" onchange="_onImpEdit('${r.id}','folder',this.value)" class="${inp} text-xs font-mono text-center" placeholder="폴더"></td>
         <td class="px-1 py-1"><input type="text" data-field="code" onpaste="_onImpCellPaste(event,this)" value="${_impEsc(r.code)}" onchange="_onImpEdit('${r.id}','code',this.value)" class="${inp} text-xs font-mono text-center" placeholder="상품코드"></td>
         <td class="px-1 py-1"><input type="text" data-field="name" onpaste="_onImpCellPaste(event,this)" value="${_impEsc(r.name)}" onchange="_onImpEdit('${r.id}','name',this.value)" class="${inp} text-sm font-semibold"></td>
@@ -10725,11 +10729,11 @@ function addImpRow() {
     const rows = document.querySelectorAll('#imp-tbody tr');
     const last = rows[rows.length - 1];
     last?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    last?.querySelector('input[data-field="date"]')?.focus();
+    last?.querySelector('input[data-field="folder"]')?.focus();
   }, 30);
 }
 // 엑셀 다중 셀 붙여넣기 — 여러 행 자동 생성 + 컬럼 매핑 (시작 셀 기준 좌→우)
-const _IMP_COLUMN_ORDER = ['date','folder','code','name','vendorCode','rate','cny','fee','tax','qty'];
+const _IMP_COLUMN_ORDER = ['folder','code','name','vendorCode','rate','cny','fee','tax','qty'];
 function _onImpCellPaste(e, el) {
   const cd = e.clipboardData || window.clipboardData;
   if (!cd) return;
@@ -10779,6 +10783,17 @@ function deleteImpRow(id) {
   if (!confirm('이 행을 삭제할까요?')) return;
   _impLoad();
   _impState.rows = _impState.rows.filter(r => r.id !== id);
+  _impSave();
+  renderImpTab();
+}
+function deleteSelectedImpRows() {
+  _impLoad();
+  const ids = _impSelectedIds();
+  if (!ids.length) { showAppAlert('선택 없음', '삭제할 행을 먼저 체크하세요.', 'warn'); return; }
+  if (!confirm(`체크한 ${ids.length}개 행을 삭제할까요?`)) return;
+  const idset = new Set(ids);
+  _impState.rows = _impState.rows.filter(r => !idset.has(r.id));
+  _impSelected.clear();
   _impSave();
   renderImpTab();
 }
