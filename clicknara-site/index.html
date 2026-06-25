@@ -2202,8 +2202,9 @@ function _evCalcHtml() {
       <div class="flex items-center gap-2 flex-wrap">
         <button onclick="evAddRow()" class="px-3 py-2 rounded-full bg-brand-blue text-white text-sm font-bold hover:opacity-90">+ 행 추가</button>
         <button onclick="evDeleteSelected()" class="px-3 py-2 rounded-full border border-brand-pink text-brand-pink text-sm font-bold hover:bg-red-50">선택 삭제</button>
+        <label class="px-3 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333] cursor-pointer">엑셀 업로드<input type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="evUploadExcel(event)"></label>
         <button onclick="evDownloadExcel()" class="px-3 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg">엑셀 다운로드</button>
-        <span class="text-xs text-brand-gray">엑셀에서 <b>모델명·기존가·노출가</b>를 복사해 칸에 붙여넣으면 아래로 자동 입력됩니다.</span>
+        <span class="text-xs text-brand-gray">엑셀 업로드 시 <b>Model·기존 SRP·행사 세팅 SRP·MKT 행사</b>를 자동 인식. 또는 셀 복사 후 칸에 붙여넣기.</span>
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-xs border-collapse whitespace-nowrap border border-brand-border">
@@ -2299,6 +2300,55 @@ function evDeleteSelected(){
   if(!confirm(`체크한 ${del.length}개 행을 삭제할까요?`)) return;
   ev.rows = ev.rows.filter(r=>!_evSel.has(r.id));
   _evSel.clear(); _evSave(o); renderEventCalc();
+}
+async function evUploadExcel(e){
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  if(typeof XLSX==='undefined'){ alert('엑셀 라이브러리 로드 실패'); return; }
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type:'array' });
+    const norm = s=>String(s==null?'':s).replace(/\s+/g,'').toLowerCase();
+    const out = []; let period = '';
+    wb.SheetNames.forEach(sn=>{
+      const ws = wb.Sheets[sn]; if(!ws) return;
+      const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+      let cols = null;
+      for(const r of rows){
+        const cells = (r||[]).map(x=>String(x==null?'':x));
+        const joined = cells.map(norm);
+        // 기간 추출
+        if(!period){ const pj = cells.join(' '); const m = pj.match(/기간[^0-9]*([0-9].*)/); if(m) period = m[1].trim().slice(0,40); }
+        // 헤더행 감지 (Model + SRP/기존)
+        const mi = joined.findIndex(c=> c==='model' || c.includes('모델'));
+        const hasHdr = mi>=0 && joined.some(c=> c.includes('srp') || c.includes('기존') || c.includes('세팅'));
+        if(hasHdr){
+          cols = { model: mi, orig:-1, disp:-1, promo:-1 };
+          joined.forEach((c,idx)=>{
+            if(cols.orig<0 && c.includes('기존')) cols.orig = idx;          // 기존 SRP
+            if(cols.disp<0 && c.includes('세팅')) cols.disp = idx;          // 행사 세팅 SRP
+            if(cols.promo<0 && (c.includes('mkt')||c.includes('프로모'))) cols.promo = idx;
+          });
+          continue;
+        }
+        if(!cols) continue;
+        const model = String(r[cols.model]==null?'':r[cols.model]).trim();
+        if(!model || norm(model)==='model') continue;
+        const orig = cols.orig>=0 ? _evNum(r[cols.orig]) : 0;
+        const disp = cols.disp>=0 ? _evNum(r[cols.disp]) : 0;
+        if(!orig && !disp) continue;   // 합계/빈 행 제외
+        out.push({ id:_evUid(), model, orig, disp, promo: cols.promo>=0?_evNum(r[cols.promo]):0 });
+      }
+    });
+    if(!out.length){ alert('불러올 데이터를 찾지 못했습니다.\n(헤더에 Model · 기존 SRP · 행사 세팅 SRP 가 있어야 합니다)'); return; }
+    const o=_evLoad(); const ev=_evActive(o);
+    const mode = ev.rows.length ? (confirm(`${out.length}개 모델을 불러왔습니다.\n\n확인 = 기존 ${ev.rows.length}행을 대체\n취소 = 맨 아래에 추가`) ? 'replace' : 'append') : 'replace';
+    if(mode==='replace') ev.rows = out; else ev.rows = ev.rows.concat(out);
+    if(period && !ev.period) ev.period = period;
+    _evSel.clear(); _evSave(o); renderEventCalc();
+    alert(`✅ ${out.length}개 모델 ${mode==='replace'?'불러오기':'추가'} 완료 (${ev.name})`);
+  }catch(err){ alert('엑셀 읽기 실패: ' + (err.message||err)); }
 }
 function evDownloadExcel(){
   if(typeof XLSX==='undefined'){ alert('엑셀 라이브러리 로드 실패'); return; }
