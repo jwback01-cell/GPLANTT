@@ -2207,7 +2207,7 @@ function _evCalcHtml() {
         <button id="ev-mode-btn" onclick="evToggleMode()" class="px-3 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg"></button>
         <span id="ev-mode-note" class="text-xs text-brand-gray"></span>
       </div>
-      <div class="overflow-x-auto">
+      <div id="ev-drop" class="overflow-x-auto rounded-xl" ondragover="evDragOver(event)" ondragleave="evDragLeave(event)" ondrop="evDropFile(event)" title="엑셀 파일을 여기로 끌어다 놓으면 업로드됩니다">
         <table class="w-full text-xs border-collapse whitespace-nowrap border border-brand-border">
           <thead><tr id="ev-thead-row" class="bg-brand-bg"></tr></thead>
           <tbody id="ev-tbody"></tbody>
@@ -2241,7 +2241,7 @@ function renderEventCalc() {
   if (isImport) {
     const heads = ['모델명','대리점','기존가(SRP)','행사세팅가','MKT행사','쿠폰+카드 최종구매가','체감가','보상금액','쿠팡 1차혜택가','쿠팡 보상',''];
     if (thRow) thRow.innerHTML = checkTh + heads.map((h,i)=>`<th class="px-2 py-2.5 font-bold border border-brand-border ${i===0?'text-left':(i===heads.length-1?'text-center':'text-right')}">${h}</th>`).join('');
-    if (!ev.rows.length) { tbody.innerHTML = `<tr><td colspan="12" class="px-3 py-8 text-center text-brand-gray border border-brand-border">엑셀 업로드로 데이터를 가져오세요.</td></tr>`; }
+    if (!ev.rows.length) { tbody.innerHTML = `<tr><td colspan="12" class="px-3 py-8 text-center text-brand-gray border border-brand-border">엑셀 파일을 이 표 위로 <b>드래그</b>하거나 "엑셀 업로드" 버튼으로 가져오세요.</td></tr>`; }
     else tbody.innerHTML = ev.rows.map((row,i)=>{ const m=row.imp||{}; const num=v=>`<td class="px-2 py-1 text-right tabular-nums border border-brand-border">${v?_evFmt(v):'-'}</td>`;
       return `<tr class="hover:bg-brand-bg/40">${cbCell(row)}
         <td class="px-2 py-1 border border-brand-border font-semibold min-w-[150px]">${_evEsc(row.model||'')}</td>
@@ -2256,7 +2256,7 @@ function renderEventCalc() {
     const heads = ['모델명','기존가','노출가','등재가','선택쿠폰할인액','1차할인액','카드할인액','최종혜택가','Cat수수료','쿠폰수수료','선택쿠폰셀러부담','카드셀러부담','ESM+정산예상','프로모션','최종체감가',''];
     if (thRow) thRow.innerHTML = checkTh + heads.map((h,i)=>`<th class="px-2 py-2.5 font-bold border border-brand-border ${i===0?'text-left':'text-right'} ${i===heads.length-1?'text-center':''}">${h}</th>`).join('');
     const cell = v => `<td class="px-2 py-1 text-right tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(v)}</td>`;
-    if (!ev.rows.length) { tbody.innerHTML = '<tr><td colspan="17" class="px-3 py-8 text-center text-brand-gray border border-brand-border">"+ 행 추가" 또는 엑셀 붙여넣기로 모델을 추가하세요.</td></tr>'; }
+    if (!ev.rows.length) { tbody.innerHTML = '<tr><td colspan="17" class="px-3 py-8 text-center text-brand-gray border border-brand-border">"+ 행 추가", 셀 붙여넣기, 또는 엑셀 파일을 이 표 위로 <b>드래그</b>해서 추가하세요.</td></tr>'; }
     else tbody.innerHTML = ev.rows.map((row, i) => {
       const c = _evCalcRow(row, ev.rates);
       return `<tr class="hover:bg-brand-bg/40">${cbCell(row)}
@@ -2320,6 +2320,18 @@ function evDeleteSelected(){
 async function evUploadExcel(e){
   const file = e.target.files && e.target.files[0];
   e.target.value = '';
+  await _evProcessFile(file);
+}
+function evDropFile(e){
+  e.preventDefault();
+  const zone = document.getElementById('ev-drop'); if(zone) zone.classList.remove('ring-2','ring-brand-blue');
+  const dt = e.dataTransfer; if(!dt) return;
+  const file = dt.files && dt.files[0];
+  if(file) _evProcessFile(file);
+}
+function evDragOver(e){ e.preventDefault(); const zone=document.getElementById('ev-drop'); if(zone) zone.classList.add('ring-2','ring-brand-blue'); }
+function evDragLeave(e){ const zone=document.getElementById('ev-drop'); if(zone) zone.classList.remove('ring-2','ring-brand-blue'); }
+async function _evProcessFile(file){
   if(!file) return;
   if(typeof XLSX==='undefined'){ alert('엑셀 라이브러리 로드 실패'); return; }
   try{
