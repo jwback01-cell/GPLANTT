@@ -2104,15 +2104,18 @@ function _evLoad() {
   let o = null;
   try { o = JSON.parse(localStorage.getItem(EV_KEY) || 'null'); } catch (_) {}
   if (!o || !Array.isArray(o.list)) o = { activeId: '', list: [] };
+  let dirty = false;
   // 고정 3개 사이트 보장 (없으면 생성)
   EV_SITES.forEach(site => {
-    if (!o.list.some(e => e.name === site)) o.list.push({ id: _evUid(), name: site, period: '', rates: _evDefaultRates(), rows: [] });
+    if (!o.list.some(e => e.name === site)) { o.list.push({ id: _evUid(), name: site, period: '', rates: _evDefaultRates(), rows: [] }); dirty = true; }
   });
   if (!o.activeId || !o.list.some(e => e.id === o.activeId)) {
     const first = o.list.find(e => e.name === EV_SITES[0]) || o.list[0];
     o.activeId = first.id;
   }
-  o.list.forEach(e => { e.rates = Object.assign(_evDefaultRates(), e.rates || {}); if (!Array.isArray(e.rows)) e.rows = []; e.rows.forEach(r => { if (!r.id) r.id = _evUid(); }); });
+  o.list.forEach(e => { e.rates = Object.assign(_evDefaultRates(), e.rates || {}); if (!Array.isArray(e.rows)) e.rows = []; e.rows.forEach(r => { if (!r.id) { r.id = _evUid(); dirty = true; } }); });
+  // 새로 부여한 id/시드는 즉시 영구 저장 — 매 렌더마다 id가 바뀌어 체크 선택이 풀리는 문제 방지
+  if (dirty) { try { localStorage.setItem(EV_KEY, JSON.stringify(o)); } catch (_) {} }
   return o;
 }
 let _evSel = new Set();   // 체크된 행 id
