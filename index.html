@@ -10654,8 +10654,11 @@ async function importImpFromImageHost() {
   // (상품코드|제품명) 기준 — 이미 있으면 폴더코드만 보완, 없으면 새로 추가 (중복 없이 재가져오기 가능)
   const byKey = new Map();
   (_impState.rows || []).forEach(r => byKey.set(String(r.code || '').trim() + '|' + String(r.name || '').trim(), r));
+  // 이미 등록된 상품코드/제품명 (중복 추가 방지)
+  const existCodes = new Set((_impState.rows || []).map(r => String(r.code || '').trim().toLowerCase()).filter(Boolean));
+  const existNames = new Set((_impState.rows || []).map(r => String(r.name || '').trim().toLowerCase()).filter(Boolean));
   const newRows = [];
-  let updated = 0, skippedBlank = 0;
+  let updated = 0, skippedBlank = 0, skippedDup = 0;
   products.forEach(p => {
     const name = String(p.name || '').trim();
     const code = String(p.code || '').trim();
@@ -10669,9 +10672,14 @@ async function importImpFromImageHost() {
       if (!String(ex.folder || '').trim() && folder) { ex.folder = folder; updated++; }
       return;
     }
+    // 상품코드/제품명 중복이면 새로 추가하지 않음
+    const cl = code.toLowerCase(), nl = name.toLowerCase();
+    if ((cl && existCodes.has(cl)) || (nl && existNames.has(nl))) { skippedDup++; return; }
     const row = _impNewRow();
     row.name = name; row.code = code; row.folder = folder;   // 중판코드(vendorCode)는 비워둠 — 직접 입력
     byKey.set(k, row);
+    if (cl) existCodes.add(cl);
+    if (nl) existNames.add(nl);
     newRows.push(row);
   });
   console.log('[IH import] 클라우드에서 읽은 상품 수:', products.length);
@@ -10680,12 +10688,28 @@ async function importImpFromImageHost() {
   if (newRows.length) _impState.rows = newRows.concat(_impState.rows);
   _impSave();
   renderImpTab();
-  alert(`✅ 완료 — 클라우드 ${products.length}개 중 새로 ${newRows.length}개 추가, 폴더코드 ${updated}개 보완.`);
+  alert(`✅ 완료 — 클라우드 ${products.length}개 중 새로 ${newRows.length}개 추가, 폴더코드 ${updated}개 보완` + (skippedDup ? `, 중복 ${skippedDup}개 제외` : '') + '.');
+}
+// 중복 검사 — 상품코드/제품명 (전역 고유). 폴더코드는 한 폴더에 여러 상품이라 단독 중복 허용.
+function _impCodeDup(code, exceptId) {
+  const c = String(code || '').trim().toLowerCase(); if (!c) return false;
+  return (_impState.rows || []).some(r => r.id !== exceptId && String(r.code || '').trim().toLowerCase() === c);
+}
+function _impNameDup(name, exceptId) {
+  const n = String(name || '').trim().toLowerCase(); if (!n) return false;
+  return (_impState.rows || []).some(r => r.id !== exceptId && String(r.name || '').trim().toLowerCase() === n);
 }
 function _onImpEdit(id, field, val) {
   _impLoad();
   const r = _impState.rows.find(x => x.id === id);
   if (!r) return;
+  // 상품코드/제품명 중복 차단 — 거부 후 원복
+  if (field === 'code' && String(val || '').trim() && _impCodeDup(val, id)) {
+    alert('이미 등록된 상품코드입니다: ' + val); renderImpTab(); return;
+  }
+  if (field === 'name' && String(val || '').trim() && _impNameDup(val, id)) {
+    alert('이미 등록된 제품명입니다: ' + val); renderImpTab(); return;
+  }
   if (['cny','fee','tax','qty','rate'].includes(field)) r[field] = Number(val) || 0;
   else r[field] = val;
   _impSave();
@@ -10725,6 +10749,7 @@ function _onImpCellPaste(e, el) {
   if (startIdx < 0) return;
   const numFields = new Set(['rate','cny','fee','tax','qty']);
   const curRate = Math.round(_impRate());
+  let _impPasteDup = 0;
   for (let r = 0; r < matrix.length; r++) {
     // 시작 행부터 아래로 기존 행에 채움. 행이 모자라면 그때만 새 행 추가.
     let item = _impState.rows[startIdx + r];
@@ -10737,6 +10762,9 @@ function _onImpCellPaste(e, el) {
       const field = _IMP_COLUMN_ORDER[startCol + c];
       if (!field) continue;
       const raw = String(cols[c] || '').trim();
+      // 상품코드/제품명 중복은 채우지 않고 건너뜀
+      if (field === 'code' && raw && _impCodeDup(raw, item.id)) { _impPasteDup++; continue; }
+      if (field === 'name' && raw && _impNameDup(raw, item.id)) { _impPasteDup++; continue; }
       if (numFields.has(field)) item[field] = Number(raw.replace(/[^0-9.\-]/g, '')) || 0;
       else item[field] = raw;
     }
@@ -10744,6 +10772,7 @@ function _onImpCellPaste(e, el) {
   }
   _impSave();
   renderImpTab();
+  if (_impPasteDup) alert(`중복(상품코드/제품명) ${_impPasteDup}건은 건너뛰었습니다.`);
 }
 function deleteImpRow(id) {
   if (!confirm('이 행을 삭제할까요?')) return;
