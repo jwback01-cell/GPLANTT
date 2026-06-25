@@ -2239,9 +2239,9 @@ function renderEventCalc() {
   const cbCell = row => `<td class="px-2 py-1 text-center border border-brand-border"><input type="checkbox" class="ev-row-cb" ${_evSel.has(row.id)?'checked':''} onchange="evToggleRow('${row.id}',this.checked)"></td>`;
 
   if (isImport) {
-    const heads = ['모델명','대리점','기존가(SRP)','행사세팅가','MKT행사','쿠폰+카드 최종구매가','체감가','보상금액','쿠팡 1차혜택가','쿠팡 보상',''];
+    const heads = ['모델명','대리점','기존가(SRP)','행사세팅가','MKT행사','쿠폰+카드 최종구매가','체감가',''];
     if (thRow) thRow.innerHTML = checkTh + heads.map((h,i)=>`<th class="px-2 py-2.5 font-bold border border-brand-border ${i===0?'text-left':(i===heads.length-1?'text-center':'text-right')}">${h}</th>`).join('');
-    if (!ev.rows.length) { tbody.innerHTML = `<tr><td colspan="12" class="px-3 py-8 text-center text-brand-gray border border-brand-border">엑셀 파일을 이 표 위로 <b>드래그</b>하거나 "엑셀 업로드" 버튼으로 가져오세요.</td></tr>`; }
+    if (!ev.rows.length) { tbody.innerHTML = `<tr><td colspan="9" class="px-3 py-8 text-center text-brand-gray border border-brand-border">엑셀 파일을 이 표 위로 <b>드래그</b>하거나 "엑셀 업로드" 버튼으로 가져오세요.</td></tr>`; }
     else tbody.innerHTML = ev.rows.map((row,i)=>{ const m=row.imp||{}; const num=v=>`<td class="px-2 py-1 text-right tabular-nums border border-brand-border">${v?_evFmt(v):'-'}</td>`;
       return `<tr class="hover:bg-brand-bg/40">${cbCell(row)}
         <td class="px-2 py-1 border border-brand-border font-semibold min-w-[150px]">${_evEsc(row.model||'')}</td>
@@ -2249,7 +2249,6 @@ function renderEventCalc() {
         ${num(row.orig)}${num(row.disp)}${num(row.promo)}
         <td class="px-2 py-1 text-right tabular-nums border border-brand-border font-bold text-brand-blue">${m.finalBuy?_evFmt(m.finalBuy):'-'}</td>
         <td class="px-2 py-1 text-right tabular-nums border border-brand-border font-bold text-brand-pink">${m.feel?_evFmt(m.feel):'-'}</td>
-        ${num(m.reward)}${num(m.cpFirst)}${num(m.cpReward)}
         <td class="px-2 py-1 text-center border border-brand-border"><button onclick="evDelRow(${i})" class="text-brand-gray hover:text-brand-pink text-base leading-none">×</button></td>
       </tr>`; }).join('');
   } else {
