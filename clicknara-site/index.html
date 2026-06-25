@@ -1948,6 +1948,7 @@ function navigate(page) {
     // switchClicknaraTab이 현재 채널명(_cnChannel)에 맞춰 타이틀/설명을 자동으로 바꿔줌
     try { switchClicknaraTab('upload'); } catch(_) {}
   }
+  try { document.querySelectorAll('.ev-submenu').forEach(s => s.classList.toggle('hidden', page !== 'event')); } catch(_) {}
   if (page === 'event') { try { renderEventCalc(); } catch(_) {} }
 }
 
@@ -2098,16 +2099,28 @@ async function logout() {
 const EV_KEY = 'cn_events_v1';
 function _evDefaultRates() { return { md: 3, sel: 14, card: 5, cat: 7, cpnFee: 20, seller: 50 }; }
 function _evUid() { return 'ev_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+const EV_SITES = ['11번가', '이베이', '롯데온'];
 function _evLoad() {
   let o = null;
   try { o = JSON.parse(localStorage.getItem(EV_KEY) || 'null'); } catch (_) {}
-  if (!o || !Array.isArray(o.list) || !o.list.length) {
-    o = { activeId: '', list: [{ id: _evUid(), name: '새 행사', period: '', rates: _evDefaultRates(), rows: [] }] };
-    o.activeId = o.list[0].id;
+  if (!o || !Array.isArray(o.list)) o = { activeId: '', list: [] };
+  // 고정 3개 사이트 보장 (없으면 생성)
+  EV_SITES.forEach(site => {
+    if (!o.list.some(e => e.name === site)) o.list.push({ id: _evUid(), name: site, period: '', rates: _evDefaultRates(), rows: [] });
+  });
+  if (!o.activeId || !o.list.some(e => e.id === o.activeId)) {
+    const first = o.list.find(e => e.name === EV_SITES[0]) || o.list[0];
+    o.activeId = first.id;
   }
-  if (!o.activeId || !o.list.some(e => e.id === o.activeId)) o.activeId = o.list[0].id;
   o.list.forEach(e => { e.rates = Object.assign(_evDefaultRates(), e.rates || {}); if (!Array.isArray(e.rows)) e.rows = []; });
   return o;
+}
+function evGoSite(name) {
+  const o = _evLoad();
+  const e = o.list.find(x => x.name === name) || o.list[0];
+  o.activeId = e.id; _evSave(o);
+  if (typeof navigate === 'function') navigate('event');
+  renderEventCalc();
 }
 function _evSave(o) { try { localStorage.setItem(EV_KEY, JSON.stringify(o)); } catch (_) {} }
 function _evActive(o) { return (o || _evLoad()).list.find(e => e.id === (o || _evLoad()).activeId); }
@@ -2139,11 +2152,9 @@ function _evCalcHtml() {
     </section>
     <section class="bg-white rounded-3xl panel p-5 flex flex-col gap-4">
       <div class="flex flex-wrap items-center gap-2">
-        <select id="ev-select" onchange="evSwitchEvent(this.value)" class="px-3 py-2 rounded-xl border border-brand-border text-sm font-bold bg-white"></select>
-        <button onclick="evNewEvent()" class="px-3 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333]">+ 새 행사</button>
-        <button onclick="evDeleteEvent()" class="px-3 py-2 rounded-full border border-brand-pink text-brand-pink text-sm font-bold hover:bg-red-50">행사 삭제</button>
-        <input id="ev-name" oninput="evSetField('name',this.value)" placeholder="행사/사이트명 (예: 11번가)" class="px-3 py-2 rounded-xl border border-brand-border text-sm w-[200px]">
-        <input id="ev-period" oninput="evSetField('period',this.value)" placeholder="기간 (예: 3/30~4/8)" class="px-3 py-2 rounded-xl border border-brand-border text-sm w-[180px]">
+        <span class="px-3 py-1.5 rounded-full bg-brand-black text-white text-sm font-bold" id="ev-site-badge">11번가</span>
+        <span class="text-brand-gray text-sm">좌측 <b>행사</b> 메뉴에서 사이트를 선택하세요.</span>
+        <input id="ev-period" oninput="evSetField('period',this.value)" placeholder="기간 (예: 3/30~4/8)" class="px-3 py-2 rounded-xl border border-brand-border text-sm w-[180px] ml-auto">
       </div>
       <div class="flex flex-wrap gap-3 text-sm bg-brand-bg rounded-2xl p-3">
         ${[['md','MD쿠폰%'],['sel','선택쿠폰%(행사)'],['card','카드%'],['cat','Cat수수료%'],['cpnFee','쿠폰수수료(Cat의%)'],['seller','셀러부담%']].map(([k,label])=>`
@@ -2169,9 +2180,13 @@ function _evCalcHtml() {
 }
 function renderEventCalc() {
   const o = _evLoad(); const ev = _evActive(o);
-  const sel = document.getElementById('ev-select');
-  if (sel) sel.innerHTML = o.list.map(e => `<option value="${e.id}" ${e.id===o.activeId?'selected':''}>${_evEsc(e.name||'(이름없음)')}</option>`).join('');
-  const nameEl = document.getElementById('ev-name'); if (nameEl && document.activeElement!==nameEl) nameEl.value = ev.name || '';
+  const badge = document.getElementById('ev-site-badge'); if (badge) badge.textContent = ev.name || '';
+  // 좌측 소메뉴 활성 표시
+  document.querySelectorAll('.ev-sub').forEach(a => {
+    const on = a.dataset.evSite === ev.name;
+    a.classList.toggle('text-brand-black', on); a.classList.toggle('font-bold', on);
+    a.classList.toggle('text-brand-gray', !on);
+  });
   const perEl = document.getElementById('ev-period'); if (perEl && document.activeElement!==perEl) perEl.value = ev.period || '';
   Object.keys(_evDefaultRates()).forEach(k => { const el = document.getElementById('ev-rate-'+k); if (el && document.activeElement!==el) el.value = ev.rates[k]; });
   const tbody = document.getElementById('ev-tbody'); if (!tbody) return;
@@ -2258,6 +2273,12 @@ function evDownloadExcel(){
       a.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11h16M4 11l1.5-5h13L20 11M4 11v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8M9 16h6"/></svg>행사';
       dashA.insertAdjacentElement('afterend', a);
       a.onclick = (e) => { e.preventDefault(); navigate('event'); };
+      // 소메뉴 (11번가/이베이/롯데온)
+      const sub = document.createElement('div');
+      sub.className = 'ev-submenu flex flex-col gap-1 ml-9 mb-1 hidden';
+      sub.innerHTML = EV_SITES.map(s => `<a class="ev-sub text-sm py-1 cursor-pointer text-brand-gray hover:text-brand-black" data-ev-site="${s}">${s}</a>`).join('');
+      a.insertAdjacentElement('afterend', sub);
+      sub.querySelectorAll('.ev-sub').forEach(link => { link.onclick = (e) => { e.preventDefault(); evGoSite(link.dataset.evSite); }; });
     });
   } catch (e) { console.warn('[event page init]', e); }
 })();
