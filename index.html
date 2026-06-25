@@ -2284,19 +2284,19 @@ tailwind.config = {
               <thead>
                 <tr class="bg-brand-bg">
                   <th class="px-2 py-3 text-center border-b-2 border-brand-border w-[36px]"><input type="checkbox" id="imp-select-all" onchange="_impToggleSelectAll(this.checked)" title="전체 선택"></th>
-                  <th class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[110px]">입항일</th>
-                  <th class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[90px]">폴더코드</th>
-                  <th class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[100px]">상품코드</th>
-                  <th class="px-3 py-3 text-left   font-bold border-b-2 border-brand-border min-w-[220px]">제품명</th>
-                  <th class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[120px]">중판코드</th>
-                  <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[80px]" title="이 행이 저장한 1위안 환율 (행 추가 시 자동 입력, 직접 수정 가능)">환율</th>
-                  <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[90px]">위안화</th>
-                  <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[110px]">원화</th>
-                  <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[110px]">중판비용</th>
-                  <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[90px]">관세</th>
-                  <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[70px]">수량</th>
-                  <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[90px]">1개금액</th>
-                  <th class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[110px]">합계</th>
+                  <th onclick="_impSetSort('date')" data-impsort="date" class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[110px] cursor-pointer select-none hover:text-brand-blue">입항일<span class="imp-sort-ind"></span></th>
+                  <th onclick="_impSetSort('folder')" data-impsort="folder" class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[90px] cursor-pointer select-none hover:text-brand-blue">폴더코드<span class="imp-sort-ind"></span></th>
+                  <th onclick="_impSetSort('code')" data-impsort="code" class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[100px] cursor-pointer select-none hover:text-brand-blue">상품코드<span class="imp-sort-ind"></span></th>
+                  <th onclick="_impSetSort('name')" data-impsort="name" class="px-3 py-3 text-left   font-bold border-b-2 border-brand-border min-w-[220px] cursor-pointer select-none hover:text-brand-blue">제품명<span class="imp-sort-ind"></span></th>
+                  <th onclick="_impSetSort('vendorCode')" data-impsort="vendorCode" class="px-3 py-3 text-center font-bold border-b-2 border-brand-border w-[120px] cursor-pointer select-none hover:text-brand-blue">중판코드<span class="imp-sort-ind"></span></th>
+                  <th onclick="_impSetSort('rate')" data-impsort="rate" class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[80px] cursor-pointer select-none hover:text-brand-blue" title="이 행이 저장한 1위안 환율 (행 추가 시 자동 입력, 직접 수정 가능)">환율<span class="imp-sort-ind"></span></th>
+                  <th onclick="_impSetSort('cny')" data-impsort="cny" class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[90px] cursor-pointer select-none hover:text-brand-blue">위안화<span class="imp-sort-ind"></span></th>
+                  <th onclick="_impSetSort('krw')" data-impsort="krw" class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[110px] cursor-pointer select-none hover:text-brand-blue">원화<span class="imp-sort-ind"></span></th>
+                  <th onclick="_impSetSort('fee')" data-impsort="fee" class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[110px] cursor-pointer select-none hover:text-brand-blue">중판비용<span class="imp-sort-ind"></span></th>
+                  <th onclick="_impSetSort('tax')" data-impsort="tax" class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[90px] cursor-pointer select-none hover:text-brand-blue">관세<span class="imp-sort-ind"></span></th>
+                  <th onclick="_impSetSort('qty')" data-impsort="qty" class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[70px] cursor-pointer select-none hover:text-brand-blue">수량<span class="imp-sort-ind"></span></th>
+                  <th onclick="_impSetSort('unit')" data-impsort="unit" class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[90px] cursor-pointer select-none hover:text-brand-blue">1개금액<span class="imp-sort-ind"></span></th>
+                  <th onclick="_impSetSort('total')" data-impsort="total" class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[110px] cursor-pointer select-none hover:text-brand-blue">합계<span class="imp-sort-ind"></span></th>
                   <th class="px-3 py-3 text-center border-b-2 border-brand-border w-[40px]"></th>
                 </tr>
               </thead>
@@ -9972,7 +9972,43 @@ let _impState = null;   // { krw, feeKrw, cny, rows: [...] }
 let _impSearch = '';    // 표 검색어
 let _impSelected = new Set();   // 체크된 행 id (검색/재렌더에도 유지)
 let _impShowSelectedOnly = false;   // 체크한 행만 보기
+let _impSort = { col: null, dir: 'asc' };   // 표 정렬 (헤더 클릭)
 function _impOnSearch(v) { _impSearch = v || ''; renderImpTab(); }
+const _IMP_NUM_COLS = new Set(['rate','cny','krw','fee','tax','qty','unit','total']);
+function _impSetSort(col) {
+  if (_impSort.col === col) _impSort.dir = (_impSort.dir === 'asc') ? 'desc' : 'asc';
+  else { _impSort.col = col; _impSort.dir = 'asc'; }
+  renderImpTab();
+}
+function _impSortVal(r, col) {
+  const cny = Number(r.cny) || 0, rate = Math.round(Number(r.rate) || 0), krw = cny * rate;
+  const fee = Number(r.fee) || 0, tax = Number(r.tax) || 0, total = krw + fee + tax;
+  const qty = Number(r.qty) || 0;
+  switch (col) {
+    case 'rate': return rate; case 'cny': return cny; case 'krw': return krw;
+    case 'fee': return fee; case 'tax': return tax; case 'qty': return qty;
+    case 'total': return total; case 'unit': return qty > 0 ? total / qty : 0;
+    default: return String(r[col] || '');
+  }
+}
+function _impUpdateSortIndicators() {
+  document.querySelectorAll('[data-impsort]').forEach(el => {
+    const c = el.getAttribute('data-impsort');
+    const ind = el.querySelector('.imp-sort-ind');
+    if (ind) ind.textContent = (_impSort.col === c) ? (_impSort.dir === 'asc' ? ' ▲' : ' ▼') : '';
+  });
+}
+function _impApplySort(rows) {
+  const col = _impSort.col;
+  if (!col) return rows;
+  const dir = _impSort.dir === 'desc' ? -1 : 1;
+  const num = _IMP_NUM_COLS.has(col);
+  return rows.slice().sort((a, b) => {
+    const va = _impSortVal(a, col), vb = _impSortVal(b, col);
+    if (num) return (va - vb) * dir;
+    return String(va).localeCompare(String(vb), 'ko') * dir;
+  });
+}
 function _impToggleSelectedOnly() {
   _impShowSelectedOnly = !_impShowSelectedOnly;
   renderImpTab();
@@ -10091,6 +10127,8 @@ function renderImpTab() {
     ? _impState.rows.filter(r => [r.name, r.folder, r.code, r.vendorCode].some(x => String(x || '').toLowerCase().includes(term)))
     : _impState.rows;
   if (_impShowSelectedOnly) viewRows = viewRows.filter(r => _impSelected.has(r.id));
+  viewRows = _impApplySort(viewRows);   // 헤더 클릭 정렬
+  _impUpdateSortIndicators();
   // 토글 버튼 상태 반영
   const soBtn = document.getElementById('imp-show-selected');
   if (soBtn) {
@@ -10655,12 +10693,14 @@ function _onImpEdit(id, field, val) {
 }
 function addImpRow() {
   _impLoad();
-  _impState.rows.unshift(_impNewRow());
+  _impState.rows.push(_impNewRow());   // 맨 아래에 추가
   _impSave();
   renderImpTab();
   setTimeout(() => {
-    const first = document.querySelector('#imp-tbody tr [oninput^="_onImpEdit"][oninput*=",\'name\'"]');
-    if (first) first.focus();
+    const rows = document.querySelectorAll('#imp-tbody tr');
+    const last = rows[rows.length - 1];
+    last?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    last?.querySelector('input[data-field="date"]')?.focus();
   }, 30);
 }
 // 엑셀 다중 셀 붙여넣기 — 여러 행 자동 생성 + 컬럼 매핑 (시작 셀 기준 좌→우)
