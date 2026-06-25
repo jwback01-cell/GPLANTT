@@ -2204,6 +2204,7 @@ function _evCalcHtml() {
         <button onclick="evDeleteSelected()" class="px-3 py-2 rounded-full border border-brand-pink text-brand-pink text-sm font-bold hover:bg-red-50">선택 삭제</button>
         <label class="px-3 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333] cursor-pointer">엑셀 업로드<input type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="evUploadExcel(event)"></label>
         <button onclick="evDownloadExcel()" class="px-3 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg">엑셀 다운로드</button>
+        <button onclick="evDownloadForm()" class="px-3 py-2 rounded-full bg-brand-blue text-white text-sm font-bold hover:opacity-90" title="상품명·기존가·할인가·포토리뷰·최종체감가 양식으로 엑셀 저장">양식 다운로드</button>
         <button id="ev-mode-btn" onclick="evToggleMode()" class="px-3 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg"></button>
         <span id="ev-mode-note" class="text-xs text-brand-gray"></span>
       </div>
@@ -2388,6 +2389,29 @@ async function _evProcessFile(file){
     _evSel.clear(); _evSave(o); renderEventCalc();
     alert(`✅ ${out.length}개 모델 ${mode==='replace'?'불러오기':'추가'} 완료 (${ev.name})\n엑셀 계산값을 그대로 표시합니다.`);
   }catch(err){ alert('엑셀 읽기 실패: ' + (err.message||err)); }
+}
+// 고객 양식 다운로드 — 상품명·기존가·할인가·포토리뷰·최종체감가·비고
+function evDownloadForm(){
+  if(typeof XLSX==='undefined'){ alert('엑셀 라이브러리 로드 실패'); return; }
+  const o=_evLoad(); const ev=_evActive(o);
+  if(!ev.rows.length){ alert('데이터가 없습니다.'); return; }
+  const isImport = ev.viewMode==='import';
+  const aoa=[];
+  aoa.push([ (ev.name||'행사') + (ev.period?(' '+ev.period):'') ]);
+  aoa.push([]);
+  aoa.push(['상품명','기존가','할인가','포토리뷰','최종 체감가','비고']);
+  ev.rows.forEach(row=>{
+    let disc, feel;
+    if(isImport){ const m=row.imp||{}; disc=Number(m.finalBuy)||0; feel=Number(m.feel)||0; }
+    else { const c=_evCalcRow(row,ev.rates); disc=c.benefit; feel=c.feel; }
+    const photo = Number(row.promo)||0;
+    aoa.push([ row.model||'', Number(row.orig)||0, disc, photo||'', feel, '' ]);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:30},{wch:12},{wch:12},{wch:12},{wch:14},{wch:16}];
+  try{ ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:5}}]; }catch(_){}
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, (ev.name||'행사').slice(0,28));
+  XLSX.writeFile(wb, `${ev.name||'행사'}_양식.xlsx`);
 }
 function evDownloadExcel(){
   if(typeof XLSX==='undefined'){ alert('엑셀 라이브러리 로드 실패'); return; }
