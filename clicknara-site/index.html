@@ -2118,11 +2118,43 @@ function _evLoad() {
 function evGoSite(name) {
   const o = _evLoad();
   const e = o.list.find(x => x.name === name) || o.list[0];
-  o.activeId = e.id; _evSave(o);
+  o.activeId = e.id; _evSave(o, true);   // 사이트 전환은 undo 대상 아님
   if (typeof navigate === 'function') navigate('event');
   renderEventCalc();
 }
-function _evSave(o) { try { localStorage.setItem(EV_KEY, JSON.stringify(o)); } catch (_) {} }
+let _evUndo = [], _evRedo = [], _evRestoring = false;
+function _evSave(o, skipUndo) {
+  try {
+    const prev = localStorage.getItem(EV_KEY);
+    if (!skipUndo && !_evRestoring && prev !== null) {
+      _evUndo.push(prev); if (_evUndo.length > 80) _evUndo.shift();
+      _evRedo.length = 0;
+    }
+    localStorage.setItem(EV_KEY, JSON.stringify(o));
+  } catch (_) {}
+}
+function evUndo() {
+  if (!_evUndo.length) return false;
+  const cur = localStorage.getItem(EV_KEY);
+  const prev = _evUndo.pop();
+  if (cur !== null) _evRedo.push(cur);
+  _evRestoring = true;
+  try { localStorage.setItem(EV_KEY, prev); } catch (_) {}
+  _evRestoring = false;
+  renderEventCalc();
+  return true;
+}
+function evRedo() {
+  if (!_evRedo.length) return false;
+  const cur = localStorage.getItem(EV_KEY);
+  const next = _evRedo.pop();
+  if (cur !== null) _evUndo.push(cur);
+  _evRestoring = true;
+  try { localStorage.setItem(EV_KEY, next); } catch (_) {}
+  _evRestoring = false;
+  renderEventCalc();
+  return true;
+}
 function _evActive(o) { return (o || _evLoad()).list.find(e => e.id === (o || _evLoad()).activeId); }
 function _evNum(v) { return Number(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')) || 0; }
 function _evFmt(n) { return Math.round(Number(n) || 0).toLocaleString('ko-KR'); }
@@ -2282,6 +2314,17 @@ function evDownloadExcel(){
     });
   } catch (e) { console.warn('[event page init]', e); }
 })();
+
+// 행사 계산기 — Ctrl+Z 되돌리기 / Ctrl+Y(또는 Ctrl+Shift+Z) 다시실행
+document.addEventListener('keydown', function (e) {
+  let onEvent = false;
+  try { onEvent = (typeof currentPage !== 'undefined' && currentPage.value === 'event'); } catch (_) {}
+  if (!onEvent) return;
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const k = (e.key || '').toLowerCase();
+  if (k === 'z' && !e.shiftKey) { e.preventDefault(); evUndo(); }
+  else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); evRedo(); }
+});
 
 // ── Init ─────────────────────────────────────
 try { updateNavItems('login'); } catch(_) {}
