@@ -2203,11 +2203,13 @@ function _evCalcHtml() {
       <div class="flex items-center gap-2 flex-wrap">
         <button onclick="evAddRow()" class="px-3 py-2 rounded-full bg-brand-blue text-white text-sm font-bold hover:opacity-90">+ 행 추가</button>
         <button onclick="evDeleteSelected()" class="px-3 py-2 rounded-full border border-brand-pink text-brand-pink text-sm font-bold hover:bg-red-50">선택 삭제</button>
-        <label class="px-3 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333] cursor-pointer">엑셀 업로드<input type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="evUploadExcel(event)"></label>
         <button onclick="evDownloadExcel()" class="px-3 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg">엑셀 다운로드</button>
-        <button onclick="evDownloadForm()" class="px-3 py-2 rounded-full bg-brand-blue text-white text-sm font-bold hover:opacity-90" title="상품명·기존가·할인가·포토리뷰·최종체감가 양식으로 엑셀 저장">양식 다운로드</button>
         <button id="ev-mode-btn" onclick="evToggleMode()" class="px-3 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg"></button>
         <span id="ev-mode-note" class="text-xs text-brand-gray"></span>
+        <button onclick="evDownloadForm()" class="ml-auto px-5 py-2.5 rounded-full bg-green-600 text-white text-sm font-extrabold hover:bg-green-700 shadow-lg shadow-green-600/30 flex items-center gap-1.5" title="상품명·기존가·할인가·포토리뷰·최종체감가 양식으로 엑셀 저장">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          양식 다운로드
+        </button>
       </div>
       <div id="ev-drop" class="overflow-x-auto rounded-xl" ondragover="evDragOver(event)" ondragleave="evDragLeave(event)" ondrop="evDropFile(event)" title="엑셀 파일을 여기로 끌어다 놓으면 업로드됩니다">
         <table class="w-full text-xs border-collapse whitespace-nowrap border border-brand-border">
@@ -2404,7 +2406,7 @@ async function evDownloadForm(){
   if(!ev.rows.length){ alert('데이터가 없습니다.'); return; }
   const isImport = ev.viewMode==='import';
   const wb=new ExcelJS.Workbook();
-  const ws=wb.addWorksheet('기본');
+  const ws=wb.addWorksheet('기본', { views:[{ showGridLines:false }] });
   ws.columns=[{width:36},{width:13},{width:13},{width:12},{width:15},{width:20}];
   const bd={style:'thin',color:{argb:'FF808080'}};
   const thin={top:bd,left:bd,bottom:bd,right:bd};
