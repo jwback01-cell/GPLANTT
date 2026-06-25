@@ -2193,7 +2193,7 @@ function _evCalcHtml() {
         <span class="text-brand-gray text-sm">좌측 <b>행사</b> 메뉴에서 사이트를 선택하세요.</span>
         <input id="ev-period" oninput="evSetField('period',this.value)" placeholder="기간 (예: 3/30~4/8)" class="px-3 py-2 rounded-xl border border-brand-border text-sm w-[180px] ml-auto">
       </div>
-      <div class="flex flex-wrap gap-3 text-sm bg-brand-bg rounded-2xl p-3">
+      <div id="ev-rate-bar" class="flex flex-wrap gap-3 text-sm bg-brand-bg rounded-2xl p-3">
         ${[['md','MD쿠폰%'],['sel','선택쿠폰%(행사)'],['card','카드%'],['cat','Cat수수료%'],['cpnFee','쿠폰수수료(Cat의%)'],['seller','셀러부담%']].map(([k,label])=>`
           <label class="flex items-center gap-1.5"><span class="text-brand-gray font-semibold whitespace-nowrap">${label}</span>
             <input type="number" step="0.1" id="ev-rate-${k}" oninput="evSetRate('${k}',this.value)" class="w-20 px-2 py-1.5 rounded-lg border border-brand-border text-right"></label>
@@ -2204,14 +2204,12 @@ function _evCalcHtml() {
         <button onclick="evDeleteSelected()" class="px-3 py-2 rounded-full border border-brand-pink text-brand-pink text-sm font-bold hover:bg-red-50">선택 삭제</button>
         <label class="px-3 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333] cursor-pointer">엑셀 업로드<input type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="evUploadExcel(event)"></label>
         <button onclick="evDownloadExcel()" class="px-3 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg">엑셀 다운로드</button>
-        <span class="text-xs text-brand-gray">엑셀 업로드 시 <b>Model·기존 SRP·행사 세팅 SRP·MKT 행사</b>를 자동 인식. 또는 셀 복사 후 칸에 붙여넣기.</span>
+        <button id="ev-mode-btn" onclick="evToggleMode()" class="px-3 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg"></button>
+        <span id="ev-mode-note" class="text-xs text-brand-gray"></span>
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-xs border-collapse whitespace-nowrap border border-brand-border">
-          <thead><tr class="bg-brand-bg">
-            <th class="px-2 py-2.5 border border-brand-border text-center w-[34px]"><input type="checkbox" id="ev-select-all" onchange="evToggleAll(this.checked)"></th>
-            ${['모델명','기존가','노출가','등재가','선택쿠폰할인액','1차할인액','카드할인액','최종혜택가','Cat수수료','쿠폰수수료','선택쿠폰셀러부담','카드셀러부담','ESM+정산예상','프로모션','최종체감가',''].map((h,i)=>`<th class="px-2 py-2.5 font-bold border border-brand-border ${i===0?'text-left':'text-right'} ${i===15?'text-center':''}">${h}</th>`).join('')}
-          </tr></thead>
+          <thead><tr id="ev-thead-row" class="bg-brand-bg"></tr></thead>
           <tbody id="ev-tbody"></tbody>
           <tfoot id="ev-tfoot"></tfoot>
         </table>
@@ -2229,34 +2227,56 @@ function renderEventCalc() {
   });
   const perEl = document.getElementById('ev-period'); if (perEl && document.activeElement!==perEl) perEl.value = ev.period || '';
   Object.keys(_evDefaultRates()).forEach(k => { const el = document.getElementById('ev-rate-'+k); if (el && document.activeElement!==el) el.value = ev.rates[k]; });
+  const isImport = ev.viewMode === 'import';
+  const rateBar = document.getElementById('ev-rate-bar'); if (rateBar) rateBar.classList.toggle('hidden', isImport);
+  const modeBtn = document.getElementById('ev-mode-btn'); if (modeBtn) modeBtn.textContent = isImport ? '계산기 모드로' : '엑셀값 모드로';
+  const modeNote = document.getElementById('ev-mode-note'); if (modeNote) modeNote.textContent = isImport ? '엑셀의 계산값을 그대로 표시 중입니다.' : '비율로 직접 계산합니다.';
+  const thRow = document.getElementById('ev-thead-row');
   const tbody = document.getElementById('ev-tbody'); if (!tbody) return;
+  const tfoot = document.getElementById('ev-tfoot'); if (tfoot) tfoot.innerHTML = '';
   const inp = 'w-full bg-transparent focus:outline-none focus:bg-brand-blue-light/30 rounded px-1.5 py-1';
-  const cell = v => `<td class="px-2 py-1 text-right tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(v)}</td>`;
-  tbody.innerHTML = ev.rows.map((row, i) => {
-    const c = _evCalcRow(row, ev.rates);
-    const checked = _evSel.has(row.id) ? 'checked' : '';
-    return `<tr class="hover:bg-brand-bg/40">
-      <td class="px-2 py-1 text-center border border-brand-border"><input type="checkbox" class="ev-row-cb" ${checked} onchange="evToggleRow('${row.id}',this.checked)"></td>
-      <td class="px-1 py-0.5 border border-brand-border"><input type="text" value="${_evEsc(row.model||'')}" onpaste="evPaste(event,${i},'model')" onchange="evEditRow(${i},'model',this.value)" class="${inp} text-left font-semibold min-w-[150px]"></td>
-      <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${row.orig?_evFmt(row.orig):''}" onpaste="evPaste(event,${i},'orig')" onchange="evEditRow(${i},'orig',this.value)" class="${inp} text-right w-full"></td>
-      <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${row.disp?_evFmt(row.disp):''}" onpaste="evPaste(event,${i},'disp')" onchange="evEditRow(${i},'disp',this.value)" class="${inp} text-right w-full"></td>
-      ${cell(c.listing)}${cell(c.selCpn)}${cell(c.first)}${cell(c.cardDc)}
-      <td class="px-2 py-1 text-right font-bold text-brand-blue tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(c.benefit)}</td>
-      ${cell(c.catFee)}${cell(c.cpnFee)}${cell(c.selSeller)}${cell(c.cardSeller)}
-      <td class="px-2 py-1 text-right font-bold tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(c.settle)}</td>
-      <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${row.promo?_evFmt(row.promo):''}" onpaste="evPaste(event,${i},'promo')" onchange="evEditRow(${i},'promo',this.value)" class="${inp} text-right w-full"></td>
-      <td class="px-2 py-1 text-right font-bold text-brand-pink tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(c.feel)}</td>
-      <td class="px-2 py-1 text-center border border-brand-border"><button onclick="evDelRow(${i})" class="text-brand-gray hover:text-brand-pink text-base leading-none">×</button></td>
-    </tr>`;
-  }).join('');
+  const checkTh = '<th class="px-2 py-2.5 border border-brand-border text-center w-[34px]"><input type="checkbox" id="ev-select-all" onchange="evToggleAll(this.checked)"></th>';
+  const cbCell = row => `<td class="px-2 py-1 text-center border border-brand-border"><input type="checkbox" class="ev-row-cb" ${_evSel.has(row.id)?'checked':''} onchange="evToggleRow('${row.id}',this.checked)"></td>`;
+
+  if (isImport) {
+    const heads = ['모델명','대리점','기존가(SRP)','행사세팅가','MKT행사','쿠폰+카드 최종구매가','체감가','보상금액','쿠팡 1차혜택가','쿠팡 보상',''];
+    if (thRow) thRow.innerHTML = checkTh + heads.map((h,i)=>`<th class="px-2 py-2.5 font-bold border border-brand-border ${i===0?'text-left':(i===heads.length-1?'text-center':'text-right')}">${h}</th>`).join('');
+    if (!ev.rows.length) { tbody.innerHTML = `<tr><td colspan="12" class="px-3 py-8 text-center text-brand-gray border border-brand-border">엑셀 업로드로 데이터를 가져오세요.</td></tr>`; }
+    else tbody.innerHTML = ev.rows.map((row,i)=>{ const m=row.imp||{}; const num=v=>`<td class="px-2 py-1 text-right tabular-nums border border-brand-border">${v?_evFmt(v):'-'}</td>`;
+      return `<tr class="hover:bg-brand-bg/40">${cbCell(row)}
+        <td class="px-2 py-1 border border-brand-border font-semibold min-w-[150px]">${_evEsc(row.model||'')}</td>
+        <td class="px-2 py-1 text-center border border-brand-border text-brand-gray">${_evEsc(row.channel||'')}</td>
+        ${num(row.orig)}${num(row.disp)}${num(row.promo)}
+        <td class="px-2 py-1 text-right tabular-nums border border-brand-border font-bold text-brand-blue">${m.finalBuy?_evFmt(m.finalBuy):'-'}</td>
+        <td class="px-2 py-1 text-right tabular-nums border border-brand-border font-bold text-brand-pink">${m.feel?_evFmt(m.feel):'-'}</td>
+        ${num(m.reward)}${num(m.cpFirst)}${num(m.cpReward)}
+        <td class="px-2 py-1 text-center border border-brand-border"><button onclick="evDelRow(${i})" class="text-brand-gray hover:text-brand-pink text-base leading-none">×</button></td>
+      </tr>`; }).join('');
+  } else {
+    const heads = ['모델명','기존가','노출가','등재가','선택쿠폰할인액','1차할인액','카드할인액','최종혜택가','Cat수수료','쿠폰수수료','선택쿠폰셀러부담','카드셀러부담','ESM+정산예상','프로모션','최종체감가',''];
+    if (thRow) thRow.innerHTML = checkTh + heads.map((h,i)=>`<th class="px-2 py-2.5 font-bold border border-brand-border ${i===0?'text-left':'text-right'} ${i===heads.length-1?'text-center':''}">${h}</th>`).join('');
+    const cell = v => `<td class="px-2 py-1 text-right tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(v)}</td>`;
+    if (!ev.rows.length) { tbody.innerHTML = '<tr><td colspan="17" class="px-3 py-8 text-center text-brand-gray border border-brand-border">"+ 행 추가" 또는 엑셀 붙여넣기로 모델을 추가하세요.</td></tr>'; }
+    else tbody.innerHTML = ev.rows.map((row, i) => {
+      const c = _evCalcRow(row, ev.rates);
+      return `<tr class="hover:bg-brand-bg/40">${cbCell(row)}
+        <td class="px-1 py-0.5 border border-brand-border"><input type="text" value="${_evEsc(row.model||'')}" onpaste="evPaste(event,${i},'model')" onchange="evEditRow(${i},'model',this.value)" class="${inp} text-left font-semibold min-w-[150px]"></td>
+        <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${row.orig?_evFmt(row.orig):''}" onpaste="evPaste(event,${i},'orig')" onchange="evEditRow(${i},'orig',this.value)" class="${inp} text-right w-full"></td>
+        <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${row.disp?_evFmt(row.disp):''}" onpaste="evPaste(event,${i},'disp')" onchange="evEditRow(${i},'disp',this.value)" class="${inp} text-right w-full"></td>
+        ${cell(c.listing)}${cell(c.selCpn)}${cell(c.first)}${cell(c.cardDc)}
+        <td class="px-2 py-1 text-right font-bold text-brand-blue tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(c.benefit)}</td>
+        ${cell(c.catFee)}${cell(c.cpnFee)}${cell(c.selSeller)}${cell(c.cardSeller)}
+        <td class="px-2 py-1 text-right font-bold tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(c.settle)}</td>
+        <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${row.promo?_evFmt(row.promo):''}" onpaste="evPaste(event,${i},'promo')" onchange="evEditRow(${i},'promo',this.value)" class="${inp} text-right w-full"></td>
+        <td class="px-2 py-1 text-right font-bold text-brand-pink tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(c.feel)}</td>
+        <td class="px-2 py-1 text-center border border-brand-border"><button onclick="evDelRow(${i})" class="text-brand-gray hover:text-brand-pink text-base leading-none">×</button></td>
+      </tr>`;
+    }).join('');
+  }
   const selAll = document.getElementById('ev-select-all');
   if (selAll) { const ids = ev.rows.map(r => r.id); selAll.checked = ids.length > 0 && ids.every(id => _evSel.has(id)); }
-  const tfoot = document.getElementById('ev-tfoot');
-  if (tfoot) {
-    tfoot.innerHTML = '';
-    if (!ev.rows.length) { tbody.innerHTML = '<tr><td colspan="17" class="px-3 py-8 text-center text-brand-gray border border-brand-border">"+ 행 추가" 또는 엑셀 붙여넣기로 모델을 추가하세요.</td></tr>'; return; }
-  }
 }
+function evToggleMode(){ const o=_evLoad(); const e=_evActive(o); e.viewMode = (e.viewMode==='import')?'calc':'import'; _evSave(o,true); renderEventCalc(); }
 function _evEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function evSwitchEvent(id){ const o=_evLoad(); o.activeId=id; _evSave(o); renderEventCalc(); }
 function evNewEvent(){ const o=_evLoad(); const e={id:_evUid(),name:'새 행사 '+(o.list.length+1),period:'',rates:_evDefaultRates(),rows:[]}; o.list.push(e); o.activeId=e.id; _evSave(o); renderEventCalc(); }
@@ -2316,15 +2336,21 @@ async function evUploadExcel(e){
         const joined = cells.map(norm);
         // 기간 추출
         if(!period){ const pj = cells.join(' '); const m = pj.match(/기간[^0-9]*([0-9].*)/); if(m) period = m[1].trim().slice(0,40); }
-        // 헤더행 감지 (Model + SRP/기존)
+        // 헤더행 감지 (Model + SRP/기존/세팅)
         const mi = joined.findIndex(c=> c==='model' || c.includes('모델'));
         const hasHdr = mi>=0 && joined.some(c=> c.includes('srp') || c.includes('기존') || c.includes('세팅'));
         if(hasHdr){
-          cols = { model: mi, orig:-1, disp:-1, promo:-1 };
+          cols = { model: mi, channel:-1, orig:-1, disp:-1, mkt:-1, finalBuy:-1, feel:-1, reward:-1, cpFirst:-1, cpReward:-1 };
           joined.forEach((c,idx)=>{
-            if(cols.orig<0 && c.includes('기존')) cols.orig = idx;          // 기존 SRP
-            if(cols.disp<0 && c.includes('세팅')) cols.disp = idx;          // 행사 세팅 SRP
-            if(cols.promo<0 && (c.includes('mkt')||c.includes('프로모'))) cols.promo = idx;
+            if(cols.channel<0 && c.includes('대리점')) cols.channel = idx;
+            if(cols.orig<0 && c.includes('기존')) cols.orig = idx;                              // 기존 SRP
+            if(cols.disp<0 && c.includes('세팅')) cols.disp = idx;                              // 행사 세팅 SRP
+            if(cols.mkt<0 && (c.includes('mkt')||c.includes('프로모'))) cols.mkt = idx;          // MKT 행사
+            if(cols.finalBuy<0 && c.includes('최종구매')) cols.finalBuy = idx;                   // 쿠폰+카드 최종구매가
+            if(cols.feel<0 && c.includes('체감')) cols.feel = idx;                              // 체감가
+            if(cols.cpFirst<0 && c.includes('쿠팡') && (c.includes('혜택')||c.includes('1차'))) cols.cpFirst = idx;  // 쿠팡 1차 혜택가
+            if(cols.cpReward<0 && c.includes('쿠팡') && c.includes('보상')) cols.cpReward = idx;  // 쿠팡 보상
+            if(cols.reward<0 && c.includes('보상') && !c.includes('쿠팡')) cols.reward = idx;     // 보상금액
           });
           continue;
         }
@@ -2334,16 +2360,22 @@ async function evUploadExcel(e){
         const orig = cols.orig>=0 ? _evNum(r[cols.orig]) : 0;
         const disp = cols.disp>=0 ? _evNum(r[cols.disp]) : 0;
         if(!orig && !disp) continue;   // 합계/빈 행 제외
-        out.push({ id:_evUid(), model, orig, disp, promo: cols.promo>=0?_evNum(r[cols.promo]):0 });
+        const get = k => cols[k]>=0 ? _evNum(r[cols[k]]) : 0;
+        out.push({ id:_evUid(), model,
+          channel: cols.channel>=0 ? String(r[cols.channel]||'').trim() : '',
+          orig, disp, promo: get('mkt'),
+          imp: { finalBuy:get('finalBuy'), feel:get('feel'), reward:get('reward'), cpFirst:get('cpFirst'), cpReward:get('cpReward') }
+        });
       }
     });
     if(!out.length){ alert('불러올 데이터를 찾지 못했습니다.\n(헤더에 Model · 기존 SRP · 행사 세팅 SRP 가 있어야 합니다)'); return; }
     const o=_evLoad(); const ev=_evActive(o);
     const mode = ev.rows.length ? (confirm(`${out.length}개 모델을 불러왔습니다.\n\n확인 = 기존 ${ev.rows.length}행을 대체\n취소 = 맨 아래에 추가`) ? 'replace' : 'append') : 'replace';
     if(mode==='replace') ev.rows = out; else ev.rows = ev.rows.concat(out);
+    ev.viewMode = 'import';   // 엑셀 계산값 그대로 표시 모드
     if(period && !ev.period) ev.period = period;
     _evSel.clear(); _evSave(o); renderEventCalc();
-    alert(`✅ ${out.length}개 모델 ${mode==='replace'?'불러오기':'추가'} 완료 (${ev.name})`);
+    alert(`✅ ${out.length}개 모델 ${mode==='replace'?'불러오기':'추가'} 완료 (${ev.name})\n엑셀 계산값을 그대로 표시합니다.`);
   }catch(err){ alert('엑셀 읽기 실패: ' + (err.message||err)); }
 }
 function evDownloadExcel(){
