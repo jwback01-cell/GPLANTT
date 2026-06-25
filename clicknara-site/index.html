@@ -2253,12 +2253,8 @@ function renderEventCalc() {
   if (selAll) { const ids = ev.rows.map(r => r.id); selAll.checked = ids.length > 0 && ids.every(id => _evSel.has(id)); }
   const tfoot = document.getElementById('ev-tfoot');
   if (tfoot) {
-    if (!ev.rows.length) { tfoot.innerHTML = ''; tbody.innerHTML = '<tr><td colspan="17" class="px-3 py-8 text-center text-brand-gray border border-brand-border">"+ 행 추가" 또는 엑셀 붙여넣기로 모델을 추가하세요.</td></tr>'; return; }
-    const s = ev.rows.reduce((a, row) => { const c = _evCalcRow(row, ev.rates); a.benefit += c.benefit; a.settle += c.settle; a.feel += c.feel; return a; }, { benefit: 0, settle: 0, feel: 0 });
-    tfoot.innerHTML = `<tr class="bg-brand-bg/60 font-bold"><td class="px-2 py-2 text-right border border-brand-border" colspan="8">합계 (${ev.rows.length}개)</td>
-      <td class="px-2 py-2 text-right text-brand-blue tabular-nums border border-brand-border">${_evFmt(s.benefit)}</td><td colspan="4" class="border border-brand-border"></td>
-      <td class="px-2 py-2 text-right tabular-nums border border-brand-border">${_evFmt(s.settle)}</td><td class="border border-brand-border"></td>
-      <td class="px-2 py-2 text-right text-brand-pink tabular-nums border border-brand-border">${_evFmt(s.feel)}</td><td class="border border-brand-border"></td></tr>`;
+    tfoot.innerHTML = '';
+    if (!ev.rows.length) { tbody.innerHTML = '<tr><td colspan="17" class="px-3 py-8 text-center text-brand-gray border border-brand-border">"+ 행 추가" 또는 엑셀 붙여넣기로 모델을 추가하세요.</td></tr>'; return; }
   }
 }
 function _evEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
