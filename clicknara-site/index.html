@@ -2393,7 +2393,7 @@ async function _evProcessFile(file){
             if(cols.finalBuy<0 && c.includes('최종구매')) cols.finalBuy = idx;                   // 쿠폰+카드 최종구매가
             if(cols.feel<0 && c.includes('체감')) cols.feel = idx;                              // 체감가
             if(cols.settleFinal<0 && c.includes('최종정산금액')) cols.settleFinal = idx;          // 대리점 2% 보상 최종정산금액
-            if(cols.settle<0 && (c.includes('최종정산가')||(c.includes('정산가')&&!c.includes('쿠팡')))) cols.settle = idx;  // 최종정산가
+            if(cols.settle<0 && (c.includes('최종정산가')||c.includes('정산예상')||(c.includes('정산가')&&!c.includes('쿠팡')&&!c.includes('마진')))) cols.settle = idx;  // 최종정산가/정산예상
             if(cols.profit<0 && c.includes('매출이익')) cols.profit = idx;                       // 매출이익
             if(cols.cpFirst<0 && c.includes('쿠팡') && (c.includes('혜택')||c.includes('1차'))) cols.cpFirst = idx;  // 쿠팡 1차 혜택가
             if(cols.cpReward<0 && c.includes('쿠팡') && c.includes('보상')) cols.cpReward = idx;  // 쿠팡 보상
