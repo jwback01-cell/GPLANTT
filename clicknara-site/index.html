@@ -2206,9 +2206,13 @@ function _evCalcHtml() {
         <button onclick="evDownloadExcel()" class="px-3 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg">엑셀 다운로드</button>
         <button id="ev-mode-btn" onclick="evToggleMode()" class="px-3 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg"></button>
         <span id="ev-mode-note" class="text-xs text-brand-gray"></span>
-        <button onclick="evDownloadForm()" class="ml-auto px-5 py-2.5 rounded-full bg-green-600 text-white text-sm font-extrabold hover:bg-green-700 shadow-lg shadow-green-600/30 flex items-center gap-1.5" title="상품명·기존가·할인가·포토리뷰·최종체감가 양식으로 엑셀 저장">
+        <button onclick="evDownloadPlayauto()" class="ml-auto px-4 py-2.5 rounded-full bg-brand-blue text-white text-sm font-bold hover:opacity-90 flex items-center gap-1.5" title="모델명(공백·하이픈 제거) + 등재가만 엑셀로 저장">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          양식 다운로드
+          플레이오토 다운로드
+        </button>
+        <button onclick="evDownloadForm()" class="px-5 py-2.5 rounded-full bg-green-600 text-white text-sm font-extrabold hover:bg-green-700 shadow-lg shadow-green-600/30 flex items-center gap-1.5" title="상품명·기존가·할인가·포토리뷰·최종체감가 양식으로 엑셀 저장">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          이미지 다운로드
         </button>
       </div>
       <div id="ev-drop" class="overflow-x-auto rounded-xl" ondragover="evDragOver(event)" ondragleave="evDragLeave(event)" ondrop="evDropFile(event)" title="엑셀 파일을 여기로 끌어다 놓으면 업로드됩니다">
@@ -2416,7 +2420,23 @@ async function _evProcessFile(file){
     alert(`✅ ${out.length}개 모델 ${mode==='replace'?'불러오기':'추가'} 완료 (${ev.name})\n엑셀 계산값을 그대로 표시합니다.`);
   }catch(err){ alert('엑셀 읽기 실패: ' + (err.message||err)); }
 }
-// 고객 양식 다운로드 — 색상·테두리·서식 포함 (ExcelJS)
+// 플레이오토 다운로드 — 모델명(공백·하이픈 제거) + 등재가만
+function evDownloadPlayauto(){
+  if(typeof XLSX==='undefined'){ alert('엑셀 라이브러리 로드 실패'); return; }
+  const o=_evLoad(); const ev=_evActive(o);
+  if(!ev.rows.length){ alert('데이터가 없습니다.'); return; }
+  const aoa=[['모델명','등재가']];
+  ev.rows.forEach(row=>{
+    const c=_evCalcRow(row, ev.rates);
+    const model=String(row.model||'').replace(/[\s-]/g,'');   // 띄어쓰기·하이픈 제거
+    if(!model) return;
+    aoa.push([model, c.listing]);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:30},{wch:14}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '플레이오토');
+  XLSX.writeFile(wb, `${ev.title||ev.name||'행사'}_플레이오토.xlsx`);
+}
+// 고객 양식(이미지) 다운로드 — 색상·테두리·서식 포함 (ExcelJS)
 async function evDownloadForm(){
   if(typeof ExcelJS==='undefined'){ alert('엑셀 서식 라이브러리 로드 실패 (새로고침 후 재시도)'); return; }
   const o=_evLoad(); const ev=_evActive(o);
