@@ -10634,7 +10634,7 @@ function _ihImportSb() {
 }
 async function importImpFromImageHost() {
   const sb2 = _ihImportSb();
-  if (!sb2) { alert('연동 클라이언트를 만들 수 없습니다. (Supabase 라이브러리 로드 확인)'); return; }
+  if (!sb2) { showAppAlert('연동 실패', '연동 클라이언트를 만들 수 없습니다. (Supabase 라이브러리 로드 확인)', 'error'); return; }
   let products = [];
   try {
     const { data, error } = await sb2.from('ih_kv').select('data').eq('key', 'ih_products_v1').maybeSingle();
@@ -10644,7 +10644,7 @@ async function importImpFromImageHost() {
     }
   } catch (e) { console.warn('[IH import]', e); }
   if (!Array.isArray(products) || !products.length) {
-    alert('이미지호스팅 상품을 불러오지 못했습니다.\n\n· 이미지호스팅에 상품이 없거나\n· 권한(RLS)으로 외부 읽기가 막혀 있을 수 있습니다.\n(콘솔의 [IH import] 오류 확인)');
+    showAppAlert('불러오기 실패', '이미지호스팅 상품을 불러오지 못했습니다.\n\n· 이미지호스팅에 상품이 없거나\n· 권한(RLS)으로 외부 읽기가 막혀 있을 수 있습니다.\n(콘솔의 [IH import] 오류 확인)', 'error');
     return;
   }
   _impLoad();
@@ -10683,12 +10683,13 @@ async function importImpFromImageHost() {
     newRows.push(row);
   });
   console.log('[IH import] 클라우드에서 읽은 상품 수:', products.length);
-  if (!newRows.length && !updated) { alert(`클라우드에서 읽은 상품: ${products.length}개\n가져올 새 상품이 없습니다 (이미 모두 반영됨).`); return; }
-  if (!confirm(`이미지호스팅 상품 가져오기\n\n· 클라우드에서 읽은 상품(색상 포함 전체): ${products.length}개\n· 새로 추가: ${newRows.length}개\n· 폴더코드 보완: ${updated}개\n\n진행할까요? (폴더코드·상품코드·제품명만 채워지고, 위안·수량은 직접 입력)`)) return;
+  if (!newRows.length && !updated) { showAppAlert('가져오기', `클라우드에서 읽은 상품: ${products.length}개\n가져올 새 상품이 없습니다 (이미 모두 반영됨).` + (skippedDup ? `\n중복 ${skippedDup}개 제외` : ''), 'info'); return; }
+  const ok = await gConfirm(`· 클라우드에서 읽은 상품(색상 포함 전체): ${products.length}개\n· 새로 추가: ${newRows.length}개\n· 폴더코드 보완: ${updated}개\n\n진행할까요? (폴더코드·상품코드·제품명만 채워지고, 위안·수량은 직접 입력)`, { title: '이미지호스팅 상품 가져오기', okText: '가져오기' });
+  if (!ok) return;
   if (newRows.length) _impState.rows = newRows.concat(_impState.rows);
   _impSave();
   renderImpTab();
-  alert(`✅ 완료 — 클라우드 ${products.length}개 중 새로 ${newRows.length}개 추가, 폴더코드 ${updated}개 보완` + (skippedDup ? `, 중복 ${skippedDup}개 제외` : '') + '.');
+  showAppAlert('가져오기 완료', `클라우드 ${products.length}개 중 새로 ${newRows.length}개 추가, 폴더코드 ${updated}개 보완` + (skippedDup ? `, 중복 ${skippedDup}개 제외` : '') + '.', 'success');
 }
 // 중복 검사 — 상품코드/제품명 (전역 고유). 폴더코드는 한 폴더에 여러 상품이라 단독 중복 허용.
 function _impCodeDup(code, exceptId) {
