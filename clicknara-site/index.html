@@ -2267,7 +2267,7 @@ function renderEventCalc() {
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${row.orig?_evFmt(row.orig):''}" onpaste="evPaste(event,${i},'orig')" onchange="evEditRow(${i},'orig',this.value)" class="${inp} text-right w-full"></td>
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${row.disp?_evFmt(row.disp):''}" onpaste="evPaste(event,${i},'disp')" onchange="evEditRow(${i},'disp',this.value)" class="${inp} text-right w-full"></td>
         ${cell(c.listing)}${cell(c.selCpn)}${cell(c.first)}${cell(c.cardDc)}
-        <td class="px-2 py-1 text-right font-bold text-brand-blue tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(c.benefit)}</td>
+        <td class="px-1 py-0.5 border border-brand-border bg-brand-blue-light/20"><input type="text" inputmode="numeric" value="${c.benefit?_evFmt(c.benefit):''}" onchange="evEditRow(${i},'benefit',this.value)" class="${inp} text-right w-full font-bold text-brand-blue" title="여기에 최종혜택가를 입력하면 노출가가 역산됩니다"></td>
         ${cell(c.catFee)}${cell(c.cpnFee)}${cell(c.selSeller)}${cell(c.cardSeller)}
         <td class="px-2 py-1 text-right font-bold tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(c.settle)}</td>
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${row.promo?_evFmt(row.promo):''}" onpaste="evPaste(event,${i},'promo')" onchange="evEditRow(${i},'promo',this.value)" class="${inp} text-right w-full"></td>
@@ -2288,7 +2288,23 @@ function evSetField(f,v){ const o=_evLoad(); const e=_evActive(o); e[f]=v; _evSa
 function evSetRate(k,v){ const o=_evLoad(); const e=_evActive(o); e.rates[k]=_evNum(v); _evSave(o); renderEventCalc(); }
 function evAddRow(){ const o=_evLoad(); _evActive(o).rows.push({id:_evUid(),model:'',orig:0,disp:0,promo:0}); _evSave(o); renderEventCalc(); }
 function evDelRow(i){ const o=_evLoad(); _evActive(o).rows.splice(i,1); _evSave(o); renderEventCalc(); }
-function evEditRow(i,field,val){ const o=_evLoad(); const e=_evActive(o); if(!e.rows[i]) return; e.rows[i][field] = (field==='model')?val:_evNum(val); _evSave(o); renderEventCalc(); }
+function evEditRow(i,field,val){
+  const o=_evLoad(); const e=_evActive(o); const row=e.rows[i]; if(!row) return;
+  if(field==='benefit'){
+    // 최종혜택가 입력 → 노출가 역산 (최종혜택가 = 등재가×(1-선택)×(1-카드), 노출가 = 등재가×(1-MD))
+    const target=_evNum(val);
+    if(target>0){
+      const r=e.rates, md=(r.md||0)/100, sel=(r.sel||0)/100, card=(r.card||0)/100;
+      let disp=Math.round(target*(1-md)/(((1-sel)||1)*((1-card)||1)));
+      let best=disp, bd=Infinity;
+      for(let d=Math.max(0,disp-100); d<=disp+100; d++){ const c=_evCalcRow({...row,disp:d}, r); const diff=Math.abs(c.benefit-target); if(diff<bd){ bd=diff; best=d; } if(diff===0) break; }
+      row.disp=best;
+    }
+  } else {
+    row[field] = (field==='model')?val:_evNum(val);
+  }
+  _evSave(o); renderEventCalc();
+}
 function evPaste(e, startIdx, startField){
   const cd=e.clipboardData||window.clipboardData; if(!cd) return; const text=cd.getData('text'); if(!text) return;
   if(!text.includes('\t') && !text.includes('\n')) return;   // 단일 셀이면 기본 붙여넣기
