@@ -2257,8 +2257,9 @@ function renderEventCalc() {
       </tr>`; }).join('');
   } else {
     const heads = ['모델명','기존가','노출가','등재가','선택쿠폰할인액','1차할인액','카드할인액','최종혜택가','Cat수수료','쿠폰수수료','선택쿠폰셀러부담','카드셀러부담','ESM+정산예상','프로모션','최종체감가',''];
-    if (thRow) thRow.innerHTML = checkTh + heads.map((h,i)=>`<th class="px-2 py-2.5 font-bold border border-brand-border ${i===0?'text-left':'text-right'} ${i===heads.length-1?'text-center':''}">${h}</th>`).join('');
+    if (thRow) thRow.innerHTML = checkTh + heads.map((h,i)=>`<th class="px-2 py-2.5 font-bold border border-brand-border ${i===0?'text-left':'text-right'} ${i===heads.length-1?'text-center':''} ${i===3?'bg-yellow-200 text-brand-black':''}">${h}</th>`).join('');
     const cell = v => `<td class="px-2 py-1 text-right tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(v)}</td>`;
+    const cellHi = v => `<td class="px-2 py-1 text-right font-extrabold tabular-nums border border-brand-border bg-yellow-100 text-brand-black">${_evFmt(v)}</td>`;
     if (!ev.rows.length) { tbody.innerHTML = '<tr><td colspan="17" class="px-3 py-8 text-center text-brand-gray border border-brand-border">"+ 행 추가", 셀 붙여넣기, 또는 엑셀 파일을 이 표 위로 <b>드래그</b>해서 추가하세요.</td></tr>'; }
     else tbody.innerHTML = ev.rows.map((row, i) => {
       const c = _evCalcRow(row, ev.rates);
@@ -2266,7 +2267,7 @@ function renderEventCalc() {
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" value="${_evEsc(row.model||'')}" onpaste="evPaste(event,${i},'model')" onchange="evEditRow(${i},'model',this.value)" class="${inp} text-left font-semibold min-w-[150px]"></td>
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${row.orig?_evFmt(row.orig):''}" onpaste="evPaste(event,${i},'orig')" onchange="evEditRow(${i},'orig',this.value)" class="${inp} text-right w-full"></td>
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${row.disp?_evFmt(row.disp):''}" onpaste="evPaste(event,${i},'disp')" onchange="evEditRow(${i},'disp',this.value)" class="${inp} text-right w-full"></td>
-        ${cell(c.listing)}${cell(c.selCpn)}${cell(c.first)}${cell(c.cardDc)}
+        ${cellHi(c.listing)}${cell(c.selCpn)}${cell(c.first)}${cell(c.cardDc)}
         <td class="px-1 py-0.5 border border-brand-border bg-brand-blue-light/20"><input type="text" inputmode="numeric" value="${c.benefit?_evFmt(c.benefit):''}" onchange="evEditRow(${i},'benefit',this.value)" class="${inp} text-right w-full font-bold text-brand-blue" title="여기에 최종혜택가를 입력하면 노출가가 역산됩니다"></td>
         ${cell(c.catFee)}${cell(c.cpnFee)}${cell(c.selSeller)}${cell(c.cardSeller)}
         <td class="px-2 py-1 text-right font-bold tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(c.settle)}</td>
