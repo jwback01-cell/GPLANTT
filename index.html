@@ -27336,11 +27336,16 @@ async function deleteOpsUnitItem(id) {
 // ── 월별 총액 ──────────────────────────────
 // 특정 월(YYYY-MM)의 운영비 총액 = 매월 반복 항목 합 + 그 달 일회성 항목 합
 // 순이익(영업이익)에서 차감하는 데 사용
+// 반복 항목이 해당 월에 적용되는지 — 시작 월(startMonth) 이상이면 적용. 시작 월 없으면(구 데이터) 전체 적용.
+function _opsRecActive(it, monthKey) {
+  const s = (it && it.startMonth) ? String(it.startMonth) : '';
+  return !s || s <= String(monthKey || '');
+}
 function _opsMonthlyTotalForMonth(monthKey) {
   try {
     const data = (typeof _loadOpsCosts === 'function') ? _loadOpsCosts() : null;
     if (!data) return 0;
-    const recurring = Array.isArray(data.recurringItems) ? data.recurringItems : [];
+    const recurring = (Array.isArray(data.recurringItems) ? data.recurringItems : []).filter(it => _opsRecActive(it, monthKey));
     const arr = (data.monthlyTotals && Array.isArray(data.monthlyTotals[monthKey])) ? data.monthlyTotals[monthKey] : [];
     const recSum = recurring.reduce((s, it) => s + (Number(it.amount) || 0), 0);
     const onceSum = arr.reduce((s, it) => s + (Number(it.amount) || 0), 0);
@@ -27361,10 +27366,12 @@ function renderOpsMonthly() {
     return;
   }
   const data = _loadOpsCosts();
-  const recurring = Array.isArray(data.recurringItems) ? data.recurringItems : [];
+  const recurringAll = Array.isArray(data.recurringItems) ? data.recurringItems : [];
+  // 선택한 월에 적용되는 반복 항목만 (시작 월 이후부터)
+  const recurring = recurringAll.filter(it => _opsRecActive(it, month));
   const arr = Array.isArray(data.monthlyTotals[month]) ? data.monthlyTotals[month] : [];
 
-  // 반복 항목 행 (모든 월에 표시) — recId 로 식별
+  // 반복 항목 행 (시작 월 이후부터 표시) — recId 로 식별
   const recurringRows = recurring.map(it => `
     <tr class="border-t border-brand-border bg-brand-blue-light/20">
       <td class="px-4 py-3">
@@ -27374,6 +27381,8 @@ function renderOpsMonthly() {
             반복
           </span>
           <input type="text" value="${_escapeHtml(it.name || '')}" onchange="updateOpsRecurringItem('${it.id}', 'name', this.value)" class="flex-1 bg-transparent border-0 outline-none focus:bg-white rounded px-2 py-1 text-sm font-semibold">
+          <span class="text-[10px] text-brand-gray whitespace-nowrap shrink-0" title="이 월부터 매월 적용됩니다">시작</span>
+          <input type="month" value="${_escapeHtml(it.startMonth || '')}" onchange="updateOpsRecurringItem('${it.id}', 'startMonth', this.value)" class="bg-white border border-brand-border rounded px-1.5 py-0.5 text-[11px] font-mono shrink-0" title="이 월부터 매월 자동 포함 (이전 달엔 미적용)">
         </div>
       </td>
       <td class="px-4 py-3 text-right">
@@ -27428,7 +27437,10 @@ function renderOpsMonthly() {
 function addOpsRecurringItem() {
   const data = _loadOpsCosts();
   if (!Array.isArray(data.recurringItems)) data.recurringItems = [];
-  data.recurringItems.push({ id: _opsUid(), name: '신규 반복 항목', amount: 0, memo: '' });
+  // 시작 월 = 현재 선택한 월 (없으면 이번 달) — 이 달부터 이후만 적용, 이전 달엔 미적용
+  const d = new Date();
+  const startMonth = (document.getElementById('ops-monthly-month')?.value) || `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  data.recurringItems.push({ id: _opsUid(), name: '신규 반복 항목', amount: 0, memo: '', startMonth });
   _saveOpsCosts(data);
   renderOpsMonthly();
 }
@@ -27436,11 +27448,12 @@ function updateOpsRecurringItem(id, field, value) {
   const data = _loadOpsCosts();
   const it = (data.recurringItems || []).find(x => x.id === id);
   if (!it) return;
-  if (field === 'name')        it.name   = String(value || '').trim() || it.name;
-  else if (field === 'amount') it.amount = Math.max(0, Number(String(value).replace(/,/g, '')) || 0);
-  else if (field === 'memo')   it.memo   = String(value || '');
+  if (field === 'name')             it.name   = String(value || '').trim() || it.name;
+  else if (field === 'amount')      it.amount = Math.max(0, Number(String(value).replace(/,/g, '')) || 0);
+  else if (field === 'memo')        it.memo   = String(value || '');
+  else if (field === 'startMonth')  it.startMonth = String(value || '');
   _saveOpsCosts(data);
-  if (field === 'amount') renderOpsMonthly(); // 합계 갱신 + 콤마 포맷
+  if (field === 'amount' || field === 'startMonth') renderOpsMonthly(); // 합계/적용월 갱신
 }
 async function deleteOpsRecurringItem(id) {
   const data = _loadOpsCosts();
