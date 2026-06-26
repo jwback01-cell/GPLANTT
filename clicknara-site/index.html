@@ -2367,7 +2367,7 @@ function evGoSettings() {
   if (calc) calc.classList.add('hidden');
   if (set) set.classList.remove('hidden');
   const fr = document.getElementById('ev-sheet-frame');
-  if (fr && !fr.src) fr.src = EV_SHEET_EMBED;   // 최초 진입 시 로드(미리보기)
+  if (fr && fr.getAttribute('src') !== EV_SHEET_EMBED) fr.src = EV_SHEET_EMBED;   // 최초 진입 시 로드
   // 소메뉴 활성 표시
   document.querySelectorAll('.ev-sub').forEach(a => {
     const on = a.dataset.evSettings === '1';
