@@ -2189,12 +2189,13 @@ const EV_SHEET_GID = '98661656';
 const EV_SHEET_URL = `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/edit?usp=sharing&gid=${EV_SHEET_GID}#gid=${EV_SHEET_GID}`;
 // 웹에 게시(Publish to web) 주소 — iframe 임베드 허용·로그인 불필요
 const EV_SHEET_PUB = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRHpO8tEQo_1EYII3CykJ0NOXznRd0dLrSPvGZhkrHcuOQ_vmf124Bxfv6W5WgpWdam2hroXpWC3OYr/pubhtml';
-// 보여줄 시트만 (게시 문서 내부 gid 기준): MSI 모니터(MSI공식몰), 지클릭커
+// 보여줄 시트만 (원본 문서 gid 기준): MSI 모니터(MSI공식몰), 지클릭커
 const EV_SHEET_TABS = [
-  { label: 'MSI 모니터', gid: '1772915100' },
-  { label: '지클릭커',   gid: '877960106' },
+  { label: 'MSI 모니터', gid: '98661656' },
+  { label: '지클릭커',   gid: '2085709414' },
 ];
-function _evSheetSrc(gid){ return `${EV_SHEET_PUB}?gid=${gid}&single=true&widget=true&headers=false`; }
+// 편집 가능한 화면 — 표 안에서 바로 수정하면 구글이 자동 저장(새 탭 불필요, 구글 로그인 필요)
+function _evSheetSrc(gid){ return `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/edit?rm=minimal&gid=${gid}#gid=${gid}`; }
 function evSheetTab(gid, el){
   const fr = document.getElementById('ev-sheet-frame');
   if (fr) fr.src = _evSheetSrc(gid);
@@ -2310,7 +2311,7 @@ function _evSettingsHtml() {
     <section class="bg-white rounded-3xl panel p-4 flex flex-col gap-3">
       <div class="flex items-center gap-2 flex-wrap">
         ${EV_SHEET_TABS.map((t,i)=>`<button onclick="evSheetTab('${t.gid}',this)" class="ev-sheet-tab px-4 py-2 rounded-full border text-sm font-bold ${i===0?'bg-brand-black text-white':'border-brand-border text-brand-gray'}">${t.label}</button>`).join('')}
-        <span class="text-brand-gray text-sm ml-1">웹에 게시된 시트(보기 전용)입니다.</span>
+        <span class="text-brand-gray text-sm ml-1">표 안에서 바로 수정하면 구글 시트에 자동 저장됩니다(구글 로그인 필요).</span>
         <a href="${EV_SHEET_URL}" target="_blank" rel="noopener" class="ml-auto px-4 py-2 rounded-full bg-green-600 text-white text-sm font-bold hover:bg-green-700 flex items-center gap-1.5">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
           편집(새 탭)
