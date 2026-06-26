@@ -2189,7 +2189,21 @@ const EV_SHEET_GID = '98661656';
 const EV_SHEET_URL = `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/edit?usp=sharing&gid=${EV_SHEET_GID}#gid=${EV_SHEET_GID}`;
 // 웹에 게시(Publish to web) 주소 — iframe 임베드 허용·로그인 불필요
 const EV_SHEET_PUB = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRHpO8tEQo_1EYII3CykJ0NOXznRd0dLrSPvGZhkrHcuOQ_vmf124Bxfv6W5WgpWdam2hroXpWC3OYr/pubhtml';
-const EV_SHEET_EMBED = `${EV_SHEET_PUB}?widget=true&headers=false&gid=${EV_SHEET_GID}`;
+// 보여줄 시트만 (게시 문서 내부 gid 기준): MSI 모니터(MSI공식몰), 지클릭커
+const EV_SHEET_TABS = [
+  { label: 'MSI 모니터', gid: '1772915100' },
+  { label: '지클릭커',   gid: '877960106' },
+];
+function _evSheetSrc(gid){ return `${EV_SHEET_PUB}?gid=${gid}&single=true&widget=true&headers=false`; }
+function evSheetTab(gid, el){
+  const fr = document.getElementById('ev-sheet-frame');
+  if (fr) fr.src = _evSheetSrc(gid);
+  document.querySelectorAll('.ev-sheet-tab').forEach(b=>{
+    const on = b===el;
+    b.classList.toggle('bg-brand-black', on); b.classList.toggle('text-white', on);
+    b.classList.toggle('border-brand-border', !on); b.classList.toggle('text-brand-gray', !on);
+  });
+}
 // ── (미사용) 사이트 내장 스프레드시트(붙여넣기형 그리드) ──
 const EV_GRID_KEY = 'cn_ev_settings_grid_v1';
 const EV_GRID_ROWS0 = 50, EV_GRID_COLS0 = 20;
@@ -2295,11 +2309,11 @@ function _evSettingsHtml() {
     </section>
     <section class="bg-white rounded-3xl panel p-4 flex flex-col gap-3">
       <div class="flex items-center gap-2 flex-wrap">
-        <span class="px-3 py-1.5 rounded-full bg-brand-black text-white text-sm font-bold">기존세팅값</span>
-        <span class="text-brand-gray text-sm">웹에 게시된 시트(보기 전용)입니다. 편집은 오른쪽 버튼으로 새 탭에서 여세요.</span>
+        ${EV_SHEET_TABS.map((t,i)=>`<button onclick="evSheetTab('${t.gid}',this)" class="ev-sheet-tab px-4 py-2 rounded-full border text-sm font-bold ${i===0?'bg-brand-black text-white':'border-brand-border text-brand-gray'}">${t.label}</button>`).join('')}
+        <span class="text-brand-gray text-sm ml-1">웹에 게시된 시트(보기 전용)입니다.</span>
         <a href="${EV_SHEET_URL}" target="_blank" rel="noopener" class="ml-auto px-4 py-2 rounded-full bg-green-600 text-white text-sm font-bold hover:bg-green-700 flex items-center gap-1.5">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          새 탭에서 열기
+          편집(새 탭)
         </a>
       </div>
       <div class="rounded-xl overflow-hidden border border-brand-border" style="height:calc(100vh - 240px); min-height:520px;">
@@ -2367,7 +2381,8 @@ function evGoSettings() {
   if (calc) calc.classList.add('hidden');
   if (set) set.classList.remove('hidden');
   const fr = document.getElementById('ev-sheet-frame');
-  if (fr && fr.getAttribute('src') !== EV_SHEET_EMBED) fr.src = EV_SHEET_EMBED;   // 최초 진입 시 로드
+  const firstSrc = _evSheetSrc(EV_SHEET_TABS[0].gid);
+  if (fr && fr.getAttribute('src') !== firstSrc && !fr.getAttribute('src')) fr.src = firstSrc;   // 최초 진입 시 첫 탭 로드
   // 소메뉴 활성 표시
   document.querySelectorAll('.ev-sub').forEach(a => {
     const on = a.dataset.evSettings === '1';
