@@ -2731,8 +2731,9 @@ async function _evFillPlayauto(file){
     const codeIdx=header.findIndex(c=>c.includes('판매자관리코드'));
     const priceIdx=header.findIndex(c=>c==='판매가');
     const mallIdx=header.findIndex(c=>c.includes('쇼핑몰'));
-    let imgIdx=header.findIndex(c=>c.includes('대표이미지'));
-    if(imgIdx<0) imgIdx=header.findIndex(c=>c.includes('이미지'));   // 플레이오토 이미지 열
+    let imgIdx=header.findIndex(c=>c.includes('기본이미지'));         // 플레이오토 기본이미지(AQ) 우선
+    if(imgIdx<0) imgIdx=header.findIndex(c=>c.includes('대표이미지'));
+    if(imgIdx<0) imgIdx=header.findIndex(c=>c.includes('이미지')&&!c.includes('추가'));   // 추가이미지는 제외
     if(codeIdx<0 || priceIdx<0){ alert('판매자관리코드 또는 판매가 열을 찾지 못했습니다.'); return; }
     // 사이트별 허용 쇼핑몰(채널) — 이베이는 옥션·지마켓만, 그 외 채널은 제외
     const SITE_CH={ '이베이':['옥션','지마켓'], '11번가':['11번가'], '롯데온':['롯데온'] };
