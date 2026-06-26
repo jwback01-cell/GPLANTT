@@ -2183,7 +2183,12 @@ function _evCalcRow(row, r) {
   const feel = benefit - promo;                                        // 최종체감가
   return { orig, disp, promo, listing, selCpn, first, cardDc, benefit, catFee, cpnFee, selSeller, cardSeller, settle, feel };
 }
-// ── 기존세팅값: 사이트 내장 스프레드시트(붙여넣기형 그리드) ──
+// ── 기존세팅값: 구글 시트 임베드 ──
+const EV_SHEET_ID = '12ixpjr9CxQX6aKHGLFfQzB9siGWcBYtt0FXzXP67HgI';
+const EV_SHEET_GID = '98661656';
+const EV_SHEET_URL = `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/edit?usp=sharing&gid=${EV_SHEET_GID}#gid=${EV_SHEET_GID}`;
+const EV_SHEET_EMBED = `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/preview?gid=${EV_SHEET_GID}#gid=${EV_SHEET_GID}`;
+// ── (미사용) 사이트 내장 스프레드시트(붙여넣기형 그리드) ──
 const EV_GRID_KEY = 'cn_ev_settings_grid_v1';
 const EV_GRID_ROWS0 = 50, EV_GRID_COLS0 = 20;
 let _evGrid = null, _evGridSaveT = null;
@@ -2282,29 +2287,22 @@ function evGridAddCols(){ if(!_evGrid) _evGrid=_evGridLoad(); _evGrid.forEach(r=
 function evGridClear(){ if(!confirm('표의 모든 값을 지웁니다. 계속할까요?')) return; _evGrid=_evGridDefault(); _evGridSave(); renderEvGrid(); }
 function _evSettingsHtml() {
   return `
-    <style>
-      #ev-grid-wrap{overflow:auto;max-height:calc(100vh - 270px);min-height:480px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;}
-      .ev-grid-table{border-collapse:separate;border-spacing:0;font-size:12px;white-space:nowrap;}
-      .ev-grid-table th,.ev-grid-table td{border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;padding:3px 7px;}
-      .ev-grid-table thead th{position:sticky;top:0;background:#f1f5f9;z-index:2;font-weight:600;color:#64748b;text-align:center;min-width:74px;}
-      .ev-grid-table .ev-rownum,.ev-grid-table .ev-corner{position:sticky;left:0;background:#f1f5f9;color:#64748b;text-align:center;font-weight:600;z-index:1;min-width:38px;}
-      .ev-grid-table .ev-corner{z-index:3;}
-      .ev-grid-table td{background:#fff;}
-      .ev-grid-table td:focus{outline:2px solid #2196F3;outline-offset:-2px;background:#eff6ff;}
-    </style>
     <section class="mt-2 pl-1 md:pl-2">
       <h1 class="text-[1.8rem] md:text-[2.25rem] font-bold tracking-tight mb-2">기존 세팅값 📋</h1>
-      <p class="text-brand-gray text-base md:text-[1.1rem]">구글 시트에서 전체 복사한 뒤 아래 표에 붙여넣으세요. <b>수식 사용 가능</b>(예: <code>=A1+B1</code>, <code>=SUM(A1:A10)</code>, <code>=ROUND(B2*0.97,0)</code>). 입력값은 이 브라우저에 자동 저장됩니다.</p>
+      <p class="text-brand-gray text-base md:text-[1.1rem]">상품관리대장(구글 시트) — 채널별 등재가·노출가·상품번호 기준 데이터입니다.</p>
     </section>
     <section class="bg-white rounded-3xl panel p-4 flex flex-col gap-3">
       <div class="flex items-center gap-2 flex-wrap">
         <span class="px-3 py-1.5 rounded-full bg-brand-black text-white text-sm font-bold">기존세팅값</span>
-        <span class="text-brand-gray text-sm">구글 시트 전체선택(Ctrl+A) → 복사(Ctrl+C) → 아래 표 <b>첫 칸 클릭 후 붙여넣기(Ctrl+V)</b></span>
-        <button onclick="evGridAddRows()" class="ml-auto px-3 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg">+ 행 10</button>
-        <button onclick="evGridAddCols()" class="px-3 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg">+ 열 5</button>
-        <button onclick="evGridClear()" class="px-3 py-2 rounded-full border border-brand-pink text-brand-pink text-sm font-bold hover:bg-red-50">전체 지우기</button>
+        <span class="text-brand-gray text-sm">아래 시트가 보이지 않으면(구글 로그인 필요) 오른쪽 버튼으로 새 탭에서 여세요.</span>
+        <a href="${EV_SHEET_URL}" target="_blank" rel="noopener" class="ml-auto px-4 py-2 rounded-full bg-green-600 text-white text-sm font-bold hover:bg-green-700 flex items-center gap-1.5">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          새 탭에서 열기
+        </a>
       </div>
-      <div id="ev-grid-wrap"></div>
+      <div class="rounded-xl overflow-hidden border border-brand-border" style="height:calc(100vh - 240px); min-height:520px;">
+        <iframe id="ev-sheet-frame" src="" title="상품관리대장" style="width:100%; height:100%; border:0;" loading="lazy"></iframe>
+      </div>
     </section>`;
 }
 function _evCalcHtml() {
@@ -2366,7 +2364,8 @@ function evGoSettings() {
   const set = document.getElementById('ev-settings-view');
   if (calc) calc.classList.add('hidden');
   if (set) set.classList.remove('hidden');
-  renderEvGrid();
+  const fr = document.getElementById('ev-sheet-frame');
+  if (fr && !fr.src) fr.src = EV_SHEET_EMBED;   // 최초 진입 시 로드(미리보기)
   // 소메뉴 활성 표시
   document.querySelectorAll('.ev-sub').forEach(a => {
     const on = a.dataset.evSettings === '1';
