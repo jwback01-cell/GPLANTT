@@ -2480,23 +2480,20 @@ async function _evFillPlayauto(file){
     const codeIdx=header.findIndex(c=>c.includes('판매자관리코드'));
     const priceIdx=header.findIndex(c=>c==='판매가');
     if(codeIdx<0 || priceIdx<0){ alert('판매자관리코드 또는 판매가 열을 찾지 못했습니다.'); return; }
-    let filled=0, miss=0;
+    const out=[rows[0]];   // 헤더
+    let filled=0, dropped=0;
     for(let r=1;r<rows.length;r++){
-      const code=String((rows[r]||[])[codeIdx]==null?'':rows[r][codeIdx]).replace(/[\s-]/g,'').toUpperCase();
-      if(!code) continue;
-      if(map.has(code)){ rows[r][priceIdx]=map.get(code); filled++; }
-      else miss++;
+      const raw=(rows[r]||[]);
+      if(!raw.length || raw.join('').toString().trim()==='') continue;   // 빈 행 제외
+      const code=String(raw[codeIdx]==null?'':raw[codeIdx]).replace(/[\s-]/g,'').toUpperCase();
+      if(code && map.has(code)){ raw[priceIdx]=map.get(code); out.push(raw); filled++; }
+      else dropped++;   // 계산기에 없는 모델 → 삭제(미포함)
     }
     if(!filled){ alert('일치하는 모델(판매자관리코드)이 없습니다. 모델명/코드를 확인하세요.'); return; }
-    const outWs=XLSX.utils.aoa_to_sheet(rows);
+    const outWs=XLSX.utils.aoa_to_sheet(out);
     const outWb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(outWb, outWs, 'Sheet1');
-    let outBuf;
-    try { outBuf=XLSX.write(outWb, { bookType:'csv', type:'array', codepage:949 }); }
-    catch(_) { outBuf=XLSX.write(outWb, { bookType:'csv', type:'array' }); }
-    const blob=new Blob([outBuf], { type:'text/csv' });
-    const url=URL.createObjectURL(blob); const a=document.createElement('a');
-    a.href=url; a.download=`플레이오토_등재가채움_${(ev.name||'행사')}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    alert(`✅ ${filled}개 행 판매가에 등재가 채움${miss?` (미매칭 ${miss}행은 그대로)`:''}`);
+    XLSX.writeFile(outWb, `플레이오토_등재가채움_${(ev.name||'행사')}.xlsx`);
+    alert(`✅ ${filled}개 행 판매가에 등재가 채움\n계산기에 없는 ${dropped}개 행은 제외하고 다운로드했습니다.`);
   }catch(err){ alert('파일 처리 실패: '+(err.message||err)); }
 }
 // 고객 양식(이미지) 다운로드 — 색상·테두리·서식 포함 (ExcelJS)
