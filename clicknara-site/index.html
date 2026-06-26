@@ -2205,6 +2205,56 @@ function evSheetTab(gid, el){
     b.classList.toggle('border-brand-border', !on); b.classList.toggle('text-brand-gray', !on);
   });
 }
+// ── 기존세팅값 시트에서 각 마켓 등재가 가져오기(계산기 '기존세팅값' 열용) ──
+let _evSheetMap = null, _evSheetLoading = false;
+const EV_SHEET_DATA_GIDS = ['98661656', '2085709414'];   // MSI공식몰, 지클릭커
+function _evNormCode(s){ return String(s==null?'':s).replace(/[\s-]/g,'').toUpperCase(); }
+function _evSheetListing(model, site){
+  if(!_evSheetMap) return null;
+  const rec = _evSheetMap.get(_evNormCode(model)); if(!rec) return null;
+  if(site==='11번가') return rec.eleven || null;
+  if(site==='롯데온') return rec.lotte || null;
+  if(site==='이베이') return rec.auction || rec.gmarket || null;
+  return null;
+}
+async function _evLoadSheetData(force){
+  if(_evSheetLoading || (_evSheetMap && !force)) return;
+  if(typeof XLSX==='undefined') return;
+  _evSheetLoading = true;
+  try{
+    const map = new Map();
+    const num = v => { const n=Number(String(v==null?'':v).replace(/[^0-9.]/g,'')); return n||0; };
+    for(const gid of EV_SHEET_DATA_GIDS){
+      try{
+        const res = await fetch(`https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/gviz/tq?tqx=out:csv&gid=${gid}`);
+        const txt = await res.text();
+        const wb = XLSX.read(txt, { type:'string' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const aoa = XLSX.utils.sheet_to_json(ws, { header:1, raw:false, defval:'' });
+        if(!aoa.length) continue;
+        const header = aoa[0].map(c=>String(c||''));
+        const codeCol = header.findIndex(h=>h.includes('판매자관리코드'));
+        if(codeCol<0) continue;
+        const findL = name => { for(let i=0;i<header.length;i++){ const h=header[i]; if(h.includes(name)&&h.includes('🅿')) return i+1; } return -1; };
+        const cols = { gmarket:findL('G마켓'), auction:findL('옥션'), eleven:findL('11번가'), lotte:findL('롯데온') };
+        for(let r=1;r<aoa.length;r++){
+          const row = aoa[r]; if(!row) continue;
+          const code = _evNormCode(row[codeCol]);
+          if(!code || code.includes('판매자관리코드')) continue;
+          if(map.has(code)) continue;
+          map.set(code, {
+            gmarket: cols.gmarket>=0?num(row[cols.gmarket]):0,
+            auction: cols.auction>=0?num(row[cols.auction]):0,
+            eleven:  cols.eleven >=0?num(row[cols.eleven]) :0,
+            lotte:   cols.lotte  >=0?num(row[cols.lotte])  :0,
+          });
+        }
+      }catch(e){ console.warn('[ev-sheet] gid 로드 실패', gid, e); }
+    }
+    _evSheetMap = map;
+    renderEventCalc();
+  } finally { _evSheetLoading = false; }
+}
 // ── (미사용) 사이트 내장 스프레드시트(붙여넣기형 그리드) ──
 const EV_GRID_KEY = 'cn_ev_settings_grid_v1';
 const EV_GRID_ROWS0 = 50, EV_GRID_COLS0 = 20;
@@ -2420,13 +2470,16 @@ function renderEventCalc() {
   const cbCell = row => `<td class="px-2 py-1 text-center border border-brand-border"><input type="checkbox" class="ev-row-cb" ${_evSel.has(row.id)?'checked':''} onchange="evToggleRow('${row.id}',this.checked)"></td>`;
 
   if (isImport) {
-    const heads = ['모델명','대리점','기존가(SRP)','행사세팅가','등재가','MKT행사','쿠폰+카드 최종구매가','최종혜택가','체감가','매출이익','정산예상(최종정산가)','최종정산금액',''];
-    if (thRow) thRow.innerHTML = checkTh + heads.map((h,i)=>`<th class="px-2 py-2.5 font-bold border border-brand-border ${i===0?'text-left':(i===heads.length-1?'text-center':'text-right')} ${(i===4||i===10)?'bg-yellow-200 text-brand-black':''}">${h}</th>`).join('');
+    if (!_evSheetMap && !_evSheetLoading) _evLoadSheetData();   // 기존세팅값 시트 등재가 로드(1회)
+    const heads = ['모델명','기존세팅값','기존가(SRP)','행사세팅가','등재가','MKT행사','쿠폰+카드 최종구매가','최종혜택가','체감가','매출이익','정산예상(최종정산가)','최종정산금액',''];
+    if (thRow) thRow.innerHTML = checkTh + heads.map((h,i)=>`<th class="px-2 py-2.5 font-bold border border-brand-border ${i===0?'text-left':(i===heads.length-1?'text-center':'text-right')} ${(i===1||i===4||i===10)?'bg-yellow-200 text-brand-black':''}">${h}</th>`).join('');
     if (!ev.rows.length) { tbody.innerHTML = `<tr><td colspan="14" class="px-3 py-8 text-center text-brand-gray border border-brand-border">엑셀 파일을 이 표 위로 <b>드래그</b>하거나 "엑셀 업로드" 버튼으로 가져오세요.</td></tr>`; }
     else tbody.innerHTML = ev.rows.map((row,i)=>{ const m=row.imp||{}; const num=v=>`<td class="px-2 py-1 text-right tabular-nums border border-brand-border">${v?_evFmt(v):'-'}</td>`;
+      const setListing = _evSheetListing(row.model, ev.name);
+      const setCell = `<td class="px-2 py-1 text-right tabular-nums border border-brand-border bg-yellow-50 ${setListing?'font-bold text-brand-black':'text-brand-gray'}" title="기존세팅값 시트의 ${_evEsc(ev.name||'')} 등재가">${setListing?_evFmt(setListing):(_evSheetMap?'-':'…')}</td>`;
       return `<tr class="hover:bg-brand-bg/40">${cbCell(row)}
         <td class="px-2 py-1 border border-brand-border font-semibold min-w-[150px]">${_evEsc(row.model||'')}</td>
-        <td class="px-2 py-1 text-center border border-brand-border text-brand-gray">${_evEsc(row.channel||'')}</td>
+        ${setCell}
         ${num(row.orig)}${num(row.disp)}
         <td class="px-2 py-1 text-right tabular-nums border border-brand-border font-extrabold bg-yellow-100 text-brand-black">${m.listing?_evFmt(m.listing):'-'}</td>
         ${num(row.promo)}
