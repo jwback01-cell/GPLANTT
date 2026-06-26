@@ -2479,15 +2479,20 @@ async function _evFillPlayauto(file){
     const header=rows[0].map(c=>norm(c));
     const codeIdx=header.findIndex(c=>c.includes('판매자관리코드'));
     const priceIdx=header.findIndex(c=>c==='판매가');
+    const mallIdx=header.findIndex(c=>c.includes('쇼핑몰'));
     if(codeIdx<0 || priceIdx<0){ alert('판매자관리코드 또는 판매가 열을 찾지 못했습니다.'); return; }
+    // 사이트별 허용 쇼핑몰(채널) — 이베이는 옥션·지마켓만, 그 외 채널은 제외
+    const SITE_CH={ '이베이':['옥션','지마켓'], '11번가':['11번가'], '롯데온':['롯데온'] };
+    const allowed=SITE_CH[ev.name]||null;
     const out=[rows[0]];   // 헤더
-    let filled=0, dropped=0;
+    let filled=0, dropped=0, chDrop=0;
     for(let r=1;r<rows.length;r++){
       const raw=(rows[r]||[]);
       if(!raw.length || raw.join('').toString().trim()==='') continue;   // 빈 행 제외
       const code=String(raw[codeIdx]==null?'':raw[codeIdx]).replace(/[\s-]/g,'').toUpperCase();
-      if(code && map.has(code)){ raw[priceIdx]=map.get(code); out.push(raw); filled++; }
-      else dropped++;   // 계산기에 없는 모델 → 삭제(미포함)
+      if(!code || !map.has(code)){ dropped++; continue; }   // 계산기에 없는 모델 → 제외
+      if(allowed && mallIdx>=0){ const chan=String(raw[mallIdx]||''); if(!allowed.some(a=>chan.includes(a))){ chDrop++; continue; } }  // 허용 채널 외 제외
+      raw[priceIdx]=map.get(code); out.push(raw); filled++;
     }
     if(!filled){ alert('일치하는 모델(판매자관리코드)이 없습니다. 모델명/코드를 확인하세요.'); return; }
     const outWs=XLSX.utils.aoa_to_sheet(out);
