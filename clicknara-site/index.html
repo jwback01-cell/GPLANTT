@@ -2217,6 +2217,22 @@ function _evSheetListing(model, site){
   if(site==='이베이') return rec.auction || rec.gmarket || null;
   return null;
 }
+// 로컬 파일(file://)에서 쓸 경우 배포 주소를 넣으면 자체 프록시로 안정 동작. 예: 'https://클릭나라도메인.vercel.app'
+const EV_PROXY_BASE = '';
+async function _evFetchCsv(gid){
+  const gviz = `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/gviz/tq?tqx=out:csv&gid=${gid}`;
+  const tries = [
+    `${EV_PROXY_BASE}/api/sheet?gid=${gid}`,                                 // 자체 프록시(배포 동일출처 / 로컬은 EV_PROXY_BASE 필요)
+    gviz,                                                                    // 직접(배포 https에서 동작)
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(gviz)}`,        // 공개 프록시 폴백
+    `https://corsproxy.io/?url=${encodeURIComponent(gviz)}`,
+  ];
+  for(const u of tries){
+    try{ const r = await fetch(u); if(r.ok){ const t = await r.text(); if(t && t.includes('판매자관리코드')) return t; } }
+    catch(_){}
+  }
+  throw new Error('시트 데이터를 불러오지 못했습니다(CORS/프록시).');
+}
 async function _evLoadSheetData(force){
   if(_evSheetLoading || (_evSheetMap && !force)) return;
   if(typeof XLSX==='undefined') return;
@@ -2226,8 +2242,7 @@ async function _evLoadSheetData(force){
     const num = v => { const n=Number(String(v==null?'':v).replace(/[^0-9.]/g,'')); return n||0; };
     for(const gid of EV_SHEET_DATA_GIDS){
       try{
-        const res = await fetch(`https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/gviz/tq?tqx=out:csv&gid=${gid}`);
-        const txt = await res.text();
+        const txt = await _evFetchCsv(gid);
         const wb = XLSX.read(txt, { type:'string' });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const aoa = XLSX.utils.sheet_to_json(ws, { header:1, raw:false, defval:'' });
@@ -2235,7 +2250,8 @@ async function _evLoadSheetData(force){
         const header = aoa[0].map(c=>String(c||''));
         const codeCol = header.findIndex(h=>h.includes('판매자관리코드'));
         if(codeCol<0) continue;
-        const findL = name => { for(let i=0;i<header.length;i++){ const h=header[i]; if(h.includes(name)&&h.includes('🅿')) return i+1; } return -1; };
+        // 각 마켓 '쿠폰' 열을 찾고 바로 다음 '등재가' 열을 사용(이모지 의존 X, _스배/사용안함 제외)
+        const findL = name => { for(let i=0;i<header.length;i++){ const h=header[i]; if(h.includes(name)&&h.includes('쿠폰')&&!h.includes('스배')&&!h.includes('사용')&&String(header[i+1]||'').includes('등재가')) return i+1; } return -1; };
         const cols = { gmarket:findL('G마켓'), auction:findL('옥션'), eleven:findL('11번가'), lotte:findL('롯데온') };
         for(let r=1;r<aoa.length;r++){
           const row = aoa[r]; if(!row) continue;
@@ -2251,8 +2267,8 @@ async function _evLoadSheetData(force){
         }
       }catch(e){ console.warn('[ev-sheet] gid 로드 실패', gid, e); }
     }
-    _evSheetMap = map;
-    renderEventCalc();
+    if(map.size>0){ _evSheetMap = map; renderEventCalc(); }   // 성공 시에만 고정·재렌더
+    else { _evSheetMap = null; console.warn('[ev-sheet] 데이터 0건 — 새로고침 시 재시도'); }
   } finally { _evSheetLoading = false; }
 }
 // ── (미사용) 사이트 내장 스프레드시트(붙여넣기형 그리드) ──
