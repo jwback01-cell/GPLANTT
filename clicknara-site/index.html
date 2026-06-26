@@ -2185,7 +2185,9 @@ function _evCalcRow(row, r) {
 }
 const EV_SHEET_ID = '12ixpjr9CxQX6aKHGLFfQzB9siGWcBYtt0FXzXP67HgI';
 const EV_SHEET_GID = '98661656';
-const EV_SHEET_URL = `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/edit?usp=sharing&rm=minimal&gid=${EV_SHEET_GID}#gid=${EV_SHEET_GID}`;
+const EV_SHEET_URL = `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/edit?usp=sharing&gid=${EV_SHEET_GID}#gid=${EV_SHEET_GID}`;
+// iframe 임베드용 — 편집 화면은 프레임 차단되므로 preview(미리보기, 읽기전용·로그인세션 사용) 사용
+const EV_SHEET_EMBED = `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/preview?gid=${EV_SHEET_GID}#gid=${EV_SHEET_GID}`;
 function _evSettingsHtml() {
   return `
     <section class="mt-2 pl-1 md:pl-2">
@@ -2266,7 +2268,7 @@ function evGoSettings() {
   if (calc) calc.classList.add('hidden');
   if (set) set.classList.remove('hidden');
   const fr = document.getElementById('ev-sheet-frame');
-  if (fr && !fr.src) fr.src = EV_SHEET_URL;   // 최초 진입 시에만 로드
+  if (fr && !fr.src) fr.src = EV_SHEET_EMBED;   // 최초 진입 시에만 로드(미리보기)
   // 소메뉴 활성 표시
   document.querySelectorAll('.ev-sub').forEach(a => {
     const on = a.dataset.evSettings === '1';
