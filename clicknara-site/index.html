@@ -2247,15 +2247,18 @@ function renderEventCalc() {
   const cbCell = row => `<td class="px-2 py-1 text-center border border-brand-border"><input type="checkbox" class="ev-row-cb" ${_evSel.has(row.id)?'checked':''} onchange="evToggleRow('${row.id}',this.checked)"></td>`;
 
   if (isImport) {
-    const heads = ['모델명','대리점','기존가(SRP)','행사세팅가','MKT행사','쿠폰+카드 최종구매가','체감가','매출이익','정산예상(최종정산가)','최종정산금액',''];
-    if (thRow) thRow.innerHTML = checkTh + heads.map((h,i)=>`<th class="px-2 py-2.5 font-bold border border-brand-border ${i===0?'text-left':(i===heads.length-1?'text-center':'text-right')} ${i===8?'bg-yellow-200 text-brand-black':''}">${h}</th>`).join('');
-    if (!ev.rows.length) { tbody.innerHTML = `<tr><td colspan="12" class="px-3 py-8 text-center text-brand-gray border border-brand-border">엑셀 파일을 이 표 위로 <b>드래그</b>하거나 "엑셀 업로드" 버튼으로 가져오세요.</td></tr>`; }
+    const heads = ['모델명','대리점','기존가(SRP)','행사세팅가','등재가','MKT행사','쿠폰+카드 최종구매가','최종혜택가','체감가','매출이익','정산예상(최종정산가)','최종정산금액',''];
+    if (thRow) thRow.innerHTML = checkTh + heads.map((h,i)=>`<th class="px-2 py-2.5 font-bold border border-brand-border ${i===0?'text-left':(i===heads.length-1?'text-center':'text-right')} ${(i===4||i===10)?'bg-yellow-200 text-brand-black':''}">${h}</th>`).join('');
+    if (!ev.rows.length) { tbody.innerHTML = `<tr><td colspan="14" class="px-3 py-8 text-center text-brand-gray border border-brand-border">엑셀 파일을 이 표 위로 <b>드래그</b>하거나 "엑셀 업로드" 버튼으로 가져오세요.</td></tr>`; }
     else tbody.innerHTML = ev.rows.map((row,i)=>{ const m=row.imp||{}; const num=v=>`<td class="px-2 py-1 text-right tabular-nums border border-brand-border">${v?_evFmt(v):'-'}</td>`;
       return `<tr class="hover:bg-brand-bg/40">${cbCell(row)}
         <td class="px-2 py-1 border border-brand-border font-semibold min-w-[150px]">${_evEsc(row.model||'')}</td>
         <td class="px-2 py-1 text-center border border-brand-border text-brand-gray">${_evEsc(row.channel||'')}</td>
-        ${num(row.orig)}${num(row.disp)}${num(row.promo)}
+        ${num(row.orig)}${num(row.disp)}
+        <td class="px-2 py-1 text-right tabular-nums border border-brand-border font-extrabold bg-yellow-100 text-brand-black">${m.listing?_evFmt(m.listing):'-'}</td>
+        ${num(row.promo)}
         <td class="px-2 py-1 text-right tabular-nums border border-brand-border font-bold text-brand-blue">${m.finalBuy?_evFmt(m.finalBuy):'-'}</td>
+        <td class="px-2 py-1 text-right tabular-nums border border-brand-border font-bold text-brand-blue">${m.benefit?_evFmt(m.benefit):'-'}</td>
         <td class="px-2 py-1 text-right tabular-nums border border-brand-border font-bold text-brand-pink">${m.feel?_evFmt(m.feel):'-'}</td>
         ${num(m.profit)}
         <td class="px-2 py-1 text-right tabular-nums border border-brand-border font-extrabold bg-yellow-100 text-brand-black">${m.settle?_evFmt(m.settle):'-'}</td>
@@ -2384,11 +2387,13 @@ async function _evProcessFile(file){
         const mi = joined.findIndex(c=> c==='model' || c.includes('모델'));
         const hasHdr = mi>=0 && joined.some(c=> c.includes('srp') || c.includes('기존') || c.includes('세팅'));
         if(hasHdr){
-          cols = { model: mi, channel:-1, orig:-1, disp:-1, mkt:-1, finalBuy:-1, feel:-1, reward:-1, cpFirst:-1, cpReward:-1, settle:-1, profit:-1, settleFinal:-1 };
+          cols = { model: mi, channel:-1, orig:-1, disp:-1, listing:-1, benefit:-1, mkt:-1, finalBuy:-1, feel:-1, reward:-1, cpFirst:-1, cpReward:-1, settle:-1, profit:-1, settleFinal:-1 };
           joined.forEach((c,idx)=>{
             if(cols.channel<0 && c.includes('대리점') && !c.includes('정산') && !c.includes('마진')) cols.channel = idx;
             if(cols.orig<0 && c.includes('기존')) cols.orig = idx;                              // 기존 SRP
-            if(cols.disp<0 && c.includes('세팅')) cols.disp = idx;                              // 행사 세팅 SRP
+            if(cols.disp<0 && (c.includes('세팅')||(c.includes('행사')&&c.includes('srp')))) cols.disp = idx;  // 행사 세팅 SRP / 행사 SRP
+            if(cols.listing<0 && c.includes('등재가')) cols.listing = idx;                       // 등재가
+            if(cols.benefit<0 && c.includes('최종혜택')) cols.benefit = idx;                     // 최종혜택가
             if(cols.mkt<0 && (c.includes('mkt')||c.includes('프로모'))) cols.mkt = idx;          // MKT 행사
             if(cols.finalBuy<0 && c.includes('최종구매')) cols.finalBuy = idx;                   // 쿠폰+카드 최종구매가
             if(cols.feel<0 && c.includes('체감')) cols.feel = idx;                              // 체감가
@@ -2411,7 +2416,7 @@ async function _evProcessFile(file){
         out.push({ id:_evUid(), model,
           channel: cols.channel>=0 ? String(r[cols.channel]||'').trim() : '',
           orig, disp, promo: get('mkt'),
-          imp: { finalBuy:get('finalBuy'), feel:get('feel'), reward:get('reward'), cpFirst:get('cpFirst'), cpReward:get('cpReward'), settle:get('settle'), profit:get('profit'), settleFinal:get('settleFinal') }
+          imp: { listing:get('listing'), benefit:get('benefit'), finalBuy:get('finalBuy'), feel:get('feel'), reward:get('reward'), cpFirst:get('cpFirst'), cpReward:get('cpReward'), settle:get('settle'), profit:get('profit'), settleFinal:get('settleFinal') }
         });
       }
     });
@@ -2431,12 +2436,13 @@ function evDownloadPlayauto(){
   if(typeof XLSX==='undefined'){ alert('엑셀 라이브러리 로드 실패'); return; }
   const o=_evLoad(); const ev=_evActive(o);
   if(!ev.rows.length){ alert('데이터가 없습니다.'); return; }
+  const isImport = ev.viewMode==='import';
   const aoa=[['모델명','등재가']];
   ev.rows.forEach(row=>{
-    const c=_evCalcRow(row, ev.rates);
+    const listing = (isImport && row.imp && Number(row.imp.listing)) ? Number(row.imp.listing) : _evCalcRow(row, ev.rates).listing;
     const model=String(row.model||'').replace(/[\s-]/g,'');   // 띄어쓰기·하이픈 제거
     if(!model) return;
-    aoa.push([model, c.listing]);
+    aoa.push([model, listing]);
   });
   const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:30},{wch:14}];
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '플레이오토');
