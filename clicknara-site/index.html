@@ -2100,7 +2100,7 @@ async function logout() {
 const EV_KEY = 'cn_events_v1';
 function _evDefaultRates() { return { md: 3, sel: 14, card: 5, cat: 7, cpnFee: 20, seller: 50 }; }
 function _evUid() { return 'ev_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
-const EV_SITES = ['11번가', '이베이', '롯데온'];
+const EV_SITES = ['11번가', '이베이', '롯데온', '그외'];
 function _evLoad() {
   let o = null;
   try { o = JSON.parse(localStorage.getItem(EV_KEY) || 'null'); } catch (_) {}
@@ -2215,6 +2215,7 @@ function _evSheetListing(model, site){
   if(site==='11번가') return rec.eleven || null;
   if(site==='롯데온') return rec.lotte || null;
   if(site==='이베이') return rec.auction || rec.gmarket || null;
+  if(site==='그외') return rec.smartstore || rec.ssg || rec.ohou || rec.coupang || rec.ali || null;  // 대표값(스마트스토어 우선)
   return null;
 }
 // 로컬 파일(file://)에서 쓸 경우 배포 주소를 넣으면 자체 프록시로 안정 동작. 예: 'https://클릭나라도메인.vercel.app'
@@ -2233,7 +2234,7 @@ async function _evFetchCsv(gid){
   }
   throw new Error('시트 데이터를 불러오지 못했습니다(CORS/프록시).');
 }
-const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v2';   // v2: imageUrl 포함
+const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v3';   // v3: 다채널(ssg/ali/ohou/coupang/smartstore) 포함
 function _evSheetCacheLoad(){
   try{ const c=JSON.parse(localStorage.getItem(EV_SHEET_CACHE_KEY)||'null'); if(Array.isArray(c)&&c.length) return new Map(c); }catch(_){}
   return null;
@@ -2263,7 +2264,11 @@ async function _evLoadSheetData(force){
         if(codeCol<0) continue;
         // 각 마켓 '쿠폰' 열을 찾고 바로 다음 '등재가' 열을 사용(이모지 의존 X, _스배/사용안함 제외)
         const findL = name => { for(let i=0;i<header.length;i++){ const h=header[i]; if(h.includes(name)&&h.includes('쿠폰')&&!h.includes('스배')&&!h.includes('사용')&&String(header[i+1]||'').includes('등재가')) return i+1; } return -1; };
-        const cols = { gmarket:findL('G마켓'), auction:findL('옥션'), eleven:findL('11번가'), lotte:findL('롯데온') };
+        const cols = {
+          gmarket:findL('G마켓'), auction:findL('옥션'), eleven:findL('11번가'), lotte:findL('롯데온'),
+          ssg:findL('SSG'), ali:findL('알리익스프레스'), ohou:findL('오늘의집'), coupang:findL('제트'),
+        };
+        const jidoCol = header.findIndex(h=>h.includes('지도가')&&!h.includes('이전'));   // 스마트스토어 기본가
         const imgCol = header.findIndex(h=>h.includes('이미지'));   // 사용자가 추가할 '이미지URL' 열
         for(let r=1;r<aoa.length;r++){
           const row = aoa[r]; if(!row) continue;
@@ -2275,6 +2280,11 @@ async function _evLoadSheetData(force){
             auction: cols.auction>=0?num(row[cols.auction]):0,
             eleven:  cols.eleven >=0?num(row[cols.eleven]) :0,
             lotte:   cols.lotte  >=0?num(row[cols.lotte])  :0,
+            ssg:     cols.ssg    >=0?num(row[cols.ssg])    :0,
+            ali:     cols.ali    >=0?num(row[cols.ali])    :0,
+            ohou:    cols.ohou   >=0?num(row[cols.ohou])   :0,
+            coupang: cols.coupang>=0?num(row[cols.coupang]):0,
+            smartstore: jidoCol>=0?num(row[jidoCol]):0,
             imageUrl: imgCol>=0 ? String(row[imgCol]||'').trim() : '',
           });
         }
@@ -2738,8 +2748,11 @@ async function _evFillPlayauto(file){
     if(imgIdx<0) imgIdx=header.findIndex(c=>c.includes('대표이미지'));
     if(imgIdx<0) imgIdx=header.findIndex(c=>c.includes('이미지')&&!c.includes('추가'));   // 추가이미지는 제외
     if(codeIdx<0 || priceIdx<0){ alert('판매자관리코드 또는 판매가 열을 찾지 못했습니다.'); return; }
-    // 사이트별 허용 쇼핑몰(채널) — 이베이는 옥션·지마켓만, 그 외 채널은 제외
-    const SITE_CH={ '이베이':['옥션','지마켓'], '11번가':['11번가'], '롯데온':['롯데온'] };
+    // 사이트별 허용 쇼핑몰(채널) — 이베이=옥션·지마켓, 그외=스마트스토어/오늘의집/SSG/알리/쿠팡 등
+    const SITE_CH={
+      '이베이':['옥션','지마켓'], '11번가':['11번가'], '롯데온':['롯데온'],
+      '그외':['스마트','스토어','네이버','오늘의집','오늘','SSG','쓱','신세계','알리','쿠팡'],
+    };
     const allowed=SITE_CH[ev.name]||null;
     // 행의 쇼핑몰(채널)에 맞는 기존세팅값 등재가 선택
     const chanListing=(rec,chan)=>{ const c=String(chan||'');
@@ -2747,6 +2760,11 @@ async function _evFillPlayauto(file){
       if(c.includes('지마켓')||c.includes('G마켓')) return rec.gmarket;
       if(c.includes('11번가')) return rec.eleven;
       if(c.includes('롯데')) return rec.lotte;
+      if(c.includes('SSG')||c.includes('쓱')||c.includes('신세계')) return rec.ssg;
+      if(c.includes('알리')) return rec.ali;
+      if(c.includes('오늘의집')||c.includes('오늘')) return rec.ohou;
+      if(c.includes('쿠팡')) return rec.coupang;
+      if(c.includes('스마트')||c.includes('스토어')||c.includes('네이버')) return rec.smartstore;
       if(ev.name==='11번가') return rec.eleven;          // 쇼핑몰 열 인식 불가 시 사이트 기본
       if(ev.name==='롯데온') return rec.lotte;
       if(ev.name==='이베이') return rec.auction||rec.gmarket;
