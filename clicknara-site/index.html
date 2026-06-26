@@ -2765,29 +2765,41 @@ async function _evFillPlayauto(file){
       return 0;
     };
     const out=[rows[0]];   // 헤더
-    let filled=0, dropped=0, chDrop=0, noPrice=0, imgFilled=0;
+    let filled=0, imgFilled=0;
+    const fails=new Map();   // 채워야 하는데 실패한 행: 판매자코드 → 사유 (중복 제거)
     for(let r=1;r<rows.length;r++){
       const raw=(rows[r]||[]);
       if(!raw.length || raw.join('').toString().trim()==='') continue;   // 빈 행 제외
-      const code=String(raw[codeIdx]==null?'':raw[codeIdx]).replace(/[\s-]/g,'').toUpperCase();
-      if(!code){ dropped++; continue; }
-      if(calcKeys.size && !calcKeys.has(code)){ dropped++; continue; }   // 계산기에 모델이 있으면 그 모델만
-      const rec=_evSheetMap.get(code);
-      if(!rec){ noPrice++; continue; }   // 기존세팅값 시트에 없는 모델 → 제외
+      const origCode=String(raw[codeIdx]==null?'':raw[codeIdx]).trim();
+      const code=origCode.replace(/[\s-]/g,'').toUpperCase();
+      if(!code) continue;   // 판매자코드 없는 행(구분/빈행)은 대상 아님
+      if(calcKeys.size && !calcKeys.has(code)) continue;   // 계산기 모델만 모드 → 그 외는 정상 제외
       const chan = mallIdx>=0 ? String(raw[mallIdx]||'') : '';
-      if(allowed && mallIdx>=0 && !allowed.some(a=>chan.includes(a))){ chDrop++; continue; }  // 허용 채널 외 제외
-      const price = chanListing(rec, chan);
-      if(!price){ noPrice++; continue; }   // 해당 채널 등재가 없음 → 제외
+      if(allowed && mallIdx>=0 && !allowed.some(a=>chan.includes(a))) continue;   // 채널외는 정상 제외
+      // ↓ 여기부터는 반드시 채워져야 하는 행 — 하나라도 실패하면 다운로드 취소
+      const rec=_evSheetMap.get(code);
+      const price = rec ? chanListing(rec, chan) : 0;
+      const chTag = chan ? chan.split('=')[0] : '';
+      if(!rec){ if(!fails.has(origCode)) fails.set(origCode, '기존세팅값 시트에 없음'); continue; }
+      if(!price){ if(!fails.has(origCode)) fails.set(origCode, `등재가 없음${chTag?`(${chTag})`:''}`); continue; }
+      if(imgIdx>=0 && !rec.imageUrl){ if(!fails.has(origCode)) fails.set(origCode, '이미지URL 없음'); continue; }
       raw[priceIdx]=price;
-      if(imgIdx>=0 && rec.imageUrl){ raw[imgIdx]=rec.imageUrl; imgFilled++; }   // 이미지URL 채움
+      if(imgIdx>=0 && rec.imageUrl){ raw[imgIdx]=rec.imageUrl; imgFilled++; }
       out.push(raw); filled++;
     }
-    if(!filled){ alert('일치하는 모델/채널 등재가가 없습니다. 코드·쇼핑몰 열을 확인하세요.'); return; }
+    if(fails.size){
+      const entries=[...fails.entries()];
+      const list=entries.slice(0,60).map(([c,why])=>`• ${c} — ${why}`).join('\n');
+      const more=entries.length>60?`\n…외 ${entries.length-60}건`:'';
+      alert(`❌ 다운로드 취소 — 값이 안 들어간 판매자코드 ${fails.size}건\n\n${list}${more}\n\n위 코드를 기존세팅값 시트에 추가(등재가·이미지URL)한 뒤 다시 시도하세요.`);
+      return;
+    }
+    if(!filled){ alert('채울 행이 없습니다. (판매자코드/쇼핑몰 열 확인)'); return; }
     const outWs=XLSX.utils.aoa_to_sheet(out);
     const outWb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(outWb, outWs, 'Sheet1');
     XLSX.writeFile(outWb, `플레이오토_기존세팅값_${(ev.name||'행사')}.xlsx`);
-    const imgNote = imgIdx<0 ? '\n(엑셀에 이미지 열이 없어 이미지URL은 미적용)' : (imgFilled? `\n이미지URL ${imgFilled}행 채움` : '\n(시트에 이미지URL 값이 없어 미적용)');
-    alert(`✅ ${filled}개 행 판매가에 기존세팅값(채널별 등재가) 채움${imgNote}\n제외 — 미매칭 ${dropped} / 채널외 ${chDrop} / 등재가없음 ${noPrice}`);
+    const imgNote = imgIdx<0 ? '\n(엑셀에 이미지 열이 없어 이미지URL은 미적용)' : `\n이미지URL ${imgFilled}행 채움`;
+    alert(`✅ ${filled}개 행 모두 판매가·이미지 채움 완료${imgNote}`);
   }catch(err){ alert('파일 처리 실패: '+(err.message||err)); }
 }
 // 고객 양식(이미지) 다운로드 — 색상·테두리·서식 포함 (ExcelJS)
