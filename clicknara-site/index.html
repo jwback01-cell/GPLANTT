@@ -2187,7 +2187,9 @@ function _evCalcRow(row, r) {
 const EV_SHEET_ID = '12ixpjr9CxQX6aKHGLFfQzB9siGWcBYtt0FXzXP67HgI';
 const EV_SHEET_GID = '98661656';
 const EV_SHEET_URL = `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/edit?usp=sharing&gid=${EV_SHEET_GID}#gid=${EV_SHEET_GID}`;
-const EV_SHEET_EMBED = `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/preview?gid=${EV_SHEET_GID}#gid=${EV_SHEET_GID}`;
+// 웹에 게시(Publish to web) 주소 — iframe 임베드 허용·로그인 불필요
+const EV_SHEET_PUB = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRHpO8tEQo_1EYII3CykJ0NOXznRd0dLrSPvGZhkrHcuOQ_vmf124Bxfv6W5WgpWdam2hroXpWC3OYr/pubhtml';
+const EV_SHEET_EMBED = `${EV_SHEET_PUB}?widget=true&headers=false&gid=${EV_SHEET_GID}`;
 // ── (미사용) 사이트 내장 스프레드시트(붙여넣기형 그리드) ──
 const EV_GRID_KEY = 'cn_ev_settings_grid_v1';
 const EV_GRID_ROWS0 = 50, EV_GRID_COLS0 = 20;
@@ -2294,7 +2296,7 @@ function _evSettingsHtml() {
     <section class="bg-white rounded-3xl panel p-4 flex flex-col gap-3">
       <div class="flex items-center gap-2 flex-wrap">
         <span class="px-3 py-1.5 rounded-full bg-brand-black text-white text-sm font-bold">기존세팅값</span>
-        <span class="text-brand-gray text-sm">아래 시트가 보이지 않으면(구글 로그인 필요) 오른쪽 버튼으로 새 탭에서 여세요.</span>
+        <span class="text-brand-gray text-sm">웹에 게시된 시트(보기 전용)입니다. 편집은 오른쪽 버튼으로 새 탭에서 여세요.</span>
         <a href="${EV_SHEET_URL}" target="_blank" rel="noopener" class="ml-auto px-4 py-2 rounded-full bg-green-600 text-white text-sm font-bold hover:bg-green-700 flex items-center gap-1.5">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
           새 탭에서 열기
