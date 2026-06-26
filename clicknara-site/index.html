@@ -2195,6 +2195,53 @@ function _evGridEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replac
 function _evColName(n){ let s=''; n++; while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
 function _evGridCols(){ return Math.max(1, ..._evGrid.map(r=>r.length)); }
 function _evGridNormalize(){ const cols=_evGridCols(); _evGrid.forEach(r=>{ while(r.length<cols) r.push(''); }); }
+// ── 수식 엔진(=1+1, =A1+B1, =SUM(A1:A10) 등) ──
+function _evColToIdx(s){ let n=0; s=String(s).toUpperCase(); for(let i=0;i<s.length;i++) n=n*26+(s.charCodeAt(i)-64); return n-1; }
+function _evRefRC(ref){ const m=/^([A-Za-z]+)(\d+)$/.exec(ref); if(!m) return null; return [parseInt(m[2],10)-1, _evColToIdx(m[1])]; }
+function _evCellNum(r,c,seen){
+  if(r<0||c<0||!_evGrid[r]) return 0;
+  const raw=_evGrid[r][c]; if(raw==null||raw==='') return 0;
+  const s=String(raw);
+  if(s[0]==='='){ const key=r+','+c; if(seen.has(key)) return 0; seen.add(key); const v=_evEvalFormula(s.slice(1),seen); seen.delete(key); const n=Number(v); return isNaN(n)?0:n; }
+  const n=Number(s.replace(/,/g,'')); return isNaN(n)?0:n;
+}
+function _evCellNumRef(ref,seen){ const rc=_evRefRC(ref); return rc?_evCellNum(rc[0],rc[1],seen):0; }
+function _evRange(a,b,seen){ const A=_evRefRC(a),B=_evRefRC(b); if(!A||!B) return []; const r1=Math.min(A[0],B[0]),r2=Math.max(A[0],B[0]),c1=Math.min(A[1],B[1]),c2=Math.max(A[1],B[1]); const out=[]; for(let r=r1;r<=r2;r++) for(let c=c1;c<=c2;c++) out.push(_evCellNum(r,c,seen)); return out; }
+function _evEvalFormula(expr, seen){
+  try{
+    let e=String(expr).trim(); if(e==='') return '';
+    e=e.replace(/([A-Za-z][A-Za-z0-9]*)\s*\(/g,(m,n)=>n.toUpperCase()+'(');          // 함수명 대문자화
+    e=e.replace(/([A-Za-z]+\d+):([A-Za-z]+\d+)/g,(m,a,b)=>`__rng(${JSON.stringify(a)},${JSON.stringify(b)})`);  // 범위
+    e=e.replace(/(^|[^A-Za-z0-9_."])([A-Za-z]+\d+)(?![A-Za-z0-9_."])/g,(m,pre,ref)=>pre+`__c(${JSON.stringify(ref)})`);  // 셀참조
+    e=e.replace(/\^/g,'**');
+    const flat=a=>a.reduce((acc,v)=>acc.concat(Array.isArray(v)?flat(v):v),[]);
+    const nums=a=>flat(a).map(Number).filter(v=>!isNaN(v));
+    const scope={
+      __c:(ref)=>_evCellNumRef(ref,seen), __rng:(a,b)=>_evRange(a,b,seen),
+      SUM:(...a)=>nums(a).reduce((x,y)=>x+y,0),
+      AVERAGE:(...a)=>{const n=nums(a);return n.length?n.reduce((x,y)=>x+y,0)/n.length:0;},
+      MIN:(...a)=>{const n=nums(a);return n.length?Math.min(...n):0;},
+      MAX:(...a)=>{const n=nums(a);return n.length?Math.max(...n):0;},
+      COUNT:(...a)=>nums(a).length, COUNTA:(...a)=>flat(a).filter(v=>v!==''&&v!=null).length,
+      PRODUCT:(...a)=>nums(a).reduce((x,y)=>x*y,1),
+      ROUND:(x,n)=>{const p=Math.pow(10,n||0);return Math.round(Number(x)*p)/p;},
+      ROUNDUP:(x,n)=>{const p=Math.pow(10,n||0);return Math.ceil(Number(x)*p)/p;},
+      ROUNDDOWN:(x,n)=>{const p=Math.pow(10,n||0);return Math.floor(Number(x)*p)/p;},
+      ABS:x=>Math.abs(Number(x)), INT:x=>Math.floor(Number(x)), SQRT:x=>Math.sqrt(Number(x)),
+      POWER:(x,y)=>Math.pow(Number(x),Number(y)), MOD:(a,b)=>Number(a)%Number(b),
+      IF:(c,a,b)=>c?a:b,
+    };
+    scope.AVG=scope.AVERAGE;
+    const names=Object.keys(scope);
+    const val=(new Function(...names,'return ('+e+');'))(...names.map(k=>scope[k]));
+    if(typeof val==='number'){ if(!isFinite(val)) return '#ERR'; return Math.round(val*1e10)/1e10; }
+    return val==null?'':val;
+  }catch(_){ return '#ERR'; }
+}
+function _evCellDisplay(r,c){ const raw=_evGrid[r]?_evGrid[r][c]:''; if(raw==null) return ''; const s=String(raw); if(s[0]==='=') return String(_evEvalFormula(s.slice(1), new Set([r+','+c]))); return s; }
+function _evGridRefreshDisplay(){ const wrap=document.getElementById('ev-grid-wrap'); if(!wrap) return; wrap.querySelectorAll('td[data-r]').forEach(td=>{ if(td===document.activeElement) return; td.textContent=_evCellDisplay(+td.dataset.r, +td.dataset.c); }); }
+function _evGridFocusIn(e){ const td=e.target.closest('td'); if(!td||td.dataset.r==null) return; const r=+td.dataset.r,c=+td.dataset.c; td.textContent=(_evGrid[r]&&_evGrid[r][c]!=null)?_evGrid[r][c]:''; }
+function _evGridFocusOut(e){ const td=e.target.closest('td'); if(!td||td.dataset.r==null) return; const r=+td.dataset.r,c=+td.dataset.c; if(!_evGrid[r]) return; _evGrid[r][c]=td.innerText.replace(/ /g,' ').replace(/\n$/,''); _evGridSave(); _evGridRefreshDisplay(); }
 function renderEvGrid(){
   const wrap=document.getElementById('ev-grid-wrap'); if(!wrap) return;
   if(!_evGrid) _evGrid=_evGridLoad();
@@ -2205,13 +2252,15 @@ function renderEvGrid(){
   html+='</tr></thead><tbody>';
   for(let r=0;r<_evGrid.length;r++){
     html+=`<tr><th class="ev-rownum">${r+1}</th>`;
-    for(let c=0;c<cols;c++) html+=`<td contenteditable="true" data-r="${r}" data-c="${c}">${_evGridEsc(_evGrid[r][c])}</td>`;
+    for(let c=0;c<cols;c++) html+=`<td contenteditable="true" data-r="${r}" data-c="${c}">${_evGridEsc(_evCellDisplay(r,c))}</td>`;
     html+='</tr>';
   }
   html+='</tbody></table>';
   wrap.innerHTML=html;
   wrap.onpaste=_evGridPaste;
   wrap.oninput=_evGridInput;
+  wrap.onfocusin=_evGridFocusIn;
+  wrap.onfocusout=_evGridFocusOut;
 }
 function _evGridInput(e){ const td=e.target.closest('td'); if(!td||td.dataset.r==null) return; const r=+td.dataset.r, c=+td.dataset.c; if(_evGrid[r]){ _evGrid[r][c]=td.innerText.replace(/ /g,' '); _evGridSaveDebounced(); } }
 function _evGridPaste(e){
@@ -2245,7 +2294,7 @@ function _evSettingsHtml() {
     </style>
     <section class="mt-2 pl-1 md:pl-2">
       <h1 class="text-[1.8rem] md:text-[2.25rem] font-bold tracking-tight mb-2">기존 세팅값 📋</h1>
-      <p class="text-brand-gray text-base md:text-[1.1rem]">구글 시트에서 전체 복사한 뒤 아래 표에 붙여넣으세요. 입력값은 이 브라우저에 자동 저장됩니다.</p>
+      <p class="text-brand-gray text-base md:text-[1.1rem]">구글 시트에서 전체 복사한 뒤 아래 표에 붙여넣으세요. <b>수식 사용 가능</b>(예: <code>=A1+B1</code>, <code>=SUM(A1:A10)</code>, <code>=ROUND(B2*0.97,0)</code>). 입력값은 이 브라우저에 자동 저장됩니다.</p>
     </section>
     <section class="bg-white rounded-3xl panel p-4 flex flex-col gap-3">
       <div class="flex items-center gap-2 flex-wrap">
