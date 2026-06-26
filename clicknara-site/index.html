@@ -2233,7 +2233,7 @@ async function _evFetchCsv(gid){
   }
   throw new Error('시트 데이터를 불러오지 못했습니다(CORS/프록시).');
 }
-const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v1';
+const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v2';   // v2: imageUrl 포함
 function _evSheetCacheLoad(){
   try{ const c=JSON.parse(localStorage.getItem(EV_SHEET_CACHE_KEY)||'null'); if(Array.isArray(c)&&c.length) return new Map(c); }catch(_){}
   return null;
@@ -2260,6 +2260,7 @@ async function _evLoadSheetData(force){
         // 각 마켓 '쿠폰' 열을 찾고 바로 다음 '등재가' 열을 사용(이모지 의존 X, _스배/사용안함 제외)
         const findL = name => { for(let i=0;i<header.length;i++){ const h=header[i]; if(h.includes(name)&&h.includes('쿠폰')&&!h.includes('스배')&&!h.includes('사용')&&String(header[i+1]||'').includes('등재가')) return i+1; } return -1; };
         const cols = { gmarket:findL('G마켓'), auction:findL('옥션'), eleven:findL('11번가'), lotte:findL('롯데온') };
+        const imgCol = header.findIndex(h=>h.includes('이미지'));   // 사용자가 추가할 '이미지URL' 열
         for(let r=1;r<aoa.length;r++){
           const row = aoa[r]; if(!row) continue;
           const code = _evNormCode(row[codeCol]);
@@ -2270,6 +2271,7 @@ async function _evLoadSheetData(force){
             auction: cols.auction>=0?num(row[cols.auction]):0,
             eleven:  cols.eleven >=0?num(row[cols.eleven]) :0,
             lotte:   cols.lotte  >=0?num(row[cols.lotte])  :0,
+            imageUrl: imgCol>=0 ? String(row[imgCol]||'').trim() : '',
           });
         }
       }catch(e){ console.warn('[ev-sheet] gid 로드 실패', gid, e); }
@@ -2729,6 +2731,8 @@ async function _evFillPlayauto(file){
     const codeIdx=header.findIndex(c=>c.includes('판매자관리코드'));
     const priceIdx=header.findIndex(c=>c==='판매가');
     const mallIdx=header.findIndex(c=>c.includes('쇼핑몰'));
+    let imgIdx=header.findIndex(c=>c.includes('대표이미지'));
+    if(imgIdx<0) imgIdx=header.findIndex(c=>c.includes('이미지'));   // 플레이오토 이미지 열
     if(codeIdx<0 || priceIdx<0){ alert('판매자관리코드 또는 판매가 열을 찾지 못했습니다.'); return; }
     // 사이트별 허용 쇼핑몰(채널) — 이베이는 옥션·지마켓만, 그 외 채널은 제외
     const SITE_CH={ '이베이':['옥션','지마켓'], '11번가':['11번가'], '롯데온':['롯데온'] };
@@ -2745,7 +2749,7 @@ async function _evFillPlayauto(file){
       return 0;
     };
     const out=[rows[0]];   // 헤더
-    let filled=0, dropped=0, chDrop=0, noPrice=0;
+    let filled=0, dropped=0, chDrop=0, noPrice=0, imgFilled=0;
     for(let r=1;r<rows.length;r++){
       const raw=(rows[r]||[]);
       if(!raw.length || raw.join('').toString().trim()==='') continue;   // 빈 행 제외
@@ -2757,13 +2761,16 @@ async function _evFillPlayauto(file){
       if(allowed && mallIdx>=0 && !allowed.some(a=>chan.includes(a))){ chDrop++; continue; }  // 허용 채널 외 제외
       const price = chanListing(rec, chan);
       if(!price){ noPrice++; continue; }   // 해당 채널 등재가 없음 → 제외
-      raw[priceIdx]=price; out.push(raw); filled++;
+      raw[priceIdx]=price;
+      if(imgIdx>=0 && rec.imageUrl){ raw[imgIdx]=rec.imageUrl; imgFilled++; }   // 이미지URL 채움
+      out.push(raw); filled++;
     }
     if(!filled){ alert('일치하는 모델/채널 등재가가 없습니다. 코드·쇼핑몰 열을 확인하세요.'); return; }
     const outWs=XLSX.utils.aoa_to_sheet(out);
     const outWb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(outWb, outWs, 'Sheet1');
     XLSX.writeFile(outWb, `플레이오토_기존세팅값_${(ev.name||'행사')}.xlsx`);
-    alert(`✅ ${filled}개 행 판매가에 기존세팅값(채널별 등재가) 채움\n제외 — 미매칭 ${dropped} / 채널외 ${chDrop} / 등재가없음 ${noPrice}`);
+    const imgNote = imgIdx<0 ? '\n(엑셀에 이미지 열이 없어 이미지URL은 미적용)' : (imgFilled? `\n이미지URL ${imgFilled}행 채움` : '\n(시트에 이미지URL 값이 없어 미적용)');
+    alert(`✅ ${filled}개 행 판매가에 기존세팅값(채널별 등재가) 채움${imgNote}\n제외 — 미매칭 ${dropped} / 채널외 ${chDrop} / 등재가없음 ${noPrice}`);
   }catch(err){ alert('파일 처리 실패: '+(err.message||err)); }
 }
 // 고객 양식(이미지) 다운로드 — 색상·테두리·서식 포함 (ExcelJS)
