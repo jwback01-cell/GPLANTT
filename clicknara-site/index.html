@@ -2206,7 +2206,7 @@ function evSheetTab(gid, el){
   });
 }
 // ── 기존세팅값 시트에서 각 마켓 등재가 가져오기(계산기 '기존세팅값' 열용) ──
-let _evSheetMap = null, _evSheetLoading = false;
+let _evSheetMap = null, _evSheetLoading = false, _evSheetFetched = false;
 const EV_SHEET_DATA_GIDS = ['98661656', '2085709414'];   // MSI공식몰, 지클릭커
 function _evNormCode(s){ return String(s==null?'':s).replace(/[\s-]/g,'').toUpperCase(); }
 function _evSheetListing(model, site){
@@ -2233,8 +2233,15 @@ async function _evFetchCsv(gid){
   }
   throw new Error('시트 데이터를 불러오지 못했습니다(CORS/프록시).');
 }
+const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v1';
+function _evSheetCacheLoad(){
+  try{ const c=JSON.parse(localStorage.getItem(EV_SHEET_CACHE_KEY)||'null'); if(Array.isArray(c)&&c.length) return new Map(c); }catch(_){}
+  return null;
+}
 async function _evLoadSheetData(force){
-  if(_evSheetLoading || (_evSheetMap && !force)) return;
+  if(_evSheetLoading) return;
+  if(_evSheetFetched && !force) return;            // 이번 세션에 이미 네트워크 시도함
+  if(!_evSheetMap){ const cached=_evSheetCacheLoad(); if(cached){ _evSheetMap=cached; } }  // 캐시로 즉시 표시
   if(typeof XLSX==='undefined') return;
   _evSheetLoading = true;
   try{
@@ -2267,8 +2274,15 @@ async function _evLoadSheetData(force){
         }
       }catch(e){ console.warn('[ev-sheet] gid 로드 실패', gid, e); }
     }
-    if(map.size>0){ _evSheetMap = map; renderEventCalc(); }   // 성공 시에만 고정·재렌더
-    else { _evSheetMap = null; console.warn('[ev-sheet] 데이터 0건 — 새로고침 시 재시도'); }
+    _evSheetFetched = true;
+    if(map.size>0){
+      _evSheetMap = map;
+      try{ localStorage.setItem(EV_SHEET_CACHE_KEY, JSON.stringify([...map.entries()])); }catch(_){}
+      renderEventCalc();
+    } else {
+      console.warn('[ev-sheet] 네트워크 0건 — 캐시 유지(있으면)');
+      if(_evSheetMap) renderEventCalc();   // 캐시라도 있으면 표시
+    }
   } finally { _evSheetLoading = false; }
 }
 // ── (미사용) 사이트 내장 스프레드시트(붙여넣기형 그리드) ──
@@ -2486,7 +2500,7 @@ function renderEventCalc() {
   const cbCell = row => `<td class="px-2 py-1 text-center border border-brand-border"><input type="checkbox" class="ev-row-cb" ${_evSel.has(row.id)?'checked':''} onchange="evToggleRow('${row.id}',this.checked)"></td>`;
 
   if (isImport) {
-    if (!_evSheetMap && !_evSheetLoading) _evLoadSheetData();   // 기존세팅값 시트 등재가 로드(1회)
+    if (!_evSheetFetched && !_evSheetLoading) _evLoadSheetData();   // 기존세팅값 시트 등재가 로드(1회/세션)
     const heads = ['모델명','기존세팅값','기존가(SRP)','행사세팅가','등재가','MKT행사','쿠폰+카드 최종구매가','최종혜택가','체감가','매출이익','정산예상(최종정산가)','최종정산금액',''];
     if (thRow) thRow.innerHTML = checkTh + heads.map((h,i)=>`<th class="px-2 py-2.5 font-bold border border-brand-border ${i===0?'text-left':(i===heads.length-1?'text-center':'text-right')} ${(i===1||i===4||i===10)?'bg-yellow-200 text-brand-black':''}">${h}</th>`).join('');
     if (!ev.rows.length) { tbody.innerHTML = `<tr><td colspan="14" class="px-3 py-8 text-center text-brand-gray border border-brand-border">엑셀 파일을 이 표 위로 <b>드래그</b>하거나 "엑셀 업로드" 버튼으로 가져오세요.</td></tr>`; }
@@ -2702,7 +2716,7 @@ async function _evFillPlayauto(file){
   const calcKeys = new Set(ev.rows.map(r=>String(r.model||'').replace(/[\s-]/g,'').toUpperCase()).filter(Boolean));
   if(!calcKeys.size){ alert('행사 계산기에 모델이 없습니다. 먼저 모델을 추가하세요.'); return; }
   // 기존세팅값(상품관리대장) 시트 등재가 로드 보장
-  if(!_evSheetMap) await _evLoadSheetData();
+  if(!_evSheetMap) await _evLoadSheetData(true);
   if(!_evSheetMap){ alert('기존세팅값 시트를 불러오지 못했습니다.\n로컬 파일이면 실행.bat으로 localhost에서 열어주세요.'); return; }
   try{
     const buf=await file.arrayBuffer();
