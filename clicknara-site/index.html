@@ -2241,15 +2241,19 @@ function _evSheetCacheLoad(){
 async function _evLoadSheetData(force){
   if(_evSheetLoading) return;
   if(_evSheetFetched && !force) return;            // 이번 세션에 이미 네트워크 시도함
-  if(!_evSheetMap){ const cached=_evSheetCacheLoad(); if(cached){ _evSheetMap=cached; } }  // 캐시로 즉시 표시
+  if(!_evSheetMap){ const cached=_evSheetCacheLoad(); if(cached){ _evSheetMap=cached; renderEventCalc(); } }  // 캐시 있으면 즉시 표시
   if(typeof XLSX==='undefined') return;
   _evSheetLoading = true;
   try{
     const map = new Map();
     const num = v => { const n=Number(String(v==null?'':v).replace(/[^0-9.]/g,'')); return n||0; };
-    for(const gid of EV_SHEET_DATA_GIDS){
+    // 두 시트를 병렬로 가져오기 (순차 대기 제거)
+    const fetched = await Promise.all(EV_SHEET_DATA_GIDS.map(gid =>
+      _evFetchCsv(gid).then(txt=>({gid,txt})).catch(e=>{ console.warn('[ev-sheet] gid 로드 실패', gid, e); return {gid,txt:null}; })
+    ));
+    for(const {txt} of fetched){
+      if(!txt) continue;
       try{
-        const txt = await _evFetchCsv(gid);
         const wb = XLSX.read(txt, { type:'string' });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const aoa = XLSX.utils.sheet_to_json(ws, { header:1, raw:false, defval:'' });
@@ -2274,7 +2278,7 @@ async function _evLoadSheetData(force){
             imageUrl: imgCol>=0 ? String(row[imgCol]||'').trim() : '',
           });
         }
-      }catch(e){ console.warn('[ev-sheet] gid 로드 실패', gid, e); }
+      }catch(e){ console.warn('[ev-sheet] 파싱 실패', e); }
     }
     _evSheetFetched = true;
     if(map.size>0){
