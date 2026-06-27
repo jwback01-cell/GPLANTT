@@ -10363,15 +10363,15 @@ function confirmImpSnapshot() {
   const list = _impLoadSaved();
   list.unshift({ id: 'imps_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, savedAt: _impNowStamp(), rows });
   _impSaveSaved(list);
-  // 저장한 원본 행의 값(위안화·중판비용·관세·수량) 비우기 — 제품/코드/날짜·환율은 유지
+  // 저장한 원본 행의 값(중판코드·위안화·중판비용·관세·수량) 비우기 — 제품/코드/날짜·환율은 유지
   _impLoad();
   const idset = new Set(clearIds);
-  _impState.rows.forEach(r => { if (idset.has(r.id)) { r.cny = 0; r.fee = 0; r.tax = 0; r.qty = 0; } });
+  _impState.rows.forEach(r => { if (idset.has(r.id)) { r.vendorCode = ''; r.cny = 0; r.fee = 0; r.tax = 0; r.qty = 0; } });
   _impSave();
   _impSelected.clear();
   closeImpSaveModal();
   renderImpTab();
-  try { if (typeof showAppToast === 'function') showAppToast(`저장완료 — "${name}" (${rows.length}품목) · 입력값 초기화됨`); else alert(`✅ 저장완료 — "${name}" (${rows.length}품목)\n입력값(위안화·중판비용·관세·수량)이 초기화되었습니다.`); } catch (_) { alert(`✅ 저장완료 — "${name}"`); }
+  try { if (typeof showAppToast === 'function') showAppToast(`저장완료 — "${name}" (${rows.length}품목) · 입력값 초기화됨`); else alert(`✅ 저장완료 — "${name}" (${rows.length}품목)\n입력값(중판코드·위안화·중판비용·관세·수량)이 초기화되었습니다.`); } catch (_) { alert(`✅ 저장완료 — "${name}"`); }
 }
 function _impSavedTotals(rec) {
   let qty = 0, total = 0;
