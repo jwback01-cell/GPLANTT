@@ -5272,8 +5272,10 @@ function _gplanCloudPushKey(key) {
       const { data: { session } } = await _supabase.auth.getSession();
       if (!session) return;
       const raw = localStorage.getItem(key);
+      if (raw == null || raw === 'null' || raw === '') return;   // 빈/없는 값은 업로드 안 함(data not-null 위반 방지)
       let parsed = null;
-      if (raw != null) { try { parsed = JSON.parse(raw); } catch (_) { parsed = raw; } }
+      try { parsed = JSON.parse(raw); } catch (_) { parsed = raw; }
+      if (parsed == null) return;
       const { error } = await _supabase.from('gplan_kv').upsert(
         { key, data: parsed, updated_by: session.user.id },
         { onConflict: 'key' }
