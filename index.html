@@ -13677,7 +13677,7 @@ function _getProductRowsFromEntries(m, range) {
     const price = r['단가(vat포함)'] || 0;
     map[name].qty      += qty;
     map[name].sales    += qty * price;
-    map[name].purchase += (r['원가'] || 0) * qty;
+    map[name].purchase += (r['원가'] || 0);   // 원가는 이미 라인합계(단가×수량) — 수량 재곱 금지
     // 순이익 구성 항목 — 공급가 + 택배비 − 원가 − 택배비용 = 이익
     map[name].supply   += r['공급가'] || 0;
     map[name].ship     += r['택배비'] || 0;
@@ -13699,7 +13699,7 @@ function _getSupplierRowsFromEntries(m, range) {
     if (!map[name]) map[name] = { name, item: r['품목명'] || '', orders: 0, qty: 0, amount: 0, profit: 0 };
     map[name].orders += 1;
     map[name].qty    += r['수량'] || 0;
-    map[name].amount += (r['원가'] || 0) * (r['수량'] || 0);
+    map[name].amount += (r['원가'] || 0);   // 원가는 이미 라인합계(단가×수량) — 수량 재곱 금지
     map[name].profit += r['이익'] || 0;
   });
   return Object.values(map).sort((a, b) => b.amount - a.amount);
