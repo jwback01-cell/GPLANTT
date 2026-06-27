@@ -5263,6 +5263,25 @@ async function gplanCloudPullAll() {
     return pulled;
   } catch (e) { console.warn('[cloud-pull] failed', e); return 0; }
 }
+// 자동 저장 상태 표시 (좌하단 플로팅 칩) — 헤더가 페이지마다 중복이라 전역 1개로 표시
+function _gplanSetSyncStatus(state) {
+  try {
+    let el = document.getElementById('gplan-sync-status');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'gplan-sync-status';
+      el.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:9999;font-size:12px;font-weight:700;padding:7px 12px;border-radius:9999px;box-shadow:0 2px 10px rgba(0,0,0,.12);background:#fff;border:1px solid #eee;transition:opacity .35s;display:flex;align-items:center;gap:6px;pointer-events:none;';
+      document.body.appendChild(el);
+    }
+    const p = n => String(n).padStart(2, '0');
+    const t = new Date(); const hm = `${p(t.getHours())}:${p(t.getMinutes())}`;
+    clearTimeout(el._hideT);
+    el.style.opacity = '1';
+    if (state === 'saving') { el.style.color = '#2196F3'; el.textContent = '☁️ 클라우드 저장 중…'; }
+    else if (state === 'saved') { el.style.color = '#00A046'; el.textContent = '☁️ 클라우드 저장됨 ' + hm; el._hideT = setTimeout(() => { el.style.opacity = '0'; }, 2500); }
+    else if (state === 'error') { el.style.color = '#E91E63'; el.textContent = '⚠️ 저장 실패 — 로그인 확인'; el._hideT = setTimeout(() => { el.style.opacity = '0'; }, 4000); }
+  } catch (_) {}
+}
 function _gplanCloudPushKey(key) {
   if (!_gplanCloudReady) return;                          // PULL 끝나기 전엔 무시
   if (!GPLAN_SYNC_KEYS.includes(key)) return;
@@ -5276,12 +5295,14 @@ function _gplanCloudPushKey(key) {
       let parsed = null;
       try { parsed = JSON.parse(raw); } catch (_) { parsed = raw; }
       if (parsed == null) return;
+      _gplanSetSyncStatus('saving');
       const { error } = await _supabase.from('gplan_kv').upsert(
         { key, data: parsed, updated_by: session.user.id },
         { onConflict: 'key' }
       );
-      if (error) console.warn('[cloud-push] error', key, error);
-    } catch (e) { console.warn('[cloud-push] failed', key, e); }
+      if (error) { console.warn('[cloud-push] error', key, error); _gplanSetSyncStatus('error'); }
+      else { _gplanSetSyncStatus('saved'); }
+    } catch (e) { console.warn('[cloud-push] failed', key, e); _gplanSetSyncStatus('error'); }
   }, 1500);
 }
 // localStorage.setItem 후킹 — 동기화 키만 자동 PUSH
