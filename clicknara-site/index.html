@@ -2930,6 +2930,35 @@ const _cnSyncTimers = {};
 const _cnPendingPayloads = {};
 let _cnCloudPullDone = false;
 
+// 동기화 대상 판별 — 큐레이션 목록(CN_SYNC_KEYS) + 그 외 cn_/cp_ 접두사 키 모두 자동 동기화
+//  (백업 슬롯·재요청 가능한 캐시·인증토큰은 제외)
+function _cnSyncMatch(key) {
+  if (!key) return false;
+  if (/^sb-/.test(key)) return false;                 // Supabase 인증 토큰 제외
+  if (/__bak_/.test(key)) return false;               // 로컬 백업 슬롯 제외
+  if (key.indexOf('cn_ev_sheet_cache') === 0) return false;   // 기존세팅값 시트 캐시(재요청 가능) 제외
+  return /^(cn_|cp_)/.test(key) || CN_SYNC_KEYS.includes(key);
+}
+function _cnAllSyncKeys() {
+  const set = new Set(CN_SYNC_KEYS);
+  try { Object.keys(localStorage).forEach(k => { if (_cnSyncMatch(k)) set.add(k); }); } catch(_) {}
+  return [...set];
+}
+// 큐레이션 외 키(예: 행사 cn_events_v1)도 저장 시 자동 클라우드 push
+(function hookCnGenericSync() {
+  if (Storage.prototype._cnOrigSetItem) return;
+  Storage.prototype._cnOrigSetItem = Storage.prototype.setItem;
+  Storage.prototype.setItem = function (k, v) {
+    Storage.prototype._cnOrigSetItem.apply(this, arguments);
+    try {
+      if (this === localStorage && _cnSyncMatch(k) && !CN_SYNC_KEYS.includes(k)) {
+        let parsed = null; try { parsed = JSON.parse(v); } catch (_) { parsed = v; }
+        if (parsed != null) _cnQueueCloudPush(k, parsed);
+      }
+    } catch(_) {}
+  };
+})();
+
 // ── 로컬 백업 슬롯 (브라우저 안 별도 키로 보관) ──
 const CN_BACKUP_DAILY_SUFFIX = '__bak_daily';
 const CN_BACKUP_PRE_SUFFIX   = '__bak_pre';
@@ -3052,7 +3081,7 @@ async function cnInitialCloudSync() {
   if (_cnCloudPullDone) return;
   _cnCloudPullDone = true;
   let changed = false;
-  for (const key of CN_SYNC_KEYS) {
+  for (const key of _cnAllSyncKeys()) {
     let cloud = null;
     try { cloud = await _cnCloudPull(key); } catch(_) {}
 

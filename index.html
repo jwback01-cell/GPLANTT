@@ -5206,6 +5206,16 @@ const GPLAN_SYNC_KEYS = [
   'gplan_import_v1',                // 수입관리 (중국 1688 위안화 단가표)
   'gplan_import_saved_v1',          // 수입 저장내역 (단가표 스냅샷)
 ];
+// 동기화 대상 판별 — 목록(allowlist)에 없어도 앱 접두사를 가진 키는 모두 자동 동기화
+//  → 새 메뉴/기능이 추가돼도 키만 gplan_/kw_/src_ 로 시작하면 자동 백업됨
+function _gplanSyncMatch(key) {
+  if (!key) return false;
+  if (/^sb-/.test(key)) return false;                 // Supabase 인증 토큰 제외
+  if (/^__/.test(key)) return false;                  // 내부 플래그/지문 제외
+  if (key === 'ih_supabase_url' || key === 'ih_supabase_key') return false;
+  return /^(gplan_|kw_|src_)/.test(key) || GPLAN_SYNC_KEYS.includes(key);
+}
+function _gplanAllSyncKeys() { try { return Object.keys(localStorage).filter(_gplanSyncMatch); } catch (_) { return GPLAN_SYNC_KEYS.slice(); } }
 let _gplanCloudReady = false;     // PULL 완료 전에는 PUSH 금지(다른 PC 데이터 덮어쓰기 방지)
 const _gplanPushTimers = {};
 async function gplanCloudPullAll() {
@@ -5224,7 +5234,7 @@ async function gplanCloudPullAll() {
     let pulled = 0;
     const pulledKeys = new Set();
     for (const row of (data || [])) {
-      if (!GPLAN_SYNC_KEYS.includes(row.key)) continue;
+      if (!_gplanSyncMatch(row.key)) continue;
       if (row.data == null) continue;
       pulledKeys.add(row.key);
       try {
@@ -5237,7 +5247,7 @@ async function gplanCloudPullAll() {
     _gplanCloudReady = true;
     console.log('[cloud-sync] pulled', pulled, 'keys');
     // PULL 후 — 클라우드에 없지만 로컬에는 있는 키는 첫 PUSH 트리거 (예: 동기화 키가 새로 추가된 경우)
-    for (const key of GPLAN_SYNC_KEYS) {
+    for (const key of _gplanAllSyncKeys()) {
       if (pulledKeys.has(key)) continue;
       const localRaw = localStorage.getItem(key);
       if (localRaw == null) continue;
@@ -5284,7 +5294,7 @@ function _gplanSetSyncStatus(state) {
 }
 function _gplanCloudPushKey(key) {
   if (!_gplanCloudReady) return;                          // PULL 끝나기 전엔 무시
-  if (!GPLAN_SYNC_KEYS.includes(key)) return;
+  if (!_gplanSyncMatch(key)) return;
   clearTimeout(_gplanPushTimers[key]);
   _gplanPushTimers[key] = setTimeout(async () => {
     try {
@@ -5324,11 +5334,12 @@ async function gplanCloudPushAll() {
   const { data: { session } } = await _supabase.auth.getSession();
   if (!session) { window.showAppAlert ? showAppAlert('알림','로그인이 필요합니다.') : alert('로그인이 필요합니다.'); return 0; }
   const rows = [];
-  for (const key of GPLAN_SYNC_KEYS) {
+  for (const key of _gplanAllSyncKeys()) {
     const raw = localStorage.getItem(key);
-    if (raw == null) continue;
+    if (raw == null || raw === 'null' || raw === '') continue;
     let parsed = null;
     try { parsed = JSON.parse(raw); } catch (_) { parsed = raw; }
+    if (parsed == null) continue;
     rows.push({ key, data: parsed, updated_by: session.user.id });
   }
   if (!rows.length) return 0;
@@ -5342,7 +5353,7 @@ async function gplanCloudPushAll() {
 // 로컬 백업 파일(JSON) 다운로드
 function gplanLocalBackupDownload() {
   const dump = {};
-  for (const key of GPLAN_SYNC_KEYS) {
+  for (const key of _gplanAllSyncKeys()) {
     const v = localStorage.getItem(key);
     if (v != null) dump[key] = v;
   }
@@ -5366,7 +5377,7 @@ async function gplanLocalBackupRestore(file) {
     }
     let n = 0;
     for (const [k, v] of Object.entries(json.data)) {
-      if (!GPLAN_SYNC_KEYS.includes(k)) continue;
+      if (!_gplanSyncMatch(k)) continue;
       if (typeof v !== 'string') continue;
       // 후킹 우회 (디바운스 PUSH 대신 아래에서 일괄 PUSH)
       Storage.prototype._origSetItem.call(localStorage, k, v);
