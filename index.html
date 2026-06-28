@@ -1855,6 +1855,10 @@ tailwind.config = {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             엑셀 내보내기
           </button>
+          <button onclick="exportProductsFormExcel()" title="상품코드/폴더코드/상품명/기준판매가/공급단가/배송비/비고 양식으로 내보내기" class="px-4 py-2.5 rounded-full bg-white border border-brand-border text-sm font-semibold hover:bg-brand-bg flex items-center gap-2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            양식 다운로드
+          </button>
           <button onclick="dedupProducts()" title="같은 SKU가 여러 번 등록된 행을 정리합니다 (백업 자동 다운로드 후 가장 오래된 것 1건만 유지)" class="px-4 py-2.5 rounded-full bg-white border border-brand-border text-sm font-semibold hover:bg-brand-bg flex items-center gap-2">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
             중복 정리
@@ -3208,6 +3212,13 @@ tailwind.config = {
           <label class="text-sm font-bold">공급가 <span class="text-brand-gray font-medium">(개당, 원)</span></label>
           <div class="relative">
             <input id="new-product-supply" type="number" min="0" step="1" value="0" class="drawer-input pr-10">
+            <span class="absolute right-4 top-1/2 -translate-y-1/2 text-brand-gray text-sm font-bold pointer-events-none">원</span>
+          </div>
+        </div>
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-bold">기준판매가 <span class="text-brand-gray font-medium">(개당, 원)</span></label>
+          <div class="relative">
+            <input id="new-product-saleprice" type="number" min="0" step="1" value="0" class="drawer-input pr-10">
             <span class="absolute right-4 top-1/2 -translate-y-1/2 text-brand-gray text-sm font-bold pointer-events-none">원</span>
           </div>
         </div>
@@ -7321,7 +7332,7 @@ function renderProductsPage() {
       '<div class="flex items-center gap-3 md:gap-4 cursor-pointer rounded-xl -mx-1 px-1 py-1 hover:bg-brand-bg transition-colors" onclick="openEditProduct(' + p.id + ')" title="클릭하여 수정">' +
         '<div class="w-12 md:w-14 h-12 md:h-14 rounded-xl ' + bg + ' ' + fg + ' flex items-center justify-center font-bold shrink-0">' + escHtml(initials) + '</div>' +
         '<div><div class="font-bold text-sm mb-0.5">' + escHtml(p.name) + linkBadge + '</div>' +
-        '<div class="text-brand-gray text-xs font-medium">SKU: <span class="cursor-pointer hover:text-brand-blue hover:underline transition-colors font-semibold" data-sku="' + escHtml(p.sku||'') + '" onclick="event.stopPropagation(); copySkuToClipboard(this.dataset.sku, this)" title="클릭하여 SKU 복사">' + escHtml(p.sku||'') + '</span> | ' + escHtml(p.category||'') + (p.folder_code ? ' | 📁 ' + escHtml(p.folder_code) : '') + (p.cost ? ' | 원가 ' + Number(p.cost).toLocaleString('ko-KR') + '원' : '') + (p.supply_price ? ' | 공급가 ' + Number(p.supply_price).toLocaleString('ko-KR') + '원' : '') + (p.shipping_fee ? ' | 택배비 ' + Number(p.shipping_fee).toLocaleString('ko-KR') + '원' : '') + (p.shipping_cost ? ' | 택배비용 ' + Number(p.shipping_cost).toLocaleString('ko-KR') + '원' : '') + (p.created_at ? ' | 등록 ' + String(p.created_at).slice(0, 10) : '') + '</div></div>' +
+        '<div class="text-brand-gray text-xs font-medium">SKU: <span class="cursor-pointer hover:text-brand-blue hover:underline transition-colors font-semibold" data-sku="' + escHtml(p.sku||'') + '" onclick="event.stopPropagation(); copySkuToClipboard(this.dataset.sku, this)" title="클릭하여 SKU 복사">' + escHtml(p.sku||'') + '</span> | ' + escHtml(p.category||'') + (p.folder_code ? ' | 📁 ' + escHtml(p.folder_code) : '') + (p.cost ? ' | 원가 ' + Number(p.cost).toLocaleString('ko-KR') + '원' : '') + (p.supply_price ? ' | 공급가 ' + Number(p.supply_price).toLocaleString('ko-KR') + '원' : '') + (p.sale_price ? ' | 기준판매가 ' + Number(p.sale_price).toLocaleString('ko-KR') + '원' : '') + (p.shipping_fee ? ' | 택배비 ' + Number(p.shipping_fee).toLocaleString('ko-KR') + '원' : '') + (p.shipping_cost ? ' | 택배비용 ' + Number(p.shipping_cost).toLocaleString('ko-KR') + '원' : '') + (p.created_at ? ' | 등록 ' + String(p.created_at).slice(0, 10) : '') + '</div></div>' +
       '</div>' +
       '<div class="text-right"><input type="number" value="' + p.stock + '" class="' + stockClass + '"></div>' +
       '<div class="text-right">' +
@@ -7884,6 +7895,7 @@ function processExcelFile(file) {
         safety:  findColIdx(header, ['안전 재고', '안전재고']),
         cost:    findColIdx(header, ['원가', 'cost']),
         supply:  findColIdx(header, ['공급가', 'supply_price', '공급단가']),
+        salePrice: findColIdx(header, ['기준판매가', '기준 판매가', '판매가', 'sale_price']),
         shipFee: findColIdx(header, ['택배비', '배송비', 'shipping_fee']),
         shipCost: findColIdx(header, ['택배비용', '택배 비용', 'shipping_cost', '배송비용']),
         folderCode: findColIdx(header, ['폴더코드', '폴더 코드', 'folder_code', '폴더']),
@@ -7918,6 +7930,7 @@ function processExcelFile(file) {
           safety:   idx.safety   !== -1 ? _num(row[idx.safety])   : undefined,
           cost:     idx.cost     !== -1 ? _num(row[idx.cost])     : undefined,
           supply:   idx.supply   !== -1 ? _num(row[idx.supply])   : undefined,
+          salePrice: idx.salePrice !== -1 ? _num(row[idx.salePrice]) : undefined,
           shipFee:  idx.shipFee  !== -1 ? _num(row[idx.shipFee])  : undefined,
           shipCost: idx.shipCost !== -1 ? _num(row[idx.shipCost]) : undefined,
           folderCode: idx.folderCode !== -1 ? _txt(row[idx.folderCode]) : undefined,
@@ -8041,6 +8054,7 @@ async function confirmImport() {
       if (r.safety    !== undefined) patch.safety_stock = r.safety;
       if (r.cost      !== undefined) patch.cost = r.cost;
       if (r.supply    !== undefined) patch.supply_price = r.supply;
+      if (r.salePrice !== undefined) patch.sale_price = r.salePrice;
       if (r.shipFee   !== undefined) patch.shipping_fee = r.shipFee;
       if (r.shipCost  !== undefined) patch.shipping_cost = r.shipCost;
       if (r.folderCode !== undefined) patch.folder_code = r.folderCode;
@@ -8063,6 +8077,7 @@ async function confirmImport() {
         safety_stock: r.safety ?? 0,
         cost: r.cost ?? 0,
         supply_price: r.supply ?? 0,
+        sale_price: r.salePrice ?? 0,
         shipping_fee: r.shipFee ?? 0,
         shipping_cost: r.shipCost ?? 0,
         folder_code: r.folderCode || ''
@@ -8076,6 +8091,7 @@ async function confirmImport() {
     const cols = [];
     if (m.includes("'cost'") || (m.includes('cost') && m.includes('column'))) cols.push('cost');
     if (m.includes("'supply_price'") || (m.includes('supply_price') && m.includes('column'))) cols.push('supply_price');
+    if (m.includes("'sale_price'") || (m.includes('sale_price') && m.includes('column'))) cols.push('sale_price');
     if (m.includes("'shipping_fee'") || (m.includes('shipping_fee') && m.includes('column'))) cols.push('shipping_fee');
     if (m.includes("'shipping_cost'") || (m.includes('shipping_cost') && m.includes('column'))) cols.push('shipping_cost');
     if (m.includes("'folder_code'") || (m.includes('folder_code') && m.includes('column'))) cols.push('folder_code');
@@ -9023,6 +9039,7 @@ function openEditProduct(id) {
   document.getElementById('new-product-safety').value = p.safety_stock;
   document.getElementById('new-product-cost').value = p.cost ?? 0;
   document.getElementById('new-product-supply').value = p.supply_price ?? 0;
+  { const _sp = document.getElementById('new-product-saleprice'); if (_sp) _sp.value = p.sale_price ?? 0; }
   document.getElementById('new-product-ship-fee').value = p.shipping_fee ?? 0;
   document.getElementById('new-product-ship-cost').value = p.shipping_cost ?? 0;
   const _fcEl = document.getElementById('new-product-folder-code');
@@ -9638,6 +9655,7 @@ function openAddProductDrawer() {
   document.getElementById('new-product-safety').value = '0';
   document.getElementById('new-product-cost').value = '0';
   document.getElementById('new-product-supply').value = '0';
+  { const _sp = document.getElementById('new-product-saleprice'); if (_sp) _sp.value = '0'; }
   document.getElementById('new-product-ship-fee').value = '0';
   document.getElementById('new-product-ship-cost').value = '0';
   const _fcEl2 = document.getElementById('new-product-folder-code');
@@ -9678,6 +9696,7 @@ async function submitAddProduct() {
   const safety   = parseInt(document.getElementById('new-product-safety').value) || 0;
   const cost     = parseInt(document.getElementById('new-product-cost').value) || 0;
   const supply   = parseInt(document.getElementById('new-product-supply').value) || 0;
+  const salePrice = parseInt(document.getElementById('new-product-saleprice')?.value) || 0;
   const shipFee  = parseInt(document.getElementById('new-product-ship-fee').value) || 0;
   const shipCost = parseInt(document.getElementById('new-product-ship-cost').value) || 0;
   const folderCode = String(document.getElementById('new-product-folder-code')?.value || '').trim();
@@ -9713,6 +9732,7 @@ async function submitAddProduct() {
     const cols = [];
     if (m.includes("'cost'") || (m.includes('cost') && m.includes('column'))) cols.push('cost');
     if (m.includes("'supply_price'") || (m.includes('supply_price') && m.includes('column')) || (m.includes('supply') && m.includes('column'))) cols.push('supply_price');
+    if (m.includes("'sale_price'") || (m.includes('sale_price') && m.includes('column'))) cols.push('sale_price');
     if (m.includes("'shipping_fee'") || (m.includes('shipping_fee') && m.includes('column'))) cols.push('shipping_fee');
     if (m.includes("'shipping_cost'") || (m.includes('shipping_cost') && m.includes('column'))) cols.push('shipping_cost');
     if (m.includes("'folder_code'") || (m.includes('folder_code') && m.includes('column'))) cols.push('folder_code');
@@ -9747,7 +9767,7 @@ async function submitAddProduct() {
     return prev ? Number(prev.stock || 0) : 0;
   })() : 0;
   try {
-    const fullBase = { name, sku, category: cat, stock, safety_stock: safety, cost, supply_price: supply, shipping_fee: shipFee, shipping_cost: shipCost, folder_code: folderCode };
+    const fullBase = { name, sku, category: cat, stock, safety_stock: safety, cost, supply_price: supply, sale_price: salePrice, shipping_fee: shipFee, shipping_cost: shipCost, folder_code: folderCode };
     const full = isEditing ? fullBase : { user_id: session.user.id, ...fullBase };
     const error = await tryWrite(full);
     if (error) { showErr((isEditing ? '수정 실패: ' : '상품 추가 실패: ') + error.message + (error.details ? ` (${error.details})` : '')); return; }
@@ -9875,6 +9895,40 @@ function exportProductsExcel() {
   const today = new Date();
   const dateStr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
   XLSX.writeFile(wb, `GPLAN_상품목록_${dateStr}.xlsx`);
+}
+
+// 양식 다운로드 — 상품코드/폴더코드/상품명/기준판매가/공급단가/배송비/비고
+function exportProductsFormExcel() {
+  const all = (typeof _allProducts !== 'undefined' ? _allProducts : []).slice();
+  if (!all.length) { showAppAlert('내보낼 상품이 없어요', '먼저 상품을 등록해주세요.', { type: 'info' }); return; }
+  // 체크된 행이 있으면 그 행만, 없으면 전체
+  const checkedIds = new Set([...document.querySelectorAll('#product-list-body .product-row-cb:checked')].map(cb => Number(cb.dataset.productId)));
+  const list = checkedIds.size ? all.filter(p => checkedIds.has(p.id)) : all;
+  const headers = ['상품코드', '폴더코드', '상품명', '기준판매가', '공급단가', '배송비', '비고'];
+  const data = [headers];
+  list.forEach(p => {
+    data.push([
+      p.sku || '',
+      p.folder_code || '',
+      p.name || '',
+      Number(p.sale_price || 0),
+      Number(p.supply_price || 0),
+      Number(p.shipping_fee || 0),
+      p.note || ''
+    ]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const cell = ws[XLSX.utils.encode_cell({ r: 0, c })];
+    if (cell) cell.s = { font: { bold: true }, fill: { fgColor: { rgb: 'F2F2F7' } } };
+  }
+  ws['!cols'] = [{ wch: 12 }, { wch: 10 }, { wch: 40 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 16 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '상품 양식');
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+  XLSX.writeFile(wb, `GPLAN_상품양식_${dateStr}.xlsx`);
 }
 
 // 선택한 상품만 엑셀로 내보내기 (체크된 행만)
