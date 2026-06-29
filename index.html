@@ -24082,8 +24082,18 @@ function openEditUploadDataRow(idx) {
           <label style="${labelCss}">품목명</label>
           <input type="text" id="eur-itemName" value="${_escapeHtml(r.itemName || '')}" style="${inputCss}">
         </div>
-        ${numFld('수량', 'eur-qty', r.qty)}
-        ${numFld('단가(VAT포함)', 'eur-price', r.price)}
+        <div>
+          <label style="${labelCss}">수량</label>
+          <input type="number" id="eur-qty" value="${r.qty == null || r.qty === '' ? '' : Number(r.qty)}" style="${numInputCss}" oninput="_eurSyncSales('qty')">
+        </div>
+        <div>
+          <label style="${labelCss}">단가(VAT포함)</label>
+          <input type="number" id="eur-price" value="${r.price == null || r.price === '' ? '' : Number(r.price)}" style="${numInputCss}" oninput="_eurSyncSales('price')">
+        </div>
+        <div>
+          <label style="${labelCss}">매출(수량×단가)</label>
+          <input type="number" id="eur-sales" value="${(Number(r.qty) || 0) * (Number(r.price) || 0)}" style="${numInputCss}" oninput="_eurSyncSales('sales')">
+        </div>
         ${numFld('공급가', 'eur-supply', r.supply)}
         ${numFld('택배비', 'eur-ship', r.ship)}
         ${numFld('택배비용', 'eur-shipCost', r.shipCost)}
@@ -24114,6 +24124,19 @@ function openEditUploadDataRow(idx) {
   });
 }
 
+// 행 수정 모달 — 수량/단가 ↔ 매출(수량×단가) 자동 연동
+function _eurSyncSales(src) {
+  const q = parseFloat(document.getElementById('eur-qty')?.value) || 0;
+  const p = parseFloat(document.getElementById('eur-price')?.value) || 0;
+  const sEl = document.getElementById('eur-sales');
+  const pEl = document.getElementById('eur-price');
+  if (src === 'sales') {
+    const s = parseFloat(sEl?.value) || 0;
+    if (q > 0 && pEl) pEl.value = +(s / q).toFixed(2);   // 매출 입력 → 단가 역산
+  } else {
+    if (sEl) sEl.value = q * p;                          // 수량/단가 입력 → 매출 갱신
+  }
+}
 function saveEditedUploadDataRow(idx) {
   const data = _loadUploadData();
   const r = data[idx];
@@ -24145,7 +24168,10 @@ function saveEditedUploadDataRow(idx) {
   r.address    = v('eur-address');
   // 숫자 필드 (cost 만 null 허용)
   const qty      = n('eur-qty');      r.qty      = qty == null ? 0 : qty;
-  const price    = n('eur-price');    r.price    = price == null ? 0 : price;
+  const priceIn  = n('eur-price');
+  const salesIn  = n('eur-sales');    // 매출(수량×단가) — 입력 시 단가 역산 기준
+  // 매출이 입력돼 있으면 그 값을 기준으로 단가 결정(매출 = 수량×단가). 없으면 단가 그대로.
+  r.price = (salesIn != null) ? (r.qty > 0 ? salesIn / r.qty : salesIn) : (priceIn == null ? 0 : priceIn);
   const supply   = n('eur-supply');   r.supply   = supply == null ? 0 : supply;
   const ship     = n('eur-ship');     r.ship     = ship == null ? 0 : ship;
   const shipCost = n('eur-shipCost'); r.shipCost = shipCost == null ? 0 : shipCost;
