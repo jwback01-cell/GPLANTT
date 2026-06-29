@@ -19560,9 +19560,11 @@ function _extRowToPaOrder(r, shop, defaults, idx) {
     console.log(`[PA 공급가] "${r.itemName}" | 엑셀=${excelSupply ?? '없음'} / 매핑=${mapping ? (mapping.supply_price ?? '없음') : '매핑없음'} / 상품DB=${mappedProd ? (mappedProd.supply_price ?? '없음') : '상품없음'} / 최종전송=${finalSupply ?? 'null'}`);
   }
 
+  // 매출(판매가) — 매칭된 공급가가 있으면 그 값으로, 없으면 다이얼로그 기본값
+  const saleUnit = (finalSupply != null) ? finalSupply : Number(d.sale_price || 0);
   const opt = {
     opt_name   : '',
-    sale_price : Number(d.sale_price || 0),
+    sale_price : saleUnit,
     sale_cnt   : qty,
   };
   if (mappedSku && !skipSku) opt.sku_cd = mappedSku;
@@ -19585,7 +19587,8 @@ function _extRowToPaOrder(r, shop, defaults, idx) {
     shop_sale_name: itemSan,
     ship_method   : d.ship_method || '선결제',
     ship_cost     : Number(d.ship_cost || 0),
-    pay_amt       : Number(d.pay_amt || 0),
+    // 매출(결제금액) — 매칭된 공급가가 있으면 공급가×수량, 없으면 다이얼로그 기본값
+    pay_amt       : (finalSupply != null) ? (saleUnit * qty) : Number(d.pay_amt || 0),
     ship_msg      : r.msg      || '',
     c_sale_cd     : '',
     opts: [opt],
@@ -19719,7 +19722,8 @@ function openPaUploadDialog() {
           <ul class="list-disc pl-5 space-y-0.5 text-brand-gray">
             <li><b>custom_shop_cd + custom_shop_id</b>는 쌍으로 필수 — 쇼핑몰 선택 시 둘 다 자동 입력됩니다.</li>
             <li><b>ship_method</b>는 정해진 값(무료배송/선결제/착불/방문수령/퀵배송/일반우편/설치배송/조건부배송/기타)만 허용됩니다.</li>
-            <li><b>ship_cost · pay_amt · opts.sale_price</b>는 Number 필수 — 위에서 기본값을 설정하세요 (0 가능).</li>
+            <li><b>ship_cost</b>는 Number 필수 — 위에서 기본값을 설정하세요 (0 가능).</li>
+            <li><b>pay_amt · opts.sale_price (매출)</b>는 매칭된 공급가가 있으면 <b>공급가</b>로 자동 설정됩니다(sale_price=공급가, pay_amt=공급가×수량). 공급가 매칭이 없는 행만 위 기본값을 사용합니다.</li>
             <li><b>상품 매핑</b>이 있으면 <code>opts.sku_cd</code>가 자동 입력됩니다. <b>공급가</b>는 (1) 엑셀의 공급가 열이 있으면 그 값 → (2) 매핑 행의 공급가 → (3) 연결된 상품관리 상품의 공급가 순으로 <code>opts.shop_supply_price</code>에 실려 나갑니다.</li>
             <li><b>shop_ord_no</b>는 엑셀의 "출고번호"가 비어 있으면 클라이언트에서 고유값이 자동 생성됩니다.</li>
           </ul>
