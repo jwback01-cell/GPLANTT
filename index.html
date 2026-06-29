@@ -25538,8 +25538,10 @@ function _doConvertSelectedToReturn(targetRows, reason, kind) {
   data.push(...newRows);
   _saveUploadData(data);
 
-  // 화면 갱신 + 매출장부 동기화
-  if (typeof renderUploadData === 'function') renderUploadData();
+  // 처리 결과를 '업로드 데이터' 소메뉴에서 바로 보여주기 — 해당 탭으로 이동(렌더 포함)
+  _uploadDataPage = 1;   // 새 행이 보이도록 첫 페이지로
+  if (typeof switchUploadTab === 'function') switchUploadTab('data');
+  else if (typeof renderUploadData === 'function') renderUploadData();
   if (typeof syncLedgerFromUploadData === 'function') syncLedgerFromUploadData();
 
   // 체크박스 해제
