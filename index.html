@@ -13815,6 +13815,75 @@ function _getChannelRowsFromEntries(m, range) {
   })).sort((a, b) => b.sales - a.sales);
 }
 
+// ── 매출 장부 집계 행 → 원본 데이터 수정 연결 ──
+//   집계값(상품별/매입처별/판매처별 합계)은 여러 원본 행의 합이라 직접 수정하면 왜곡됨.
+//   그래서 행 클릭 시 해당 그룹의 '원본 업로드 데이터 행'을 (1건이면 바로, 여러 건이면 선택) 수정.
+function editLedgerGroupFromRow(tr, kind) {
+  const name = tr.getAttribute('data-agg-name') || '';
+  editLedgerGroup(kind, name);
+}
+function editLedgerGroup(kind, name) {
+  const data = (typeof _loadUploadData === 'function') ? _loadUploadData() : [];
+  const field = kind === 'supplier' ? 'vendor' : (kind === 'channel' ? 'site' : 'itemName');
+  const target = String(name == null ? '' : name).trim();
+  const idxs = [];
+  data.forEach((r, i) => { if (String(r[field] || '').trim() === target) idxs.push(i); });
+  if (!idxs.length) {
+    showAppAlert('수정할 원본이 없음', '이 항목의 원본 업로드 데이터를 찾지 못했습니다.\n(일부 집계 행은 "장부 업로드 → 업로드 데이터"에서 직접 수정하세요)', 'error');
+    return;
+  }
+  if (idxs.length === 1) { openEditUploadDataRow(idxs[0]); return; }
+  _openLedgerEntryPicker(kind, target, idxs, data);
+}
+function _openLedgerEntryPicker(kind, name, idxs, data) {
+  const prev = document.getElementById('ledger-entry-picker'); if (prev) prev.remove();
+  const fmt = v => Number(v || 0).toLocaleString('ko-KR');
+  const m = document.createElement('div');
+  m.id = 'ledger-entry-picker';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px;';
+  const rowsHtml = idxs.map(i => { const r = data[i]; return `
+    <tr class="border-t border-brand-border hover:bg-brand-bg/50">
+      <td style="padding:8px 10px;white-space:nowrap;">${escHtml(r.date || '')}</td>
+      <td style="padding:8px 10px;">${escHtml(r.itemName || '')}</td>
+      <td style="padding:8px 10px;text-align:right;">${fmt(r.qty)}</td>
+      <td style="padding:8px 10px;text-align:right;">${fmt(r.price)}</td>
+      <td style="padding:8px 10px;text-align:right;">${r.profit == null ? '-' : fmt(r.profit)}</td>
+      <td style="padding:8px 10px;text-align:center;"><button onclick="document.getElementById('ledger-entry-picker').remove();openEditUploadDataRow(${i})" style="padding:5px 14px;border-radius:16px;border:none;background:#000;color:#fff;font-size:12px;font-weight:bold;cursor:pointer;">✏️ 수정</button></td>
+    </tr>`; }).join('');
+  m.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:780px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+    <div style="padding:16px 22px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+      <div><div style="font-weight:bold;font-size:16px;">${escHtml(name)} — 원본 ${idxs.length}건</div>
+      <div style="color:#888;font-size:12px;margin-top:4px;">집계값은 여러 건의 합이라, 수정할 개별 행을 선택하세요.</div></div>
+      <button onclick="document.getElementById('ledger-entry-picker').remove()" style="border:none;background:none;font-size:24px;line-height:1;cursor:pointer;color:#888;">×</button>
+    </div>
+    <div style="overflow:auto;flex:1;padding:8px 14px 16px;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="text-align:left;color:#666;font-size:11px;font-weight:bold;">
+          <th style="padding:8px 10px;">날짜</th><th style="padding:8px 10px;">품목명</th>
+          <th style="padding:8px 10px;text-align:right;">수량</th><th style="padding:8px 10px;text-align:right;">단가</th>
+          <th style="padding:8px 10px;text-align:right;">이익</th><th style="padding:8px 10px;text-align:center;">수정</th>
+        </tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+  m.addEventListener('click', e => { if (e.target === m) m.remove(); });
+}
+// 원본 행 수정 저장 후 현재 보고 있는 매출 장부 탭을 다시 렌더
+function _refreshActiveLedgerTab() {
+  const active = document.querySelector('#ledger-tabs .tab-btn.active');
+  const tab = active ? active.dataset.tab : null;
+  if (!tab) return;
+  try {
+    if (tab === 'product')       renderProductTab(_detailPeriod.product);
+    else if (tab === 'supplier') renderSupplierTab(_detailPeriod.supplier);
+    else if (tab === 'channel')  renderChannelTab(_detailPeriod.channel);
+    else if (tab === 'daily' && typeof renderDailyTab === 'function')       renderDailyTab();
+    else if (tab === 'period' && typeof renderPeriodChart === 'function')    renderPeriodChart();
+    else if (tab === 'analysis' && typeof renderAnalysisTab === 'function')  renderAnalysisTab(_detailPeriod.analysis);
+  } catch (_) {}
+}
 function renderProductTab(m, rangeOrIdxs) {
   // 두 번째 인자가 {start,end} 객체면 직접 선택 모드, 배열이면 구버전 idxs (사용 안 함)
   const range = (rangeOrIdxs && typeof rangeOrIdxs === 'object' && !Array.isArray(rangeOrIdxs))
@@ -13900,9 +13969,9 @@ function renderProductTab(m, rangeOrIdxs) {
     const real = (r.profit || 0) - ad;
     const realCls = real >= 0 ? 'text-brand-green' : 'text-brand-pink';
     const realRate = r.sales > 0 ? (real / r.sales * 100).toFixed(1) : '0.0';
-    return `<tr class="border-t border-brand-border hover:bg-brand-bg/50 transition-colors" data-product-name="${escHtml(r.name)}">
+    return `<tr class="border-t border-brand-border hover:bg-brand-blue-light/20 transition-colors cursor-pointer" data-product-name="${escHtml(r.name)}" data-agg-name="${escHtml(r.name)}" onclick="editLedgerGroupFromRow(this,'product')" title="클릭하면 이 상품의 원본 데이터를 수정합니다">
       <td class="px-6 py-4"><span class="w-6 h-6 rounded-full ${i===0?'bg-brand-black text-white':'bg-brand-gray/20 text-brand-gray'} text-xs font-bold inline-flex items-center justify-center">${i+1}</span></td>
-      <td class="px-4 py-4 font-semibold">${escHtml(r.name)}</td>
+      <td class="px-4 py-4 font-semibold"><span class="mr-1 opacity-60">✏️</span>${escHtml(r.name)}</td>
       <td class="px-4 py-4 text-right text-brand-gray">${_fmtW(r.qty)}</td>
       <td class="px-4 py-4 text-right font-bold">${_fmtW(r.sales)}</td>
       <td class="px-4 py-4 text-right text-brand-gray">${_fmtW(r.supply || 0)}</td>
@@ -13992,8 +14061,8 @@ function renderSupplierTab(m, rangeOrIdxs) {
   document.getElementById('supplier-tbody').innerHTML = rows.map(r => {
     const pct = totalAmount > 0 ? (r.amount / totalAmount * 100).toFixed(1) : '0.0';
     const badgeCls = parseFloat(pct) >= 20 ? 'bg-brand-blue/10 text-brand-blue' : 'bg-brand-gray/10 text-brand-gray';
-    return `<tr class="border-t border-brand-border hover:bg-brand-bg/50 transition-colors">
-      <td class="px-6 py-4 font-bold">${escHtml(r.name)}</td>
+    return `<tr class="border-t border-brand-border hover:bg-brand-blue-light/20 transition-colors cursor-pointer" data-agg-name="${escHtml(r.name)}" onclick="editLedgerGroupFromRow(this,'supplier')" title="클릭하면 이 매입처의 원본 데이터를 수정합니다">
+      <td class="px-6 py-4 font-bold"><span class="mr-1 opacity-60">✏️</span>${escHtml(r.name)}</td>
       <td class="px-4 py-4 text-brand-gray">${r.item}</td>
       <td class="px-4 py-4 text-right">${_fmtW(r.orders)}</td>
       <td class="px-4 py-4 text-right">${_fmtW(r.qty)}</td>
@@ -14065,8 +14134,8 @@ function renderChannelTab(m, rangeOrIdxs) {
     const ad = Number(r.adCost || 0);
     const real = (r.profit || 0) - ad;
     const realCls = real >= 0 ? 'text-brand-green' : 'text-brand-pink';
-    return `<tr class="border-t border-brand-border hover:bg-brand-bg/50 transition-colors">
-      <td class="px-6 py-4 font-bold">${escHtml(r.name)}</td>
+    return `<tr class="border-t border-brand-border hover:bg-brand-blue-light/20 transition-colors cursor-pointer" data-agg-name="${escHtml(r.name)}" onclick="editLedgerGroupFromRow(this,'channel')" title="클릭하면 이 판매처의 원본 데이터를 수정합니다">
+      <td class="px-6 py-4 font-bold"><span class="mr-1 opacity-60">✏️</span>${escHtml(r.name)}</td>
       <td class="px-4 py-4 text-right">${_fmtW(r.orders)}</td>
       <td class="px-4 py-4 text-right font-bold">${_fmtW(r.sales)}</td>
       <td class="px-4 py-4 text-right text-brand-pink">${_fmtW(r.fee)}</td>
@@ -24089,6 +24158,8 @@ function saveEditedUploadDataRow(idx) {
   document.getElementById('edit-upload-row-modal').remove();
   showAppAlert('저장 완료', '행이 수정되었습니다.', 'success');
   if (typeof renderUploadData === 'function') renderUploadData();
+  // 매출 장부(집계 탭)에서 수정한 경우 — 원본 재동기화 후 현재 탭 다시 렌더
+  try { if (typeof syncLedgerFromUploadData === 'function') { syncLedgerFromUploadData(); _refreshActiveLedgerTab(); } } catch (_) {}
 }
 
 // ──────────────────────────────────────────────────────────
