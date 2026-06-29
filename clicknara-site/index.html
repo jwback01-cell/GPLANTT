@@ -2101,6 +2101,8 @@ const EV_KEY = 'cn_events_v1';
 function _evDefaultRates() { return { md: 3, sel: 14, card: 5, cat: 7, cpnFee: 20, seller: 50 }; }
 function _evUid() { return 'ev_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 const EV_SITES = ['11번가', '이베이', '롯데온', '쿠팡', '스마트스토어', '알리익스프레스', '에스에스지', '오늘의집'];
+// 행사 양식 — 사이트별 '기본이미지' 가져올 기존세팅값 시트의 열(컬럼 문자). 미설정 사이트는 일반 이미지 열로 폴백.
+const EV_FORM_IMG_COL = { '쿠팡': 'BE' };
 function _evLoad() {
   let o = null;
   try { o = JSON.parse(localStorage.getItem(EV_KEY) || 'null'); } catch (_) {}
@@ -2220,6 +2222,13 @@ function _evSheetListing(model, site){
   // 모든 행사 소메뉴는 쿠팡 기준으로 동일 — 지도가 사용 (기존세팅값 시트 메뉴만 별도)
   return rec.jido || null;
 }
+// 행사 양식용 — 사이트 이름에 맞는 기본이미지(미설정 사이트는 일반 이미지 열로 폴백)
+function _evSheetSiteImage(model, site){
+  if(!_evSheetMap) return '';
+  const rec=_evSheetMap.get(_evNormCode(model)); if(!rec) return '';
+  const v = rec.siteImg && rec.siteImg[site];
+  return (v && String(v).trim()) || rec.imageUrl || '';
+}
 // 로컬 파일(file://)에서 쓸 경우 배포 주소를 넣으면 자체 프록시로 안정 동작. 예: 'https://클릭나라도메인.vercel.app'
 const EV_PROXY_BASE = '';
 async function _evFetchCsv(gid){
@@ -2236,7 +2245,7 @@ async function _evFetchCsv(gid){
   }
   throw new Error('시트 데이터를 불러오지 못했습니다(CORS/프록시).');
 }
-const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v4';   // v4: ssg 등재가 + jido(지도가)
+const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v5';   // v5: + 사이트별 이미지(siteImg, 행사 양식용)
 function _evSheetCacheLoad(){
   try{ const c=JSON.parse(localStorage.getItem(EV_SHEET_CACHE_KEY)||'null'); if(Array.isArray(c)&&c.length) return new Map(c); }catch(_){}
   return null;
@@ -2272,11 +2281,16 @@ async function _evLoadSheetData(force){
         };
         const jidoCol = header.findIndex(h=>h.includes('지도가')&&!h.includes('이전'));   // 지도가(기본가)
         const imgCol = header.findIndex(h=>h.includes('이미지'));   // 사용자가 추가할 '이미지URL' 열
+        // 행사 양식: 사이트별 이미지 열(컬럼 문자 → 인덱스). 예: 쿠팡=BE
+        const siteImgIdx = {};
+        Object.keys(EV_FORM_IMG_COL).forEach(site=>{ try{ siteImgIdx[site]=XLSX.utils.decode_col(EV_FORM_IMG_COL[site]); }catch(_){ siteImgIdx[site]=-1; } });
         for(let r=1;r<aoa.length;r++){
           const row = aoa[r]; if(!row) continue;
           const code = _evNormCode(row[codeCol]);
           if(!code || code.includes('판매자관리코드')) continue;
           if(map.has(code)) continue;
+          const siteImg = {};
+          for(const s in siteImgIdx){ const ci=siteImgIdx[s]; siteImg[s] = ci>=0 ? String(row[ci]||'').trim() : ''; }
           map.set(code, {
             gmarket: cols.gmarket>=0?num(row[cols.gmarket]):0,
             auction: cols.auction>=0?num(row[cols.auction]):0,
@@ -2285,6 +2299,7 @@ async function _evLoadSheetData(force){
             ssg:     cols.ssg    >=0?num(row[cols.ssg])    :0,
             jido:    jidoCol>=0?num(row[jidoCol]):0,   // 지도가(스마트스토어/오늘의집/알리/쿠팡 공통)
             imageUrl: imgCol>=0 ? String(row[imgCol]||'').trim() : '',
+            siteImg,   // 행사 양식용 사이트별 기본이미지
           });
         }
       }catch(e){ console.warn('[ev-sheet] 파싱 실패', e); }
@@ -2457,6 +2472,13 @@ function _evCalcHtml() {
         <span class="text-sm font-bold text-brand-black">원복양식</span>
         <span class="text-xs text-brand-gray">플레이오토 상품양식(csv)을 여기로 <b>드래그</b>하면 <b>기존세팅값</b> 시트의 등재가를 <b>각 행 쇼핑몰(옥션·지마켓 등)에 맞게</b> 판매가에 채워 다운로드합니다. (판매자관리코드로 매칭)</span>
         <label class="ml-auto px-3 py-1.5 rounded-full bg-brand-black text-white text-xs font-bold hover:bg-[#333] cursor-pointer">파일 선택<input type="file" accept=".csv,.xlsx,.xls" class="hidden" onchange="evFillPlayautoUpload(event)"></label>
+      </div>
+      <div id="ev-ef-drop" ondragover="evEfDragOver(event)" ondragleave="evEfDragLeave(event)" ondrop="evEfDrop(event)"
+           class="rounded-2xl border-2 border-dashed border-green-500/50 bg-green-50/50 px-4 py-3 flex items-center gap-3 flex-wrap">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span class="text-sm font-bold text-brand-black">행사 양식</span>
+        <span class="text-xs text-brand-gray">플레이오토 엑셀을 여기로 <b>드래그</b>하면 <b>판매가(I열)=행사정산계산기 등재가</b>, <b>기본이미지(AP열)=기존세팅값 시트의 사이트별 이미지</b>(쿠팡=BE열)로 채워 다운로드합니다. (판매자관리코드로 매칭)</span>
+        <label class="ml-auto px-3 py-1.5 rounded-full bg-green-600 text-white text-xs font-bold hover:bg-green-700 cursor-pointer">파일 선택<input type="file" accept=".csv,.xlsx,.xls" class="hidden" onchange="evFillEventFormUpload(event)"></label>
       </div>
       <div id="ev-drop" class="overflow-x-auto rounded-xl" ondragover="evDragOver(event)" ondragleave="evDragLeave(event)" ondrop="evDropFile(event)" title="엑셀 파일을 여기로 끌어다 놓으면 업로드됩니다">
         <table class="w-full text-xs border-collapse whitespace-nowrap border border-brand-border">
@@ -2787,6 +2809,69 @@ async function _evFillPlayauto(file){
     XLSX.writeFile(outWb, `플레이오토_기존세팅값_${(ev.name||'행사')}.xlsx`);
     const imgNote = imgIdx<0 ? '\n(엑셀에 이미지 열이 없어 이미지URL은 미적용)' : `\n이미지URL ${imgFilled}행 채움`;
     alert(`✅ ${filled}개 행 모두 판매가·이미지 채움 완료${imgNote}`);
+  }catch(err){ alert('파일 처리 실패: '+(err.message||err)); }
+}
+// ── 행사 양식 — 판매가(I열)=계산기 등재가, 기본이미지(AP열)=기존세팅값 시트 사이트별 이미지 ──
+function evEfDragOver(e){ e.preventDefault(); const z=document.getElementById('ev-ef-drop'); if(z) z.classList.add('ring-2','ring-green-500'); }
+function evEfDragLeave(e){ const z=document.getElementById('ev-ef-drop'); if(z) z.classList.remove('ring-2','ring-green-500'); }
+function evEfDrop(e){ e.preventDefault(); const z=document.getElementById('ev-ef-drop'); if(z) z.classList.remove('ring-2','ring-green-500'); const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) _evFillEventForm(f); }
+function evFillEventFormUpload(e){ const f=e.target.files&&e.target.files[0]; e.target.value=''; if(f) _evFillEventForm(f); }
+async function _evFillEventForm(file){
+  if(typeof XLSX==='undefined'){ alert('엑셀 라이브러리 로드 실패'); return; }
+  const o=_evLoad(); const ev=_evActive(o);
+  if(!ev.rows.length){ alert('행사정산계산기에 데이터가 없습니다. (등재가를 가져올 행이 필요)'); return; }
+  // 계산기 등재가 맵: 판매자관리코드(정규화) → 등재가
+  //  - 엑셀값 모드: 등재가 = 행사세팅가(disp)  / 계산기 모드: 등재가 = 계산된 listing
+  const isImport = ev.viewMode==='import';
+  const listingOf = row => isImport ? (Number(row.disp)||0) : (_evCalcRow(row, ev.rates).listing||0);
+  const evListingMap = new Map();
+  ev.rows.forEach(row=>{ const k=_evNormCode(row.model); if(k) evListingMap.set(k, listingOf(row)); });
+  // 사이트별 이미지(기존세팅값 시트) 로드 보장
+  if(!_evSheetMap) await _evLoadSheetData(true);
+  if(!_evSheetMap){ alert('기존세팅값 시트를 불러오지 못했습니다.\n로컬 파일이면 실행.bat으로 localhost에서 열어주세요.'); return; }
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf, { type:'array', codepage:949, raw:true });   // 플레이오토 CSV = CP949
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:'' });
+    if(!rows.length){ alert('빈 파일입니다.'); return; }
+    const norm=s=>String(s==null?'':s).replace(/\s+/g,'');
+    const header=rows[0].map(c=>norm(c));
+    let codeIdx=header.findIndex(c=>c.includes('판매자관리코드'));
+    if(codeIdx<0) codeIdx=header.findIndex(c=>c.includes('판매자상품코드')||c.includes('상품코드'));
+    if(codeIdx<0){ alert('판매자관리코드 열을 찾지 못했습니다.'); return; }
+    const PRICE_IDX=XLSX.utils.decode_col('I');    // 판매가 = I열
+    const IMG_IDX  =XLSX.utils.decode_col('AP');   // 기본이미지 = AP열
+    const out=[rows[0]];   // 헤더
+    let filled=0, imgFilled=0;
+    const fails=new Map();
+    for(let r=1;r<rows.length;r++){
+      const raw=(rows[r]||[]);
+      if(!raw.length || raw.join('').toString().trim()==='') continue;   // 빈 행
+      const origCode=String(raw[codeIdx]==null?'':raw[codeIdx]).trim();
+      const code=origCode.replace(/[\s-]/g,'').toUpperCase();
+      if(!code) continue;
+      if(!evListingMap.has(code)) continue;   // 이 행사 계산기에 없는 상품은 제외
+      const price=evListingMap.get(code);
+      const img=_evSheetSiteImage(code, ev.name);
+      if(!price){ if(!fails.has(origCode)) fails.set(origCode, '계산기 등재가 0/없음'); continue; }
+      if(!img){ if(!fails.has(origCode)) fails.set(origCode, `기본이미지 없음(${ev.name})`); continue; }
+      raw[PRICE_IDX]=price;
+      raw[IMG_IDX]=img; imgFilled++;
+      out.push(raw); filled++;
+    }
+    if(fails.size){
+      const entries=[...fails.entries()];
+      const list=entries.slice(0,60).map(([c,why])=>`• ${c} — ${why}`).join('\n');
+      const more=entries.length>60?`\n…외 ${entries.length-60}건`:'';
+      alert(`❌ 다운로드 취소 — 값이 안 들어간 판매자코드 ${fails.size}건\n\n${list}${more}\n\n계산기 등재가 / 기존세팅값 시트의 사이트별 이미지(${ev.name})를 확인한 뒤 다시 시도하세요.`);
+      return;
+    }
+    if(!filled){ alert('채울 행이 없습니다.\n업로드한 엑셀의 판매자관리코드가 계산기 모델과 일치하는지 확인하세요.'); return; }
+    const outWs=XLSX.utils.aoa_to_sheet(out);
+    const outWb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(outWb, outWs, 'Sheet1');
+    XLSX.writeFile(outWb, `행사양식_${(ev.name||'행사')}.xlsx`);
+    alert(`✅ ${filled}개 행 판매가(I열)·기본이미지(AP열) 채움 완료\n이미지 ${imgFilled}행`);
   }catch(err){ alert('파일 처리 실패: '+(err.message||err)); }
 }
 // 고객 양식(이미지) 다운로드 — 색상·테두리·서식 포함 (ExcelJS)
