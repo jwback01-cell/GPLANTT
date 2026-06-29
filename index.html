@@ -27996,7 +27996,7 @@ function renderReturnData() {
       <td class="px-4 py-3 text-xs">${escHtml(r.itemName || '-')}</td>
       <td class="px-4 py-3 text-xs font-mono whitespace-nowrap text-brand-gray">${escHtml(r.orderNo || '-')}</td>
       <td class="px-4 py-3 text-xs whitespace-nowrap">${escHtml(_normReturnOutDate(r.outDate) || r.outDate || '-')}</td>
-      <td class="px-4 py-3 text-xs whitespace-nowrap"><span class="px-2 py-0.5 rounded-full bg-brand-pink-light text-brand-pink font-bold">${escHtml(r.action || '-')}</span></td>
+      <td class="px-4 py-3 text-xs whitespace-nowrap"><span class="px-2 py-0.5 rounded-full font-bold ${(r._claimKind === 'exchange' || /교환/.test(String(r.action||''))) ? 'bg-brand-blue-light text-brand-blue' : 'bg-brand-pink-light text-brand-pink'}">${escHtml(r.action || '-')}</span></td>
       <td class="px-4 py-3 text-xs truncate max-w-[280px]" title="${escHtml(r.detail || '')}">${escHtml(r.detail || '-')}</td>
       <td class="px-4 py-3 text-xs text-brand-gray whitespace-nowrap">${r._mailDate ? String(r._mailDate) : String(r._uploadedAt || '').slice(0, 16).replace('T',' ')}</td>
     </tr>`).join('');
@@ -28087,9 +28087,10 @@ function _renderReturnsKpi(all, filtered) {
       distEl.innerHTML = sorted.map(([a, n]) => {
         const pct = (n / totalCount * 100).toFixed(1);
         const barW = Math.max(2, Math.round(n / max * 100));
+        const _barCls = /교환/.test(String(a)) ? 'bg-brand-blue' : 'bg-brand-pink';   // 교환은 파란색
         return `<div class="flex items-center gap-3">
           <div class="w-44 shrink-0 text-sm font-semibold truncate" title="${escHtml(a)}">${escHtml(a)}</div>
-          <div class="flex-1 bg-brand-bg rounded-full h-3 overflow-hidden"><div class="h-3 rounded-full bg-brand-pink transition-all" style="width:${barW}%;"></div></div>
+          <div class="flex-1 bg-brand-bg rounded-full h-3 overflow-hidden"><div class="h-3 rounded-full ${_barCls} transition-all" style="width:${barW}%;"></div></div>
           <div class="w-32 shrink-0 text-sm font-bold text-right">${fmt(n)}건 <span class="text-brand-gray font-normal text-xs">(${pct}%)</span></div>
         </div>`;
       }).join('');
