@@ -27478,6 +27478,35 @@ function _loadReturns() {
 function _saveReturns(rows) {
   localStorage.setItem(RETURN_DATA_KEY, JSON.stringify(rows));
 }
+// 반품 데이터 처리사항 옵션 (클레임 관리와 동일)
+const RETURN_ACTION_OPTIONS = ['단순 변심 반품', '단순 변심 교환', '불량 반품', '불량 교환', '오배송 반품', '오배송 교환'];
+// 처리사항 드롭다운 셀 — 교환=파랑, 반품=핑크. 현재값이 옵션에 없으면 그대로 보존
+function _returnActionSelect(r) {
+  const cur = r.action || '';
+  const isExch = r._claimKind === 'exchange' || /교환/.test(cur);
+  const cls = isExch ? 'text-brand-blue border-brand-blue/40 bg-brand-blue-light/40' : 'text-brand-pink border-brand-pink/40 bg-brand-pink-light/40';
+  let opts = '<option value="">선택…</option>';
+  if (cur && !RETURN_ACTION_OPTIONS.includes(cur)) opts += `<option value="${escHtml(cur)}" selected>${escHtml(cur)}</option>`;
+  opts += RETURN_ACTION_OPTIONS.map(a => `<option value="${escHtml(a)}" ${a === cur ? 'selected' : ''}>${escHtml(a)}</option>`).join('');
+  return `<select onchange="setReturnAction('${escHtml(r._key || '')}', this.value)" class="px-2 py-1 rounded-full font-bold border ${cls} text-xs cursor-pointer outline-none">${opts}</select>`;
+}
+function setReturnAction(key, value) {
+  const rows = _loadReturns();
+  const r = rows.find(x => x._key === key);
+  if (!r) return;
+  r.action = value;
+  if (/교환/.test(value)) r._claimKind = 'exchange';
+  else if (/반품/.test(value)) r._claimKind = 'return';
+  _saveReturns(rows);
+  renderReturnData();
+}
+function setReturnDetail(key, value) {
+  const rows = _loadReturns();
+  const r = rows.find(x => x._key === key);
+  if (!r) return;
+  r.detail = value;
+  _saveReturns(rows);   // 입력 중 전체 재렌더는 하지 않음(포커스 유지)
+}
 function _refreshReturnKpi() {
   const rows = _loadReturns();
   const cntEl = document.getElementById('return-count');
@@ -27996,8 +28025,8 @@ function renderReturnData() {
       <td class="px-4 py-3 text-xs">${escHtml(r.itemName || '-')}</td>
       <td class="px-4 py-3 text-xs font-mono whitespace-nowrap text-brand-gray">${escHtml(r.orderNo || '-')}</td>
       <td class="px-4 py-3 text-xs whitespace-nowrap">${escHtml(_normReturnOutDate(r.outDate) || r.outDate || '-')}</td>
-      <td class="px-4 py-3 text-xs whitespace-nowrap"><span class="px-2 py-0.5 rounded-full font-bold ${(r._claimKind === 'exchange' || /교환/.test(String(r.action||''))) ? 'bg-brand-blue-light text-brand-blue' : 'bg-brand-pink-light text-brand-pink'}">${escHtml(r.action || '-')}</span></td>
-      <td class="px-4 py-3 text-xs truncate max-w-[280px]" title="${escHtml(r.detail || '')}">${escHtml(r.detail || '-')}</td>
+      <td class="px-4 py-3 text-xs whitespace-nowrap">${_returnActionSelect(r)}</td>
+      <td class="px-4 py-3 text-xs"><input type="text" value="${escHtml(r.detail || '')}" onchange="setReturnDetail('${escHtml(r._key || '')}', this.value)" placeholder="사유 입력" class="w-full min-w-[220px] bg-transparent border border-transparent hover:border-brand-border focus:border-brand-black rounded px-2 py-1 outline-none"></td>
       <td class="px-4 py-3 text-xs text-brand-gray whitespace-nowrap">${r._mailDate ? String(r._mailDate) : String(r._uploadedAt || '').slice(0, 16).replace('T',' ')}</td>
     </tr>`).join('');
   }
@@ -28098,27 +28127,81 @@ function _renderReturnsKpi(all, filtered) {
   }
 }
 
-function exportReturnData() {
+async function exportReturnData() {
   const all = _loadReturns();
   if (!all.length) { showAppAlert('내보낼 데이터 없음', '저장된 반품 데이터가 없습니다.', 'info'); return; }
-  const filtered = _filterReturnsByUI(all);
-  const target = filtered.length ? filtered : all;
+  // 1순위 체크된 행, 2순위 필터, 3순위 전체
+  const checkedKeys = new Set([...document.querySelectorAll('#returns-tbody .returns-cb:checked')].map(cb => cb.dataset.key));
+  let target, selectedOnly = false;
+  if (checkedKeys.size) { target = all.filter(r => checkedKeys.has(r._key)); selectedOnly = true; }
+  else { const filtered = _filterReturnsByUI(all); target = filtered.length ? filtered : all; }
+  if (!target.length) { showAppAlert('내보낼 데이터 없음', '체크된 반품이 없습니다. 행을 체크하거나 날짜 필터를 조정하세요.', 'info'); return; }
+
+  // 셀 색상 라이브러리 로드 (실패해도 색상 없이 진행)
+  try { await _ensureXlsxStyle(); } catch (e) { console.warn('[반품 export]', e); }
+
+  const fmtMD = (s) => { const m = String(s || '').match(/(\d{4})[-./](\d{1,2})[-./](\d{1,2})/); return m ? String(m[2]).padStart(2,'0') + '/' + String(m[3]).padStart(2,'0') : String(s || ''); };
+
+  // 클레임 관리와 동일한 양식 (15열)
   const data = [
-    ['받는분성명','받는분기타연락처','업체명','받는분연락처','우편번호','받는분주소','수량','상품명','운임TYPE','지불조건','출고번호','배송메세지','출고일','처리사항','내용','업로드일시'],
+    ['받는분성명','받는분기타연락처','업체명(필수기입)','받는분연락처','우편번호','받는분주소','수량','상품명','운임TYPE','지불조건','출고번호','배송메세지','출고일','처리사항','내용'],
     ...target.map(r => [
-      r.recvName||'', r.phoneEtc||'', r.vendor||'', r.phone||'', r.zip||'', r.addr||'',
-      Number(r.qty)||0, r.itemName||'', r.shipType||'', r.payType||'', r.orderNo||'',
-      r.shipMemo||'', _normReturnOutDate(r.outDate) || r.outDate || '',
-      r.action||'', r.detail||'',
-      String(r._uploadedAt||'').slice(0,16).replace('T',' '),
+      String(r.recvName || ''),
+      String(r.phoneEtc || ''),
+      String(r.vendor || '지플랜'),
+      String(r.phone || ''),
+      String(r.zip || ''),
+      String(r.addr || ''),
+      Number(r.qty) || 0,
+      String(r.itemName || ''),
+      String(r.shipType || ''),
+      String(r.payType || ''),
+      String(r.orderNo || ''),
+      String(r.shipMemo || ''),
+      fmtMD(_normReturnOutDate(r.outDate) || r.outDate || ''),
+      String(r.action || ''),
+      String(r.detail || ''),
     ]),
   ];
+
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{wch:10},{wch:14},{wch:14},{wch:14},{wch:8},{wch:50},{wch:6},{wch:30},{wch:8},{wch:8},{wch:14},{wch:30},{wch:10},{wch:14},{wch:30},{wch:18}];
-  XLSX.utils.book_append_sheet(wb, ws, '반품데이터');
-  const stamp = new Date().toISOString().slice(0,10);
-  XLSX.writeFile(wb, `GPLAN_반품데이터_${stamp}.xlsx`);
+  ws['!cols'] = [
+    {wch:10},{wch:14},{wch:12},{wch:14},{wch:8},{wch:42},
+    {wch:6},{wch:42},{wch:8},{wch:10},{wch:16},{wch:24},{wch:8},{wch:14},{wch:36}
+  ];
+  // 스타일 — 클레임 export 와 동일(테두리 + 회색 헤더 + 업체명 노랑)
+  if (window.XLSX && window.XLSX._jsStyleLoaded) {
+    const thinBorder = {
+      top:    { style: 'thin', color: { rgb: '000000' } },
+      bottom: { style: 'thin', color: { rgb: '000000' } },
+      left:   { style: 'thin', color: { rgb: '000000' } },
+      right:  { style: 'thin', color: { rgb: '000000' } },
+    };
+    const YELLOW = 'FFFF00', GRAY = 'D0CECE';
+    const totalRows = data.length;
+    for (let rr = 0; rr < totalRows; rr++) {
+      for (let c = 0; c < 15; c++) {
+        const addr = XLSX.utils.encode_cell({ r: rr, c });
+        if (!ws[addr]) ws[addr] = { v: '', t: 's' };
+        const isHeader = (rr === 0);
+        ws[addr].s = {
+          border: thinBorder,
+          alignment: isHeader ? { horizontal: 'center', vertical: 'center', wrapText: true } : { vertical: 'center', wrapText: true },
+          font: isHeader ? { bold: true } : undefined,
+          fill: isHeader ? { patternType: 'solid', fgColor: { rgb: GRAY } } : undefined,
+        };
+      }
+    }
+    { const addr = XLSX.utils.encode_cell({ r: 0, c: 2 }); ws[addr].s = { border: thinBorder, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, font: { bold: true }, fill: { patternType: 'solid', fgColor: { rgb: YELLOW } } }; }
+    for (let rr = 1; rr < totalRows; rr++) { const addr = XLSX.utils.encode_cell({ r: rr, c: 2 }); ws[addr].s = { border: thinBorder, alignment: { horizontal: 'center', vertical: 'center' }, font: { bold: true }, fill: { patternType: 'solid', fgColor: { rgb: YELLOW } } }; }
+  }
+
+  const sheetName = selectedOnly ? `반품(선택 ${target.length}건)` : '반품데이터';
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  const _d = new Date();
+  const stamp = String(_d.getFullYear()).slice(2) + String(_d.getMonth() + 1).padStart(2, '0') + String(_d.getDate()).padStart(2, '0');
+  XLSX.writeFile(wb, `CS발주서 (지플랜)_${stamp}.xlsx`);
 }
 
 // ── 이카운트 매출반품(매출 반품 등록) 양식 엑셀 다운로드 ────────────────
