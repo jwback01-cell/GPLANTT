@@ -2102,7 +2102,19 @@ function _evDefaultRates() { return { md: 3, sel: 14, card: 5, cat: 7, cpnFee: 2
 function _evUid() { return 'ev_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 const EV_SITES = ['11번가', '이베이', '롯데온', '쿠팡', '스마트스토어', '알리익스프레스', '에스에스지', '오늘의집'];
 // 행사 양식 — 사이트별 '기본이미지' 가져올 기존세팅값 시트의 열(컬럼 문자). 미설정 사이트는 일반 이미지 열로 폴백.
-const EV_FORM_IMG_COL = { '쿠팡': 'BE' };
+//  이베이는 행 쇼핑몰에 따라 지마켓(W)/옥션(AH) 구분.
+const EV_FORM_IMG_COL = {
+  '11번가': 'AS',
+  '이베이': { '지마켓': 'W', '옥션': 'AH' },
+  '롯데온': 'AY',
+  '쿠팡': 'BE',
+  '스마트스토어': 'BK',
+  '알리익스프레스': 'BV',
+  '에스에스지': 'CB',
+  '오늘의집': 'CH',
+};
+// 위 설정에 쓰인 모든 컬럼 문자(중복 제거)
+const EV_ALL_IMG_COLS = (() => { const s = new Set(); Object.values(EV_FORM_IMG_COL).forEach(v => { if (typeof v === 'string') s.add(v); else Object.values(v).forEach(x => s.add(x)); }); return [...s]; })();
 function _evLoad() {
   let o = null;
   try { o = JSON.parse(localStorage.getItem(EV_KEY) || 'null'); } catch (_) {}
@@ -2222,12 +2234,21 @@ function _evSheetListing(model, site){
   // 모든 행사 소메뉴는 쿠팡 기준으로 동일 — 지도가 사용 (기존세팅값 시트 메뉴만 별도)
   return rec.jido || null;
 }
-// 행사 양식용 — 사이트 이름에 맞는 기본이미지(미설정 사이트는 일반 이미지 열로 폴백)
-function _evSheetSiteImage(model, site){
+// 행사 양식용 — 사이트(+이베이는 행 쇼핑몰)에 맞는 기본이미지. 미설정/미발견 시 일반 이미지 열로 폴백.
+function _evSheetSiteImage(model, site, chan){
   if(!_evSheetMap) return '';
   const rec=_evSheetMap.get(_evNormCode(model)); if(!rec) return '';
-  const v = rec.siteImg && rec.siteImg[site];
-  return (v && String(v).trim()) || rec.imageUrl || '';
+  const cols = rec.imgCols || {};
+  const cfg = EV_FORM_IMG_COL[site];
+  let val='';
+  if(typeof cfg==='string') val = cols[cfg]||'';
+  else if(cfg){   // 이베이: 지마켓(W)/옥션(AH) — 행 쇼핑몰로 구분
+    const c=String(chan||'');
+    if(c.includes('옥션')) val = cols[cfg['옥션']]||'';
+    else if(c.includes('지마켓')||c.includes('G마켓')||c.includes('지마')) val = cols[cfg['지마켓']]||'';
+    else val = cols[cfg['지마켓']]||cols[cfg['옥션']]||'';   // 채널 불명 시 지마켓 우선
+  }
+  return (val && String(val).trim()) || rec.imageUrl || '';
 }
 // 로컬 파일(file://)에서 쓸 경우 배포 주소를 넣으면 자체 프록시로 안정 동작. 예: 'https://클릭나라도메인.vercel.app'
 const EV_PROXY_BASE = '';
@@ -2245,7 +2266,7 @@ async function _evFetchCsv(gid){
   }
   throw new Error('시트 데이터를 불러오지 못했습니다(CORS/프록시).');
 }
-const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v5';   // v5: + 사이트별 이미지(siteImg, 행사 양식용)
+const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v6';   // v6: + 컬럼별 이미지(imgCols, 행사 양식용)
 function _evSheetCacheLoad(){
   try{ const c=JSON.parse(localStorage.getItem(EV_SHEET_CACHE_KEY)||'null'); if(Array.isArray(c)&&c.length) return new Map(c); }catch(_){}
   return null;
@@ -2281,16 +2302,16 @@ async function _evLoadSheetData(force){
         };
         const jidoCol = header.findIndex(h=>h.includes('지도가')&&!h.includes('이전'));   // 지도가(기본가)
         const imgCol = header.findIndex(h=>h.includes('이미지'));   // 사용자가 추가할 '이미지URL' 열
-        // 행사 양식: 사이트별 이미지 열(컬럼 문자 → 인덱스). 예: 쿠팡=BE
-        const siteImgIdx = {};
-        Object.keys(EV_FORM_IMG_COL).forEach(site=>{ try{ siteImgIdx[site]=XLSX.utils.decode_col(EV_FORM_IMG_COL[site]); }catch(_){ siteImgIdx[site]=-1; } });
+        // 행사 양식: 사이트별 이미지 열(컬럼 문자 → 인덱스). 예: 쿠팡=BE, 11번가=AS …
+        const imgColIdx = {};
+        EV_ALL_IMG_COLS.forEach(letter=>{ try{ imgColIdx[letter]=XLSX.utils.decode_col(letter); }catch(_){ imgColIdx[letter]=-1; } });
         for(let r=1;r<aoa.length;r++){
           const row = aoa[r]; if(!row) continue;
           const code = _evNormCode(row[codeCol]);
           if(!code || code.includes('판매자관리코드')) continue;
           if(map.has(code)) continue;
-          const siteImg = {};
-          for(const s in siteImgIdx){ const ci=siteImgIdx[s]; siteImg[s] = ci>=0 ? String(row[ci]||'').trim() : ''; }
+          const imgCols = {};
+          for(const letter in imgColIdx){ const ci=imgColIdx[letter]; imgCols[letter] = ci>=0 ? String(row[ci]||'').trim() : ''; }
           map.set(code, {
             gmarket: cols.gmarket>=0?num(row[cols.gmarket]):0,
             auction: cols.auction>=0?num(row[cols.auction]):0,
@@ -2299,7 +2320,7 @@ async function _evLoadSheetData(force){
             ssg:     cols.ssg    >=0?num(row[cols.ssg])    :0,
             jido:    jidoCol>=0?num(row[jidoCol]):0,   // 지도가(스마트스토어/오늘의집/알리/쿠팡 공통)
             imageUrl: imgCol>=0 ? String(row[imgCol]||'').trim() : '',
-            siteImg,   // 행사 양식용 사이트별 기본이미지
+            imgCols,   // 행사 양식용 — 컬럼문자별 이미지(AS/W/AH/BE…)
           });
         }
       }catch(e){ console.warn('[ev-sheet] 파싱 실패', e); }
@@ -2840,6 +2861,7 @@ async function _evFillEventForm(file){
     let codeIdx=header.findIndex(c=>c.includes('판매자관리코드'));
     if(codeIdx<0) codeIdx=header.findIndex(c=>c.includes('판매자상품코드')||c.includes('상품코드'));
     if(codeIdx<0){ alert('판매자관리코드 열을 찾지 못했습니다.'); return; }
+    const mallIdx=header.findIndex(c=>c.includes('쇼핑몰'));   // 이베이 지마켓/옥션 구분용
     const PRICE_IDX=XLSX.utils.decode_col('I');    // 판매가 = I열
     const IMG_IDX  =XLSX.utils.decode_col('AP');   // 기본이미지 = AP열
     const out=[rows[0]];   // 헤더
@@ -2853,7 +2875,8 @@ async function _evFillEventForm(file){
       if(!code) continue;
       if(!evListingMap.has(code)) continue;   // 이 행사 계산기에 없는 상품은 제외
       const price=evListingMap.get(code);
-      const img=_evSheetSiteImage(code, ev.name);
+      const chan = mallIdx>=0 ? String(raw[mallIdx]||'') : '';
+      const img=_evSheetSiteImage(code, ev.name, chan);
       if(!price){ if(!fails.has(origCode)) fails.set(origCode, '계산기 등재가 0/없음'); continue; }
       if(!img){ if(!fails.has(origCode)) fails.set(origCode, `기본이미지 없음(${ev.name})`); continue; }
       raw[PRICE_IDX]=price;
