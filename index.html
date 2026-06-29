@@ -12901,6 +12901,8 @@ function _returnAmountInRange(start, end) {
     const all = (typeof _loadReturns === 'function') ? _loadReturns() : [];
     let total = 0;
     all.forEach(r => {
+      // 업로드 데이터에서 반품/교환으로 변환된 표시용 행은 이미 업로드 음수 행이 매출을 차감함 → 이중차감 방지
+      if (r._fromUpload) return;
       const d = (typeof _normReturnOutDate === 'function') ? _normReturnOutDate(r.outDate) : String(r.outDate || '').slice(0, 10);
       if (!d) return;
       if (start && d < start) return;
@@ -25538,11 +25540,35 @@ function _doConvertSelectedToReturn(targetRows, reason, kind) {
   data.push(...newRows);
   _saveUploadData(data);
 
-  // 처리 결과를 '업로드 데이터' 소메뉴에서 바로 보여주기 — 해당 탭으로 이동(렌더 포함)
-  _uploadDataPage = 1;   // 새 행이 보이도록 첫 페이지로
-  if (typeof switchUploadTab === 'function') switchUploadTab('data');
-  else if (typeof renderUploadData === 'function') renderUploadData();
+  // 반품 데이터(소메뉴)에도 등록 — 표시용. 매출 차감은 위 업로드 음수 행이 이미 반영하므로
+  //  _fromUpload 플래그를 달아 반품금액 이중차감을 막는다.
+  try {
+    const returns = (typeof _loadReturns === 'function') ? _loadReturns() : [];
+    const _ts = Date.now();
+    targetRows.forEach((orig, k) => {
+      returns.push({
+        recvName   : orig.receiver || '',
+        vendor     : orig.vendor || '',
+        qty        : Math.abs(Number(orig.qty) || 1),
+        itemName   : orig.itemName || '',
+        orderNo    : orig.orderNo || orig.shopOrdNo || orig.itemCode || '',
+        outDate    : orig.date || todayDate,
+        action     : `${actionLabel}(${reasonLabel})`,
+        detail     : `업로드 데이터에서 ${actionLabel} 처리`,
+        _uploadedAt: _now.toISOString(),
+        _fromUpload: true,
+        _claimKind : isExchange ? 'exchange' : 'return',
+        _key       : `udret-${_ts}-${k}-${Math.random().toString(36).slice(2,7)}`,
+      });
+    });
+    if (typeof _saveReturns === 'function') _saveReturns(returns);
+  } catch (_) {}
+
+  // 매출장부 동기화 후 '반품 데이터' 소메뉴로 이동(렌더 포함)
+  _uploadDataPage = 1;
   if (typeof syncLedgerFromUploadData === 'function') syncLedgerFromUploadData();
+  if (typeof switchUploadTab === 'function') switchUploadTab('returns');
+  else if (typeof renderReturnData === 'function') renderReturnData();
 
   // 체크박스 해제
   document.querySelectorAll('.upload-data-cb').forEach(c => { c.checked = false; });
