@@ -13563,10 +13563,13 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 let _detailPeriod = { product:0, supplier:0, channel:0, analysis:0 };
+// 각 탭에 '현재 적용된 기간'을 기억 — 행 수정 후 재렌더 시 같은 기간(오늘/어제/직접선택) 유지용
+let _ledgerPeriodState = { product:{m:0}, supplier:{m:0}, channel:{m:0}, analysis:{m:0} };
 const _fmtW = n => n.toLocaleString('ko-KR');
 
 function setDetailPeriod(tab, m) {
   _detailPeriod[tab] = m;
+  _ledgerPeriodState[tab] = { m };
   // "오늘" 버튼은 항상 비활성화 (인덱스 매칭에서 제외)
   const todayBtn = document.querySelector('#' + tab + '-period-btns .dp-today-btn');
   if (todayBtn) {
@@ -13627,6 +13630,7 @@ function setTodayPeriod(tab) {
   if (eEl) eEl.value = k;
 
   const range = { start: k, end: k };
+  _ledgerPeriodState[tab] = { range };
   if (tab === 'product')       renderProductTab(0, range);
   else if (tab === 'supplier') renderSupplierTab(0, range);
   else if (tab === 'channel')  renderChannelTab(0, range);
@@ -13663,6 +13667,7 @@ function setYesterdayPeriod(tab) {
   if (eEl) eEl.value = k;
 
   const range = { start: k, end: k };
+  _ledgerPeriodState[tab] = { range };
   if (tab === 'product')       renderProductTab(0, range);
   else if (tab === 'supplier') renderSupplierTab(0, range);
   else if (tab === 'channel')  renderChannelTab(0, range);
@@ -13731,6 +13736,7 @@ function applyDetailRange(tab) {
 
   // 해당 기간 데이터로 렌더링 — idxs 대신 정확한 날짜 범위 전달
   const dateRange = { start: startVal, end: endVal };
+  _ledgerPeriodState[tab] = { range: dateRange };
   if (tab === 'product')       renderProductTab(0, dateRange);
   else if (tab === 'supplier') renderSupplierTab(0, dateRange);
   else if (tab === 'channel')  renderChannelTab(0, dateRange);
@@ -13875,13 +13881,20 @@ function _refreshActiveLedgerTab() {
   const active = document.querySelector('#ledger-tabs .tab-btn.active');
   const tab = active ? active.dataset.tab : null;
   if (!tab) return;
+  const renderFor = (kind) => {
+    const fn = kind === 'product' ? renderProductTab
+             : kind === 'supplier' ? renderSupplierTab
+             : kind === 'channel' ? renderChannelTab
+             : (kind === 'analysis' && typeof renderAnalysisTab === 'function') ? renderAnalysisTab : null;
+    if (!fn) return;
+    const st = _ledgerPeriodState[kind] || { m: _detailPeriod[kind] || 0 };
+    if (st.range) fn(0, st.range);     // 오늘/어제/직접선택 기간 유지
+    else fn(st.m || 0);                // 전체/월 인덱스 유지
+  };
   try {
-    if (tab === 'product')       renderProductTab(_detailPeriod.product);
-    else if (tab === 'supplier') renderSupplierTab(_detailPeriod.supplier);
-    else if (tab === 'channel')  renderChannelTab(_detailPeriod.channel);
-    else if (tab === 'daily' && typeof renderDailyTab === 'function')       renderDailyTab();
-    else if (tab === 'period' && typeof renderPeriodChart === 'function')    renderPeriodChart();
-    else if (tab === 'analysis' && typeof renderAnalysisTab === 'function')  renderAnalysisTab(_detailPeriod.analysis);
+    if (['product','supplier','channel','analysis'].includes(tab)) renderFor(tab);
+    else if (tab === 'daily' && typeof renderDailyTab === 'function')    renderDailyTab();
+    else if (tab === 'period' && typeof renderPeriodChart === 'function') renderPeriodChart();
   } catch (_) {}
 }
 function renderProductTab(m, rangeOrIdxs) {
