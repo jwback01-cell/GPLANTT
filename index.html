@@ -4764,6 +4764,13 @@ tailwind.config = {
                   <button onclick="_closeMenu('upload-return-menu');convertSelectedToReturn('seller')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold text-brand-pink hover:bg-brand-pink-light" title="판매자 귀책 — 택배비용도 음수 처리 (회수)">↩ 반품(판매자귀책)</button>
                 </div>
               </div>
+              <div class="relative">
+                <button type="button" onclick="_toggleMenu('upload-exchange-menu')" class="px-4 py-2 rounded-full border border-brand-blue bg-brand-blue-light text-sm font-bold text-brand-blue hover:bg-brand-blue hover:text-white transition-colors flex items-center gap-1.5" title="교환(구매자귀책) / 교환(판매자귀책)">🔁 교환<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>
+                <div id="upload-exchange-menu" class="ud-dropdown-menu hidden absolute z-50 mt-1 left-0 bg-white border border-brand-border rounded-2xl shadow-xl p-1.5 w-52">
+                  <button onclick="_closeMenu('upload-exchange-menu');convertSelectedToReturn('buyer','exchange')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold text-brand-blue hover:bg-brand-blue-light" title="구매자 귀책 — 택배비용은 양수 그대로 (우리가 부담)">🔁 교환(구매자귀책)</button>
+                  <button onclick="_closeMenu('upload-exchange-menu');convertSelectedToReturn('seller','exchange')" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold text-brand-blue hover:bg-brand-blue-light" title="판매자 귀책 — 택배비용도 음수 처리 (회수)">🔁 교환(판매자귀책)</button>
+                </div>
+              </div>
               <button onclick="exportUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg">엑셀 내보내기</button>
               <button id="upload-data-delete-btn" onclick="deleteSelectedUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-pink hover:bg-brand-bg">선택 삭제 <span id="upload-data-sel-count" class="ml-1 text-xs text-brand-gray">(0)</span></button>
             </div>
@@ -25427,7 +25434,9 @@ function toggleAllUploadData(cb) {
 // ── 선택한 행을 반품으로 처리 (모든 금액·수량을 음수로 복제) ──
 // reason: 'buyer' = 구매자 귀책 (택배비용은 양수 유지 — 우리 부담)
 //          'seller' = 판매자 귀책 (택배비용도 음수 — 회수)
-function convertSelectedToReturn(reason) {
+function convertSelectedToReturn(reason, kind) {
+  const isExchange = kind === 'exchange';
+  const actionLabel = isExchange ? '교환' : '반품';
   const checkedRows = Array.from(document.querySelectorAll('.upload-data-cb:checked'));
   // 일반 행만 처리 (제트 집계 행은 데이터 자체가 아니므로 제외)
   const directIdxs = checkedRows
@@ -25436,7 +25445,7 @@ function convertSelectedToReturn(reason) {
     .filter(n => !isNaN(n));
 
   if (directIdxs.length === 0) {
-    showAppAlert('선택 항목 없음', '반품 처리할 행을 먼저 선택해 주세요.', 'warn');
+    showAppAlert('선택 항목 없음', `${actionLabel} 처리할 행을 먼저 선택해 주세요.`, 'warn');
     return;
   }
 
@@ -25454,18 +25463,20 @@ function convertSelectedToReturn(reason) {
     : '택배비용은 양수 유지 (구매자 잘못 → 우리가 부담)';
 
   showAppConfirm(
-    `반품(${reasonLabel})으로 처리할까요?`,
-    `${targetRows.length}건의 행을 반품으로 변환합니다.\n\n` +
+    `${actionLabel}(${reasonLabel})으로 처리할까요?`,
+    `${targetRows.length}건의 행을 ${actionLabel}으로 변환합니다.\n\n` +
     `→ 같은 행을 복제하여 수량 / 단가 / 공급가 / 원가 / 마진을 음수로 저장\n` +
     `→ ${shipCostNote}\n` +
-    `→ 사이트에 '반품-${reasonLabel}' 표시가 추가됩니다\n` +
+    `→ 사이트에 '${actionLabel}-${reasonLabel}' 표시가 추가됩니다\n` +
     `→ 매출장부 합계가 자동 차감됩니다`,
-    () => { _doConvertSelectedToReturn(targetRows, reason); },
-    { type: 'warning', confirmText: `반품(${reasonLabel})`, confirmStyle: 'danger' }
+    () => { _doConvertSelectedToReturn(targetRows, reason, kind); },
+    { type: 'warning', confirmText: `${actionLabel}(${reasonLabel})`, confirmStyle: 'danger' }
   );
 }
 
-function _doConvertSelectedToReturn(targetRows, reason) {
+function _doConvertSelectedToReturn(targetRows, reason, kind) {
+  const isExchange = kind === 'exchange';
+  const actionLabel = isExchange ? '교환' : '반품';
   const isSeller = reason === 'seller';
   const reasonLabel = isSeller ? '판매자귀책' : '구매자귀책';
   const _now = new Date();
@@ -25498,12 +25509,13 @@ function _doConvertSelectedToReturn(targetRows, reason) {
       : ((Number(orig.supply) || 0) + (Number(orig.ship) || 0) - (Number(orig.cost) || 0) - (Number(orig.shipCost) || 0));
     clone.profit = -_origMargin;
 
-    // 사이트에 '반품-귀책' 표시
+    // 사이트에 '반품-귀책' / '교환-귀책' 표시
     const origSite = String(orig.site || '').trim();
-    const tag = `반품-${reasonLabel}`;
-    clone.site = /반품/.test(origSite) ? origSite : (origSite ? `${origSite} (${tag})` : tag);
-    clone.template = 'manual-return';
+    const tag = `${actionLabel}-${reasonLabel}`;
+    clone.site = /반품|교환/.test(origSite) ? origSite : (origSite ? `${origSite} (${tag})` : tag);
+    clone.template = isExchange ? 'manual-exchange' : 'manual-return';
     clone._isReturn = true;
+    clone._claimKind = isExchange ? 'exchange' : 'return';
     clone._returnReason = reason; // 'buyer' | 'seller'
     clone._returnFrom = orig.savedAt || '';
     clone._returnFromDate = orig.date || ''; // 원본 매출일 보관 (역추적)
@@ -25525,7 +25537,7 @@ function _doConvertSelectedToReturn(targetRows, reason) {
   const sa = document.getElementById('upload-data-select-all'); if (sa) sa.checked = false;
   if (typeof updateUploadDataSelCount === 'function') updateUploadDataSelCount();
 
-  showAppAlert(`반품(${reasonLabel}) 처리 완료`,
+  showAppAlert(`${actionLabel}(${reasonLabel}) 처리 완료`,
     `${newRows.length}건이 음수 행으로 추가되었습니다.\n` +
     (isSeller
       ? `택배비용도 음수 처리되어 회수됩니다.`
