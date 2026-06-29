@@ -791,6 +791,29 @@ tailwind.config = {
         <div id="dashboard-pa-status" class="hidden mt-4 text-sm font-semibold"></div>
       </section>
 
+      <!-- 클라우드 사용량 -->
+      <section class="bg-white rounded-3xl panel p-5 md:p-7">
+        <div class="flex items-center justify-between gap-3 flex-wrap mb-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-12 h-12 rounded-[14px] flex items-center justify-center bg-brand-blue-light shrink-0">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2196F3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6-1.5A4 4 0 0 0 6 19z"/></svg>
+            </div>
+            <div class="min-w-0">
+              <div class="font-bold text-[1.05rem]">클라우드 사용량</div>
+              <div id="cloud-usage-sub" class="text-xs text-brand-gray">측정 중…</div>
+            </div>
+          </div>
+          <button onclick="_renderCloudUsage(true)" class="px-4 py-2 rounded-full bg-brand-bg border border-brand-border text-sm font-bold hover:bg-white transition-colors flex items-center gap-1.5">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+            새로고침
+          </button>
+        </div>
+        <div class="w-full bg-brand-bg rounded-full h-3 overflow-hidden">
+          <div id="cloud-usage-bar" class="h-3 rounded-full bg-brand-blue transition-all" style="width:0%"></div>
+        </div>
+        <div id="cloud-usage-text" class="mt-2 text-sm font-semibold text-brand-gray">측정 중…</div>
+      </section>
+
       <!-- Todo + Chart -->
       <section class="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-6">
         <!-- Todo mini -->
@@ -5235,6 +5258,41 @@ function _gplanSyncMatch(key) {
   return /^(gplan_|kw_|src_)/.test(key) || GPLAN_SYNC_KEYS.includes(key);
 }
 function _gplanAllSyncKeys() { try { return Object.keys(localStorage).filter(_gplanSyncMatch); } catch (_) { return GPLAN_SYNC_KEYS.slice(); } }
+
+// ── 클라우드 사용량 표시 ──
+// Supabase 무료 플랜 DB 한도(MB). Pro 플랜이면 8192 로 바꾸세요.
+const CLOUD_MAX_MB = 500;
+async function _renderCloudUsage(force) {
+  const bar = document.getElementById('cloud-usage-bar');
+  const txt = document.getElementById('cloud-usage-text');
+  const sub = document.getElementById('cloud-usage-sub');
+  if (!bar || !txt) return;
+  // 1) 즉시 추정 — 이 앱이 클라우드에 동기화하는 localStorage 데이터 크기 합
+  let usedBytes = 0;
+  try {
+    _gplanAllSyncKeys().forEach(k => {
+      const v = localStorage.getItem(k) || '';
+      usedBytes += new Blob([k + v]).size;
+    });
+  } catch (_) {}
+  let source = '추정 (이 앱이 저장한 데이터)';
+  // 2) 정확한 DB 용량 — RPC(gplan_db_size)가 있으면 실제 DB 바이트 사용
+  try {
+    const { data, error } = await _supabase.rpc('gplan_db_size');
+    if (!error && data != null) {
+      const n = Number(typeof data === 'object' ? (data.size || data.bytes || data.db_size) : data);
+      if (!isNaN(n) && n > 0) { usedBytes = n; source = '실제 DB 용량'; }
+    }
+  } catch (_) {}
+  const usedMB = usedBytes / (1024 * 1024);
+  const pct = Math.min(100, (usedMB / CLOUD_MAX_MB) * 100);
+  bar.style.width = pct.toFixed(2) + '%';
+  bar.className = 'h-3 rounded-full transition-all ' + (pct >= 90 ? 'bg-brand-pink' : pct >= 70 ? 'bg-brand-orange' : 'bg-brand-blue');
+  const fmt = mb => mb >= 1 ? mb.toFixed(1) + ' MB' : (mb * 1024).toFixed(0) + ' KB';
+  txt.innerHTML = `사용 <b class="text-brand-black">${fmt(usedMB)}</b> / 최대 <b class="text-brand-black">${CLOUD_MAX_MB} MB</b> <span class="text-brand-gray">(${pct.toFixed(2)}%)</span>`;
+  if (sub) sub.textContent = `Supabase 무료 플랜 기준 · ${source}`;
+}
+document.addEventListener('DOMContentLoaded', () => { setTimeout(() => { try { _renderCloudUsage(); } catch (_) {} }, 1200); });
 let _gplanCloudReady = false;     // PULL 완료 전에는 PUSH 금지(다른 PC 데이터 덮어쓰기 방지)
 const _gplanPushTimers = {};
 async function gplanCloudPullAll() {
