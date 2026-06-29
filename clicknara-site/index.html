@@ -2125,9 +2125,12 @@ const EV_RESTORE_PRICE_COL = {
   '에스에스지': 'BX',
   '오늘의집': 'J',
 };
-// 위 두 설정에 쓰인 모든 컬럼 문자(중복 제거)
+// 원복양식 '기본이미지' 열 override — 지정 사이트만 다른 열 사용(미지정은 기본 H열)
+//  스마트스토어·오늘의집 = BK열
+const EV_RESTORE_IMG_COL = { '스마트스토어': 'BK', '오늘의집': 'BK' };
+// 위 설정들에 쓰인 모든 컬럼 문자(중복 제거)
 const _evFlatCols = obj => { const s = new Set(); Object.values(obj).forEach(v => { if (typeof v === 'string') s.add(v); else Object.values(v).forEach(x => s.add(x)); }); return [...s]; };
-const EV_ALL_IMG_COLS = _evFlatCols(EV_FORM_IMG_COL);
+const EV_ALL_IMG_COLS = [...new Set([..._evFlatCols(EV_FORM_IMG_COL), ...Object.values(EV_RESTORE_IMG_COL)])];
 const EV_ALL_PRICE_COLS = _evFlatCols(EV_RESTORE_PRICE_COL);
 function _evLoad() {
   let o = null;
@@ -2278,6 +2281,13 @@ function _evSheetSitePrice(model, site, chan){
     return cols[cfg['지마켓']]||cols[cfg['옥션']]||0;   // 채널 불명 시 지마켓 우선
   }
   return 0;
+}
+// 원복양식용 — 사이트별 기본이미지(override 사이트는 지정 열, 그 외는 기본 H열)
+function _evRestoreImageFor(rec, site){
+  if(!rec) return '';
+  const col = EV_RESTORE_IMG_COL[site];
+  if(col){ const v = rec.imgCols && rec.imgCols[col]; return (v && String(v).trim()) || ''; }
+  return rec.restoreImg || '';
 }
 // 로컬 파일(file://)에서 쓸 경우 배포 주소를 넣으면 자체 프록시로 안정 동작. 예: 'https://클릭나라도메인.vercel.app'
 const EV_PROXY_BASE = '';
@@ -2910,9 +2920,10 @@ async function _evFillPlayauto(file){
       // 매칭된 행 — 판매가=사이트별 등재가 열, 기본이미지=시트 H열로 교체 (둘 중 하나라도 비면 취소)
       const chan = mallIdx>=0 ? String(raw[mallIdx]||'') : '';
       const price = _evSheetSitePrice(code, ev.name, chan);
+      const img = _evRestoreImageFor(rec, ev.name);
       if(!price){ if(!fails.has(origCode)) fails.set(origCode, `${ev.name} 등재가(판매가) 없음`); }
-      else if(!rec.restoreImg){ if(!fails.has(origCode)) fails.set(origCode, '시트 H열(기본이미지) 비어있음'); }
-      else { raw[PRICE_IDX]=price; raw[IMG_IDX]=rec.restoreImg; filled++; }
+      else if(!img){ if(!fails.has(origCode)) fails.set(origCode, '기본이미지 없음'); }
+      else { raw[PRICE_IDX]=price; raw[IMG_IDX]=img; filled++; }
       out.push(raw);
     }
     if(fails.size){
