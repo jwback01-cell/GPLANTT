@@ -25548,10 +25548,15 @@ function _doConvertSelectedToReturn(targetRows, reason, kind) {
     targetRows.forEach((orig, k) => {
       returns.push({
         recvName   : orig.receiver || '',
-        vendor     : orig.vendor || '',
+        vendor     : '지플랜',                                              // CS발주 업체명 고정
+        phone      : orig.phone || orig.htel || orig.to_htel || '',         // 받는분연락처
+        phoneEtc   : orig.phone2 || orig.tel || orig.to_tel || '',          // 받는분기타연락처
+        zip        : orig.zip || orig.to_zipcd || '',                       // 우편번호
+        addr       : orig.address || orig.addr || '',                       // 받는분주소
+        shipMemo   : orig.msg || orig.shipMsg || '',                        // 배송메세지
         qty        : Math.abs(Number(orig.qty) || 1),
         itemName   : orig.itemName || '',
-        orderNo    : orig.orderNo || orig.shopOrdNo || orig.itemCode || '',
+        orderNo    : orig.orderNo || orig.shopOrdNo || orig.invoice || '',  // 출고번호(없으면 빈값)
         outDate    : orig.date || todayDate,
         action     : `${actionLabel}(${reasonLabel})`,
         detail     : `업로드 데이터에서 ${actionLabel} 처리`,
@@ -28148,7 +28153,7 @@ async function exportReturnData() {
     ...target.map(r => [
       String(r.recvName || ''),
       String(r.phoneEtc || ''),
-      String(r.vendor || '지플랜'),
+      '지플랜',
       String(r.phone || ''),
       String(r.zip || ''),
       String(r.addr || ''),
