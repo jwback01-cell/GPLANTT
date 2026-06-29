@@ -2100,13 +2100,18 @@ async function logout() {
 const EV_KEY = 'cn_events_v1';
 function _evDefaultRates() { return { md: 3, sel: 14, card: 5, cat: 7, cpnFee: 20, seller: 50 }; }
 function _evUid() { return 'ev_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
-const EV_SITES = ['11번가', '이베이', '롯데온', '그외'];
+const EV_SITES = ['11번가', '이베이', '롯데온', '쿠팡', '스마트스토어', '알리익스프레스', '에스에스지', '오늘의집'];
 function _evLoad() {
   let o = null;
   try { o = JSON.parse(localStorage.getItem(EV_KEY) || 'null'); } catch (_) {}
   if (!o || !Array.isArray(o.list)) o = { activeId: '', list: [] };
   let dirty = false;
-  // 고정 3개 사이트 보장 (없으면 생성)
+  // (마이그레이션) 기존 '그외' 행사 → '쿠팡'으로 이름 변경(데이터 보존)
+  {
+    const old = o.list.find(e => e.name === '그외');
+    if (old && !o.list.some(e => e.name === '쿠팡')) { old.name = '쿠팡'; dirty = true; }
+  }
+  // 고정 사이트 보장 (없으면 생성)
   EV_SITES.forEach(site => {
     if (!o.list.some(e => e.name === site)) { o.list.push({ id: _evUid(), name: site, period: '', rates: _evDefaultRates(), rows: [] }); dirty = true; }
   });
@@ -2215,7 +2220,9 @@ function _evSheetListing(model, site){
   if(site==='11번가') return rec.eleven || null;
   if(site==='롯데온') return rec.lotte || null;
   if(site==='이베이') return rec.auction || rec.gmarket || null;
-  if(site==='그외') return rec.jido || rec.ssg || null;  // 대표값(지도가)
+  if(site==='에스에스지') return rec.ssg || rec.jido || null;   // SSG등재가
+  if(site==='쿠팡'||site==='스마트스토어'||site==='알리익스프레스'||site==='오늘의집') return rec.jido || null;  // 지도가
+  if(site==='그외') return rec.jido || rec.ssg || null;  // (구) 대표값(지도가)
   return null;
 }
 // 로컬 파일(file://)에서 쓸 경우 배포 주소를 넣으면 자체 프록시로 안정 동작. 예: 'https://클릭나라도메인.vercel.app'
@@ -2746,8 +2753,10 @@ async function _evFillPlayauto(file){
     if(imgIdx<0) imgIdx=header.findIndex(c=>c.includes('이미지')&&!c.includes('추가'));   // 추가이미지는 제외
     if(codeIdx<0 || priceIdx<0){ alert('판매자관리코드 또는 판매가 열을 찾지 못했습니다.'); return; }
     // 사이트별 허용 쇼핑몰(채널) — 이베이=옥션·지마켓, 그외=모든 채널(필터 없음)
-    const SITE_CH={ '이베이':['옥션','지마켓'], '11번가':['11번가'], '롯데온':['롯데온'] };
-    const allowed=SITE_CH[ev.name]||null;   // 그외는 null → 채널 제한 없음
+    const SITE_CH={ '이베이':['옥션','지마켓'], '11번가':['11번가'], '롯데온':['롯데온'],
+      '쿠팡':['쿠팡'], '스마트스토어':['스마트','스토어','네이버'], '알리익스프레스':['알리'],
+      '에스에스지':['SSG','쓱','신세계'], '오늘의집':['오늘'] };
+    const allowed=SITE_CH[ev.name]||null;   // 그외(구)는 null → 채널 제한 없음
     // 행의 쇼핑몰(채널)에 맞는 기존세팅값 등재가 선택
     //  - 11번가/옥션/지마켓/롯데온/SSG = 각 마켓 등재가
     //  - 스마트스토어/오늘의집/알리익스프레스/쿠팡 = 지도가(기본가)
@@ -2761,6 +2770,8 @@ async function _evFillPlayauto(file){
       if(ev.name==='11번가') return rec.eleven;          // 쇼핑몰 열 인식 불가 시 사이트 기본
       if(ev.name==='롯데온') return rec.lotte;
       if(ev.name==='이베이') return rec.auction||rec.gmarket;
+      if(ev.name==='에스에스지') return rec.ssg;
+      if(ev.name==='쿠팡'||ev.name==='스마트스토어'||ev.name==='알리익스프레스'||ev.name==='오늘의집') return rec.jido;
       if(ev.name==='그외') return rec.jido;
       return 0;
     };
