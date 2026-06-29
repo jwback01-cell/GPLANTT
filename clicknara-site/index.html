@@ -2217,13 +2217,8 @@ function _evNormCode(s){ return String(s==null?'':s).replace(/[\s-]/g,'').toUppe
 function _evSheetListing(model, site){
   if(!_evSheetMap) return null;
   const rec = _evSheetMap.get(_evNormCode(model)); if(!rec) return null;
-  if(site==='11번가') return rec.eleven || null;
-  if(site==='롯데온') return rec.lotte || null;
-  if(site==='이베이') return rec.auction || rec.gmarket || null;
-  if(site==='에스에스지') return rec.ssg || rec.jido || null;   // SSG등재가
-  if(site==='쿠팡'||site==='스마트스토어'||site==='알리익스프레스'||site==='오늘의집') return rec.jido || null;  // 지도가
-  if(site==='그외') return rec.jido || rec.ssg || null;  // (구) 대표값(지도가)
-  return null;
+  // 모든 행사 소메뉴는 쿠팡 기준으로 동일 — 지도가 사용 (기존세팅값 시트 메뉴만 별도)
+  return rec.jido || null;
 }
 // 로컬 파일(file://)에서 쓸 경우 배포 주소를 넣으면 자체 프록시로 안정 동작. 예: 'https://클릭나라도메인.vercel.app'
 const EV_PROXY_BASE = '';
@@ -2753,28 +2748,9 @@ async function _evFillPlayauto(file){
     if(imgIdx<0) imgIdx=header.findIndex(c=>c.includes('이미지')&&!c.includes('추가'));   // 추가이미지는 제외
     if(codeIdx<0 || priceIdx<0){ alert('판매자관리코드 또는 판매가 열을 찾지 못했습니다.'); return; }
     // 사이트별 허용 쇼핑몰(채널) — 이베이=옥션·지마켓, 그외=모든 채널(필터 없음)
-    const SITE_CH={ '이베이':['옥션','지마켓'], '11번가':['11번가'], '롯데온':['롯데온'],
-      '쿠팡':['쿠팡'], '스마트스토어':['스마트','스토어','네이버'], '알리익스프레스':['알리'],
-      '에스에스지':['SSG','쓱','신세계'], '오늘의집':['오늘'] };
-    const allowed=SITE_CH[ev.name]||null;   // 그외(구)는 null → 채널 제한 없음
-    // 행의 쇼핑몰(채널)에 맞는 기존세팅값 등재가 선택
-    //  - 11번가/옥션/지마켓/롯데온/SSG = 각 마켓 등재가
-    //  - 스마트스토어/오늘의집/알리익스프레스/쿠팡 = 지도가(기본가)
-    const chanListing=(rec,chan)=>{ const c=String(chan||'');
-      if(c.includes('옥션')) return rec.auction;
-      if(c.includes('지마켓')||c.includes('G마켓')) return rec.gmarket;
-      if(c.includes('11번가')) return rec.eleven;
-      if(c.includes('롯데')) return rec.lotte;
-      if(c.includes('SSG')||c.includes('쓱')||c.includes('신세계')) return rec.ssg;
-      if(c.includes('알리')||c.includes('오늘')||c.includes('쿠팡')||c.includes('스마트')||c.includes('스토어')||c.includes('네이버')) return rec.jido;
-      if(ev.name==='11번가') return rec.eleven;          // 쇼핑몰 열 인식 불가 시 사이트 기본
-      if(ev.name==='롯데온') return rec.lotte;
-      if(ev.name==='이베이') return rec.auction||rec.gmarket;
-      if(ev.name==='에스에스지') return rec.ssg;
-      if(ev.name==='쿠팡'||ev.name==='스마트스토어'||ev.name==='알리익스프레스'||ev.name==='오늘의집') return rec.jido;
-      if(ev.name==='그외') return rec.jido;
-      return 0;
-    };
+    // 모든 행사 소메뉴는 쿠팡 기준으로 동일 동작 — 채널 제한 없이 지도가로 채움
+    const allowed=null;
+    const chanListing=(rec)=> rec.jido;   // 지도가(쿠팡 기준)
     const out=[rows[0]];   // 헤더
     let filled=0, imgFilled=0;
     const fails=new Map();   // 채워야 하는데 실패한 행: 판매자코드 → 사유 (중복 제거)
