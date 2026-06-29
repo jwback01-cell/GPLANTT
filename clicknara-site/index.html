@@ -2489,6 +2489,13 @@ function _evCalcHtml() {
           이미지 다운로드
         </button>
       </div>
+      <div id="ev-up-drop" ondragover="evUpDragOver(event)" ondragleave="evUpDragLeave(event)" ondrop="evUpDrop(event)"
+           class="rounded-2xl border-2 border-dashed border-brand-black/40 bg-brand-bg/50 px-4 py-3 flex items-center gap-3 flex-wrap">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span class="text-sm font-bold text-brand-black">엑셀 업로드</span>
+        <span class="text-xs text-brand-gray">행사 정산표 엑셀(<b>Model · 기존 SRP · 행사 SRP · 최종혜택가 · 정산예상</b> 등)을 여기로 <b>드래그</b>하면 위 계산기 표로 불러옵니다.</span>
+        <label class="ml-auto px-3 py-1.5 rounded-full bg-brand-black text-white text-xs font-bold hover:bg-[#333] cursor-pointer">파일 선택<input type="file" accept=".csv,.xlsx,.xls" class="hidden" onchange="evUploadExcel(event)"></label>
+      </div>
       <div id="ev-pa-drop" ondragover="evPaDragOver(event)" ondragleave="evPaDragLeave(event)" ondrop="evPaDrop(event)"
            class="rounded-2xl border-2 border-dashed border-brand-blue/50 bg-brand-blue-light/10 px-4 py-3 flex items-center gap-3 flex-wrap">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2196F3" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -2677,6 +2684,10 @@ function evDropFile(e){
 }
 function evDragOver(e){ e.preventDefault(); const zone=document.getElementById('ev-drop'); if(zone) zone.classList.add('ring-2','ring-brand-blue'); }
 function evDragLeave(e){ const zone=document.getElementById('ev-drop'); if(zone) zone.classList.remove('ring-2','ring-brand-blue'); }
+// 엑셀 업로드 드롭존(원복양식 위) — 행사 정산표를 계산기로 불러오기(_evProcessFile 재사용)
+function evUpDragOver(e){ e.preventDefault(); const z=document.getElementById('ev-up-drop'); if(z) z.classList.add('ring-2','ring-brand-black'); }
+function evUpDragLeave(e){ const z=document.getElementById('ev-up-drop'); if(z) z.classList.remove('ring-2','ring-brand-black'); }
+function evUpDrop(e){ e.preventDefault(); const z=document.getElementById('ev-up-drop'); if(z) z.classList.remove('ring-2','ring-brand-black'); const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) _evProcessFile(f); }
 async function _evProcessFile(file){
   if(!file) return;
   if(typeof XLSX==='undefined'){ alert('엑셀 라이브러리 로드 실패'); return; }
