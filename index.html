@@ -19822,6 +19822,55 @@ async function submitPaNewOrders() {
     return;
   }
 
+  // Pre-flight 2: 공급가 매칭 확인 — 공급가가 매칭 안 된 행이 하나라도 있으면 전송 차단.
+  //   (상품DB 공급가까지 확인해야 하므로 캐시를 먼저 로드)
+  try {
+    if (typeof loadProductsFromDB === 'function') await loadProductsFromDB();
+    else if (typeof _paGetMappingProducts === 'function') await _paGetMappingProducts(true);
+  } catch(_) {}
+  const noSupply = [];
+  for (let i = 0; i < payload.rows.length; i++) {
+    const _b = _extRowToPaOrder(payload.rows[i], shop, defaults, i);
+    const sp = (_b && Array.isArray(_b.opts) && _b.opts[0]) ? _b.opts[0].shop_supply_price : undefined;
+    if (sp == null || isNaN(Number(sp))) {
+      noSupply.push({ idx: i + 1, receiver: payload.rows[i].receiver, itemName: payload.rows[i].itemName });
+    }
+  }
+  if (noSupply.length) {
+    if (progPre) progPre.classList.add('hidden');
+    if (resultsWrapPre) {
+      const listHtml = noSupply.map(u => `
+        <tr class="border-t border-brand-border">
+          <td class="p-2 text-xs text-brand-gray">#${u.idx}</td>
+          <td class="p-2 text-xs">${_escapeHtml(u.receiver || '-')}</td>
+          <td class="p-2 text-xs">${_escapeHtml(u.itemName || '-')}</td>
+        </tr>`).join('');
+      resultsWrapPre.innerHTML = `
+        <div class="bg-brand-pink-light/40 border border-brand-pink/40 rounded-xl p-4 text-xs leading-relaxed">
+          <div class="font-bold text-brand-black mb-1">⛔ 공급가가 매칭되지 않은 상품이 있어 전송을 중단했습니다 (${noSupply.length}건 / 총 ${payload.rows.length}건)</div>
+          <div class="text-brand-gray">아래 행들은 공급가를 찾지 못했습니다. "매핑 관리"에서 해당 상품의 공급가를 입력(또는 연결된 상품관리 상품에 공급가 등록)한 뒤 다시 실행해 주세요.</div>
+        </div>
+        <div class="mt-3 border border-brand-border rounded-xl overflow-auto max-h-[260px]">
+          <table class="w-full text-sm">
+            <thead class="bg-brand-bg sticky top-0">
+              <tr class="text-brand-gray text-[11px]">
+                <th class="p-2 text-left font-semibold w-14">#</th>
+                <th class="p-2 text-left font-semibold">수령자</th>
+                <th class="p-2 text-left font-semibold">품목명 (공급가 없음)</th>
+              </tr>
+            </thead>
+            <tbody>${listHtml}</tbody>
+          </table>
+        </div>
+        <div class="mt-3 flex justify-end">
+          <button onclick="openPaProductMapDialog()" class="px-4 py-2 rounded-full bg-brand-black text-white text-xs font-bold hover:bg-[#333]">매핑 관리 열기</button>
+        </div>`;
+      resultsWrapPre.classList.remove('hidden');
+      resultsWrapPre.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    return;
+  }
+
   const btn = document.getElementById('pa-upload-submit-btn');
   const progWrap = document.getElementById('pa-upload-progress');
   const progBar = document.getElementById('pa-upload-progress-bar');
