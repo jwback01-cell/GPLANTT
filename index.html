@@ -25308,7 +25308,16 @@ function renderUploadData() {
     const editCell = isAgg
       ? `<td class="px-4 py-3 text-center whitespace-nowrap"><button onclick="openJetItemDetail(${JSON.stringify(r.itemName||'').replace(/"/g, '&quot;')})" title="이 품목의 개별 매핑 내역과 광고비 보기" class="text-brand-blue hover:text-brand-black hover:underline text-sm font-bold">🔍 상세</button></td>`
       : `<td class="px-4 py-3 text-center whitespace-nowrap"><button onclick="openEditUploadDataRow(${origIdx})" title="이 행 수정" class="text-brand-blue hover:underline text-xs font-bold">✏️ 수정</button></td>`;
-    const rowClass = isAgg ? 'border-t border-brand-border bg-brand-blue-light/20 hover:bg-brand-blue-light/40 font-semibold' : 'border-t border-brand-border hover:bg-brand-bg/50';
+    // 반품 / 교환 행 색상 구분 (반품=핑크, 교환=블루)
+    const isExchangeRow = !isAgg && (r._claimKind === 'exchange' || r.template === 'manual-exchange');
+    const isReturnRow   = !isAgg && !isExchangeRow && (r._isReturn || r.template === 'manual-return');
+    const rowClass = isAgg
+      ? 'border-t border-brand-border bg-brand-blue-light/20 hover:bg-brand-blue-light/40 font-semibold'
+      : isExchangeRow
+        ? 'border-t border-brand-border bg-brand-blue-light/40 hover:bg-brand-blue-light/60'
+        : isReturnRow
+          ? 'border-t border-brand-border bg-brand-pink-light/40 hover:bg-brand-pink-light/60'
+          : 'border-t border-brand-border hover:bg-brand-bg/50';
     return `
     <tr class="${rowClass}">
       ${cbCell}
@@ -25507,7 +25516,8 @@ function _doConvertSelectedToReturn(targetRows, reason, kind) {
     const _origMargin = (orig.profit != null && orig.profit !== '')
       ? Number(orig.profit)
       : ((Number(orig.supply) || 0) + (Number(orig.ship) || 0) - (Number(orig.cost) || 0) - (Number(orig.shipCost) || 0));
-    clone.profit = -_origMargin;
+    // 반품: 마진 반대부호(원본+반품=0) / 교환: 마진 0
+    clone.profit = isExchange ? 0 : -_origMargin;
 
     // 사이트에 '반품-귀책' / '교환-귀책' 표시
     const origSite = String(orig.site || '').trim();
