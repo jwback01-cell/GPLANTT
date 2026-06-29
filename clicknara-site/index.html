@@ -2793,20 +2793,21 @@ async function _evFillPlayauto(file){
       if(!raw.length || raw.join('').toString().trim()==='') continue;   // 빈 행 제외
       const origCode=String(raw[CODE_IDX]==null?'':raw[CODE_IDX]).trim();
       const code=origCode.replace(/[\s-]/g,'').toUpperCase();
-      const rec=code?_evSheetMap.get(code):null;   // A열 == 시트 G열 매칭
-      if(rec){
-        // 매칭된 행 — 시트 J열(판매가)·H열(기본이미지)로 교체 (둘 중 하나라도 비면 취소)
-        if(!rec.restorePrice){ if(!fails.has(origCode)) fails.set(origCode, '시트 J열(판매가) 비어있음'); }
-        else if(!rec.restoreImg){ if(!fails.has(origCode)) fails.set(origCode, '시트 H열(기본이미지) 비어있음'); }
-        else { raw[PRICE_IDX]=rec.restorePrice; raw[IMG_IDX]=rec.restoreImg; filled++; }
-      }
-      out.push(raw);   // 매칭 안 된 행도 원본 그대로 유지
+      if(!code){ out.push(raw); continue; }   // 판매자관리코드 없는 행은 그대로 유지(대상 아님)
+      const rec=_evSheetMap.get(code);   // A열 == 시트 G열 매칭
+      // 코드가 있는데 시트에 매칭값이 없으면 → 오류(다운로드 취소)
+      if(!rec){ if(!fails.has(origCode)) fails.set(origCode, '기존세팅값 시트에 매칭값 없음'); out.push(raw); continue; }
+      // 매칭된 행 — 시트 J열(판매가)·H열(기본이미지)로 교체 (둘 중 하나라도 비면 취소)
+      if(!rec.restorePrice){ if(!fails.has(origCode)) fails.set(origCode, '시트 J열(판매가) 비어있음'); }
+      else if(!rec.restoreImg){ if(!fails.has(origCode)) fails.set(origCode, '시트 H열(기본이미지) 비어있음'); }
+      else { raw[PRICE_IDX]=rec.restorePrice; raw[IMG_IDX]=rec.restoreImg; filled++; }
+      out.push(raw);
     }
     if(fails.size){
       const entries=[...fails.entries()];
       const list=entries.slice(0,60).map(([c,why])=>`• ${c} — ${why}`).join('\n');
       const more=entries.length>60?`\n…외 ${entries.length-60}건`:'';
-      alert(`❌ 다운로드 취소 — 값이 비어있는 판매자코드 ${fails.size}건\n\n${list}${more}\n\n기존세팅값 시트의 J열(판매가)·H열(기본이미지)를 채운 뒤 다시 시도하세요.`);
+      alert(`❌ 다운로드 취소 — 처리 불가 판매자코드 ${fails.size}건\n\n${list}${more}\n\n위 코드를 기존세팅값 시트에 추가하거나 J열(판매가)·H열(기본이미지)를 채운 뒤 다시 시도하세요.`);
       return;
     }
     if(!filled){ alert('교체된 행이 없습니다.\n업로드 엑셀 A열(판매자관리코드)이 기존세팅값 시트 G열과 일치하는지 확인하세요.'); return; }
