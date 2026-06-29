@@ -2524,7 +2524,7 @@ function renderEventCalc() {
         <td class="px-2 py-1 border border-brand-border font-semibold min-w-[150px]">${_evEsc(row.model||'')}</td>
         ${setCell}
         ${num(row.orig)}${num(row.disp)}
-        <td class="px-2 py-1 text-right tabular-nums border border-brand-border font-extrabold bg-yellow-100 text-brand-black">${m.listing?_evFmt(m.listing):'-'}</td>
+        <td class="px-2 py-1 text-right tabular-nums border border-brand-border font-extrabold bg-yellow-100 text-brand-black">${row.disp?_evFmt(row.disp):'-'}</td>
         ${num(row.promo)}
         <td class="px-2 py-1 text-right tabular-nums border border-brand-border font-bold text-brand-blue">${m.finalBuy?_evFmt(m.finalBuy):'-'}</td>
         <td class="px-2 py-1 text-right tabular-nums border border-brand-border font-bold text-brand-blue">${m.benefit?_evFmt(m.benefit):'-'}</td>
