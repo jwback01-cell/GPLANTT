@@ -2113,8 +2113,22 @@ const EV_FORM_IMG_COL = {
   '에스에스지': 'CB',
   '오늘의집': 'CH',
 };
-// 위 설정에 쓰인 모든 컬럼 문자(중복 제거)
-const EV_ALL_IMG_COLS = (() => { const s = new Set(); Object.values(EV_FORM_IMG_COL).forEach(v => { if (typeof v === 'string') s.add(v); else Object.values(v).forEach(x => s.add(x)); }); return [...s]; })();
+// 원복양식 — 사이트별 '판매가(등재가)' 가져올 기존세팅값 시트의 열(컬럼 문자).
+//  이베이는 행 쇼핑몰에 따라 지마켓(T)/옥션(AD) 구분.
+const EV_RESTORE_PRICE_COL = {
+  '11번가': 'AO',
+  '이베이': { '지마켓': 'T', '옥션': 'AD' },
+  '롯데온': 'AU',
+  '쿠팡': 'J',
+  '스마트스토어': 'J',
+  '알리익스프레스': 'J',
+  '에스에스지': 'BX',
+  '오늘의집': 'J',
+};
+// 위 두 설정에 쓰인 모든 컬럼 문자(중복 제거)
+const _evFlatCols = obj => { const s = new Set(); Object.values(obj).forEach(v => { if (typeof v === 'string') s.add(v); else Object.values(v).forEach(x => s.add(x)); }); return [...s]; };
+const EV_ALL_IMG_COLS = _evFlatCols(EV_FORM_IMG_COL);
+const EV_ALL_PRICE_COLS = _evFlatCols(EV_RESTORE_PRICE_COL);
 function _evLoad() {
   let o = null;
   try { o = JSON.parse(localStorage.getItem(EV_KEY) || 'null'); } catch (_) {}
@@ -2250,6 +2264,21 @@ function _evSheetSiteImage(model, site, chan){
   }
   return (val && String(val).trim()) || rec.imageUrl || '';
 }
+// 원복양식용 — 사이트(+이베이는 행 쇼핑몰)에 맞는 판매가(등재가)
+function _evSheetSitePrice(model, site, chan){
+  if(!_evSheetMap) return 0;
+  const rec=_evSheetMap.get(_evNormCode(model)); if(!rec) return 0;
+  const cols = rec.priceCols || {};
+  const cfg = EV_RESTORE_PRICE_COL[site];
+  if(typeof cfg==='string') return cols[cfg]||0;
+  if(cfg){   // 이베이: 지마켓(T)/옥션(AD) — 행 쇼핑몰로 구분
+    const c=String(chan||'');
+    if(c.includes('옥션')) return cols[cfg['옥션']]||0;
+    if(c.includes('지마켓')||c.includes('G마켓')||c.includes('지마')) return cols[cfg['지마켓']]||0;
+    return cols[cfg['지마켓']]||cols[cfg['옥션']]||0;   // 채널 불명 시 지마켓 우선
+  }
+  return 0;
+}
 // 로컬 파일(file://)에서 쓸 경우 배포 주소를 넣으면 자체 프록시로 안정 동작. 예: 'https://클릭나라도메인.vercel.app'
 const EV_PROXY_BASE = '';
 async function _evFetchCsv(gid){
@@ -2266,7 +2295,7 @@ async function _evFetchCsv(gid){
   }
   throw new Error('시트 데이터를 불러오지 못했습니다(CORS/프록시).');
 }
-const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v7';   // v7: + 원복양식 J열(판매가)/H열(이미지)
+const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v8';   // v8: + 원복양식 사이트별 판매가 열(priceCols)
 function _evSheetCacheLoad(){
   try{ const c=JSON.parse(localStorage.getItem(EV_SHEET_CACHE_KEY)||'null'); if(Array.isArray(c)&&c.length) return new Map(c); }catch(_){}
   return null;
@@ -2305,6 +2334,9 @@ async function _evLoadSheetData(force){
         // 행사 양식: 사이트별 이미지 열(컬럼 문자 → 인덱스). 예: 쿠팡=BE, 11번가=AS …
         const imgColIdx = {};
         EV_ALL_IMG_COLS.forEach(letter=>{ try{ imgColIdx[letter]=XLSX.utils.decode_col(letter); }catch(_){ imgColIdx[letter]=-1; } });
+        // 원복양식: 사이트별 판매가(등재가) 열(컬럼 문자 → 인덱스). 예: 11번가=AO, 쿠팡=J …
+        const priceColIdx = {};
+        EV_ALL_PRICE_COLS.forEach(letter=>{ try{ priceColIdx[letter]=XLSX.utils.decode_col(letter); }catch(_){ priceColIdx[letter]=-1; } });
         for(let r=1;r<aoa.length;r++){
           const row = aoa[r]; if(!row) continue;
           const code = _evNormCode(row[codeCol]);
@@ -2312,6 +2344,8 @@ async function _evLoadSheetData(force){
           if(map.has(code)) continue;
           const imgCols = {};
           for(const letter in imgColIdx){ const ci=imgColIdx[letter]; imgCols[letter] = ci>=0 ? String(row[ci]||'').trim() : ''; }
+          const priceCols = {};
+          for(const letter in priceColIdx){ const ci=priceColIdx[letter]; priceCols[letter] = ci>=0 ? num(row[ci]) : 0; }
           map.set(code, {
             gmarket: cols.gmarket>=0?num(row[cols.gmarket]):0,
             auction: cols.auction>=0?num(row[cols.auction]):0,
@@ -2321,7 +2355,7 @@ async function _evLoadSheetData(force){
             jido:    jidoCol>=0?num(row[jidoCol]):0,   // 지도가(스마트스토어/오늘의집/알리/쿠팡 공통)
             imageUrl: imgCol>=0 ? String(row[imgCol]||'').trim() : '',
             imgCols,   // 행사 양식용 — 컬럼문자별 이미지(AS/W/AH/BE…)
-            restorePrice: num(row[XLSX.utils.decode_col('J')]),            // 원복양식 판매가 = 시트 J열
+            priceCols, // 원복양식용 — 컬럼문자별 판매가/등재가(AO/T/AD/J…)
             restoreImg:   String(row[XLSX.utils.decode_col('H')]||'').trim(),  // 원복양식 기본이미지 = 시트 H열
           });
         }
@@ -2500,7 +2534,7 @@ function _evCalcHtml() {
            class="rounded-2xl border-2 border-dashed border-brand-blue/50 bg-brand-blue-light/10 px-4 py-3 flex items-center gap-3 flex-wrap">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2196F3" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         <span class="text-sm font-bold text-brand-black">원복양식</span>
-        <span class="text-xs text-brand-gray">플레이오토 엑셀을 여기로 <b>드래그</b>하면 <b>판매자관리코드(A열)</b>가 같은 행의 <b>판매가(I열)=기존세팅값 시트 J열</b>, <b>기본이미지(AP열)=기존세팅값 시트 H열</b>로 교체해 다운로드합니다.</span>
+        <span class="text-xs text-brand-gray">플레이오토 엑셀을 여기로 <b>드래그</b>하면 <b>판매자관리코드(A열)</b>가 같은 행의 <b>판매가(I열)=각 사이트의 기존세팅값 등재가</b>, <b>기본이미지(AP열)=기존세팅값 시트 H열</b>로 교체해 다운로드합니다.</span>
         <label class="ml-auto px-3 py-1.5 rounded-full bg-brand-black text-white text-xs font-bold hover:bg-[#333] cursor-pointer">파일 선택<input type="file" accept=".csv,.xlsx,.xls" class="hidden" onchange="evFillPlayautoUpload(event)"></label>
       </div>
       <div id="ev-ef-drop" ondragover="evEfDragOver(event)" ondragleave="evEfDragLeave(event)" ondrop="evEfDrop(event)"
@@ -2796,6 +2830,8 @@ async function _evFillPlayauto(file){
     const CODE_IDX =XLSX.utils.decode_col('A');    // 판매자관리코드
     const PRICE_IDX=XLSX.utils.decode_col('I');    // 판매가
     const IMG_IDX  =XLSX.utils.decode_col('AP');   // 기본이미지
+    const _hdr=(rows[0]||[]).map(c=>String(c==null?'':c).replace(/\s+/g,''));
+    const mallIdx=_hdr.findIndex(c=>c.includes('쇼핑몰'));   // 이베이 지마켓/옥션 구분용
     const out=[rows[0]];   // 헤더(그대로)
     let filled=0;
     const fails=new Map();   // 시트에 매칭됐지만 값이 빈 코드
@@ -2808,24 +2844,26 @@ async function _evFillPlayauto(file){
       const rec=_evSheetMap.get(code);   // A열 == 시트 G열 매칭
       // 코드가 있는데 시트에 매칭값이 없으면 → 오류(다운로드 취소)
       if(!rec){ if(!fails.has(origCode)) fails.set(origCode, '기존세팅값 시트에 매칭값 없음'); out.push(raw); continue; }
-      // 매칭된 행 — 시트 J열(판매가)·H열(기본이미지)로 교체 (둘 중 하나라도 비면 취소)
-      if(!rec.restorePrice){ if(!fails.has(origCode)) fails.set(origCode, '시트 J열(판매가) 비어있음'); }
+      // 매칭된 행 — 판매가=사이트별 등재가 열, 기본이미지=시트 H열로 교체 (둘 중 하나라도 비면 취소)
+      const chan = mallIdx>=0 ? String(raw[mallIdx]||'') : '';
+      const price = _evSheetSitePrice(code, ev.name, chan);
+      if(!price){ if(!fails.has(origCode)) fails.set(origCode, `${ev.name} 등재가(판매가) 없음`); }
       else if(!rec.restoreImg){ if(!fails.has(origCode)) fails.set(origCode, '시트 H열(기본이미지) 비어있음'); }
-      else { raw[PRICE_IDX]=rec.restorePrice; raw[IMG_IDX]=rec.restoreImg; filled++; }
+      else { raw[PRICE_IDX]=price; raw[IMG_IDX]=rec.restoreImg; filled++; }
       out.push(raw);
     }
     if(fails.size){
       const entries=[...fails.entries()];
       const list=entries.slice(0,60).map(([c,why])=>`• ${c} — ${why}`).join('\n');
       const more=entries.length>60?`\n…외 ${entries.length-60}건`:'';
-      alert(`❌ 다운로드 취소 — 처리 불가 판매자코드 ${fails.size}건\n\n${list}${more}\n\n위 코드를 기존세팅값 시트에 추가하거나 J열(판매가)·H열(기본이미지)를 채운 뒤 다시 시도하세요.`);
+      alert(`❌ 다운로드 취소 — 처리 불가 판매자코드 ${fails.size}건\n\n${list}${more}\n\n위 코드를 기존세팅값 시트에 추가하거나 해당 사이트 등재가·H열(기본이미지)를 채운 뒤 다시 시도하세요.`);
       return;
     }
     if(!filled){ alert('교체된 행이 없습니다.\n업로드 엑셀 A열(판매자관리코드)이 기존세팅값 시트 G열과 일치하는지 확인하세요.'); return; }
     const outWs=XLSX.utils.aoa_to_sheet(out);
     const outWb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(outWb, outWs, 'Sheet1');
     XLSX.writeFile(outWb, `원복양식_${(ev.name||'행사')}.xlsx`);
-    alert(`✅ ${filled}개 행 판매가(I열)·기본이미지(AP열)를 기존세팅값(J열·H열)으로 교체 완료`);
+    alert(`✅ ${filled}개 행 판매가(I열)=${ev.name} 등재가·기본이미지(AP열)로 교체 완료`);
   }catch(err){ alert('파일 처리 실패: '+(err.message||err)); }
 }
 // ── 행사 양식 — 판매가(I열)=계산기 등재가, 기본이미지(AP열)=기존세팅값 시트 사이트별 이미지 ──
