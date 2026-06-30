@@ -2100,7 +2100,7 @@ async function logout() {
 const EV_KEY = 'cn_events_v1';
 function _evDefaultRates() { return { md: 3, sel: 14, card: 5, cat: 7, cpnFee: 20, seller: 50 }; }
 function _evUid() { return 'ev_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
-const EV_SITES = ['11번가', '이베이', '롯데온', '쿠팡', '스마트스토어', '알리익스프레스', '에스에스지', '오늘의집'];
+const EV_SITES = ['11번가', '이베이', '롯데온', '쿠팡', '스마트스토어', '알리익스프레스', '에스에스지', '오늘의집', '전체'];
 // 행사 양식 — 사이트별 '기본이미지' 가져올 기존세팅값 시트의 열(컬럼 문자). 미설정 사이트는 일반 이미지 열로 폴백.
 //  이베이는 행 쇼핑몰에 따라 지마켓(W)/옥션(AH) 구분.
 const EV_FORM_IMG_COL = {
@@ -2124,6 +2124,7 @@ const EV_RESTORE_PRICE_COL = {
   '알리익스프레스': 'J',
   '에스에스지': 'BX',
   '오늘의집': 'J',
+  '전체': 'J',
 };
 // 원복양식 '기본이미지' 열 override — 지정 사이트만 다른 열 사용(미지정은 기본 H열)
 //  스마트스토어·오늘의집 = BK열
@@ -2230,7 +2231,6 @@ const EV_SHEET_PUB = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRHpO8tEQo
 // 보여줄 시트만 (원본 문서 gid 기준): MSI 모니터(MSI공식몰), 지클릭커
 const EV_SHEET_TABS = [
   { label: 'MSI 모니터', gid: '98661656' },
-  { label: '지클릭커',   gid: '2085709414' },
 ];
 // 편집 가능한 화면 — 표 안에서 바로 수정하면 구글이 자동 저장(새 탭 불필요, 구글 로그인 필요)
 function _evSheetSrc(gid){ return `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/edit?rm=minimal&gid=${gid}#gid=${gid}`; }
