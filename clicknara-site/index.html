@@ -2206,7 +2206,7 @@ function _evCalcRow(row, r) {
   const orig = _evNum(row.orig), disp = _evNum(row.disp), promo = _evNum(row.promo);
   const md = (r.md || 0) / 100, sel = (r.sel || 0) / 100, card = (r.card || 0) / 100;
   const cat = (r.cat || 0) / 100, cpnFeeP = (r.cpnFee || 0) / 100, sellerP = (r.seller || 0) / 100;
-  const listing = md < 1 && md > 0 ? _evR10(disp / (1 - md)) : disp;   // 등재가
+  const listing = md < 1 && md > 0 ? Math.floor(disp / (1 - md) / 10) * 10 : disp;   // 등재가 = ROUNDDOWN(노출가/(1-MD쿠폰%), -1)
   const selCpn = _evR10(listing * sel);                                // 선택쿠폰할인액
   const first = listing - selCpn;                                      // 1차할인액
   const cardDc = _evR10(first * card);                                 // 카드할인액
