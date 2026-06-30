@@ -20846,8 +20846,14 @@ async function fetchInvoiceFromMail(opts) {
       return;
     }
 
+    // 메일 제목에 'CS'가 포함되면 무시 (CS발주서 등 — 송장 메일 아님)
+    let items = (data.items || []).filter(it => !/cs/i.test(String(it.subject || '')));
+    if (!items.length) {
+      _invoiceStatus('가져올 송장 메일이 없습니다. (제목에 CS 포함 메일은 무시)', 'warn');
+      showAppAlert('가져올 메일 없음', '제목에 "CS"가 포함된 메일은 송장 메일이 아니므로 무시됩니다.\n그 외 송장 첨부 메일이 최근 7일 내에 없습니다.', 'info');
+      return;
+    }
     // 클라이언트 측 includes/excludes 필터 (파일 변형 처리용)
-    let items = data.items;
     if (includes.length || excludes.length) {
       items = items.filter(it => {
         const fn = String(it.fileName || '').toLowerCase().replace(/\s+/g, '');
