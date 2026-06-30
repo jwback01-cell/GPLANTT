@@ -3067,7 +3067,7 @@ async function evDownloadForm(){
   });
   const buf=await wb.xlsx.writeBuffer();
   const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-  const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`${_formTitle}_양식.xlsx`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`이미지제작요청_MSI모니터_${ev.name||'행사'}_${_evNowDate()}.xlsx`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
 function evDownloadExcel(){
   if(typeof XLSX==='undefined'){ alert('엑셀 라이브러리 로드 실패'); return; }
