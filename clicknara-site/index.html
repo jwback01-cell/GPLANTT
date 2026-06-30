@@ -2520,6 +2520,7 @@ function _evCalcHtml() {
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         <button onclick="evAddRow()" class="px-3 py-2 rounded-full bg-brand-blue text-white text-sm font-bold hover:opacity-90">+ 행 추가</button>
+        <button onclick="evPasteFromClipboard()" class="px-3 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg" title="엑셀에서 모델명·가격 범위를 복사한 뒤 클릭하면 행으로 붙여넣습니다">📋 붙여넣기</button>
         <button onclick="evDeleteSelected()" class="px-3 py-2 rounded-full border border-brand-pink text-brand-pink text-sm font-bold hover:bg-red-50">선택 삭제</button>
         <button onclick="evDownloadExcel()" class="px-3 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg">엑셀 다운로드</button>
         <button id="ev-mode-btn" onclick="evToggleMode()" class="px-3 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg"></button>
@@ -2639,7 +2640,7 @@ function renderEventCalc() {
     if (thRow) thRow.innerHTML = checkTh + heads.map((h,i)=>`<th class="px-2 py-2.5 font-bold border border-brand-border ${i===0?'text-left':'text-right'} ${i===heads.length-1?'text-center':''} ${i===3?'bg-yellow-200 text-brand-black':''}">${h}</th>`).join('');
     const cell = v => `<td class="px-2 py-1 text-right tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(v)}</td>`;
     const cellHi = v => `<td class="px-2 py-1 text-right font-extrabold tabular-nums border border-brand-border bg-yellow-100 text-brand-black">${_evFmt(v)}</td>`;
-    if (!ev.rows.length) { tbody.innerHTML = '<tr><td colspan="17" class="px-3 py-8 text-center text-brand-gray border border-brand-border">"+ 행 추가", 셀 붙여넣기, 또는 엑셀 파일을 이 표 위로 <b>드래그</b>해서 추가하세요.</td></tr>'; }
+    if (!ev.rows.length) { tbody.innerHTML = '<tr><td colspan="17" class="px-3 py-8 text-center text-brand-gray border border-brand-border">"+ 행 추가", 엑셀에서 복사 후 <b>📋 붙여넣기</b>, 또는 엑셀 파일을 이 표 위로 <b>드래그</b>해서 추가하세요.</td></tr>'; }
     else tbody.innerHTML = ev.rows.map((row, i) => {
       const c = _evCalcRow(row, ev.rates);
       return `<tr class="hover:bg-brand-bg/40">${cbCell(row)}
@@ -2706,6 +2707,33 @@ function evPaste(e, startIdx, startField){
   });
   for(let i=0;i<ev.rows.length;i++){ if(!ev.rows[i]) ev.rows[i]=newRow(); }
   _evSave(o); renderEventCalc();
+}
+// 버튼 클릭 → 클립보드(엑셀 복사본)를 읽어 행으로 추가. 표가 비어 있어도 동작.
+//  열 매핑: 1열=모델명, 2열=기존가, 3열=노출가 (탭 구분). 빈 표일 땐 새 행으로 추가.
+async function evPasteFromClipboard(){
+  let text='';
+  try { text = await navigator.clipboard.readText(); }
+  catch(err){ alert('클립보드를 읽지 못했습니다.\n표의 모델명 칸을 클릭한 뒤 Ctrl+V 로 붙여넣어도 됩니다.'); return; }
+  if(!text || !text.trim()){ alert('클립보드가 비어 있습니다. 엑셀에서 모델명·가격 범위를 먼저 복사하세요.'); return; }
+  const matrix = text.replace(/\r/g,'').split('\n').map(r=>r.split('\t'));
+  while(matrix.length && matrix[matrix.length-1].join('').trim()==='') matrix.pop();
+  if(!matrix.length){ alert('붙여넣을 데이터가 없습니다.'); return; }
+  const order=['model','orig','disp'];
+  const o=_evLoad(); const ev=_evActive(o);
+  let added=0;
+  matrix.forEach(cols=>{
+    const row={id:_evUid(),model:'',orig:0,disp:0,promo:0};
+    for(let c=0;c<cols.length && c<order.length;c++){
+      const raw=String(cols[c]||'').trim();
+      if(raw==='') continue;
+      row[order[c]] = (order[c]==='model') ? raw : _evNum(raw);
+    }
+    if(!row.model && !row.orig && !row.disp) return;   // 완전 빈 행 제외
+    ev.rows.push(row); added++;
+  });
+  if(!added){ alert('붙여넣을 행이 없습니다.'); return; }
+  _evSave(o); renderEventCalc();
+  alert(`✅ ${added}개 행을 붙여넣었습니다.`);
 }
 function evToggleRow(id, checked){ if(checked) _evSel.add(id); else _evSel.delete(id); const sa=document.getElementById('ev-select-all'); if(sa){ const ev=_evActive(); sa.checked = ev.rows.length>0 && ev.rows.every(r=>_evSel.has(r.id)); } }
 function evToggleAll(checked){ const ev=_evActive(); ev.rows.forEach(r=>{ if(checked) _evSel.add(r.id); else _evSel.delete(r.id); }); renderEventCalc(); }
