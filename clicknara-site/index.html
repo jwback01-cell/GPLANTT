@@ -3036,7 +3036,8 @@ async function evDownloadForm(){
   // 제목 (2행) + 기간 (3행) — 위 여백
   ws.getRow(1).height=8;
   ws.mergeCells('A2:F2');
-  const t=ws.getCell('A2'); t.value=ev.title||ev.name||'행사'; t.font={bold:true,size:22}; t.alignment={vertical:'middle'}; ws.getRow(2).height=34;
+  const _formTitle = [ev.name, ev.title].filter(Boolean).join(' ') || '행사';   // 사이트 이름 + 행사 이름
+  const t=ws.getCell('A2'); t.value=_formTitle; t.font={bold:true,size:22}; t.alignment={vertical:'middle'}; ws.getRow(2).height=34;
   ws.mergeCells('A3:F3');
   const p=ws.getCell('A3'); p.value=ev.period?('*기간: '+ev.period):''; p.font={bold:true,size:13,color:{argb:'FF333333'}}; ws.getRow(3).height=22;
   ws.getRow(4).height=8;   // 간격
@@ -3066,7 +3067,7 @@ async function evDownloadForm(){
   });
   const buf=await wb.xlsx.writeBuffer();
   const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-  const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`${ev.title||ev.name||'행사'}_양식.xlsx`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`${_formTitle}_양식.xlsx`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
 function evDownloadExcel(){
   if(typeof XLSX==='undefined'){ alert('엑셀 라이브러리 로드 실패'); return; }
