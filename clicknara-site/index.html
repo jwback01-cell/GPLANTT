@@ -2517,7 +2517,8 @@ function _evCalcHtml() {
       <div class="flex flex-wrap items-center gap-2">
         <span class="px-3 py-1.5 rounded-full bg-brand-black text-white text-sm font-bold" id="ev-site-badge">11번가</span>
         <span class="text-brand-gray text-sm">좌측 <b>행사</b> 메뉴에서 사이트를 선택하세요.</span>
-        <input id="ev-period" oninput="evSetField('period',this.value)" placeholder="기간 (예: 3/30~4/8)" class="px-3 py-2 rounded-xl border border-brand-border text-sm w-[180px] ml-auto">
+        <input id="ev-title" oninput="evSetField('title',this.value)" placeholder="행사 이름 (예: 이베이 월첫세일)" class="px-3 py-2 rounded-xl border border-brand-border text-sm w-[220px] ml-auto">
+        <input id="ev-period" oninput="evSetField('period',this.value)" placeholder="기간 (예: 7/01~7/05)" class="px-3 py-2 rounded-xl border border-brand-border text-sm w-[180px]">
       </div>
       <div id="ev-rate-bar" class="flex flex-wrap gap-3 text-sm bg-brand-bg rounded-2xl p-3">
         ${[['md','MD쿠폰%'],['sel','선택쿠폰%(행사)'],['card','카드%'],['cat','Cat수수료%'],['cpnFee','쿠폰수수료(Cat의%)'],['seller','셀러부담%']].map(([k,label])=>`
@@ -2607,6 +2608,7 @@ function renderEventCalc() {
     a.classList.toggle('text-brand-gray', !on);
   });
   const perEl = document.getElementById('ev-period'); if (perEl && document.activeElement!==perEl) perEl.value = ev.period || '';
+  const titEl = document.getElementById('ev-title'); if (titEl && document.activeElement!==titEl) titEl.value = ev.title || '';
   Object.keys(_evDefaultRates()).forEach(k => { const el = document.getElementById('ev-rate-'+k); if (el && document.activeElement!==el) el.value = ev.rates[k]; });
   const isImport = ev.viewMode === 'import';
   const rateBar = document.getElementById('ev-rate-bar'); if (rateBar) rateBar.classList.toggle('hidden', isImport);
@@ -3046,8 +3048,12 @@ async function evDownloadForm(){
   hr.height=34;
   // 데이터
   ev.rows.forEach((row,idx)=>{
-    let disc,feel; if(isImport){ const m=row.imp||{}; disc=Number(m.finalBuy)||0; feel=Number(m.feel)||0; } else { const cc=_evCalcRow(row,ev.rates); disc=cc.benefit; feel=cc.feel; }
-    const photo=Number(row.promo)||0;
+    // 프로모션 — 기존세팅값 시트 K열(모델 매칭) 우선, 없으면 입력값
+    const _sheetPromo=_evSheetPromo(row.model);
+    const photo=(_sheetPromo!=null && _sheetPromo!==0) ? _sheetPromo : (Number(row.promo)||0);
+    let disc,feel;
+    if(isImport){ const m=row.imp||{}; disc=Number(m.finalBuy)||0; const _ben=Number(m.benefit)||0; feel = _ben ? (_ben - photo) : (Number(m.feel)||0); }
+    else { const cc=_evCalcRow({...row, promo:photo}, ev.rates); disc=cc.benefit; feel=cc.feel; }
     const r=ws.getRow(HR+1+idx);
     const vals=[row.model||'', Number(row.orig)||0, disc, (photo||null), feel, ''];
     vals.forEach((v,i)=>{ const c=r.getCell(i+1); c.value=v; c.border=thin;
