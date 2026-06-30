@@ -2297,6 +2297,12 @@ function _evSheetPromo(model){
   const rec=_evSheetMap.get(_evNormCode(model)); if(!rec) return null;
   return (rec.promoK != null) ? Number(rec.promoK) : null;
 }
+// 이미지 양식 상품명 — 기존세팅값 시트 L열(모델 매칭). 없으면 빈값
+function _evSheetName(model){
+  if(!_evSheetMap) return '';
+  const rec=_evSheetMap.get(_evNormCode(model)); if(!rec) return '';
+  return (rec.nameL && String(rec.nameL).trim()) || '';
+}
 // 로컬 파일(file://)에서 쓸 경우 배포 주소를 넣으면 자체 프록시로 안정 동작. 예: 'https://클릭나라도메인.vercel.app'
 const EV_PROXY_BASE = '';
 async function _evFetchCsv(gid){
@@ -2313,7 +2319,7 @@ async function _evFetchCsv(gid){
   }
   throw new Error('시트 데이터를 불러오지 못했습니다(CORS/프록시).');
 }
-const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v9';   // v9: + 프로모션 K열(promoK)
+const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v10';   // v10: + 상품명 L열(nameL)
 function _evSheetCacheLoad(){
   try{ const c=JSON.parse(localStorage.getItem(EV_SHEET_CACHE_KEY)||'null'); if(Array.isArray(c)&&c.length) return new Map(c); }catch(_){}
   return null;
@@ -2376,6 +2382,7 @@ async function _evLoadSheetData(force){
             priceCols, // 원복양식용 — 컬럼문자별 판매가/등재가(AO/T/AD/J…)
             restoreImg:   String(row[XLSX.utils.decode_col('H')]||'').trim(),  // 원복양식 기본이미지 = 시트 H열
             promoK:       num(row[XLSX.utils.decode_col('K')]),                // 행사 계산기 프로모션 = 시트 K열
+            nameL:        String(row[XLSX.utils.decode_col('L')]||'').trim(),  // 이미지 양식 상품명 = 시트 L열
           });
         }
       }catch(e){ console.warn('[ev-sheet] 파싱 실패', e); }
@@ -3058,7 +3065,8 @@ async function evDownloadForm(){
     if(isImport){ const m=row.imp||{}; disc=Number(m.finalBuy)||0; const _ben=Number(m.benefit)||0; feel = _ben ? (_ben - photo) : (Number(m.feel)||0); }
     else { const cc=_evCalcRow({...row, promo:photo}, ev.rates); disc=cc.benefit; feel=cc.feel; }
     const r=ws.getRow(HR+1+idx);
-    const vals=[row.model||'', Number(row.orig)||0, disc, (photo||null), feel, ''];
+    const _name=_evSheetName(row.model) || row.model || '';   // 상품명 = 기존세팅값 시트 L열(없으면 모델명)
+    const vals=[_name, Number(row.orig)||0, disc, (photo||null), feel, ''];
     vals.forEach((v,i)=>{ const c=r.getCell(i+1); c.value=v; c.border=thin;
       if(i===0){ c.font={bold:true,size:11}; c.alignment={horizontal:'left',vertical:'middle'}; }
       else if(i===5){ c.alignment={horizontal:'left',vertical:'middle'}; }
