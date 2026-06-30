@@ -2996,7 +2996,10 @@ async function _evFillAllImage(file){
     const rows=XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:'' });
     if(!rows.length){ alert('빈 파일입니다.'); return; }
     const CODE_IDX=XLSX.utils.decode_col('A');   // 판매자관리코드
-    const IMG_IDX =XLSX.utils.decode_col('AP');  // 기본이미지
+    // 파일명에 '단일'이 포함되면 AQ열, 아니면 AP열을 교체
+    const _isSingle = /단일/.test(String(file.name||''));
+    const IMG_IDX =XLSX.utils.decode_col(_isSingle ? 'AQ' : 'AP');
+    const _imgColLabel = _isSingle ? 'AQ' : 'AP';
     const out=[rows[0]];
     let filled=0;
     const fails=new Map();
@@ -3025,7 +3028,7 @@ async function _evFillAllImage(file){
     const outWb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(outWb, outWs, 'Sheet1');
     const _d=new Date(); const _stamp=String(_d.getFullYear()).slice(2)+String(_d.getMonth()+1).padStart(2,'0')+String(_d.getDate()).padStart(2,'0');
     XLSX.writeFile(outWb, `전체_기본이미지_${_stamp}.xlsx`);
-    alert(`✅ ${filled}개 행 기본이미지(AP열)를 기존세팅값 H열로 교체 완료`);
+    alert(`✅ ${filled}개 행 기본이미지(${_imgColLabel}열)를 기존세팅값 H열로 교체 완료`);
   }catch(err){ alert('파일 처리 실패: '+(err.message||err)); }
 }
 async function _evFillEventForm(file){
