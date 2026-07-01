@@ -2303,6 +2303,14 @@ function _evSheetName(model){
   const rec=_evSheetMap.get(_evNormCode(model)); if(!rec) return '';
   return (rec.nameL && String(rec.nameL).trim()) || '';
 }
+// 모델명 입력 시 기존세팅값 매칭 — 모델명=L열, 기존가=J열(지도가)로 채움
+function _evApplyModelLookup(row){
+  if(!row || !_evSheetMap) return;
+  const rec=_evSheetMap.get(_evNormCode(row.model)); if(!rec) return;
+  if(rec.nameL && String(rec.nameL).trim()) row.model = String(rec.nameL).trim();   // 모델명 = L열
+  const j = (rec.priceCols && rec.priceCols['J']!=null) ? Number(rec.priceCols['J']) : (Number(rec.jido)||0);
+  if(j) row.orig = j;                                                                 // 기존가 = J열(지도가)
+}
 // 로컬 파일(file://)에서 쓸 경우 배포 주소를 넣으면 자체 프록시로 안정 동작. 예: 'https://클릭나라도메인.vercel.app'
 const EV_PROXY_BASE = '';
 async function _evFetchCsv(gid){
@@ -2720,6 +2728,7 @@ function evEditRow(i,field,val){
     }
   } else {
     row[field] = (field==='model')?val:_evNum(val);
+    if(field==='model') _evApplyModelLookup(row);   // 모델명 매칭 → L열/J열 반영
   }
   _evSave(o); renderEventCalc();
 }
@@ -2741,6 +2750,8 @@ function evPaste(e, startIdx, startField){
       const raw=String(cols[0]||'').trim(); row[startField]= (startField==='model')? raw : _evNum(raw);
     }
   });
+  // 붙여넣은 행에 기존세팅값 매칭 반영 — 모델명=L열, 기존가=J열
+  for(let r=0;r<matrix.length;r++){ const row=ev.rows[startIdx+r]; if(row && row.model) _evApplyModelLookup(row); }
   for(let i=0;i<ev.rows.length;i++){ if(!ev.rows[i]) ev.rows[i]=newRow(); }
   _evSave(o); renderEventCalc();
 }
