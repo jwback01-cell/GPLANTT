@@ -2311,6 +2311,17 @@ function _evApplyModelLookup(row){
   const j = (rec.priceCols && rec.priceCols['J']!=null) ? Number(rec.priceCols['J']) : (Number(rec.jido)||0);
   if(j) row.orig = j;                                                                 // 기존가 = J열(지도가)
 }
+// 모델명 자동완성 목록 — 기존세팅값 시트의 L열(없으면 코드) 값들
+function _evRenderModelDatalist(){
+  const dl=document.getElementById('ev-model-list'); if(!dl) return;
+  if(!_evSheetMap){ dl.innerHTML=''; return; }
+  const seen=new Set(); const opts=[];
+  _evSheetMap.forEach((rec,code)=>{
+    const v=(rec.nameL&&String(rec.nameL).trim())||code;
+    if(v && !seen.has(v)){ seen.add(v); opts.push(`<option value="${_evEsc(v)}"></option>`); }
+  });
+  dl.innerHTML=opts.join('');
+}
 // 로컬 파일(file://)에서 쓸 경우 배포 주소를 넣으면 자체 프록시로 안정 동작. 예: 'https://클릭나라도메인.vercel.app'
 const EV_PROXY_BASE = '';
 async function _evFetchCsv(gid){
@@ -2590,6 +2601,7 @@ function _evCalcHtml() {
         <label class="ml-auto px-3 py-1.5 rounded-full bg-brand-black text-white text-xs font-bold hover:bg-[#333] cursor-pointer">파일 선택<input type="file" accept=".csv,.xlsx,.xls" class="hidden" onchange="evAllImgUpload(event)"></label>
       </div>
       <div id="ev-upload-info" style="display:none" class="items-center gap-2 text-sm flex-wrap"></div>
+      <datalist id="ev-model-list"></datalist>
       <div id="ev-drop" class="overflow-x-auto rounded-xl" ondragover="evDragOver(event)" ondragleave="evDragLeave(event)" ondrop="evDropFile(event)" title="엑셀 파일을 여기로 끌어다 놓으면 업로드됩니다">
         <table class="w-full text-xs border-collapse whitespace-nowrap border border-brand-border">
           <thead><tr id="ev-thead-row" class="bg-brand-bg"></tr></thead>
@@ -2686,7 +2698,7 @@ function renderEventCalc() {
       const _effPromo = (_sheetPromo != null && _sheetPromo !== 0) ? _sheetPromo : _evNum(row.promo);
       const c = _evCalcRow({ ...row, promo: _effPromo }, ev.rates);
       return `<tr class="hover:bg-brand-bg/40">${cbCell(row)}
-        <td class="px-1 py-0.5 border border-brand-border"><input type="text" value="${_evEsc(row.model||'')}" onpaste="evPaste(event,${i},'model')" onchange="evEditRow(${i},'model',this.value)" class="${inp} text-left font-semibold min-w-[150px]"></td>
+        <td class="px-1 py-0.5 border border-brand-border"><input type="text" list="ev-model-list" value="${_evEsc(row.model||'')}" onpaste="evPaste(event,${i},'model')" onchange="evEditRow(${i},'model',this.value)" class="${inp} text-left font-semibold min-w-[150px]" autocomplete="off"></td>
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${row.orig?_evFmt(row.orig):''}" onpaste="evPaste(event,${i},'orig')" onchange="evEditRow(${i},'orig',this.value)" class="${inp} text-right w-full"></td>
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${row.disp?_evFmt(row.disp):''}" onpaste="evPaste(event,${i},'disp')" onchange="evEditRow(${i},'disp',this.value)" class="${inp} text-right w-full"></td>
         ${cellHi(c.listing)}${cell(c.selCpn)}${cell(c.first)}${cell(c.cardDc)}
@@ -2702,6 +2714,7 @@ function renderEventCalc() {
   const selAll = document.getElementById('ev-select-all');
   if (selAll) { const ids = ev.rows.map(r => r.id); selAll.checked = ids.length > 0 && ids.every(id => _evSel.has(id)); }
   try { _evRenderUploadControls(); } catch(_) {}
+  try { _evRenderModelDatalist(); } catch(_) {}
 }
 function evToggleMode(){ const o=_evLoad(); const e=_evActive(o); e.viewMode = (e.viewMode==='import')?'calc':'import'; _evSave(o,true); renderEventCalc(); }
 function _evEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
