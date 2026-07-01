@@ -2541,7 +2541,9 @@ function _evCalcHtml() {
         <button onclick="evDownloadExcel()" class="px-3 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg">엑셀 다운로드</button>
         <button id="ev-mode-btn" onclick="evToggleMode()" class="px-3 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg"></button>
         <span id="ev-mode-note" class="text-xs text-brand-gray"></span>
-        <select id="ev-upload-select" onchange="evLoadUploadSnapshot(this.value)" title="저장된 업로드 불러오기" class="ml-auto px-3 py-2.5 rounded-full border border-brand-border text-sm font-bold bg-white max-w-[220px] cursor-pointer"><option value="">📅 저장된 업로드</option></select>
+        <button onclick="evSaveUploadSnapshot()" class="ml-auto px-4 py-2.5 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333]" title="현재 행사(이름·기간·비율·행)를 저장합니다">💾 행사 저장</button>
+        <select id="ev-upload-select" onchange="evLoadUploadSnapshot(this.value)" title="저장된 행사 불러오기 (행사이름 · 저장날짜)" class="px-3 py-2.5 rounded-full border border-brand-border text-sm font-bold bg-white max-w-[260px] cursor-pointer"><option value="">💾 저장된 행사</option></select>
+        <button onclick="evDeleteUploadSnapshot()" class="px-3 py-2.5 rounded-full border border-brand-border text-sm font-bold text-brand-gray hover:bg-red-50 hover:text-brand-pink hover:border-brand-pink" title="드롭다운에서 선택한 저장 행사 삭제">🗑</button>
         <button onclick="evDownloadPlayauto()" class="px-4 py-2.5 rounded-full bg-brand-blue text-white text-sm font-bold hover:opacity-90 flex items-center gap-1.5" title="모델명(공백·하이픈 제거) + 등재가만 엑셀로 저장">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           플레이오토 다운로드
@@ -2848,16 +2850,19 @@ function _evUploadsLoad(){ try{ const o=JSON.parse(localStorage.getItem(EV_UPLOA
 function _evUploadsSaveAll(o){ try{ localStorage.setItem(EV_UPLOADS_KEY, JSON.stringify(o)); }catch(_){} }
 function evSaveUploadSnapshot(){
   const o=_evLoad(); const ev=_evActive(o);
-  if(!ev.rows || !ev.rows.length){ alert('저장할 업로드 데이터가 없습니다. 먼저 엑셀을 업로드하세요.'); return; }
-  const date = ev.uploadDate || _evNowDate();
+  if(!ev.rows || !ev.rows.length){ alert('저장할 행사 데이터가 없습니다. 먼저 표에 값을 입력하거나 엑셀을 업로드하세요.'); return; }
+  const date = _evNowDate();
+  const title = (ev.title||'').trim();
   const all=_evUploadsLoad();
   const list = Array.isArray(all[ev.name]) ? all[ev.name] : [];
-  const snap = { id:'up_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), date, savedAt:new Date().toISOString(), title:ev.title||'', period:ev.period||'', viewMode:ev.viewMode||'import', rows: JSON.parse(JSON.stringify(ev.rows)) };
-  const idx = list.findIndex(s=>s.date===date);   // 같은 날짜는 교체
+  // 행사 전체 스냅샷 — 이름·기간·비율(쿠폰/카드)·행 모두 저장
+  const snap = { id:'up_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), date, savedAt:new Date().toISOString(), title, period:ev.period||'', viewMode:ev.viewMode||'import', rates: JSON.parse(JSON.stringify(ev.rates||{})), rows: JSON.parse(JSON.stringify(ev.rows)) };
+  const key = `${title}__${date}`;
+  const idx = list.findIndex(s=>`${(s.title||'').trim()}__${s.date}`===key);   // 같은 이름+날짜는 교체
   if(idx>=0) list[idx]=snap; else list.unshift(snap);
   all[ev.name]=list; _evUploadsSaveAll(all);
   _evRenderUploadControls();
-  alert(`✅ '${ev.name}' 업로드 저장됨 (${date}) — ${snap.rows.length}개 모델`);
+  alert(`✅ 행사 저장됨\n${title||'(이름없음)'} · ${date} · ${snap.rows.length}개 모델`);
 }
 function evLoadUploadSnapshot(id){
   if(!id) return;
@@ -2868,6 +2873,7 @@ function evLoadUploadSnapshot(id){
   ev.uploadDate = snap.date;
   if(snap.period!=null) ev.period=snap.period;
   if(snap.title!=null) ev.title=snap.title;
+  if(snap.rates) ev.rates = JSON.parse(JSON.stringify(snap.rates));   // 비율(쿠폰/카드)도 복원
   ev.viewMode = snap.viewMode||'import';
   _evSel.clear(); _evSave(o); renderEventCalc();
 }
@@ -2887,16 +2893,15 @@ function _evRenderUploadControls(){
   const sel=document.getElementById('ev-upload-select');
   if(sel){
     const all=_evUploadsLoad(); const list=all[ev.name]||[];
-    sel.innerHTML = `<option value="">📅 저장된 업로드 (${list.length})</option>` +
-      list.map(s=>`<option value="${s.id}">${s.date}${Array.isArray(s.rows)?` · ${s.rows.length}개`:''}</option>`).join('');
+    const _dOf = s => (s.savedAt ? String(s.savedAt).slice(0,10) : (s.date||''));
+    sel.innerHTML = `<option value="">💾 저장된 행사 (${list.length})</option>` +
+      list.map(s=>`<option value="${s.id}">${_evEsc(s.title||'(이름없음)')} · ${_dOf(s)}${Array.isArray(s.rows)?` · ${s.rows.length}개`:''}</option>`).join('');
   }
   const info=document.getElementById('ev-upload-info');
   if(info){
     if(ev.uploadDate && ev.rows && ev.rows.length){
       info.style.display='flex';
-      info.innerHTML = `<span class="px-3 py-1.5 rounded-full bg-brand-bg text-brand-black font-bold">📅 업로드 날짜: ${_evEsc(ev.uploadDate)}</span>
-        <button onclick="evSaveUploadSnapshot()" class="px-3 py-1.5 rounded-full bg-brand-black text-white text-xs font-bold hover:bg-[#333]">💾 이 업로드 저장</button>
-        <button onclick="evDeleteUploadSnapshot()" class="px-3 py-1.5 rounded-full border border-brand-border text-brand-gray text-xs font-bold hover:bg-red-50 hover:text-brand-pink hover:border-brand-pink" title="드롭다운에서 선택한 저장 항목 삭제">🗑 선택 삭제</button>`;
+      info.innerHTML = `<span class="px-3 py-1.5 rounded-full bg-brand-bg text-brand-black font-bold">📅 업로드 날짜: ${_evEsc(ev.uploadDate)}</span>`;
     } else { info.style.display='none'; info.innerHTML=''; }
   }
 }
