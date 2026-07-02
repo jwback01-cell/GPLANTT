@@ -4828,6 +4828,7 @@ tailwind.config = {
                   <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap cursor-pointer hover:bg-brand-border/60 select-none" data-upload-sort="cost" onclick="sortUploadData('cost')">원가<span class="upload-sort-icon text-brand-gray/50 ml-1">↕</span></th>
                   <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap cursor-pointer hover:bg-brand-border/60 select-none" data-upload-sort="receiver" onclick="sortUploadData('receiver')">수령자명<span class="upload-sort-icon text-brand-gray/50 ml-1">↕</span></th>
                   <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap cursor-pointer hover:bg-brand-border/60 select-none" data-upload-sort="profit" onclick="sortUploadData('profit')" title="마진 = 공급가 + 택배비 − 원가 − 택배비용">마진(공급가+택배비-원가-택배비용)<span class="upload-sort-icon text-brand-gray/50 ml-1">↕</span></th>
+                  <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap" title="해당 기간 광고비를 상품별 매출 비중으로 안분한 값 (리워드=대상 상품에만, 일반=전체 상품에 안분)">광고비</th>
                   <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap cursor-pointer hover:bg-brand-border/60 select-none" data-upload-sort="savedAt" onclick="sortUploadData('savedAt')">저장일시<span class="upload-sort-icon text-brand-gray/50 ml-1">↕</span></th>
                   <th class="text-center px-4 py-3 font-bold text-xs whitespace-nowrap">수정</th>
                 </tr>
@@ -25449,6 +25450,49 @@ function renderUploadData() {
     }
     return _fmt(r.shipCost);
   };
+  // 행별 광고비 안분: 기간(필터 날짜 또는 데이터 전체 범위)의 광고비를
+  //  · 리워드 광고비 → 대상 상품(품목코드/이름 매칭)에만, 각 행 매출(단가×수량) 비중으로
+  //  · 일반 광고비   → 전체 행에 매출 비중으로 안분
+  const adByRow = (function () {
+    const m = new Map();
+    if (!all.length) return m;
+    const ads = (typeof _loadAdCosts === 'function' ? _loadAdCosts() : []);
+    if (!ads.length) return m;
+    const _rnA = s => String(s == null ? '' : s).replace(/[^0-9a-z가-힣]/gi, '').toLowerCase();
+    const rowRev = r => (Number(r.price) || 0) * (Number(r.qty) || 0);
+    const ds = all.map(r => _normDate(r.date)).filter(d => d && d.length === 8).sort();
+    const aStart = startDate || ds[0] || '';
+    const aEnd   = endDate   || ds[ds.length - 1] || '';
+    ads.forEach(a => {
+      const d = String(a.date || '').replace(/-/g, '').slice(0, 8);
+      if (!d) return;
+      if (aStart && d < aStart) return;
+      if (aEnd && d > aEnd) return;
+      const amt = Number(a.amount) || 0;
+      if (amt <= 0) return;
+      let targets;
+      if (a.template === 'reward' && Array.isArray(a.rewardProducts) && a.rewardProducts.length) {
+        const skus  = new Set(a.rewardProducts.map(p => String(p.sku || '').trim().toUpperCase()).filter(Boolean));
+        const names = new Set(a.rewardProducts.map(p => _rnA(p.name)).filter(Boolean));
+        targets = all.filter(r => {
+          const rs = String(r.itemCode || '').trim().toUpperCase();
+          if (rs && skus.has(rs)) return true;
+          return names.has(_rnA(r.itemName));
+        });
+      } else {
+        targets = all;
+      }
+      if (!targets.length) return;
+      const tot = targets.reduce((s, r) => s + rowRev(r), 0);
+      if (tot > 0) targets.forEach(r => m.set(r, (m.get(r) || 0) + amt * rowRev(r) / tot));
+      else { const per = amt / targets.length; targets.forEach(r => m.set(r, (m.get(r) || 0) + per)); }
+    });
+    return m;
+  })();
+  const _adCell = r => {
+    const v = adByRow.get(r) || 0;
+    return v > 0 ? `<span class="text-brand-pink font-bold">${_fmt(Math.round(v))}</span>` : '<span class="text-brand-gray">-</span>';
+  };
   const tbody = document.getElementById('upload-data-tbody');
   tbody.innerHTML = filtered.map(r => {
     const isAgg = !!r._isJetAggregate;
@@ -25489,6 +25533,7 @@ function renderUploadData() {
       <td class="px-4 py-3 text-right whitespace-nowrap">${_money(r.cost)}</td>
       <td class="px-4 py-3 whitespace-nowrap">${r.receiver||''}</td>
       <td class="px-4 py-3 text-right whitespace-nowrap">${_marginCell(r.profit)}</td>
+      <td class="px-4 py-3 text-right whitespace-nowrap">${_adCell(r)}</td>
       <td class="px-4 py-3 text-brand-gray text-xs whitespace-nowrap">${r.savedAt||''}</td>
       ${editCell}
     </tr>`;
@@ -25527,12 +25572,14 @@ function renderUploadData() {
       <tr class="border-t border-brand-border bg-brand-blue-light/30">
         <td class="px-4 py-2 font-bold text-xs text-brand-gray" colspan="13">📣 광고비 (${minD || '?'} ~ ${maxD || '?'} · 사이트 전체)</td>
         <td class="px-4 py-2 text-right font-black text-brand-pink">−${_fmt(adTotal)}</td>
+        <td class="px-4 py-2 text-right font-black text-brand-pink">${_fmt(adTotal)}</td>
         <td class="px-4 py-2"></td>
         <td class="px-4 py-2"></td>
       </tr>
       <tr class="border-t-2 border-brand-black bg-brand-bg">
         <td class="px-4 py-3 font-bold text-xs text-brand-gray" colspan="13">실마진 (마진 − 광고비)</td>
         <td class="px-4 py-3 text-right font-black ${profitClass}">${_fmt(profitAfterAd)}</td>
+        <td class="px-4 py-3"></td>
         <td class="px-4 py-3"></td>
         <td class="px-4 py-3"></td>
       </tr>`;
@@ -25548,6 +25595,7 @@ function renderUploadData() {
       <td class="px-4 py-3 text-right font-black">${_sumCell(sumCostObj)}</td>
       <td class="px-4 py-3"></td>
       <td class="px-4 py-3 text-right font-black">${_sumProfitCell(sumProfitObj)}</td>
+      <td class="px-4 py-3 text-right font-black text-brand-pink">${(() => { const v = all.reduce((s,r)=>s+(adByRow.get(r)||0),0); return v > 0 ? _fmt(Math.round(v)) : '<span class="text-brand-gray font-normal">-</span>'; })()}</td>
       <td class="px-4 py-3"></td>
       <td class="px-4 py-3"></td>
     </tr>${adFooterHtml}`;
