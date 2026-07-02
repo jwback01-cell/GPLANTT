@@ -2844,6 +2844,7 @@ async function _evProcessFile(file){
         if(!cols) continue;
         const model = String(r[cols.model]==null?'':r[cols.model]).trim();
         if(!model || norm(model)==='model') continue;
+        if(model.startsWith('*')) continue;   // 섹션 헤더 행(*GAMING MNT, *PRO MNT 등) 제외
         const orig = cols.orig>=0 ? _evNum(r[cols.orig]) : 0;
         const disp = cols.disp>=0 ? _evNum(r[cols.disp]) : 0;
         if(!orig && !disp) continue;   // 합계/빈 행 제외
@@ -2888,8 +2889,10 @@ function evSaveUploadSnapshot(){
   _evRenderUploadControls();
   alert(`✅ 행사 저장됨\n${title||'(이름없음)'} · ${date} · ${snap.rows.length}개 모델`);
 }
+let _evSelSnapId='';   // 드롭다운에서 선택한 저장 행사 id (삭제 대상 추적)
 function evLoadUploadSnapshot(id){
-  if(!id) return;
+  if(!id){ _evSelSnapId=''; return; }
+  _evSelSnapId=id;
   const o=_evLoad(); const ev=_evActive(o);
   const all=_evUploadsLoad(); const list=all[ev.name]||[];
   const snap=list.find(s=>s.id===id); if(!snap){ return; }
@@ -2903,13 +2906,15 @@ function evLoadUploadSnapshot(id){
 }
 function evDeleteUploadSnapshot(){
   const o=_evLoad(); const ev=_evActive(o);
-  const sel=document.getElementById('ev-upload-select'); const id=sel&&sel.value;
-  if(!id){ alert('삭제할 저장 항목을 먼저 선택하세요.'); return; }
+  const sel=document.getElementById('ev-upload-select');
+  const id=(sel&&sel.value) || _evSelSnapId;   // 드롭다운 선택값 우선, 없으면 마지막 선택 추적값
+  if(!id){ alert('삭제할 저장 행사를 드롭다운에서 먼저 선택하세요.'); return; }
   const all=_evUploadsLoad(); const list=all[ev.name]||[];
   const snap=list.find(s=>s.id===id);
-  if(!snap){ return; }
-  if(!confirm(`저장된 업로드(${snap.date}, ${ (snap.rows||[]).length }개)를 삭제할까요?`)) return;
+  if(!snap){ alert('삭제할 저장 행사를 찾을 수 없습니다.'); return; }
+  if(!confirm(`저장된 행사 "${snap.title||'(이름없음)'} · ${snap.date}"를 삭제할까요?`)) return;
   all[ev.name]=list.filter(s=>s.id!==id); _evUploadsSaveAll(all);
+  _evSelSnapId='';
   _evRenderUploadControls();
 }
 function _evRenderUploadControls(){
@@ -2920,6 +2925,8 @@ function _evRenderUploadControls(){
     const _dOf = s => (s.savedAt ? String(s.savedAt).slice(0,10) : (s.date||''));
     sel.innerHTML = `<option value="">💾 저장된 행사 (${list.length})</option>` +
       list.map(s=>`<option value="${s.id}">${_evEsc(s.title||'(이름없음)')} · ${_dOf(s)}${Array.isArray(s.rows)?` · ${s.rows.length}개`:''}</option>`).join('');
+    // 마지막 선택 유지 → 🗑 삭제가 대상을 알 수 있게
+    if(_evSelSnapId && list.some(s=>s.id===_evSelSnapId)) sel.value=_evSelSnapId; else _evSelSnapId='';
   }
   const info=document.getElementById('ev-upload-info');
   if(info){
