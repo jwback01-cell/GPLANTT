@@ -2663,9 +2663,9 @@ function renderEventCalc() {
 
   if (isImport) {
     if (!_evSheetFetched && !_evSheetLoading) _evLoadSheetData();   // 기존세팅값 시트 등재가 로드(1회/세션)
-    const heads = ['모델명','기존세팅값','기존가(SRP)','행사세팅가','등재가','MKT행사','쿠폰+카드 최종구매가','최종혜택가','체감가','매출이익','정산예상(최종정산가)','최종정산금액',''];
+    const heads = ['모델명','기존세팅값','기존가(SRP)','행사세팅가','등재가','MKT행사','쿠폰+카드 최종구매가','최종혜택가','체감가','매출이익','정산예상(최종정산가)','최종정산금액','비고',''];
     if (thRow) thRow.innerHTML = checkTh + heads.map((h,i)=>`<th class="px-2 py-2.5 font-bold border border-brand-border ${i===0?'text-left':(i===heads.length-1?'text-center':'text-right')} ${(i===1||i===4||i===10)?'bg-yellow-200 text-brand-black':''}">${h}</th>`).join('');
-    if (!ev.rows.length) { tbody.innerHTML = `<tr><td colspan="14" class="px-3 py-8 text-center text-brand-gray border border-brand-border">엑셀 파일을 이 표 위로 <b>드래그</b>하거나 "엑셀 업로드" 버튼으로 가져오세요.</td></tr>`; }
+    if (!ev.rows.length) { tbody.innerHTML = `<tr><td colspan="15" class="px-3 py-8 text-center text-brand-gray border border-brand-border">엑셀 파일을 이 표 위로 <b>드래그</b>하거나 "엑셀 업로드" 버튼으로 가져오세요.</td></tr>`; }
     else tbody.innerHTML = ev.rows.map((row,i)=>{ const m=row.imp||{}; const num=v=>`<td class="px-2 py-1 text-right tabular-nums border border-brand-border">${v?_evFmt(v):'-'}</td>`;
       const setListing = _evSheetListing(row.model, ev.name);
       const setCell = `<td class="px-2 py-1 text-right tabular-nums border border-brand-border bg-yellow-50 ${setListing?'font-bold text-brand-black':'text-brand-gray'}" title="기존세팅값 시트의 ${_evEsc(ev.name||'')} 등재가">${setListing?_evFmt(setListing):(_evSheetMap?'-':'…')}</td>`;
@@ -2681,17 +2681,18 @@ function renderEventCalc() {
         ${num(m.profit)}
         <td class="px-2 py-1 text-right tabular-nums border border-brand-border font-extrabold bg-yellow-100 text-brand-black">${m.settle?_evFmt(m.settle):'-'}</td>
         ${num(m.settleFinal)}
+        <td class="px-1 py-0.5 border border-brand-border"><input type="text" value="${_evEsc(row.note||'')}" onchange="evEditRow(${i},'note',this.value)" placeholder="비고" class="${inp} text-left w-full min-w-[120px]"></td>
         <td class="px-2 py-1 text-center border border-brand-border"><button onclick="evDelRow(${i})" class="text-brand-gray hover:text-brand-pink text-base leading-none">×</button></td>
       </tr>`; }).join('');
   } else {
     if (!_evSheetFetched && !_evSheetLoading) _evLoadSheetData();   // 프로모션(K열) 매칭용 시트 로드
-    const heads = ['모델명','기존가','노출가','등재가','선택쿠폰할인액','1차할인액','카드할인액','최종혜택가','Cat수수료','쿠폰수수료','선택쿠폰셀러부담','카드셀러부담','ESM+정산예상','프로모션','최종체감가',''];
+    const heads = ['모델명','기존가','노출가','등재가','선택쿠폰할인액','1차할인액','카드할인액','최종혜택가','Cat수수료','쿠폰수수료','선택쿠폰셀러부담','카드셀러부담','ESM+정산예상','프로모션','최종체감가','비고',''];
     if (thRow) thRow.innerHTML = checkTh + heads.map((h,i)=>`<th class="px-2 py-2.5 font-bold border border-brand-border ${i===0?'text-left':'text-right'} ${i===heads.length-1?'text-center':''} ${i===3?'bg-yellow-200 text-brand-black':''}">${h}</th>`).join('');
     const cell = v => `<td class="px-2 py-1 text-right tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(v)}</td>`;
     const cellHi = v => `<td class="px-2 py-1 text-right font-extrabold tabular-nums border border-brand-border bg-yellow-100 text-brand-black">${_evFmt(v)}</td>`;
     // 빈 표여도 입력 가능한 빈 행 1개를 띄움 → 모델명 칸 클릭 후 Ctrl+V 로 붙여넣기 가능
     const rowsToRender = ev.rows.length ? ev.rows : [{ id:'__blank0__', model:'', orig:0, disp:0, promo:0 }];
-    const _emptyHint = ev.rows.length ? '' : `<tr><td colspan="17" class="px-3 py-2 text-center text-xs text-brand-gray border border-brand-border bg-brand-bg/40">아래 <b>모델명</b> 칸을 클릭하고 엑셀(모델명·기존가·노출가)을 복사해 <b>Ctrl+V</b> 로 붙여넣으세요. 상단 쿠폰·카드 비율 기준으로 등재가·혜택가가 자동 계산됩니다.</td></tr>`;
+    const _emptyHint = ev.rows.length ? '' : `<tr><td colspan="18" class="px-3 py-2 text-center text-xs text-brand-gray border border-brand-border bg-brand-bg/40">아래 <b>모델명</b> 칸을 클릭하고 엑셀(모델명·기존가·노출가)을 복사해 <b>Ctrl+V</b> 로 붙여넣으세요. 상단 쿠폰·카드 비율 기준으로 등재가·혜택가가 자동 계산됩니다.</td></tr>`;
     tbody.innerHTML = _emptyHint + rowsToRender.map((row, i) => {
       // 프로모션 — 기존세팅값 시트 K열(모델 매칭) 우선, 없으면 직접 입력값
       const _sheetPromo = _evSheetPromo(row.model);
@@ -2707,6 +2708,7 @@ function renderEventCalc() {
         <td class="px-2 py-1 text-right font-bold tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(c.settle)}</td>
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${_effPromo?_evFmt(_effPromo):''}" onpaste="evPaste(event,${i},'promo')" onchange="evEditRow(${i},'promo',this.value)" class="${inp} text-right w-full" title="${_sheetPromo!=null?'기존세팅값 시트 K열 자동 반영':''}"></td>
         <td class="px-2 py-1 text-right font-bold text-brand-pink tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(c.feel)}</td>
+        <td class="px-1 py-0.5 border border-brand-border"><input type="text" value="${_evEsc(row.note||'')}" onchange="evEditRow(${i},'note',this.value)" placeholder="비고" class="${inp} text-left w-full min-w-[120px]"></td>
         <td class="px-2 py-1 text-center border border-brand-border"><button onclick="evDelRow(${i})" class="text-brand-gray hover:text-brand-pink text-base leading-none">×</button></td>
       </tr>`;
     }).join('');
@@ -2740,7 +2742,7 @@ function evEditRow(i,field,val){
       row.disp=best;
     }
   } else {
-    row[field] = (field==='model')?val:_evNum(val);
+    row[field] = (field==='model'||field==='note')?val:_evNum(val);   // 모델명·비고는 문자열
     if(field==='model') _evApplyModelLookup(row);   // 모델명 매칭 → L열/J열 반영
   }
   _evSave(o); renderEventCalc();
@@ -3162,7 +3164,7 @@ async function evDownloadForm(){
     else { const cc=_evCalcRow({...row, promo:photo}, ev.rates); disc=cc.benefit; feel=cc.feel; }
     const r=ws.getRow(HR+1+idx);
     const _name=_evSheetName(row.model) || row.model || '';   // 상품명 = 기존세팅값 시트 L열(없으면 모델명)
-    const vals=[_name, Number(row.orig)||0, disc, (photo||null), feel, ''];
+    const vals=[_name, Number(row.orig)||0, disc, (photo||null), feel, (row.note||'')];   // 마지막=비고
     vals.forEach((v,i)=>{ const c=r.getCell(i+1); c.value=v; c.border=thin;
       if(i===0){ c.font={bold:true,size:11}; c.alignment={horizontal:'left',vertical:'middle'}; }
       else if(i===5){ c.alignment={horizontal:'left',vertical:'middle'}; }
