@@ -2098,7 +2098,7 @@ async function logout() {
 
 // ════════════════ 행사 정산 계산기 ════════════════
 const EV_KEY = 'cn_events_v1';
-function _evDefaultRates() { return { md: 3, sel: 14, card: 5, cat: 7, cpnFee: 20, seller: 50 }; }
+function _evDefaultRates() { return { md: 3, sel: 14, card: 5, cat: 7, cpnFee: 20, seller: 50, capCoupon: 1000000, capCard: 100000 }; }
 function _evUid() { return 'ev_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 const EV_SITES = ['11번가', '이베이', '롯데온', '쿠팡', '스마트스토어', '알리익스프레스', '에스에스지', '오늘의집', '전체'];
 // 행사 양식 — 사이트별 '기본이미지' 가져올 기존세팅값 시트의 열(컬럼 문자). 미설정 사이트는 일반 이미지 열로 폴백.
@@ -2208,9 +2208,11 @@ function _evCalcRow(row, r) {
   const md = (r.md || 0) / 100, sel = (r.sel || 0) / 100, card = (r.card || 0) / 100;
   const cat = (r.cat || 0) / 100, cpnFeeP = (r.cpnFee || 0) / 100, sellerP = (r.seller || 0) / 100;
   const listing = md < 1 && md > 0 ? Math.floor(disp / (1 - md) / 10) * 10 : disp;   // 등재가 = ROUNDDOWN(노출가/(1-MD쿠폰%), -1)
-  // 행별 최대 할인 한도(입력 시 그 이하로 제한). 미입력 시 기본 한도(선택쿠폰 100만, 카드 10만)
-  const selCap  = (row.selCap  != null && row.selCap  !== '') ? Number(row.selCap)  : 1000000;
-  const cardCap = (row.cardCap != null && row.cardCap !== '') ? Number(row.cardCap) : 100000;
+  // 최대 할인 한도 — 행별 입력(row.selCap/cardCap) 우선, 없으면 전체 한도(rates.capCoupon/capCard), 그것도 없으면 기본값
+  const gCapSel  = (r.capCoupon != null && r.capCoupon !== '' && Number(r.capCoupon) > 0) ? Number(r.capCoupon) : 1000000;
+  const gCapCard = (r.capCard   != null && r.capCard   !== '' && Number(r.capCard)   > 0) ? Number(r.capCard)   : 100000;
+  const selCap  = (row.selCap  != null && row.selCap  !== '') ? Number(row.selCap)  : gCapSel;
+  const cardCap = (row.cardCap != null && row.cardCap !== '') ? Number(row.cardCap) : gCapCard;
   // 선택쿠폰할인액 = IF(등재가>=50000, MIN(ROUNDDOWN(선택쿠폰%*등재가,-1), 한도), 0)
   const selCpn = listing >= 50000 ? Math.min(Math.floor(listing * sel / 10) * 10, selCap) : 0;
   const first = listing - selCpn;                                      // 1차할인액
@@ -2552,7 +2554,7 @@ function _evCalcHtml() {
         <input id="ev-period" oninput="evSetField('period',this.value)" placeholder="기간 (예: 7/01~7/05)" class="px-3 py-2 rounded-xl border border-brand-border text-sm w-[180px]">
       </div>
       <div id="ev-rate-bar" class="flex flex-wrap gap-3 text-sm bg-brand-bg rounded-2xl p-3">
-        ${[['md','MD쿠폰%'],['sel','선택쿠폰%(행사)'],['card','카드%'],['cat','Cat수수료%'],['cpnFee','쿠폰수수료(Cat의%)'],['seller','셀러부담%']].map(([k,label])=>`
+        ${[['md','MD쿠폰%'],['sel','선택쿠폰%(행사)'],['card','카드%'],['cat','Cat수수료%'],['cpnFee','쿠폰수수료(Cat의%)'],['seller','셀러부담%'],['capCoupon','쿠폰한도'],['capCard','카드한도']].map(([k,label])=>`
           <label class="flex items-center gap-1.5"><span class="text-brand-gray font-semibold whitespace-nowrap">${label}</span>
             <input type="number" step="0.1" id="ev-rate-${k}" oninput="evSetRate('${k}',this.value)" class="w-20 px-2 py-1.5 rounded-lg border border-brand-border text-right"></label>
         `).join('')}
@@ -2950,7 +2952,7 @@ function evLoadUploadSnapshot(id){
   ev.uploadDate = snap.date;
   if(snap.period!=null) ev.period=snap.period;
   if(snap.title!=null) ev.title=snap.title;
-  if(snap.rates) ev.rates = JSON.parse(JSON.stringify(snap.rates));   // 비율(쿠폰/카드)도 복원
+  if(snap.rates) ev.rates = Object.assign(_evDefaultRates(), snap.rates);   // 비율(쿠폰/카드·한도) 복원 + 신규 한도 기본값 보장
   ev.viewMode = snap.viewMode||'import';
   _evSel.clear(); _evSave(o); renderEventCalc();
 }
