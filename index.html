@@ -1116,6 +1116,11 @@ tailwind.config = {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               내보내기
             </button>
+            <button onclick="document.getElementById('event-excel-input').click()" class="bg-white border border-brand-border text-brand-black px-4 py-2 rounded-full text-sm font-bold hover:bg-brand-bg flex items-center gap-1.5" title="행사 엑셀(제목=사이트+행사이름, *기간, 상품표)을 업로드하면 캘린더에 행사가 저장됩니다">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              엑셀 업로드
+            </button>
+            <input type="file" id="event-excel-input" accept=".xlsx,.xls,.csv" class="hidden" onchange="uploadEventExcel(event)">
             <button onclick="openAddEventModal()" class="bg-brand-black text-white px-4 py-2 rounded-full text-sm font-bold hover:-translate-y-0.5 transition-transform shadow-md flex items-center gap-1.5">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
               행사 추가
@@ -14419,6 +14424,65 @@ function _loadEvents() {
 }
 function _saveEvents(arr) {
   try { localStorage.setItem(EVENTS_KEY, JSON.stringify(arr || [])); } catch(_) {}
+}
+// 기간 문자열 → {start,end} (YYYY-MM-DD). 예: "07/01-07/11", "7/1 ~ 7/11", "3/30~4/8"
+function _gpParsePeriod(period) {
+  const s = String(period || ''); const found = s.match(/(\d{1,2})\s*[\/.\-]\s*(\d{1,2})/g);
+  if (!found || !found.length) return null;
+  const md = str => { const m = str.match(/(\d{1,2})\s*[\/.\-]\s*(\d{1,2})/); return m ? { mo:+m[1], d:+m[2] } : null; };
+  const a = md(found[0]); const b = md(found[found.length >= 2 ? 1 : 0]); if (!a) return null;
+  const yr = new Date().getFullYear(); const pad = n => String(n).padStart(2,'0');
+  const eb = b || a; const eY = (eb.mo < a.mo) ? yr + 1 : yr;
+  return { start:`${yr}-${pad(a.mo)}-${pad(a.d)}`, end:`${eY}-${pad(eb.mo)}-${pad(eb.d)}`, sMD:`${pad(a.mo)}.${pad(a.d)}`, eMD:`${pad(eb.mo)}.${pad(eb.d)}` };
+}
+// 행사 엑셀 업로드 → 캘린더 행사로 저장 (제목=사이트+행사이름, *기간, 상품명 표)
+async function uploadEventExcel(e) {
+  const file = e.target.files && e.target.files[0]; e.target.value = '';
+  if (!file) return;
+  if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 로드 실패 (새로고침 후 재시도)'); return; }
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    if (!aoa.length) { alert('빈 파일입니다.'); return; }
+    const cellsOf = r => (r || []).map(c => String(c == null ? '' : c).trim()).filter(Boolean);
+    // 제목(사이트+행사이름) — 상단에서 '*'/기간/헤더 아닌 첫 텍스트
+    let title = '';
+    for (let i = 0; i < Math.min(aoa.length, 6) && !title; i++) {
+      for (const c of cellsOf(aoa[i])) {
+        if (c.startsWith('*')) continue;
+        if (/기간/.test(c)) continue;
+        if (/^(상품명|기존가|할인가|포토리뷰|최종\s*체감가|비고)$/.test(c)) continue;
+        title = c; break;
+      }
+    }
+    if (!title) { alert('엑셀 상단에서 행사 제목(예: "11번가 십일절")을 찾지 못했습니다.'); return; }
+    // 기간
+    let periodStr = '';
+    for (let i = 0; i < Math.min(aoa.length, 8); i++) { const line = cellsOf(aoa[i]).join(' '); const m = line.match(/기간[^0-9]*([0-9].*)/); if (m) { periodStr = m[1]; break; } }
+    const pd = _gpParsePeriod(periodStr);
+    if (!pd) { alert('엑셀에서 기간(예: *기간: 07/01-07/11)을 찾지 못했습니다.'); return; }
+    // 상품명 목록 (헤더행 아래 A열)
+    let hdrIdx = -1;
+    for (let i = 0; i < aoa.length; i++) { if (cellsOf(aoa[i]).some(c => c === '상품명')) { hdrIdx = i; break; } }
+    let products = '';
+    if (hdrIdx >= 0) { const names = []; for (let i = hdrIdx + 1; i < aoa.length; i++) { const nm = String((aoa[i] || [])[0] || '').trim(); if (nm) names.push(nm); } products = names.join('\n'); }
+    // 사이트 / 행사이름 분리 (첫 단어=사이트)
+    const parts = title.split(/\s+/); const site = parts[0] || title; const name = parts.slice(1).join(' ') || title;
+    const composed = (typeof _evComposeTitle === 'function') ? _evComposeTitle(site, name, pd.start, pd.end) : `${site} ${name} ${pd.sMD}-${pd.eMD}`;
+    const events = _loadEvents();
+    const existing = events.find(ev => ev.site === site && (ev.name || '') === name && ev.dateStart === pd.start);
+    if (existing) {
+      existing.dateEnd = pd.end; existing.title = composed; existing.category = site; if (products) existing.products = products; existing.updatedAt = new Date().toISOString();
+    } else {
+      events.push({ id: _evNewId(), site, name, title: composed, category: site, dateStart: pd.start, dateEnd: pd.end, products, createdAt: new Date().toISOString() });
+    }
+    _saveEvents(events);
+    const d = new Date(pd.start + 'T00:00:00'); if (!isNaN(d.getTime())) { _eventsMonth = d.getMonth(); _eventsYear = d.getFullYear(); }
+    renderEventsCalendar();
+    alert(`✅ 행사 등록 완료\n${composed}${products ? `\n상품 ${products.split('\n').length}개 포함` : ''}${existing ? '\n(기존 행사 업데이트)' : ''}`);
+  } catch (err) { alert('엑셀 처리 실패: ' + (err.message || err)); }
 }
 function _evDateKey(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
