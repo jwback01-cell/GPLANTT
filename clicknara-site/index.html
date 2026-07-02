@@ -2208,11 +2208,14 @@ function _evCalcRow(row, r) {
   const md = (r.md || 0) / 100, sel = (r.sel || 0) / 100, card = (r.card || 0) / 100;
   const cat = (r.cat || 0) / 100, cpnFeeP = (r.cpnFee || 0) / 100, sellerP = (r.seller || 0) / 100;
   const listing = md < 1 && md > 0 ? Math.floor(disp / (1 - md) / 10) * 10 : disp;   // 등재가 = ROUNDDOWN(노출가/(1-MD쿠폰%), -1)
-  // 선택쿠폰할인액 = IF(등재가>=50000, MIN(ROUNDDOWN(선택쿠폰%*등재가,-1), 1,000,000), 0)
-  const selCpn = listing >= 50000 ? Math.min(Math.floor(listing * sel / 10) * 10, 1000000) : 0;
+  // 행별 최대 할인 한도(입력 시 그 이하로 제한). 미입력 시 기본 한도(선택쿠폰 100만, 카드 10만)
+  const selCap  = (row.selCap  != null && row.selCap  !== '') ? Number(row.selCap)  : 1000000;
+  const cardCap = (row.cardCap != null && row.cardCap !== '') ? Number(row.cardCap) : 100000;
+  // 선택쿠폰할인액 = IF(등재가>=50000, MIN(ROUNDDOWN(선택쿠폰%*등재가,-1), 한도), 0)
+  const selCpn = listing >= 50000 ? Math.min(Math.floor(listing * sel / 10) * 10, selCap) : 0;
   const first = listing - selCpn;                                      // 1차할인액
-  // 카드할인액 = IF(1차할인액>=50000, MIN(ROUNDDOWN(카드%*1차할인액,-1), 100,000), 0)
-  const cardDc = first >= 50000 ? Math.min(Math.floor(first * card / 10) * 10, 100000) : 0;
+  // 카드할인액 = IF(1차할인액>=50000, MIN(ROUNDDOWN(카드%*1차할인액,-1), 한도), 0)
+  const cardDc = first >= 50000 ? Math.min(Math.floor(first * card / 10) * 10, cardCap) : 0;
   const benefit = first - cardDc;                                      // 최종혜택가
   const catFee = Math.round(listing * cat);                            // Cat수수료
   const cpnFee = Math.round(catFee * cpnFeeP);                         // 쿠폰수수료(Cat의 %)
@@ -2702,7 +2705,10 @@ function renderEventCalc() {
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" list="ev-model-list" value="${_evEsc(row.model||'')}" onpaste="evPaste(event,${i},'model')" onchange="evEditRow(${i},'model',this.value)" class="${inp} text-left font-semibold min-w-[150px]" autocomplete="off"></td>
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${row.orig?_evFmt(row.orig):''}" onpaste="evPaste(event,${i},'orig')" onchange="evEditRow(${i},'orig',this.value)" class="${inp} text-right w-full"></td>
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${row.disp?_evFmt(row.disp):''}" onpaste="evPaste(event,${i},'disp')" onchange="evEditRow(${i},'disp',this.value)" class="${inp} text-right w-full"></td>
-        ${cellHi(c.listing)}${cell(c.selCpn)}${cell(c.first)}${cell(c.cardDc)}
+        ${cellHi(c.listing)}
+        <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${c.selCpn?_evFmt(c.selCpn):''}" onchange="evEditRow(${i},'selCap',this.value)" class="${inp} text-right w-full" title="선택쿠폰 최대 할인 한도 — 값을 입력하면 그 이하로 제한됩니다(미입력 시 100만)"></td>
+        ${cell(c.first)}
+        <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${c.cardDc?_evFmt(c.cardDc):''}" onchange="evEditRow(${i},'cardCap',this.value)" class="${inp} text-right w-full" title="카드 최대 할인 한도 — 값을 입력하면 그 이하로 제한됩니다(미입력 시 10만)"></td>
         <td class="px-1 py-0.5 border border-brand-border bg-brand-blue-light/20"><input type="text" inputmode="numeric" value="${c.benefit?_evFmt(c.benefit):''}" onchange="evEditRow(${i},'benefit',this.value)" class="${inp} text-right w-full font-bold text-brand-blue" title="여기에 최종혜택가를 입력하면 노출가가 역산됩니다"></td>
         ${cell(c.catFee)}${cell(c.cpnFee)}${cell(c.selSeller)}${cell(c.cardSeller)}
         <td class="px-2 py-1 text-right font-bold tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(c.settle)}</td>
@@ -2741,6 +2747,9 @@ function evEditRow(i,field,val){
       for(let d=Math.max(0,disp-100); d<=disp+100; d++){ const c=_evCalcRow({...row,disp:d}, r); const diff=Math.abs(c.benefit-target); if(diff<bd){ bd=diff; best=d; } if(diff===0) break; }
       row.disp=best;
     }
+  } else if(field==='selCap' || field==='cardCap'){
+    const t=String(val==null?'':val).trim();
+    row[field] = (t==='') ? '' : _evNum(t);   // 빈값 = 한도 없음(기본값 사용)
   } else {
     row[field] = (field==='model'||field==='note')?val:_evNum(val);   // 모델명·비고는 문자열
     if(field==='model') _evApplyModelLookup(row);   // 모델명 매칭 → L열/J열 반영
