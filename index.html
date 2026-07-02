@@ -1606,10 +1606,11 @@ tailwind.config = {
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',5,'num')">매입 원가<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',6,'num')">택배비<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',7,'num')">택배비용<span class="sort-icon"></span></th>
-                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap text-brand-pink" onclick="sortLedgerTable('product',8,'num')">광고비<span class="sort-icon"></span></th>
-                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',9,'num')">순이익<span class="sort-icon"></span></th>
-                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',10,'num')">실순이익<span class="sort-icon" title="순이익 - 광고비"></span></th>
-                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',11,'num')">수익률<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap text-brand-pink" onclick="sortLedgerTable('product',8,'num')" title="일반 광고비 (전체 상품 매출 비례 안분)">광고비<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap text-brand-orange" onclick="sortLedgerTable('product',9,'num')" title="리워드 광고비 (대상 상품에만 매출 비례 안분)">리워드<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',10,'num')">순이익<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',11,'num')">실순이익<span class="sort-icon" title="순이익 - 광고비 - 리워드"></span></th>
+                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('product',12,'num')">수익률<span class="sort-icon"></span></th>
                 </tr>
               </thead>
               <tbody id="product-tbody"></tbody>
@@ -14003,9 +14004,10 @@ function renderProductTab(m, rangeOrIdxs) {
   //     매출이 모두 0이면 균등 분배(N등분) 폴백
   //  2) 일반 광고비 (그 외) → 전체 상품들의 매출 비례로 안분
   const adByProduct = (function () {
-    const result = new Map();
+    const reward = new Map();   // 리워드 광고비 (대상 상품 매출 비례)
+    const general = new Map();  // 일반 광고비 (전체 상품 매출 비례)
     const ads = (typeof _adCostsRaw === 'function') ? _adCostsRaw() : [];
-    if (!_range) return result;
+    if (!_range) return { reward, general };
     // 상품명 → 매출 lookup (공백·괄호·기호·대소문자 무시 정규화 매칭 — "케이스 (블랙)" ↔ "케이스 블랙" 매칭)
     const _rn = s => String(s == null ? '' : s).replace(/[^0-9a-z가-힣]/gi, '').toLowerCase();
     const salesByName = new Map();
@@ -14045,13 +14047,13 @@ function renderProductTab(m, rangeOrIdxs) {
           // 매출 비례 분배
           targetNames.forEach(n => {
             const ratio = (salesByName.get(n) || 0) / targetSalesSum;
-            result.set(n, (result.get(n) || 0) + amt * ratio);
+            reward.set(n, (reward.get(n) || 0) + amt * ratio);
           });
         } else {
           // 매출 모두 0 → 균등 분배 폴백
           const per = amt / targetNames.length;
           targetNames.forEach(n => {
-            result.set(n, (result.get(n) || 0) + per);
+            reward.set(n, (reward.get(n) || 0) + per);
           });
         }
       } else {
@@ -14062,14 +14064,16 @@ function renderProductTab(m, rangeOrIdxs) {
     if (nonRewardSum > 0 && totalSales > 0) {
       rows.forEach(r => {
         const ratio = (r.sales || 0) / totalSales;
-        result.set(r.name, (result.get(r.name) || 0) + nonRewardSum * ratio);
+        general.set(r.name, (general.get(r.name) || 0) + nonRewardSum * ratio);
       });
     }
-    return result;
+    return { reward, general };
   })();
 
   document.getElementById('product-tbody').innerHTML = rows.map((r, i) => {
-    const ad = Math.round(adByProduct.get(r.name) || 0);
+    const adG = Math.round(adByProduct.general.get(r.name) || 0);
+    const adR = Math.round(adByProduct.reward.get(r.name) || 0);
+    const ad = adG + adR;
     const real = (r.profit || 0) - ad;
     const realCls = real >= 0 ? 'text-brand-green' : 'text-brand-pink';
     const realRate = r.sales > 0 ? (real / r.sales * 100).toFixed(1) : '0.0';
@@ -14082,7 +14086,8 @@ function renderProductTab(m, rangeOrIdxs) {
       <td class="px-4 py-4 text-right text-brand-gray">${_fmtW(r.purchase)}</td>
       <td class="px-4 py-4 text-right text-brand-gray">${_fmtW(r.ship || 0)}</td>
       <td class="px-4 py-4 text-right text-brand-gray">${_fmtW(r.shipCost || 0)}</td>
-      <td class="px-4 py-4 text-right ${ad ? 'text-brand-pink font-semibold' : 'text-brand-gray'}">${ad ? _fmtW(ad) : '-'}</td>
+      <td class="px-4 py-4 text-right ${adG ? 'text-brand-pink font-semibold' : 'text-brand-gray'}">${adG ? _fmtW(adG) : '-'}</td>
+      <td class="px-4 py-4 text-right ${adR ? 'text-brand-orange font-semibold' : 'text-brand-gray'}">${adR ? _fmtW(adR) : '-'}</td>
       <td class="px-4 py-4 text-right font-bold text-brand-green">${_fmtW(r.profit)}</td>
       <td class="px-4 py-4 text-right font-bold ${realCls}">${_fmtW(real)}</td>
       <td class="px-6 py-4 text-right font-bold ${realCls}">${realRate}%</td>
@@ -14095,7 +14100,7 @@ function filterProductTable() {
   const input = document.getElementById('ledger-product-search');
   const q = (input ? input.value : '').trim().toLowerCase();
   const rows = document.querySelectorAll('#product-tbody tr');
-  let qtySum = 0, salesSum = 0, purchaseSum = 0, supplySum = 0, shipSum = 0, shipCostSum = 0, adSum = 0, profitSum = 0, realSum = 0, visibleCount = 0;
+  let qtySum = 0, salesSum = 0, purchaseSum = 0, supplySum = 0, shipSum = 0, shipCostSum = 0, adSum = 0, rewardSum = 0, profitSum = 0, realSum = 0, visibleCount = 0;
   const _num = el => {
     if (!el) return 0;
     const v = parseInt((el.textContent || '').replace(/[^\d-]/g,''), 10);
@@ -14113,8 +14118,9 @@ function filterProductTable() {
       shipSum     += _num(tr.children[6]);
       shipCostSum += _num(tr.children[7]);
       adSum       += _num(tr.children[8]);
-      profitSum   += _num(tr.children[9]);
-      realSum     += _num(tr.children[10]);
+      rewardSum   += _num(tr.children[9]);
+      profitSum   += _num(tr.children[10]);
+      realSum     += _num(tr.children[11]);
       visibleCount++;
     }
   });
@@ -14132,6 +14138,7 @@ function filterProductTable() {
         <td class="px-4 py-4 text-right font-black">${_fmtW(shipSum)}</td>
         <td class="px-4 py-4 text-right font-black">${_fmtW(shipCostSum)}</td>
         <td class="px-4 py-4 text-right font-black text-brand-pink">${_fmtW(adSum)}</td>
+        <td class="px-4 py-4 text-right font-black text-brand-orange">${_fmtW(rewardSum)}</td>
         <td class="px-4 py-4 text-right font-black text-brand-green">${_fmtW(profitSum)}</td>
         <td class="px-4 py-4 text-right font-black ${realCls}">${_fmtW(realSum)}</td>
         <td class="px-6 py-4 text-right font-black ${realCls}">${avgMargin}%</td>
