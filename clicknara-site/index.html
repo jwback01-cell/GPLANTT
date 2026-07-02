@@ -2867,13 +2867,52 @@ async function _evProcessFile(file){
     if(title) ev.title = title;
     ev.uploadDate = _evNowDate();   // 업로드 날짜 기록(모델명 위 표시·저장용)
     _evSel.clear(); _evSave(o); renderEventCalc();
-    alert(`✅ ${out.length}개 모델 ${mode==='replace'?'불러오기':'추가'} 완료 (${ev.name})\n업로드 날짜: ${ev.uploadDate}\n엑셀 계산값을 그대로 표시합니다.`);
+    // GPLAN 캘린더에 행사 자동 등록 (엑셀 안의 기간 기준)
+    let _gpMsg='';
+    try{
+      const r=await _evAutoAddGplanEvent(ev);
+      if(r&&r.ok) _gpMsg=`\n📅 GPLAN 캘린더에 '${r.title}' 자동 등록됨`;
+      else if(r&&r.dup) _gpMsg=`\n📅 (이미 GPLAN 캘린더에 등록된 행사)`;
+      else if(r&&r.noPeriod) _gpMsg=`\n(엑셀에 기간이 없어 캘린더 등록은 건너뜀)`;
+      else if(r&&r.noAuth) _gpMsg=`\n(로그인 필요 — 캘린더 등록 건너뜀)`;
+    }catch(_){}
+    alert(`✅ ${out.length}개 모델 ${mode==='replace'?'불러오기':'추가'} 완료 (${ev.name})\n업로드 날짜: ${ev.uploadDate}\n엑셀 계산값을 그대로 표시합니다.${_gpMsg}`);
   }catch(err){ alert('엑셀 읽기 실패: ' + (err.message||err)); }
 }
 // ── 업로드 스냅샷(날짜별 저장/불러오기) ──
 const EV_UPLOADS_KEY = 'cn_ev_uploads_v1';   // 사이트별 업로드 스냅샷(클라우드 동기화: cn_ 접두사)
 function _evNowDate(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function _evUploadsLoad(){ try{ const o=JSON.parse(localStorage.getItem(EV_UPLOADS_KEY)||'{}'); return (o&&typeof o==='object')?o:{}; }catch(_){ return {}; } }
+// 기간 문자열 → {start,end} (YYYY-MM-DD). 예: "7/1 (수) ~ 7/11 (토)", "07/01-07/11", "3/30~4/8"
+function _evParsePeriodToDates(period){
+  const s=String(period||''); const found=s.match(/(\d{1,2})\s*[\/.\-]\s*(\d{1,2})/g);
+  if(!found||!found.length) return null;
+  const md=str=>{ const m=str.match(/(\d{1,2})\s*[\/.\-]\s*(\d{1,2})/); return m?{mo:+m[1],d:+m[2]}:null; };
+  const a=md(found[0]); const b=md(found[found.length>=2?1:0]);
+  if(!a) return null;
+  const yr=new Date().getFullYear(); const pad=n=>String(n).padStart(2,'0');
+  const eb=b||a; const eY=(eb.mo<a.mo)?yr+1:yr;   // 연말 걸침 보정
+  return { start:`${yr}-${pad(a.mo)}-${pad(a.d)}`, end:`${eY}-${pad(eb.mo)}-${pad(eb.d)}`, sMD:`${pad(a.mo)}.${pad(a.d)}`, eMD:`${pad(eb.mo)}.${pad(eb.d)}` };
+}
+// GPLAN 캘린더(gplan_kv → gplan_events_v1)에 행사 자동 등록 (같은 Supabase 프로젝트)
+async function _evAutoAddGplanEvent(ev){
+  const pd=_evParsePeriodToDates(ev.period);
+  if(!pd) return { noPeriod:true };
+  const site=ev.name||''; const name=(ev.title||'').trim()||'행사';
+  const title=`${site} ${name} ${pd.sMD}-${pd.eMD}`.trim();
+  try{
+    if(typeof _supabase==='undefined' || !_supabase) return {};
+    const { data:{ session } } = await _supabase.auth.getSession();
+    if(!session) return { noAuth:true };
+    const { data } = await _supabase.from('gplan_kv').select('data').eq('key','gplan_events_v1').maybeSingle();
+    let arr=[]; if(data&&data.data!=null){ arr=(typeof data.data==='string')?JSON.parse(data.data):data.data; if(!Array.isArray(arr)) arr=[]; }
+    if(arr.some(e=>e && e.site===site && (e.name||'')===name && e.dateStart===pd.start)) return { dup:true };
+    arr.push({ id:'ev_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7), site, name, title, category:site, dateStart:pd.start, dateEnd:pd.end, products:'', createdAt:new Date().toISOString(), _fromClicknara:true });
+    const { error } = await _supabase.from('gplan_kv').upsert({ key:'gplan_events_v1', data:arr, updated_by:session.user.id }, { onConflict:'key' });
+    if(error){ console.warn('[행사 자동등록] 실패', error); return { error }; }
+    return { ok:true, title };
+  }catch(e){ console.warn('[행사 자동등록] 오류', e); return { error:e }; }
+}
 function _evUploadsSaveAll(o){ try{ localStorage.setItem(EV_UPLOADS_KEY, JSON.stringify(o)); }catch(_){} }
 function evSaveUploadSnapshot(){
   const o=_evLoad(); const ev=_evActive(o);
