@@ -3133,7 +3133,7 @@ async function _evFillEventForm(file){
     if(codeIdx<0) codeIdx=header.findIndex(c=>c.includes('판매자상품코드')||c.includes('상품코드'));
     if(codeIdx<0){ alert('판매자관리코드 열을 찾지 못했습니다.'); return; }
     const mallIdx=header.findIndex(c=>c.includes('쇼핑몰'));   // 이베이 지마켓/옥션 구분용
-    const PRICE_IDX=XLSX.utils.decode_col('I');    // 판매가 = I열
+    const PRICE_IDX=XLSX.utils.decode_col(ev.name==='이베이' ? 'J' : 'I');   // 판매가 (이베이는 J열, 그 외 I열)
     const IMG_IDX  =XLSX.utils.decode_col(ev.name==='이베이' ? 'AQ' : 'AP');   // 기본이미지 (이베이는 AQ, 그 외 AP)
     const out=[rows[0]];   // 헤더
     let filled=0, imgFilled=0;
