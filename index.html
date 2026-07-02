@@ -14005,8 +14005,8 @@ function renderProductTab(m, rangeOrIdxs) {
     const result = new Map();
     const ads = (typeof _adCostsRaw === 'function') ? _adCostsRaw() : [];
     if (!_range) return result;
-    // 상품명 → 매출 lookup (공백·대소문자 무시 정규화 매칭 지원)
-    const _rn = s => String(s == null ? '' : s).replace(/\s+/g, '').toLowerCase();
+    // 상품명 → 매출 lookup (공백·괄호·기호·대소문자 무시 정규화 매칭 — "케이스 (블랙)" ↔ "케이스 블랙" 매칭)
+    const _rn = s => String(s == null ? '' : s).replace(/[^0-9a-z가-힣]/gi, '').toLowerCase();
     const salesByName = new Map();
     const normToName = new Map();   // 정규화명 → 매출장부의 실제 상품명
     rows.forEach(r => { salesByName.set(r.name, Number(r.sales) || 0); if (r.name) normToName.set(_rn(r.name), r.name); });
