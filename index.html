@@ -14005,9 +14005,11 @@ function renderProductTab(m, rangeOrIdxs) {
     const result = new Map();
     const ads = (typeof _adCostsRaw === 'function') ? _adCostsRaw() : [];
     if (!_range) return result;
-    // 상품명 → 매출 lookup
+    // 상품명 → 매출 lookup (공백·대소문자 무시 정규화 매칭 지원)
+    const _rn = s => String(s == null ? '' : s).replace(/\s+/g, '').toLowerCase();
     const salesByName = new Map();
-    rows.forEach(r => salesByName.set(r.name, Number(r.sales) || 0));
+    const normToName = new Map();   // 정규화명 → 매출장부의 실제 상품명
+    rows.forEach(r => { salesByName.set(r.name, Number(r.sales) || 0); if (r.name) normToName.set(_rn(r.name), r.name); });
 
     let nonRewardSum = 0;
     ads.forEach(r => {
@@ -14017,9 +14019,9 @@ function renderProductTab(m, rangeOrIdxs) {
       const amt = Number(r.amount) || 0;
       if (amt <= 0) return;
       if (r.template === 'reward' && Array.isArray(r.rewardProducts) && r.rewardProducts.length) {
-        // 리워드 대상 상품들의 매출 합계
+        // 리워드 대상 상품 → 매출장부 상품명으로 정규화 매칭 (상품관리/매출장부 이름 차이 흡수)
         const targetNames = r.rewardProducts
-          .map(p => String(p.name || '').trim())
+          .map(p => { const nm = String(p.name || '').trim(); return normToName.get(_rn(nm)) || nm; })
           .filter(Boolean);
         if (!targetNames.length) return;
         const targetSalesSum = targetNames.reduce((s, n) => s + (salesByName.get(n) || 0), 0);
