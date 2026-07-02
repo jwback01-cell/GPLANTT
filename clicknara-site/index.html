@@ -3145,10 +3145,11 @@ async function _evFillEventForm(file){
       const code=origCode.replace(/[\s-]/g,'').toUpperCase();
       if(!code) continue;
       if(!evListingMap.has(code)) continue;   // 이 행사 계산기에 없는 상품은 제외
-      const price=evListingMap.get(code);
       const chan = mallIdx>=0 ? String(raw[mallIdx]||'') : '';
+      // 이베이: 판매가(I열)=기존세팅값 사이트 등재가(지마켓 T/옥션 AD) / 그 외: 행사정산계산기 등재가
+      const price = (ev.name==='이베이') ? _evSheetSitePrice(code, ev.name, chan) : evListingMap.get(code);
       const img=_evSheetSiteImage(code, ev.name, chan);
-      if(!price){ if(!fails.has(origCode)) fails.set(origCode, '계산기 등재가 0/없음'); continue; }
+      if(!price){ if(!fails.has(origCode)) fails.set(origCode, ev.name==='이베이' ? '기존세팅값 등재가 없음' : '계산기 등재가 0/없음'); continue; }
       if(!img){ if(!fails.has(origCode)) fails.set(origCode, `기본이미지 없음(${ev.name})`); continue; }
       raw[PRICE_IDX]=price;
       raw[IMG_IDX]=img; imgFilled++;
