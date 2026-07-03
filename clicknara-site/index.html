@@ -2925,7 +2925,7 @@ async function _evAutoAddGplanEvent(ev){
   }catch(e){ console.warn('[행사 자동등록] 오류', e); return { error:e }; }
 }
 function _evUploadsSaveAll(o){ try{ localStorage.setItem(EV_UPLOADS_KEY, JSON.stringify(o)); }catch(_){} }
-function evSaveUploadSnapshot(){
+async function evSaveUploadSnapshot(){
   const o=_evLoad(); const ev=_evActive(o);
   if(!ev.rows || !ev.rows.length){ alert('저장할 행사 데이터가 없습니다. 먼저 표에 값을 입력하거나 엑셀을 업로드하세요.'); return; }
   const date = _evNowDate();
@@ -2939,7 +2939,16 @@ function evSaveUploadSnapshot(){
   if(idx>=0) list[idx]=snap; else list.unshift(snap);
   all[ev.name]=list; _evUploadsSaveAll(all);
   _evRenderUploadControls();
-  alert(`✅ 행사 저장됨\n${title||'(이름없음)'} · ${date} · ${snap.rows.length}개 모델`);
+  // GPLAN 캘린더(행사 내역)에 자동 등록 — 상단 기간 입력값 기준
+  let _gpMsg='';
+  try{
+    const r=await _evAutoAddGplanEvent(ev);
+    if(r&&r.ok) _gpMsg=`\n📅 GPLAN 캘린더(행사 내역)에 '${r.title}' 등록됨`;
+    else if(r&&r.dup) _gpMsg=`\n📅 (이미 GPLAN 캘린더에 등록된 행사)`;
+    else if(r&&r.noPeriod) _gpMsg=`\n⚠ 기간이 없어 캘린더 등록은 건너뜀 (상단 기간칸에 07/06-07/20 형식으로 입력)`;
+    else if(r&&r.noAuth) _gpMsg=`\n(로그인 필요 — 캘린더 등록 건너뜀)`;
+  }catch(_){}
+  alert(`✅ 행사 저장됨\n${title||'(이름없음)'} · ${date} · ${snap.rows.length}개 모델${_gpMsg}`);
 }
 let _evSelSnapId='';   // 드롭다운에서 선택한 저장 행사 id (삭제 대상 추적)
 function evLoadUploadSnapshot(id){
