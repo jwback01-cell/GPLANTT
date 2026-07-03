@@ -2330,16 +2330,13 @@ function _evRenderModelDatalist(){
 // 로컬 파일(file://)에서 쓸 경우 배포 주소를 넣으면 자체 프록시로 안정 동작. 예: 'https://클릭나라도메인.vercel.app'
 const EV_PROXY_BASE = '';
 async function _evFetchCsv(gid){
-  // ⚠ gviz(out:csv)는 빈 열을 잘라내/밀어 열 인덱스(AS/AY/BE… 사이트별 이미지)가 어긋난다.
-  //    /export?format=csv 는 시트의 모든 열을 원위치대로 보존하므로 열 문자 매칭이 정확하다.
-  const csv = `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/export?format=csv&gid=${gid}`;
+  // 시트가 '웹에 게시'만 되어 있고 링크공유가 아니면 /export 는 로그인 페이지를 반환하므로 gviz 사용.
+  // (열 정렬은 캐시 v11 최신 재로딩으로 해결 — gviz out:csv 는 시트 데이터 범위의 빈 열을 보존)
   const gviz = `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/gviz/tq?tqx=out:csv&gid=${gid}`;
   const tries = [
-    `${EV_PROXY_BASE}/api/sheet?gid=${gid}&format=csv`,                      // 자체 프록시(배포 동일출처 / 로컬은 EV_PROXY_BASE 필요)
-    csv,                                                                     // 직접(배포 https에서 동작)
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(csv)}`,        // 공개 프록시 폴백
-    `https://corsproxy.io/?url=${encodeURIComponent(csv)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(gviz)}`,        // 최후: gviz (열 정렬 어긋날 수 있음)
+    `${EV_PROXY_BASE}/api/sheet?gid=${gid}`,                                 // 자체 프록시(배포 동일출처 / 로컬은 EV_PROXY_BASE 필요)
+    gviz,                                                                    // 직접(배포 https에서 동작)
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(gviz)}`,        // 공개 프록시 폴백
     `https://corsproxy.io/?url=${encodeURIComponent(gviz)}`,
   ];
   for(const u of tries){
