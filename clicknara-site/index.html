@@ -2882,9 +2882,8 @@ async function _evProcessFile(file){
     let _gpMsg='';
     try{
       const r=await _evAutoAddGplanEvent(ev);
-      if(r&&r.ok) _gpMsg=`\n📅 GPLAN 캘린더에 '${r.title}' 자동 등록됨`;
-      else if(r&&r.dup) _gpMsg=`\n📅 (이미 GPLAN 캘린더에 등록된 행사)`;
-      else if(r&&r.noPeriod) _gpMsg=`\n(엑셀에 기간이 없어 캘린더 등록은 건너뜀)`;
+      if(r&&r.ok) _gpMsg = (r.count>1) ? `\n📅 GPLAN 캘린더에 ${r.count}건 자동 등록됨 (비고 날짜별)` : `\n📅 GPLAN 캘린더에 '${r.title}' 자동 등록됨`;
+      else if(r&&r.noPeriod) _gpMsg=`\n(엑셀에 기간·비고 날짜가 없어 캘린더 등록은 건너뜀)`;
       else if(r&&r.noAuth) _gpMsg=`\n(로그인 필요 — 캘린더 등록 건너뜀)`;
     }catch(_){}
     alert(`✅ ${out.length}개 모델 ${mode==='replace'?'불러오기':'추가'} 완료 (${ev.name})\n업로드 날짜: ${ev.uploadDate}\n엑셀 계산값을 그대로 표시합니다.${_gpMsg}`);
@@ -2905,34 +2904,65 @@ function _evParsePeriodToDates(period){
   const eb=b||a; const eY=(eb.mo<a.mo)?yr+1:yr;   // 연말 걸침 보정
   return { start:`${yr}-${pad(a.mo)}-${pad(a.d)}`, end:`${eY}-${pad(eb.mo)}-${pad(eb.d)}`, sMD:`${pad(a.mo)}.${pad(a.d)}`, eMD:`${pad(eb.mo)}.${pad(eb.d)}` };
 }
+// 비고 "07/04 타임딜" · "07월04일 긴급공수" → { date, sMD, name } (날짜+행사명 파싱)
+function _evParseNoteEvent(note){
+  const s=String(note||'').trim(); if(!s) return null;
+  const m=s.match(/(\d{1,2})\s*[\/.\-월]\s*(\d{1,2})/);
+  if(!m) return null;
+  const mo=+m[1], d=+m[2]; if(!mo||!d) return null;
+  const name=s.replace(m[0],' ').replace(/일/g,' ').replace(/[\/.\-]/g,' ').replace(/\s+/g,' ').trim();
+  const yr=new Date().getFullYear(); const pad=n=>String(n).padStart(2,'0');
+  return { date:`${yr}-${pad(mo)}-${pad(d)}`, sMD:`${pad(mo)}.${pad(d)}`, name:name||'행사' };
+}
 // GPLAN 캘린더(gplan_kv → gplan_events_v1)에 행사 자동 등록 (같은 Supabase 프로젝트)
+//  · 상단 기간칸 있음 → 전체 모델을 하나의 행사로 등록
+//  · 기간칸 없음      → 각 행의 비고(날짜+행사명)로 그룹핑해 개별 행사로 등록
 async function _evAutoAddGplanEvent(ev){
+  const site=ev.name||'';
+  const rows=(ev.rows||[]).filter(r=>r && String(r.model||'').trim() && !String(r.model||'').startsWith('*'));
   const pd=_evParsePeriodToDates(ev.period);
-  if(!pd) return { noPeriod:true };
-  const site=ev.name||''; const name=(ev.title||'').trim()||'행사';
-  const title=`${site} ${name} ${pd.sMD}-${pd.eMD}`.trim();
-  // 행사 표의 모델명을 한 줄씩 → GPLAN '행사 제품/메모'로 전달 (중복 제거)
-  const products=[...new Set((ev.rows||[]).map(r=>String(r&&r.model||'').trim()).filter(m=>m && !m.startsWith('*')))].join('\n');
+  const events=[];   // {name, title, dateStart, dateEnd, products}
+  if(pd){
+    const name=(ev.title||'').trim()||'행사';
+    const products=[...new Set(rows.map(r=>String(r.model||'').trim()))].join('\n');
+    events.push({ name, title:`${site} ${name} ${pd.sMD}-${pd.eMD}`.trim(), dateStart:pd.start, dateEnd:pd.end, products });
+  } else {
+    // 기간 없음 → 비고의 날짜+이름으로 그룹핑 (같은 날짜·이름은 모델을 합침)
+    const groups=new Map();
+    rows.forEach(r=>{
+      const pn=_evParseNoteEvent(r.note);
+      if(!pn) return;
+      const key=`${pn.date}|${pn.name}`;
+      if(!groups.has(key)) groups.set(key,{ date:pn.date, sMD:pn.sMD, name:pn.name, models:[] });
+      groups.get(key).models.push(String(r.model||'').trim());
+    });
+    groups.forEach(g=>{
+      events.push({ name:g.name, title:`${site} ${g.name} ${g.sMD}`.trim(), dateStart:g.date, dateEnd:g.date, products:[...new Set(g.models)].join('\n') });
+    });
+    if(!events.length) return { noPeriod:true };
+  }
   try{
     if(typeof _supabase==='undefined' || !_supabase) return {};
     const { data:{ session } } = await _supabase.auth.getSession();
     if(!session) return { noAuth:true };
     const { data } = await _supabase.from('gplan_kv').select('data').eq('key','gplan_events_v1').maybeSingle();
     let arr=[]; if(data&&data.data!=null){ arr=(typeof data.data==='string')?JSON.parse(data.data):data.data; if(!Array.isArray(arr)) arr=[]; }
-    const dupIdx = arr.findIndex(e=>e && e.site===site && (e.name||'')===name && e.dateStart===pd.start);
-    if(dupIdx>=0){
-      // 이미 등록된 행사 → 기간·제목·모델명(제품)만 최신값으로 갱신
-      const ex=arr[dupIdx];
-      ex.title=title; ex.dateEnd=pd.end; ex.category=site;
-      if(products) ex.products=products;
-      const { error:e2 } = await _supabase.from('gplan_kv').upsert({ key:'gplan_events_v1', data:arr, updated_by:session.user.id }, { onConflict:'key' });
-      if(e2){ console.warn('[행사 자동등록] 갱신 실패', e2); return { error:e2 }; }
-      return { ok:true, title, updated:true };
-    }
-    arr.push({ id:'ev_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7), site, name, title, category:site, dateStart:pd.start, dateEnd:pd.end, products, createdAt:new Date().toISOString(), _fromClicknara:true });
+    let added=0, updated=0;
+    events.forEach((evt,i)=>{
+      const dupIdx=arr.findIndex(e=>e && e.site===site && (e.name||'')===evt.name && e.dateStart===evt.dateStart);
+      if(dupIdx>=0){
+        const ex=arr[dupIdx];
+        ex.title=evt.title; ex.dateEnd=evt.dateEnd; ex.category=site;
+        if(evt.products) ex.products=evt.products;
+        updated++;
+      } else {
+        arr.push({ id:'ev_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)+i, site, name:evt.name, title:evt.title, category:site, dateStart:evt.dateStart, dateEnd:evt.dateEnd, products:evt.products, createdAt:new Date().toISOString(), _fromClicknara:true });
+        added++;
+      }
+    });
     const { error } = await _supabase.from('gplan_kv').upsert({ key:'gplan_events_v1', data:arr, updated_by:session.user.id }, { onConflict:'key' });
     if(error){ console.warn('[행사 자동등록] 실패', error); return { error }; }
-    return { ok:true, title };
+    return { ok:true, title:(events.length===1?events[0].title:`${events.length}건`), count:events.length, added, updated };
   }catch(e){ console.warn('[행사 자동등록] 오류', e); return { error:e }; }
 }
 function _evUploadsSaveAll(o){ try{ localStorage.setItem(EV_UPLOADS_KEY, JSON.stringify(o)); }catch(_){} }
@@ -2954,9 +2984,12 @@ async function evSaveUploadSnapshot(){
   let _gpMsg='';
   try{
     const r=await _evAutoAddGplanEvent(ev);
-    if(r&&r.ok) _gpMsg=`\n📅 GPLAN 캘린더(행사 내역)에 '${r.title}' 등록됨`;
-    else if(r&&r.dup) _gpMsg=`\n📅 (이미 GPLAN 캘린더에 등록된 행사)`;
-    else if(r&&r.noPeriod) _gpMsg=`\n⚠ 기간이 없어 캘린더 등록은 건너뜀 (상단 기간칸에 07/06-07/20 형식으로 입력)`;
+    if(r&&r.ok){
+      _gpMsg = (r.count>1)
+        ? `\n📅 GPLAN 캘린더(행사 내역)에 ${r.count}건 등록됨 (비고 날짜별)`
+        : `\n📅 GPLAN 캘린더(행사 내역)에 '${r.title}' 등록됨`;
+    }
+    else if(r&&r.noPeriod) _gpMsg=`\n⚠ 기간·비고 날짜가 없어 캘린더 등록 건너뜀 (상단 기간칸에 07/06-07/20, 또는 각 행 비고에 "07/04 타임딜" 형식 입력)`;
     else if(r&&r.noAuth) _gpMsg=`\n(로그인 필요 — 캘린더 등록 건너뜀)`;
   }catch(_){}
   alert(`✅ 행사 저장됨\n${title||'(이름없음)'} · ${date} · ${snap.rows.length}개 모델${_gpMsg}`);
