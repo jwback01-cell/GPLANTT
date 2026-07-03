@@ -2911,14 +2911,25 @@ async function _evAutoAddGplanEvent(ev){
   if(!pd) return { noPeriod:true };
   const site=ev.name||''; const name=(ev.title||'').trim()||'행사';
   const title=`${site} ${name} ${pd.sMD}-${pd.eMD}`.trim();
+  // 행사 표의 모델명을 한 줄씩 → GPLAN '행사 제품/메모'로 전달 (중복 제거)
+  const products=[...new Set((ev.rows||[]).map(r=>String(r&&r.model||'').trim()).filter(m=>m && !m.startsWith('*')))].join('\n');
   try{
     if(typeof _supabase==='undefined' || !_supabase) return {};
     const { data:{ session } } = await _supabase.auth.getSession();
     if(!session) return { noAuth:true };
     const { data } = await _supabase.from('gplan_kv').select('data').eq('key','gplan_events_v1').maybeSingle();
     let arr=[]; if(data&&data.data!=null){ arr=(typeof data.data==='string')?JSON.parse(data.data):data.data; if(!Array.isArray(arr)) arr=[]; }
-    if(arr.some(e=>e && e.site===site && (e.name||'')===name && e.dateStart===pd.start)) return { dup:true };
-    arr.push({ id:'ev_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7), site, name, title, category:site, dateStart:pd.start, dateEnd:pd.end, products:'', createdAt:new Date().toISOString(), _fromClicknara:true });
+    const dupIdx = arr.findIndex(e=>e && e.site===site && (e.name||'')===name && e.dateStart===pd.start);
+    if(dupIdx>=0){
+      // 이미 등록된 행사 → 기간·제목·모델명(제품)만 최신값으로 갱신
+      const ex=arr[dupIdx];
+      ex.title=title; ex.dateEnd=pd.end; ex.category=site;
+      if(products) ex.products=products;
+      const { error:e2 } = await _supabase.from('gplan_kv').upsert({ key:'gplan_events_v1', data:arr, updated_by:session.user.id }, { onConflict:'key' });
+      if(e2){ console.warn('[행사 자동등록] 갱신 실패', e2); return { error:e2 }; }
+      return { ok:true, title, updated:true };
+    }
+    arr.push({ id:'ev_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7), site, name, title, category:site, dateStart:pd.start, dateEnd:pd.end, products, createdAt:new Date().toISOString(), _fromClicknara:true });
     const { error } = await _supabase.from('gplan_kv').upsert({ key:'gplan_events_v1', data:arr, updated_by:session.user.id }, { onConflict:'key' });
     if(error){ console.warn('[행사 자동등록] 실패', error); return { error }; }
     return { ok:true, title };
