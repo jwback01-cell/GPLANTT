@@ -16120,9 +16120,9 @@ function openRewardUpload(siteId) {
       <div style="padding:14px 22px;border-bottom:1px solid #eee;display:grid;grid-template-columns:160px 1fr;gap:10px 14px;align-items:center;">
         <label style="font-size:13px;font-weight:600;">기간</label>
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-          <input type="date" id="reward-date-start" value="${today}" onchange="_rewardDateChanged()" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;width:160px;">
+          <input type="date" id="reward-date-start" value="${today}" onchange="_rewardDateChanged('start')" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;width:160px;">
           <span style="color:#888;">~</span>
-          <input type="date" id="reward-date-end" value="${today}" onchange="_rewardDateChanged()" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;width:160px;">
+          <input type="date" id="reward-date-end" value="${today}" onchange="_rewardDateChanged('end')" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;width:160px;">
           <button type="button" onclick="_rewardSetRange('today')" style="padding:5px 10px;border:1px solid #ddd;border-radius:14px;background:white;font-size:11px;font-weight:bold;cursor:pointer;">오늘</button>
           <button type="button" onclick="_rewardSetRange('thisMonth')" style="padding:5px 10px;border:1px solid #ddd;border-radius:14px;background:white;font-size:11px;font-weight:bold;cursor:pointer;">이번 달 1~말일</button>
           <button type="button" onclick="_rewardSetRange('lastMonth')" style="padding:5px 10px;border:1px solid #ddd;border-radius:14px;background:white;font-size:11px;font-weight:bold;cursor:pointer;">지난 달</button>
@@ -16185,11 +16185,14 @@ function _rewardSetRange(kind) {
   _rewardUpdateSplit();
 }
 
-function _rewardDateChanged() {
-  // 시작일 > 종료일 이면 종료일을 시작일로 맞춤
+function _rewardDateChanged(which) {
+  // 시작일 > 종료일 충돌 시 — 방금 편집한 필드 값은 보존하고 반대쪽만 맞춤
   const s = document.getElementById('reward-date-start');
   const e = document.getElementById('reward-date-end');
-  if (s && e && s.value && e.value && s.value > e.value) e.value = s.value;
+  if (s && e && s.value && e.value && s.value > e.value) {
+    if (which === 'end') s.value = e.value;   // 종료일을 앞으로 당김 → 시작일을 당겨 맞춤
+    else e.value = s.value;                    // 시작일을 뒤로 밀음 → 종료일을 밀어 맞춤
+  }
   _rewardUpdateSplit();
 }
 
@@ -16244,7 +16247,8 @@ function _renderRewardProductList() {
     if (!tokens.length) return true;
     const name = (p.name || '').toLowerCase();
     const sku  = (p.sku  || '').toLowerCase();
-    return tokens.some(t => name.includes(t) || sku.includes(t));
+    // 모든 검색어가 상품명/SKU에 포함되어야 매칭 (예: "에어팟 잠금" → 둘 다 포함된 것만)
+    return tokens.every(t => name.includes(t) || sku.includes(t));
   });
 
   // 선택된 항목을 위로
