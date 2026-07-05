@@ -16907,10 +16907,11 @@ function renderAdSummary() {
     <th class="p-3 text-right font-semibold pr-5">ROAS (마진/광고비)</th>
   </tr>`;
 
-  const allSites = new Set([...Object.keys(adBySite), ...Object.keys(marginBySite)]);
+  // 광고비를 실제 사용한 사이트(광고비 합계 > 0)만 표시
+  const allSites = new Set(Object.keys(adBySite).filter(s => (adBySite[s] || 0) > 0));
   if (!allSites.size) {
     tbodyEl.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-brand-gray text-sm">
-      광고비와 매출(업로드 데이터)을 등록한 뒤 조회해주세요.${(uploadRows.length || minusRows.length) ? '' : ' (표시할 데이터가 없습니다)'}
+      선택한 기간에 광고비가 등록된 사이트가 없습니다. 광고비를 업로드한 뒤 조회해주세요.
     </td></tr>`;
     return;
   }
