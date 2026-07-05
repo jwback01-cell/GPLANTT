@@ -1677,7 +1677,7 @@ tailwind.config = {
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',3,'num')">매입 수량<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',4,'num')">총 매입액<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',5,'num')">이익<span class="sort-icon"></span></th>
-                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap text-brand-pink" onclick="sortLedgerTable('supplier',6,'num')" title="기간 광고비를 매입액 비중으로 안분">광고비<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap text-brand-pink" onclick="sortLedgerTable('supplier',6,'num')" title="기간 광고비를 지플랜 매입처에만 전액 배분">광고비<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',7,'num')" title="이익 − 광고비">실이익<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',8,'num')">비중<span class="sort-icon"></span></th>
                 </tr>
@@ -14256,10 +14256,19 @@ function renderSupplierTab(m, rangeOrIdxs) {
     <div class="font-black mt-1 ${k.color||''} ${k.small ? 'text-xl truncate' : 'text-2xl'}">${k.value}</div>
   </div>`).join('');
 
-  // 매입처별 광고비 안분: 기간 총 광고비를 각 매입처의 매입액(총 매입 원가) 비중으로 배분
+  // 매입처별 광고비: 기간 총 광고비를 '지플랜' 매입처에만 전액 배분 (그 외 매입처 0)
   const adBySupplier = new Map();
-  if (totalAd > 0 && totalAmount > 0) {
-    rows.forEach(r => { adBySupplier.set(r.name, totalAd * (r.amount || 0) / totalAmount); });
+  if (totalAd > 0) {
+    const _isGp = (typeof _isGplanVendor === 'function') ? _isGplanVendor : (v => /지플랜|GPLAN/i.test(String(v||'')));
+    const gpRows = rows.filter(r => _isGp(r.name));
+    if (gpRows.length) {
+      // 지플랜 매입처가 여러 개면 매입액 비중(없으면 균등)으로 나눠 지플랜 내에서만 배분
+      const gpAmt = gpRows.reduce((s, r) => s + (r.amount || 0), 0);
+      gpRows.forEach(r => {
+        const share = gpAmt > 0 ? (r.amount || 0) / gpAmt : 1 / gpRows.length;
+        adBySupplier.set(r.name, totalAd * share);
+      });
+    }
   }
 
   document.getElementById('supplier-tbody').innerHTML = rows.map(r => {
