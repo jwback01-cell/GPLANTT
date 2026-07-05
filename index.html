@@ -1677,7 +1677,9 @@ tailwind.config = {
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',3,'num')">매입 수량<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',4,'num')">총 매입액<span class="sort-icon"></span></th>
                   <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',5,'num')">이익<span class="sort-icon"></span></th>
-                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',6,'num')">비중<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap text-brand-pink" onclick="sortLedgerTable('supplier',6,'num')" title="기간 광고비를 매입액 비중으로 안분">광고비<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-4 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',7,'num')" title="이익 − 광고비">실이익<span class="sort-icon"></span></th>
+                  <th class="sortable text-right px-6 py-3.5 font-bold text-xs tracking-wide whitespace-nowrap" onclick="sortLedgerTable('supplier',8,'num')">비중<span class="sort-icon"></span></th>
                 </tr>
               </thead>
               <tbody id="supplier-tbody"></tbody>
@@ -14254,9 +14256,18 @@ function renderSupplierTab(m, rangeOrIdxs) {
     <div class="font-black mt-1 ${k.color||''} ${k.small ? 'text-xl truncate' : 'text-2xl'}">${k.value}</div>
   </div>`).join('');
 
+  // 매입처별 광고비 안분: 기간 총 광고비를 각 매입처의 매입액(총 매입 원가) 비중으로 배분
+  const adBySupplier = new Map();
+  if (totalAd > 0 && totalAmount > 0) {
+    rows.forEach(r => { adBySupplier.set(r.name, totalAd * (r.amount || 0) / totalAmount); });
+  }
+
   document.getElementById('supplier-tbody').innerHTML = rows.map(r => {
     const pct = totalAmount > 0 ? (r.amount / totalAmount * 100).toFixed(1) : '0.0';
     const badgeCls = parseFloat(pct) >= 20 ? 'bg-brand-blue/10 text-brand-blue' : 'bg-brand-gray/10 text-brand-gray';
+    const ad = Math.round(adBySupplier.get(r.name) || 0);
+    const real = (r.profit || 0) - ad;
+    const realCls = real < 0 ? 'text-brand-pink' : 'text-brand-green';
     return `<tr class="border-t border-brand-border hover:bg-brand-blue-light/20 transition-colors cursor-pointer" data-agg-name="${escHtml(r.name)}" onclick="editLedgerGroupFromRow(this,'supplier')" title="클릭하면 이 매입처의 원본 데이터를 수정합니다">
       <td class="px-6 py-4 font-bold"><span class="mr-1 opacity-60">✏️</span>${escHtml(r.name)}</td>
       <td class="px-4 py-4 text-brand-gray">${r.item}</td>
@@ -14264,6 +14275,8 @@ function renderSupplierTab(m, rangeOrIdxs) {
       <td class="px-4 py-4 text-right">${_fmtW(r.qty)}</td>
       <td class="px-4 py-4 text-right font-bold">${_fmtW(r.amount)}</td>
       <td class="px-4 py-4 text-right font-bold text-brand-green">${_fmtW(r.profit || 0)}</td>
+      <td class="px-4 py-4 text-right ${ad ? 'text-brand-pink font-semibold' : 'text-brand-gray'}">${ad ? _fmtW(ad) : '-'}</td>
+      <td class="px-4 py-4 text-right font-bold ${realCls}">${_fmtW(real)}</td>
       <td class="px-6 py-4 text-right"><span class="px-2.5 py-0.5 rounded-full ${badgeCls} text-xs font-bold">${pct}%</span></td>
     </tr>`;
   }).join('');
@@ -14272,6 +14285,9 @@ function renderSupplierTab(m, rangeOrIdxs) {
   const sumQty    = rows.reduce((s,r) => s + (r.qty||0), 0);
   const sumAmount = rows.reduce((s,r) => s + (r.amount||0), 0);
   const sumProfit = rows.reduce((s,r) => s + (r.profit||0), 0);
+  const sumAd     = rows.reduce((s,r) => s + Math.round(adBySupplier.get(r.name) || 0), 0);
+  const sumReal   = sumProfit - sumAd;
+  const sumRealCls = sumReal < 0 ? 'text-brand-pink' : 'text-brand-green';
   const margin    = sumAmount > 0 ? (sumProfit / sumAmount * 100).toFixed(1) : '0.0';
   const sFoot = document.getElementById('supplier-tfoot');
   if (sFoot) {
@@ -14282,6 +14298,8 @@ function renderSupplierTab(m, rangeOrIdxs) {
         <td class="px-4 py-4 text-right font-black">${_fmtW(sumQty)}</td>
         <td class="px-4 py-4 text-right font-black">${_fmtW(sumAmount)}</td>
         <td class="px-4 py-4 text-right font-black text-brand-green">${_fmtW(sumProfit)}</td>
+        <td class="px-4 py-4 text-right font-black text-brand-pink">${_fmtW(sumAd)}</td>
+        <td class="px-4 py-4 text-right font-black ${sumRealCls}">${_fmtW(sumReal)}</td>
         <td class="px-6 py-4 text-right font-black text-brand-green">${margin}%</td>
       </tr>`;
   }
