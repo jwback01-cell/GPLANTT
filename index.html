@@ -21075,8 +21075,9 @@ async function runInvoiceOneClick() {
 async function fetchInvoiceFromMail(opts) {
   // opts.includes: 파일명에 모두 포함되어야 할 부분문자열 배열 (공백 무시, 대소문자 무시)
   // opts.excludes: 파일명에 하나라도 포함되면 제외 (공백 무시, 대소문자 무시)
-  const includes = (opts && Array.isArray(opts.includes)) ? opts.includes.map(s => String(s).toLowerCase().replace(/\s+/g, '')) : [];
-  const excludes = (opts && Array.isArray(opts.excludes)) ? opts.excludes.map(s => String(s).toLowerCase().replace(/\s+/g, '')) : [];
+  // 기본값: 송장 파일은 '발주양식' 이름만 대상, '거래원장'(월마감 대조용 다른 문서)은 제외
+  const includes = (opts && Array.isArray(opts.includes)) ? opts.includes.map(s => String(s).toLowerCase().replace(/\s+/g, '')) : ['발주양식'];
+  const excludes = (opts && Array.isArray(opts.excludes)) ? opts.excludes.map(s => String(s).toLowerCase().replace(/\s+/g, '')) : ['거래원장'];
   const btn = document.getElementById('invoice-fetch-mail-btn');
   const origLabel = btn ? btn.innerHTML : '';
   if (btn) {
