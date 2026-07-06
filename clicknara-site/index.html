@@ -2336,20 +2336,29 @@ function _evRenderModelDatalist(){
 // 로컬 파일(file://)에서 쓸 경우 배포 주소를 넣으면 자체 프록시로 안정 동작. 예: 'https://클릭나라도메인.vercel.app'
 const EV_PROXY_BASE = '';
 async function _evFetchCsv(gid){
-  // 시트가 '웹에 게시'만 되어 있고 링크공유가 아니면 /export 는 로그인 페이지를 반환하므로 gviz 사용.
-  // (열 정렬은 캐시 v11 최신 재로딩으로 해결 — gviz out:csv 는 시트 데이터 범위의 빈 열을 보존)
+  // /export = 링크공유 시 열 정렬 완벽 / gviz = 웹게시만 되어도 동작(빈 열 밀릴 수 있어 헤더탐지로 보정)
+  const csv  = `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/export?format=csv&gid=${gid}`;
   const gviz = `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/gviz/tq?tqx=out:csv&gid=${gid}`;
-  const tries = [
-    `${EV_PROXY_BASE}/api/sheet?gid=${gid}`,                                 // 자체 프록시(배포 동일출처 / 로컬은 EV_PROXY_BASE 필요)
-    gviz,                                                                    // 직접(배포 https에서 동작)
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(gviz)}`,        // 공개 프록시 폴백
-    `https://corsproxy.io/?url=${encodeURIComponent(gviz)}`,
+  // 공개 CORS 프록시 — codetabs(가장 안정) → allorigins → corsproxy 순
+  const prox = u => [
+    `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(u)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
   ];
+  const tries = [
+    `${EV_PROXY_BASE}/api/sheet?gid=${gid}`,   // 자체 프록시(배포 시)
+    csv, ...prox(csv),                          // /export 우선(열 정렬 완벽)
+    gviz, ...prox(gviz),                        // gviz 폴백
+  ];
+  let lastErr = '';
   for(const u of tries){
-    try{ const r = await fetch(u); if(r.ok){ const t = await r.text(); if(t && t.includes('판매자관리코드')) return t; } }
-    catch(_){}
+    try{
+      const r = await fetch(u);
+      if(r.ok){ const t = await r.text(); if(t && t.includes('판매자관리코드')) { console.log('[ev-sheet] 로드 성공:', u.slice(0,60)); return t; } }
+      else lastErr = 'HTTP ' + r.status;
+    }catch(e){ lastErr = String(e && e.message || e); }
   }
-  throw new Error('시트 데이터를 불러오지 못했습니다(CORS/프록시).');
+  throw new Error('시트 데이터를 불러오지 못했습니다(CORS/프록시). ' + lastErr);
 }
 const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v12';   // v12: 사이트 이미지 열 헤더명 자동탐지(gviz 열밀림 대비, 문자보다 우선)
 function _evSheetCacheLoad(){
