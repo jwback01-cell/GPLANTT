@@ -25938,11 +25938,11 @@ function _doConvertSelectedToReturn(targetRows, reason, kind) {
     if (typeof _saveReturns === 'function') _saveReturns(returns);
   } catch (_) {}
 
-  // 매출장부 동기화 후 '반품 데이터' 소메뉴로 이동(렌더 포함)
+  // 매출장부 동기화 — 탭 이동 없이 현재 업로드 데이터 화면 유지 (반품 데이터는 백그라운드 렌더만)
   _uploadDataPage = 1;
   if (typeof syncLedgerFromUploadData === 'function') syncLedgerFromUploadData();
-  if (typeof switchUploadTab === 'function') switchUploadTab('returns');
-  else if (typeof renderReturnData === 'function') renderReturnData();
+  if (typeof renderUploadData === 'function') renderUploadData();
+  if (typeof renderReturnData === 'function') renderReturnData();
 
   // 체크박스 해제
   document.querySelectorAll('.upload-data-cb').forEach(c => { c.checked = false; });
