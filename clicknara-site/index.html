@@ -2265,7 +2265,8 @@ function _evSheetSiteImage(model, site, chan){
   const cols = rec.imgCols || {};
   const cfg = EV_FORM_IMG_COL[site];
   let val='';
-  if(typeof cfg==='string') val = cols[cfg]||'';
+  // 헤더로 찾은 사이트명 키(cols[site]) 우선, 없으면 컬럼 문자(cols[cfg]) 폴백
+  if(typeof cfg==='string') val = cols[site] || cols[cfg] || '';
   else if(cfg){   // 이베이: 지마켓(W)/옥션(AH) — 행 쇼핑몰로 구분
     const c=String(chan||'');
     if(c.includes('옥션')) val = cols[cfg['옥션']]||'';
@@ -2345,7 +2346,7 @@ async function _evFetchCsv(gid){
   }
   throw new Error('시트 데이터를 불러오지 못했습니다(CORS/프록시).');
 }
-const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v11';   // v11: /export CSV로 열 정렬 보존(AY 등 사이트별 이미지 정확 매칭)
+const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v12';   // v12: 사이트 이미지 열 헤더명 자동탐지(gviz 열밀림 대비, 문자보다 우선)
 function _evSheetCacheLoad(){
   try{ const c=JSON.parse(localStorage.getItem(EV_SHEET_CACHE_KEY)||'null'); if(Array.isArray(c)&&c.length) return new Map(c); }catch(_){}
   return null;
@@ -2384,6 +2385,18 @@ async function _evLoadSheetData(force){
         // 행사 양식: 사이트별 이미지 열(컬럼 문자 → 인덱스). 예: 쿠팡=BE, 11번가=AS …
         const imgColIdx = {};
         EV_ALL_IMG_COLS.forEach(letter=>{ try{ imgColIdx[letter]=XLSX.utils.decode_col(letter); }catch(_){ imgColIdx[letter]=-1; } });
+        // 사이트별 이미지 열을 '헤더 이름'으로도 탐지 — gviz 열밀림 대비(문자보다 우선 사용)
+        const _hn = s => String(s||'').replace(/\s+/g,'').toLowerCase();
+        const _imgHint = h => /이미지|image|url|사진|jpg|png/.test(h);
+        const siteImgIdx = {};
+        Object.keys(EV_FORM_IMG_COL).forEach(site=>{
+          if(typeof EV_FORM_IMG_COL[site] !== 'string') return;   // 이베이(객체)는 문자 매칭 유지
+          const key=_hn(site);
+          let idx = header.findIndex(h=>{ const hh=_hn(h); return hh.includes(key) && _imgHint(hh); });
+          if(idx<0) idx = header.findIndex(h=>_hn(h)===key);       // 정확히 사이트명만인 헤더
+          siteImgIdx[site]=idx;
+        });
+        console.log('[ev-sheet] 사이트 이미지 헤더 탐지:', Object.fromEntries(Object.entries(siteImgIdx).map(([s,i])=>[s, i>=0?`${header[i]}(#${i})`:'미발견→문자폴백'])));
         // 원복양식: 사이트별 판매가(등재가) 열(컬럼 문자 → 인덱스). 예: 11번가=AO, 쿠팡=J …
         const priceColIdx = {};
         EV_ALL_PRICE_COLS.forEach(letter=>{ try{ priceColIdx[letter]=XLSX.utils.decode_col(letter); }catch(_){ priceColIdx[letter]=-1; } });
@@ -2394,6 +2407,8 @@ async function _evLoadSheetData(force){
           if(map.has(code)) continue;
           const imgCols = {};
           for(const letter in imgColIdx){ const ci=imgColIdx[letter]; imgCols[letter] = ci>=0 ? String(row[ci]||'').trim() : ''; }
+          // 헤더로 찾은 사이트별 이미지 값(사이트명 키로 저장) — _evSheetSiteImage 에서 문자보다 우선 사용
+          for(const site in siteImgIdx){ const ci=siteImgIdx[site]; if(ci>=0) imgCols[site] = String(row[ci]||'').trim(); }
           const priceCols = {};
           for(const letter in priceColIdx){ const ci=priceColIdx[letter]; priceCols[letter] = ci>=0 ? num(row[ci]) : 0; }
           map.set(code, {
