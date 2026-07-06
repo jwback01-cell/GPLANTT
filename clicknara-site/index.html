@@ -2294,7 +2294,12 @@ function _evSheetSitePrice(model, site, chan){
 function _evRestoreImageFor(rec, site){
   if(!rec) return '';
   const col = EV_RESTORE_IMG_COL[site];
-  if(col){ const v = rec.imgCols && rec.imgCols[col]; return (v && String(v).trim()) || ''; }
+  if(col){
+    // 원복 열이 행사 열과 같은 사이트(예: 스마트스토어 BK=BK)는 헤더 탐지값 우선(gviz 열밀림 대비)
+    const byHeader = (EV_FORM_IMG_COL[site] === col) ? (rec.imgCols && rec.imgCols[site]) : '';
+    const byLetter = rec.imgCols && rec.imgCols[col];
+    return (byHeader && String(byHeader).trim()) || (byLetter && String(byLetter).trim()) || '';
+  }
   return rec.restoreImg || '';
 }
 // 행사 계산기 프로모션 — 기존세팅값 시트 K열(모델=판매자관리코드 매칭). 없으면 null
