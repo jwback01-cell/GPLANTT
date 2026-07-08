@@ -7323,26 +7323,22 @@ function renderProductsPage() {
   const dateEnd   = (document.getElementById('product-date-end')?.value   || '').replace(/-/g,'');
   const _pmEditedMap = _pmLoadEdited();   // 로컬 수정시각 (id -> YYYY-MM-DD)
 
+  // 검색어 매칭 (상품명/SKU) — 메인 필터 + 필터에 가려진 경우 재검색에 공통 사용
+  //   isExactMode → SKU 정확 일치 / isAndMode → 모든 토큰 포함 / 그 외 → OR 부분 일치
+  const _matchQ = (name, sku) => {
+    if (!queryTokens.length) return true;
+    if (isExactMode) return queryTokens.some(t => sku === t);
+    if (isAndMode)   return queryTokens.every(t => name.includes(t) || sku.includes(t));
+    return queryTokens.some(t => name.includes(t) || sku.includes(t));
+  };
   // 필터링
-  const filtered = _allProducts.filter(p => {
+  let filtered = _allProducts.filter(p => {
     const name = (p.name || '').toLowerCase();
     const sku  = (p.sku  || '').toLowerCase();
     const cat  = p.category || '';
     const isLow  = p.safety_stock > 0 && p.stock < p.safety_stock;
 
-    // isExactMode  → SKU 정확 일치만 (다중 검색의 1:1 매칭 보장)
-    // isAndMode    → 모든 토큰이 상품명/SKU 에 포함 (AND, 부분 일치) — 상품명 붙여넣기 대응
-    // 그 외(1-2개 토큰 + SKU 패턴) → OR 부분 일치 (기존 동작)
-    let matchQuery;
-    if (!queryTokens.length) {
-      matchQuery = true;
-    } else if (isExactMode) {
-      matchQuery = queryTokens.some(t => sku === t);
-    } else if (isAndMode) {
-      matchQuery = queryTokens.every(t => name.includes(t) || sku.includes(t));
-    } else {
-      matchQuery = queryTokens.some(t => name.includes(t) || sku.includes(t));
-    }
+    const matchQuery = _matchQ(name, sku);
     // 폴더코드 매칭 — folderTokens 중 하나라도 p.folder_code 에 포함되면 OK (대소문자 무시, 부분 일치)
     const folderCode = String(p.folder_code || '').toLowerCase();
     const matchFolder = folderTokens.length === 0
@@ -7365,6 +7361,16 @@ function renderProductsPage() {
     }
     return matchQuery && matchFolder && matchCat && matchStat && matchDate;
   });
+
+  // 검색어가 있는데 다른 필터(카테고리·재고상태·날짜·폴더)에 가려 0건이면
+  //  → 검색어만으로 전체 카탈로그 재검색해서 가려진 상품을 보여줌 (예: K122293)
+  let _filterBypassed = false;
+  if (queryTokens.length && filtered.length === 0) {
+    const byQueryOnly = _allProducts.filter(p =>
+      _matchQ((p.name || '').toLowerCase(), (p.sku || '').toLowerCase())
+    );
+    if (byQueryOnly.length) { filtered = byQueryOnly; _filterBypassed = true; }
+  }
 
   // 정렬
   if (_productSortKey) {
@@ -7428,7 +7434,8 @@ function renderProductsPage() {
       const modeText  = isExactMode ? ` · SKU 정확 일치 (다중 검색)`
                       : isAndMode   ? ` · 단어 모두 포함`
                       : '';
-      metaEl.textContent = `${tokenText}결과 ${filtered.length.toLocaleString('ko-KR')}건${modeText}`;
+      const bypassText = _filterBypassed ? ` · ⚠ 카테고리/재고상태/날짜 필터를 무시하고 전체에서 검색` : '';
+      metaEl.textContent = `${tokenText}결과 ${filtered.length.toLocaleString('ko-KR')}건${modeText}${bypassText}`;
     } else {
       metaEl.classList.add('hidden');
     }
