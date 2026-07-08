@@ -25640,6 +25640,11 @@ function renderUploadData() {
     if (!ads.length) return m;
     const _rnA = s => String(s == null ? '' : s).replace(/[^0-9a-z가-힣]/gi, '').toLowerCase();
     const rowRev = r => (Number(r.price) || 0) * (Number(r.qty) || 0);
+    // 반품/교환·수량≤0 행은 리워드 배분 대상에서 제외 (판매 행에만 리워드가 붙도록)
+    const _isNonSale = r => (Number(r.qty) || 0) <= 0
+      || r._isReturn || r.template === 'manual-return'
+      || r._claimKind === 'exchange' || r.template === 'manual-exchange';
+    const saleRows = all.filter(r => !_isNonSale(r));
     const ds = all.map(r => _normDate(r.date)).filter(d => d && d.length === 8).sort();
     const aStart = startDate || ds[0] || '';
     const aEnd   = endDate   || ds[ds.length - 1] || '';
@@ -25655,13 +25660,13 @@ function renderUploadData() {
       if (a.template === 'reward' && Array.isArray(a.rewardProducts) && a.rewardProducts.length) {
         const skus  = new Set(a.rewardProducts.map(p => String(p.sku || '').trim().toUpperCase()).filter(Boolean));
         const names = new Set(a.rewardProducts.map(p => _rnA(p.name)).filter(Boolean));
-        targets = all.filter(r => {
+        targets = saleRows.filter(r => {
           const rs = String(r.itemCode || '').trim().toUpperCase();
           if (rs && skus.has(rs)) return true;
           return names.has(_rnA(r.itemName));
         });
       } else {
-        targets = all;
+        targets = saleRows;
       }
       if (!targets.length) return;
       const tot = targets.reduce((s, r) => s + rowRev(r), 0);
