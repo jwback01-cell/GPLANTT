@@ -4876,7 +4876,7 @@ tailwind.config = {
                   <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap cursor-pointer hover:bg-brand-border/60 select-none" data-upload-sort="cost" onclick="sortUploadData('cost')">원가<span class="upload-sort-icon text-brand-gray/50 ml-1">↕</span></th>
                   <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap cursor-pointer hover:bg-brand-border/60 select-none" data-upload-sort="receiver" onclick="sortUploadData('receiver')">수령자명<span class="upload-sort-icon text-brand-gray/50 ml-1">↕</span></th>
                   <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap cursor-pointer hover:bg-brand-border/60 select-none" data-upload-sort="profit" onclick="sortUploadData('profit')" title="마진 = 공급가 + 택배비 − 원가 − 택배비용">마진(공급가+택배비-원가-택배비용)<span class="upload-sort-icon text-brand-gray/50 ml-1">↕</span></th>
-                  <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap" title="해당 기간 광고비를 상품별 매출 비중으로 안분한 값 (리워드=대상 상품에만, 일반=전체 상품에 안분)">광고비</th>
+                  <th class="text-right px-4 py-3 font-bold text-xs whitespace-nowrap" title="기간 리워드를 상품별 매출 비중으로 안분한 값 (대상 상품에만). 합계는 판매 없는 제품 리워드까지 포함한 전체 총액">리워드</th>
                   <th class="text-left px-4 py-3 font-bold text-xs whitespace-nowrap cursor-pointer hover:bg-brand-border/60 select-none" data-upload-sort="savedAt" onclick="sortUploadData('savedAt')">저장일시<span class="upload-sort-icon text-brand-gray/50 ml-1">↕</span></th>
                   <th class="text-center px-4 py-3 font-bold text-xs whitespace-nowrap">수정</th>
                 </tr>
@@ -25631,6 +25631,8 @@ function renderUploadData() {
   // 행별 광고비 안분: 기간(필터 날짜 또는 데이터 전체 범위)의 광고비를
   //  · 리워드 광고비 → 대상 상품(품목코드/이름 매칭)에만, 각 행 매출(단가×수량) 비중으로
   //  · 일반 광고비   → 전체 행에 매출 비중으로 안분
+  // adTotalInRange = 기간 내 리워드 총액(판매 없는 제품분 포함) — 합계 표시용
+  let adTotalInRange = 0;
   const adByRow = (function () {
     const m = new Map();
     if (!all.length) return m;
@@ -25648,6 +25650,7 @@ function renderUploadData() {
       if (aEnd && d > aEnd) return;
       const amt = Number(a.amount) || 0;
       if (amt <= 0) return;
+      adTotalInRange += amt;   // 판매 여부와 무관하게 전액 집계
       let targets;
       if (a.template === 'reward' && Array.isArray(a.rewardProducts) && a.rewardProducts.length) {
         const skus  = new Set(a.rewardProducts.map(p => String(p.sku || '').trim().toUpperCase()).filter(Boolean));
@@ -25748,14 +25751,14 @@ function renderUploadData() {
     const profitClass = profitAfterAd < 0 ? 'text-brand-pink' : (profitAfterAd > 0 ? 'text-brand-green' : '');
     adFooterHtml = `
       <tr class="border-t border-brand-border bg-brand-blue-light/30">
-        <td class="px-4 py-2 font-bold text-xs text-brand-gray" colspan="13">📣 광고비 (${minD || '?'} ~ ${maxD || '?'} · 사이트 전체)</td>
+        <td class="px-4 py-2 font-bold text-xs text-brand-gray" colspan="13">📣 리워드 (${minD || '?'} ~ ${maxD || '?'} · 사이트 전체)</td>
         <td class="px-4 py-2 text-right font-black text-brand-pink">−${_fmt(adTotal)}</td>
         <td class="px-4 py-2 text-right font-black text-brand-pink">${_fmt(adTotal)}</td>
         <td class="px-4 py-2"></td>
         <td class="px-4 py-2"></td>
       </tr>
       <tr class="border-t-2 border-brand-black bg-brand-bg">
-        <td class="px-4 py-3 font-bold text-xs text-brand-gray" colspan="13">실마진 (마진 − 광고비)</td>
+        <td class="px-4 py-3 font-bold text-xs text-brand-gray" colspan="13">실마진 (마진 − 리워드)</td>
         <td class="px-4 py-3 text-right font-black ${profitClass}">${_fmt(profitAfterAd)}</td>
         <td class="px-4 py-3"></td>
         <td class="px-4 py-3"></td>
@@ -25773,7 +25776,7 @@ function renderUploadData() {
       <td class="px-4 py-3 text-right font-black">${_sumCell(sumCostObj)}</td>
       <td class="px-4 py-3"></td>
       <td class="px-4 py-3 text-right font-black">${_sumProfitCell(sumProfitObj)}</td>
-      <td class="px-4 py-3 text-right font-black text-brand-pink">${(() => { const v = all.reduce((s,r)=>s+(adByRow.get(r)||0),0); return v > 0 ? _fmt(Math.round(v)) : '<span class="text-brand-gray font-normal">-</span>'; })()}</td>
+      <td class="px-4 py-3 text-right font-black text-brand-pink" title="판매 없는 제품에 쓴 리워드까지 포함한 기간 전체 리워드 총액">${adTotalInRange > 0 ? _fmt(Math.round(adTotalInRange)) : '<span class="text-brand-gray font-normal">-</span>'}</td>
       <td class="px-4 py-3"></td>
       <td class="px-4 py-3"></td>
     </tr>${adFooterHtml}`;
