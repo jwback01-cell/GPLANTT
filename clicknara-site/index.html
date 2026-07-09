@@ -48,6 +48,9 @@ tailwind.config = {
 }
 </script>
 <style>
+  /* 체크된 행 강조 — 기존 셀 배경(노란 등재가 등) 위에 파란 반투명 오버레이 + 좌측 액센트 */
+  tr.ev-row-selected > td { background-image: linear-gradient(rgba(52,120,246,.16), rgba(52,120,246,.16)); }
+  tr.ev-row-selected > td:first-child { box-shadow: inset 4px 0 0 #3478F6; }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body {
@@ -2695,7 +2698,7 @@ function renderEventCalc() {
   const tfoot = document.getElementById('ev-tfoot'); if (tfoot) tfoot.innerHTML = '';
   const inp = 'w-full bg-transparent focus:outline-none focus:bg-brand-blue-light/30 rounded px-1.5 py-1';
   const checkTh = '<th class="px-2 py-2.5 border border-brand-border text-center w-[34px]"><input type="checkbox" id="ev-select-all" onchange="evToggleAll(this.checked)"></th>';
-  const cbCell = row => `<td class="px-2 py-1 text-center border border-brand-border"><input type="checkbox" class="ev-row-cb" ${_evSel.has(row.id)?'checked':''} onchange="evToggleRow('${row.id}',this.checked)"></td>`;
+  const cbCell = row => `<td class="px-2 py-1 text-center border border-brand-border"><input type="checkbox" class="ev-row-cb" ${_evSel.has(row.id)?'checked':''} onchange="evToggleRow('${row.id}',this.checked,this)"></td>`;
 
   if (isImport) {
     if (!_evSheetFetched && !_evSheetLoading) _evLoadSheetData();   // 기존세팅값 시트 등재가 로드(1회/세션)
@@ -2705,7 +2708,7 @@ function renderEventCalc() {
     else tbody.innerHTML = ev.rows.map((row,i)=>{ const m=row.imp||{}; const num=v=>`<td class="px-2 py-1 text-right tabular-nums border border-brand-border">${v?_evFmt(v):'-'}</td>`;
       const setListing = _evSheetListing(row.model, ev.name);
       const setCell = `<td class="px-2 py-1 text-right tabular-nums border border-brand-border bg-yellow-50 ${setListing?'font-bold text-brand-black':'text-brand-gray'}" title="기존세팅값 시트의 ${_evEsc(ev.name||'')} 등재가">${setListing?_evFmt(setListing):(_evSheetMap?'-':'…')}</td>`;
-      return `<tr class="hover:bg-brand-bg/40">${cbCell(row)}
+      return `<tr class="hover:bg-brand-bg/40 ${_evSel.has(row.id)?'ev-row-selected':''}">${cbCell(row)}
         <td class="px-2 py-1 border border-brand-border font-semibold min-w-[150px]">${_evEsc(row.model||'')}</td>
         ${setCell}
         ${num(row.orig)}${num(row.disp)}
@@ -2734,7 +2737,7 @@ function renderEventCalc() {
       const _sheetPromo = _evSheetPromo(row.model);
       const _effPromo = (_sheetPromo != null && _sheetPromo !== 0) ? _sheetPromo : _evNum(row.promo);
       const c = _evCalcRow({ ...row, promo: _effPromo }, ev.rates);
-      return `<tr class="hover:bg-brand-bg/40">${cbCell(row)}
+      return `<tr class="hover:bg-brand-bg/40 ${_evSel.has(row.id)?'ev-row-selected':''}">${cbCell(row)}
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" list="ev-model-list" value="${_evEsc(row.model||'')}" onpaste="evPaste(event,${i},'model')" onchange="evEditRow(${i},'model',this.value)" class="${inp} text-left font-semibold min-w-[150px]" autocomplete="off"></td>
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${row.orig?_evFmt(row.orig):''}" onpaste="evPaste(event,${i},'orig')" onchange="evEditRow(${i},'orig',this.value)" class="${inp} text-right w-full"></td>
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${row.disp?_evFmt(row.disp):''}" onpaste="evPaste(event,${i},'disp')" onchange="evEditRow(${i},'disp',this.value)" class="${inp} text-right w-full"></td>
@@ -2812,7 +2815,7 @@ function evPaste(e, startIdx, startField){
   for(let i=0;i<ev.rows.length;i++){ if(!ev.rows[i]) ev.rows[i]=newRow(); }
   _evSave(o); renderEventCalc();
 }
-function evToggleRow(id, checked){ if(checked) _evSel.add(id); else _evSel.delete(id); const sa=document.getElementById('ev-select-all'); if(sa){ const ev=_evActive(); sa.checked = ev.rows.length>0 && ev.rows.every(r=>_evSel.has(r.id)); } }
+function evToggleRow(id, checked, cb){ if(checked) _evSel.add(id); else _evSel.delete(id); if(cb){ const tr=cb.closest('tr'); if(tr) tr.classList.toggle('ev-row-selected', !!checked); } const sa=document.getElementById('ev-select-all'); if(sa){ const ev=_evActive(); sa.checked = ev.rows.length>0 && ev.rows.every(r=>_evSel.has(r.id)); } }
 function evToggleAll(checked){ const ev=_evActive(); ev.rows.forEach(r=>{ if(checked) _evSel.add(r.id); else _evSel.delete(r.id); }); renderEventCalc(); }
 function evDeleteSelected(){
   const o=_evLoad(); const ev=_evActive(o);
