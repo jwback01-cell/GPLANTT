@@ -18179,8 +18179,7 @@ async function instructGplanDepot() {
     gplanAlert('지플랜 주문은 있으나 묶음번호(bundle_no)를 찾지 못했습니다.', { type: 'error', title: '묶음번호 없음' });
     return;
   }
-  if (!confirm(`배송처 "지플랜" 주문 ${target.length}건 (묶음 ${bundles.length}개)을 출고지시할까요?\n\n※ 신규주문/출고대기 상태의 주문에만 적용됩니다.`)) return;
-
+  // 확인 팝업 없이 바로 출고지시 실행
   const btn = document.querySelector('button[onclick="instructGplanDepot()"]');
   const orig = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = '출고지시 중…'; }
