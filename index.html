@@ -25633,7 +25633,9 @@ function renderUploadData() {
   //  · 리워드 광고비 → 대상 상품(품목코드/이름 매칭)에만, 각 행 매출(단가×수량) 비중으로
   //  · 일반 광고비   → 전체 행에 매출 비중으로 안분
   // adTotalInRange = 기간 내 리워드 총액(판매 없는 제품분 포함) — 합계 표시용
+  // unattributedAds = 판매가 없어 어느 행에도 못 붙은 리워드 목록 {label, amt}
   let adTotalInRange = 0;
+  const unattributedAds = [];
   const adByRow = (function () {
     const m = new Map();
     if (!all.length) return m;
@@ -25669,13 +25671,27 @@ function renderUploadData() {
       } else {
         targets = saleRows;
       }
-      if (!targets.length) return;
+      if (!targets.length) {
+        // 판매 행이 없어 배분 불가 — 미배분 리워드로 기록 (하단에 표시)
+        const label = (a.template === 'reward' && Array.isArray(a.rewardProducts) && a.rewardProducts.length)
+          ? a.rewardProducts.map(p => String(p.name || p.sku || '').trim()).filter(Boolean).join(', ')
+          : (a.memo || a.campaign || '일반 광고비');
+        unattributedAds.push({ label: label || '(대상 미상)', amt, date: d });
+        return;
+      }
       const tot = targets.reduce((s, r) => s + rowRev(r), 0);
       if (tot > 0) targets.forEach(r => m.set(r, (m.get(r) || 0) + amt * rowRev(r) / tot));
       else { const per = amt / targets.length; targets.forEach(r => m.set(r, (m.get(r) || 0) + per)); }
     });
     return m;
   })();
+  // 미배분 리워드를 상품(label)별로 합산
+  const unattributedByLabel = (() => {
+    const g = new Map();
+    unattributedAds.forEach(u => g.set(u.label, (g.get(u.label) || 0) + u.amt));
+    return [...g.entries()].map(([label, amt]) => ({ label, amt })).sort((a, b) => b.amt - a.amt);
+  })();
+  const unattributedTotal = unattributedByLabel.reduce((s, u) => s + u.amt, 0);
   const _adCell = r => {
     const v = adByRow.get(r) || 0;
     return v > 0 ? `<span class="text-brand-pink font-bold">${_fmt(Math.round(v))}</span>` : '<span class="text-brand-gray">-</span>';
@@ -25785,7 +25801,20 @@ function renderUploadData() {
       <td class="px-4 py-3 text-right font-black text-brand-pink" title="판매 없는 제품에 쓴 리워드까지 포함한 기간 전체 리워드 총액">${adTotalInRange > 0 ? _fmt(Math.round(adTotalInRange)) : '<span class="text-brand-gray font-normal">-</span>'}</td>
       <td class="px-4 py-3"></td>
       <td class="px-4 py-3"></td>
-    </tr>${adFooterHtml}`;
+    </tr>${unattributedByLabel.length ? `
+    <tr class="bg-brand-pink-light/25 border-t border-brand-border">
+      <td class="px-4 py-2 text-xs font-bold text-brand-pink" colspan="6">↳ 판매가 없어 각 행에 못 붙은 리워드 (아래 상품은 이 기간 판매 0건)</td>
+      <td class="px-4 py-2"></td><td class="px-4 py-2"></td><td class="px-4 py-2"></td><td class="px-4 py-2"></td><td class="px-4 py-2"></td><td class="px-4 py-2"></td><td class="px-4 py-2"></td><td class="px-4 py-2"></td>
+      <td class="px-4 py-2 text-right text-xs font-black text-brand-pink">${_fmt(Math.round(unattributedTotal))}</td>
+      <td class="px-4 py-2"></td><td class="px-4 py-2"></td>
+    </tr>
+    ${unattributedByLabel.map(u => `
+    <tr class="bg-brand-pink-light/10">
+      <td class="px-4 py-1.5 text-xs text-brand-gray" colspan="6">· ${_escapeHtml(u.label)}</td>
+      <td class="px-4 py-1.5"></td><td class="px-4 py-1.5"></td><td class="px-4 py-1.5"></td><td class="px-4 py-1.5"></td><td class="px-4 py-1.5"></td><td class="px-4 py-1.5"></td><td class="px-4 py-1.5"></td><td class="px-4 py-1.5"></td>
+      <td class="px-4 py-1.5 text-right text-xs font-bold text-brand-pink">${_fmt(Math.round(u.amt))}</td>
+      <td class="px-4 py-1.5"></td><td class="px-4 py-1.5"></td>
+    </tr>`).join('')}` : ''}${adFooterHtml}`;
   const sa = document.getElementById('upload-data-select-all'); if (sa) sa.checked = false;
   updateUploadDataSelCount();
   // 페이지 사이즈 버튼 active 표시
