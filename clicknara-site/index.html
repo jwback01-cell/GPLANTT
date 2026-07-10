@@ -3111,8 +3111,8 @@ async function _evFillPlayauto(file){
     if(!rows.length){ alert('빈 파일입니다.'); return; }
     // 업로드 엑셀 고정 열: 판매자관리코드=A, 판매가=I, 기본이미지=AP
     const CODE_IDX =XLSX.utils.decode_col('A');    // 판매자관리코드
-    const PRICE_IDX=XLSX.utils.decode_col('I');    // 판매가
-    const IMG_IDX  =XLSX.utils.decode_col('AP');   // 기본이미지
+    const PRICE_IDX=XLSX.utils.decode_col(ev.name==='이베이' ? 'J' : 'I');    // 판매가 (이베이는 J열, 그 외 I열)
+    const IMG_IDX  =XLSX.utils.decode_col(ev.name==='이베이' ? 'AQ' : 'AP');   // 기본이미지 (이베이는 AQ, 그 외 AP)
     const _hdr=(rows[0]||[]).map(c=>String(c==null?'':c).replace(/\s+/g,''));
     const mallIdx=_hdr.findIndex(c=>c.includes('쇼핑몰'));   // 이베이 지마켓/옥션 구분용
     const out=[rows[0]];   // 헤더(그대로)
