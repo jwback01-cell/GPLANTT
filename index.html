@@ -16002,9 +16002,10 @@ async function gplanQuickCollectAndInstruct() {
     _paQcAck = false;
     try { window.postMessage({ source: 'gplan-page', type: 'GPLAN_TRIGGER_PA_QUICKCOLLECT' }, '*'); } catch (_) {}
 
-    // 2) 수집 반영 대기 (PA가 쇼핑몰 주문을 수집하는 시간)
+    // 2) 수집 반영 대기 (PA가 쇼핑몰 주문을 수집 + API 인덱싱하는 시간)
+    //    퀵수집 직후엔 신규주문이 API에 아직 안 뜰 수 있어 넉넉히 대기 (10s→16s)
     if (btn) btn.innerHTML = '② 수집 대기 중…';
-    await new Promise(r => setTimeout(r, 10000));
+    await new Promise(r => setTimeout(r, 16000));
     if (!_paQcAck) {
       console.warn('[퀵수집] 확장 ACK 없음 — 기존 PA 상태로 진행');
     }
@@ -18205,16 +18206,23 @@ async function instructGplanDepot() {
   let orders = _get();
   let target = orders.filter(_isGp);
 
-  // 지플랜 대상이 없으면 최신 주문을 다시 조회해 1회 재시도
-  //  (퀵수집 직후 GPLAN 주문 목록이 오래됐거나 일부만 수집된 경우 대응)
+  // 지플랜 대상이 없으면 최신 주문을 반복 재조회 (폴링)
+  //  (퀵수집 직후 PA가 신규주문을 아직 API로 안 내려주는 인덱싱 지연 대응 —
+  //   지플랜 주문이 뜰 때까지 최대 5회 × 4초 간격으로 재조회)
   if (!target.length && typeof fetchPlayautoOrders === 'function') {
     const _b0 = document.querySelector('button[onclick="instructGplanDepot()"]');
     const _o0 = _b0 ? _b0.innerHTML : '';
-    if (_b0) { _b0.disabled = true; _b0.innerHTML = '최신 주문 재조회…'; }
-    try { await fetchPlayautoOrders(); } catch (_) {}
+    if (_b0) _b0.disabled = true;
+    const MAX_RETRY = 5;
+    for (let i = 0; i < MAX_RETRY && !target.length; i++) {
+      if (_b0) _b0.innerHTML = `최신 주문 재조회… (${i + 1}/${MAX_RETRY})`;
+      try { await fetchPlayautoOrders(); } catch (_) {}
+      orders = _get();
+      target = orders.filter(_isGp);
+      if (target.length) break;
+      if (i < MAX_RETRY - 1) await new Promise(r => setTimeout(r, 4000));  // PA 인덱싱 대기
+    }
     if (_b0) { _b0.disabled = false; _b0.innerHTML = _o0; }
-    orders = _get();
-    target = orders.filter(_isGp);
   }
 
   if (!orders.length) {
