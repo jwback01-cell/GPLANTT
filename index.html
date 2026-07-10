@@ -18204,10 +18204,10 @@ async function instructGplanDepot() {
     });
     const r = (res && (res.results || res.result)) || (typeof res === 'string' ? res : JSON.stringify(res));
 
-    // 출고지시 직후 → 운송장출력(택배사 연동 자동 생성) 자동 실행
+    // 출고지시 직후 → 운송장출력(택배사 연동으로 배정된 송장번호를 setInvoice로 반영) 자동 실행
     if (btn) btn.innerHTML = '운송장출력 중…';
-    await new Promise(rs => setTimeout(rs, 2500));   // 출고대기 상태 반영 대기
-    const printRes = await _paPrintInvoiceForBundles(bundles);
+    await new Promise(rs => setTimeout(rs, 3000));   // 출고대기 + 택배사 송장 배정 반영 대기
+    const printRes = await _paPrintInvoiceForBundles(target);
     const printMsg = printRes.ok
       ? `\n\n🖨 운송장출력 요청 완료 (엔드포인트: ${printRes.endpoint})${printRes.note ? `\n응답: ${printRes.note}` : ''}`
       : `\n\n⚠ 운송장출력 자동 실행 실패: ${printRes.msg}\n(출고지시는 완료됨 — 플레이오토 [출고관리]에서 운송장출력을 직접 눌러주세요)`;
@@ -18220,40 +18220,57 @@ async function instructGplanDepot() {
   }
 }
 
-// 운송장출력(택배사 연동 자동 생성) — 플레이오토 환경별 엔드포인트 편차 대응해 후보를 순차 시도
-// 404/미지원 응답은 건너뛰고 다음 후보로 (실제 처리된 응답이 오면 성공 처리)
-async function _paPrintInvoiceForBundles(bundles) {
-  if (!bundles || !bundles.length) return { ok: false, msg: '묶음번호 없음' };
-  const bodyCodes  = JSON.stringify({ bundle_codes: bundles, auto_bundle: false });
-  const bodyOrders = JSON.stringify({ orders: bundles.map(b => ({ bundle_no: b })) });
-  const candidates = [
-    { method: 'POST', path: '/order/printInvoice',  body: bodyCodes  },
-    { method: 'PUT',  path: '/order/printInvoice',  body: bodyCodes  },
-    { method: 'POST', path: '/order/invoicePrint',  body: bodyCodes  },
-    { method: 'POST', path: '/order/deliveryPrint', body: bodyCodes  },
-    { method: 'POST', path: '/orders/printInvoice', body: bodyOrders },
-    { method: 'POST', path: '/order/printDelivery', body: bodyOrders },
-  ];
-  const _isNotFound = (m) => /page could not be found|not found|cannot (post|put)|\b404\b|없는 (경로|주소)|지원하지 않|invalid (url|endpoint|path)/i.test(String(m || ''));
-  let lastErr = '';
-  for (const c of candidates) {
-    try {
-      const res = await _paFetch(c.path, { method: c.method, body: c.body });
-      if (typeof _isPaErrorResponse === 'function' && _isPaErrorResponse(res)) {
-        const m = (res && (res.message || (res.response && res.response.message) || res.error)) || '';
-        if (_isNotFound(m)) { lastErr = m; continue; }
-        // 404 아닌 응답 = 해당 엔드포인트가 존재하고 처리 시도됨 → 성공으로 간주(메시지 첨부)
-        return { ok: true, endpoint: c.path, note: String(m).slice(0, 200) };
-      }
-      return { ok: true, endpoint: c.path, res };
-    } catch (e) {
-      const m = (e && e.message) || String(e);
-      lastErr = m;
-      if (_isNotFound(m)) continue;   // 404 → 다음 후보
-      return { ok: false, msg: m, endpoint: c.path };   // 실제 오류 → 중단
-    }
+// 운송장출력 — PUT /order/setInvoice (change_complete:false → '운송장출력' 상태)
+//  setInvoice 는 송장번호·택배사코드가 필수라 자동생성은 안 함 → 출고지시된 주문을 다시 조회해
+//  택배사 연동으로 이미 배정된 invoice_no·carr_no 를 수집한 뒤 그 값으로 운송장출력 처리한다.
+async function _paPrintInvoiceForBundles(target) {
+  const _bn = o => String((o && (o.bundle_no || o.pa_bundle_no || o.ori_bundle_no)) || '').trim();
+  const bundleSet = new Set((target || []).map(_bn).filter(Boolean));
+  if (!bundleSet.size) return { ok: false, msg: '묶음번호 없음' };
+
+  // 출고지시된 주문 재조회 (출고대기 상태, 최근 14일) — 택배사 연동으로 배정된 송장번호 확보용
+  let fetched = [];
+  try {
+    const today = _ymdString(new Date());
+    const body = {
+      start: 0, length: 500, date_type: 'wdate', masking_yn: false, bundle_yn: false, orderby: 'wdate desc',
+      sdate: _paAddDays(today, -14) + ' 00:00:00', edate: today + ' 23:59:59',
+      status: (typeof PA_STATUS_CANDIDATES !== 'undefined' && PA_STATUS_CANDIDATES['출고대기']) || ['출고대기'],
+    };
+    const data = await _paFetch('/orders', { method: 'POST', body: JSON.stringify(body) });
+    fetched = _paUnwrap(data) || [];
+  } catch (e) {
+    return { ok: false, msg: '출고대기 주문 재조회 실패: ' + (e.message || e) };
   }
-  return { ok: false, msg: lastErr || '운송장출력 엔드포인트를 찾지 못했습니다' };
+
+  const mine = fetched.filter(o => bundleSet.has(_bn(o)));
+  const withInv = mine.filter(o => String(o.invoice_no || '').trim() && String(o.carr_no || '').trim());
+  if (!withInv.length) {
+    return { ok: false, msg: `택배사 연동 송장번호가 아직 배정되지 않았습니다 (대상 ${mine.length || bundleSet.size}건 중 송장 0건).\n플레이오토 택배사 자동출력이 끝난 뒤 다시 시도하거나 [출고관리]에서 운송장출력을 눌러주세요.` };
+  }
+
+  // 묶음별 1건씩 (중복 bundle 제거)
+  const seen = new Set();
+  const ordersBody = [];
+  withInv.forEach(o => {
+    const b = _bn(o);
+    if (seen.has(b)) return;
+    seen.add(b);
+    ordersBody.push({ bundle_no: b, carr_no: String(o.carr_no).trim(), invoice_no: String(o.invoice_no).trim() });
+  });
+
+  try {
+    // change_complete:false → '운송장출력' 상태로 변경 (true 면 출고완료)
+    const res = await _paFetch('/order/setInvoice', {
+      method: 'PUT',
+      body: JSON.stringify({ orders: ordersBody, overwrite: false, dupl_doubt_except_yn: 'N', change_complete: false }),
+    });
+    const arr = Array.isArray(res) ? res : ((res && (res.result || res.results)) || []);
+    const okCnt = Array.isArray(arr) ? arr.filter(x => String(x.result || '').includes('성공')).length : ordersBody.length;
+    return { ok: true, endpoint: '/order/setInvoice', note: `${okCnt}/${ordersBody.length}건 운송장출력 처리` };
+  } catch (e) {
+    return { ok: false, msg: 'setInvoice 실패: ' + (e.message || e), endpoint: '/order/setInvoice' };
+  }
 }
 
 // 스타일 지원 XLSX 라이브러리(xlsx-js-style) 지연 로드 — 색상 채우기/테두리 저장용
