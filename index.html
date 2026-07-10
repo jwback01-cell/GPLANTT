@@ -18166,6 +18166,20 @@ async function instructGplanDepot() {
     gplanAlert('먼저 "주문 수집"으로 주문을 가져오세요.', { type: 'warn', title: '주문 없음' });
     return;
   }
+  // 매칭여부 검사 — SKU 코드가 비어 있는(플레이오토 미매칭) 주문이 하나라도 있으면 전체 출고지시 중단
+  const _skuKeys = ['sku_cd', 'set_cd', 'c_sale_cd', 'shop_sku_cd', 'item_code', 'stock_cd', 'model_no', 'prod_cd'];
+  const _hasSku = o => _skuKeys.some(k => o[k] != null && String(o[k]).trim() !== '');
+  const unmatchedOrders = orders.filter(o => !_hasSku(o));
+  if (unmatchedOrders.length) {
+    const names = [...new Set(unmatchedOrders.map(o => String(o.shop_sale_name || o.prod_name || o.to_name || o.receiver_name || '').trim()).filter(Boolean))].slice(0, 8);
+    gplanAlert(
+      `미매칭(SKU 매칭 안 됨) 주문이 ${unmatchedOrders.length}건 있어 출고지시를 중단했습니다.\n\n` +
+      (names.length ? `예: ${names.join(', ')}\n\n` : '') +
+      `플레이오토에서 모든 주문의 SKU 매칭을 완료한 뒤 다시 시도하세요.`,
+      { type: 'error', title: '미매칭 주문 있음 — 출고지시 중단' }
+    );
+    return;
+  }
   const norm = s => String(s || '').replace(/\s+/g, '').trim();
   const target = orders.filter(o => norm(_extDepotName(o)) === '지플랜');
   if (!target.length) {
