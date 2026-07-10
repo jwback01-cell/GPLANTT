@@ -18198,7 +18198,25 @@ function _extDepotName(o) {
 // 배송처가 '지플랜'인 주문만 출고지시 (플레이오토 출고 지시 API)
 //   PUT /api/order/instruction  { bundle_codes: [묶음번호...], auto_bundle: false }
 async function instructGplanDepot() {
-  const orders = Array.isArray(window._paOrders) ? window._paOrders : (typeof _paOrders !== 'undefined' ? _paOrders : []);
+  const _get = () => Array.isArray(window._paOrders) ? window._paOrders : (typeof _paOrders !== 'undefined' ? _paOrders : []);
+  const _norm = s => String(s || '').replace(/\s+/g, '').trim();
+  const _isGp = o => _norm(_extDepotName(o)) === '지플랜';
+
+  let orders = _get();
+  let target = orders.filter(_isGp);
+
+  // 지플랜 대상이 없으면 최신 주문을 다시 조회해 1회 재시도
+  //  (퀵수집 직후 GPLAN 주문 목록이 오래됐거나 일부만 수집된 경우 대응)
+  if (!target.length && typeof fetchPlayautoOrders === 'function') {
+    const _b0 = document.querySelector('button[onclick="instructGplanDepot()"]');
+    const _o0 = _b0 ? _b0.innerHTML : '';
+    if (_b0) { _b0.disabled = true; _b0.innerHTML = '최신 주문 재조회…'; }
+    try { await fetchPlayautoOrders(); } catch (_) {}
+    if (_b0) { _b0.disabled = false; _b0.innerHTML = _o0; }
+    orders = _get();
+    target = orders.filter(_isGp);
+  }
+
   if (!orders.length) {
     gplanAlert('먼저 "주문 수집"으로 주문을 가져오세요.', { type: 'warn', title: '주문 없음' });
     return;
@@ -18217,8 +18235,6 @@ async function instructGplanDepot() {
     );
     return;
   }
-  const norm = s => String(s || '').replace(/\s+/g, '').trim();
-  const target = orders.filter(o => norm(_extDepotName(o)) === '지플랜');
   if (!target.length) {
     const depots = [...new Set(orders.map(o => _extDepotName(o)).filter(Boolean))];
     gplanAlert('배송처가 "지플랜"인 주문이 없습니다.' + (depots.length ? `\n\n(수집된 배송처: ${depots.join(', ')})` : ''), { type: 'warn', title: '대상 없음' });
