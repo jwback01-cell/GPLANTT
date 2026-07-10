@@ -25801,6 +25801,14 @@ function renderUploadData() {
       <td class="px-4 py-3 text-right font-black text-brand-pink" title="판매 없는 제품에 쓴 리워드까지 포함한 기간 전체 리워드 총액">${adTotalInRange > 0 ? _fmt(Math.round(adTotalInRange)) : '<span class="text-brand-gray font-normal">-</span>'}</td>
       <td class="px-4 py-3"></td>
       <td class="px-4 py-3"></td>
+    </tr>
+    <tr class="border-t border-brand-border bg-brand-bg/60">
+      <td class="px-4 py-2.5 font-bold text-xs text-brand-gray" colspan="6">실마진 (마진 − 리워드)</td>
+      <td class="px-4 py-2.5"></td><td class="px-4 py-2.5"></td><td class="px-4 py-2.5"></td><td class="px-4 py-2.5"></td><td class="px-4 py-2.5"></td><td class="px-4 py-2.5"></td><td class="px-4 py-2.5"></td>
+      ${(() => { const rm = (sumProfitObj.n ? sumProfitObj.v : 0) - adTotalInRange; const cls = rm < 0 ? 'text-brand-pink' : (rm > 0 ? 'text-brand-green' : ''); return `<td class="px-4 py-2.5 text-right font-black ${cls}" title="마진 합계 − 리워드 총액">${_fmt(Math.round(rm))}</td>`; })()}
+      <td class="px-4 py-2.5"></td>
+      <td class="px-4 py-2.5"></td>
+      <td class="px-4 py-2.5"></td>
     </tr>${unattributedByLabel.length ? `
     <tr class="bg-brand-pink-light/25 border-t border-brand-border">
       <td class="px-4 py-2 text-xs font-bold text-brand-pink" colspan="6">↳ 판매가 없어 각 행에 못 붙은 리워드 (아래 상품은 이 기간 판매 0건)</td>
