@@ -17482,10 +17482,12 @@ function _paShipCostFromProductMgmt(skuCode) {
   const sLower = s.toLowerCase();
   const products = (typeof _allProducts !== 'undefined' && Array.isArray(_allProducts)) ? _allProducts : [];
 
-  // 1단계: 일반 상품의 SKU 매칭
+  // 1단계: 일반 상품의 SKU 매칭 (실패 시 상품명 일치 폴백 — SKU/상품명이 뒤바뀐 등록도 매칭)
   if (products.length) {
     let hit = products.find(p => String(p.sku || '').trim() === s);
     if (!hit) hit = products.find(p => String(p.sku || '').trim().toLowerCase() === sLower);
+    if (!hit) hit = products.find(p => String(p.name || '').trim() === s);
+    if (!hit) hit = products.find(p => String(p.name || '').trim().toLowerCase() === sLower);
     if (hit) {
       const v = Number(hit.shipping_cost);
       return isNaN(v) ? 0 : v;
@@ -17725,13 +17727,16 @@ async function runPaMinusCheck() {
     if (missing.length) {
       console.log(`[마이너스확인] 캐시 누락 SKU ${missing.length}개 DB 직접 조회 시도`);
       const chunkSize = 200;
+      const _seenIds = new Set((_allProducts || []).map(p => p.id));
       for (let i = 0; i < missing.length; i += chunkSize) {
         const chunk = missing.slice(i, i + chunkSize);
-        const { data: extra, error } = await _supabase.from('products').select('*').in('sku', chunk);
+        // SKU 또는 상품명(SKU/이름 뒤바뀐 등록 대비)으로 조회
+        const { data: extra, error } = await _supabase.from('products').select('*').or(`sku.in.(${chunk.join(',')}),name.in.(${chunk.join(',')})`);
         if (error) { console.warn('[마이너스확인] DB 직접 조회 오류:', error); continue; }
         if (extra && extra.length) {
-          _allProducts = (_allProducts || []).concat(extra);
-          console.log(`[마이너스확인] DB에서 ${extra.length}개 발견하여 캐시 보완`);
+          const add = extra.filter(p => !_seenIds.has(p.id));
+          add.forEach(p => _seenIds.add(p.id));
+          if (add.length) { _allProducts = (_allProducts || []).concat(add); console.log(`[마이너스확인] DB에서 ${add.length}개 발견하여 캐시 보완`); }
         }
       }
     }
