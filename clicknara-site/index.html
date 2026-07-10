@@ -2117,10 +2117,10 @@ const EV_FORM_IMG_COL = {
   '오늘의집': 'CH',
 };
 // 원복양식 — 사이트별 '판매가(등재가)' 가져올 기존세팅값 시트의 열(컬럼 문자).
-//  이베이는 행 쇼핑몰에 따라 지마켓(T)/옥션(AD) 구분.
+//  이베이는 행 쇼핑몰에 따라 지마켓(S)/옥션(AD) 구분.
 const EV_RESTORE_PRICE_COL = {
   '11번가': 'AO',
-  '이베이': { '지마켓': 'T', '옥션': 'AD' },
+  '이베이': { '지마켓': 'S', '옥션': 'AD' },
   '롯데온': 'AU',
   '쿠팡': 'J',
   '스마트스토어': 'J',
@@ -2363,7 +2363,7 @@ async function _evFetchCsv(gid){
   }
   throw new Error('시트 데이터를 불러오지 못했습니다(CORS/프록시). ' + lastErr);
 }
-const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v12';   // v12: 사이트 이미지 열 헤더명 자동탐지(gviz 열밀림 대비, 문자보다 우선)
+const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v13';   // v13: 이베이 지마켓 원복양식 판매가 T→S열
 function _evSheetCacheLoad(){
   try{ const c=JSON.parse(localStorage.getItem(EV_SHEET_CACHE_KEY)||'null'); if(Array.isArray(c)&&c.length) return new Map(c); }catch(_){}
   return null;
