@@ -26624,7 +26624,13 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
   const SOURCE_LABEL   = isPurchase ? '서울리빙(수동) 사이트' : '서울리빙 계열';
   const FIELD_LABEL    = isPurchase ? '단가/매입' : '원가/매출';
   // 거래원장 측 금액: sale 모드 = L.sale, purchase 모드 = L.purchase
-  const _amtL = (L) => isPurchase ? (Number(L.purchase) || 0) : (Number(L.sale) || 0);
+  // 거래원장 금액 — 금액 칸이 비어 있으면(반품 등) 수량×단가로 계산 (예: -1 × 2400 = -2400)
+  const _amtL = (L) => {
+    const base = isPurchase ? (Number(L.purchase) || 0) : (Number(L.sale) || 0);
+    if (base) return base;
+    const q = Number(L.qty) || 0, u = Number(L.unit) || 0;
+    return (q && u) ? q * u : base;
+  };
   // GPLAN 측 금액: sale 모드 = r.cost (원가), purchase 모드 = r.supply (공급가)
   const _amtG = (r) => isPurchase ? (Number(r.supply) || 0) : (Number(r.cost) || 0);
   const FILE_SUFFIX    = isPurchase ? '_매입' : '';
