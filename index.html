@@ -15523,8 +15523,14 @@ function _doEventsExport() {
     return;
   }
 
-  // 시작일 오름차순 정렬
-  visible.sort((a, b) => String(a.dateStart || '').localeCompare(String(b.dateStart || '')));
+  // 사이트순 정렬 → 같은 사이트 안에서는 시작일 오름차순
+  visible.sort((a, b) => {
+    const siteA = String(a.site || a.category || '');
+    const siteB = String(b.site || b.category || '');
+    const s = siteA.localeCompare(siteB, 'ko');
+    if (s !== 0) return s;
+    return String(a.dateStart || '').localeCompare(String(b.dateStart || ''));
+  });
 
   // 각 행사 = 제목 + 줄바꿈 + 행사 제품 메모, 행사 사이는 빈 줄
   const text = visible.map(ev => {
