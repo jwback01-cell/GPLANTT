@@ -19597,7 +19597,15 @@ async function applyPaInvoicesToExtUpload() {
     if (name && phone) match = idxByNamePhone.get(name + '|' + phone);
     if (!match && name) {
       const list = idxByName.get(name);
-      if (list && list.length === 1) match = list[0];  // 동명이인 위험 회피 — 단일 후보만 매칭
+      if (list && list.length === 1) {
+        match = list[0];  // 단일 후보 — 바로 매칭
+      } else if (list && list.length > 1) {
+        // 동명이인 후보 다수 — 단, 후보들의 송장번호가 모두 같으면(합포장 등 동일 수령인) 안전하게 그 송장 사용
+        //   예) 노주선 2건이 같은 묶음번호로 합포장되어 같은 송장 → 이름만으로도 명확
+        const uniqInv = [...new Set(list.map(_pickInvoice).filter(Boolean))];
+        if (uniqInv.length === 1) match = list[0];
+        // 송장이 서로 다르면 진짜 동명이인 위험 → 스킵(미매칭 유지)
+      }
     }
     if (!match) {
       noMatch++;
