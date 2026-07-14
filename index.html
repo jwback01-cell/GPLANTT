@@ -3961,9 +3961,15 @@ tailwind.config = {
               </div>
               <div class="text-xs text-brand-gray mt-1">플레이오토에서 주문 데이터를 가져와 매출 장부에 반영합니다.</div>
             </div>
-            <button type="button" onclick="gplanTriggerPaQuickCollect()" title="플레이오토 사이트의 '퀵수집' 버튼을 자동으로 눌러 쇼핑몰 주문을 수집합니다 (GPLAN 퀵수집 확장 필요)" class="shrink-0 px-5 py-2.5 rounded-full text-sm font-extrabold bg-brand-blue text-white hover:opacity-90 hover:-translate-y-0.5 transition-all shadow-md flex items-center gap-2">
+            <!-- 플레이오토 퀵수집 버튼은 숨김 (지플랜 주문처리로 통합) -->
+            <button type="button" onclick="gplanTriggerPaQuickCollect()" title="플레이오토 사이트의 '퀵수집' 버튼을 자동으로 눌러 쇼핑몰 주문을 수집합니다 (GPLAN 퀵수집 확장 필요)" class="hidden shrink-0 px-5 py-2.5 rounded-full text-sm font-extrabold bg-brand-blue text-white hover:opacity-90 hover:-translate-y-0.5 transition-all shadow-md flex items-center gap-2">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
               플레이오토 퀵수집
+            </button>
+            <!-- 지플랜 주문처리: 퀵수집 → 신규주문 가져오기 → 지플랜 출고지시 → 운송장출력 → 출고완료 원클릭 -->
+            <button type="button" onclick="gplanQuickCollectAndInstruct()" title="플레이오토 퀵수집 → 신규주문 가져오기 → 지플랜 배송처 출고지시 → 운송장출력 → 출고완료까지 한 번에 실행" class="shrink-0 px-5 py-2.5 rounded-full text-sm font-extrabold bg-brand-blue text-white hover:opacity-90 hover:-translate-y-0.5 transition-all shadow-md flex items-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              지플랜 주문처리
             </button>
           </div>
           <div class="p-6 flex flex-col gap-4">
@@ -4002,7 +4008,7 @@ tailwind.config = {
               <button type="button" onclick="setPaOrderQuickDate('today')" class="px-4 py-2 rounded-full text-xs font-bold bg-brand-bg border border-brand-border hover:bg-white transition-colors">오늘</button>
               <button type="button" onclick="setPaOrderQuickDate('yesterday')" class="px-4 py-2 rounded-full text-xs font-bold bg-brand-bg border border-brand-border hover:bg-white transition-colors">어제</button>
               <div class="h-4 w-px bg-brand-border mx-1"></div>
-              <button type="button" onclick="gplanQuickCollectAndInstruct()" title="퀵수집 → 신규주문 가져오기 → 지플랜 배송처 출고지시(+운송장출력)까지 한 번에 실행" class="px-4 py-2 rounded-full text-xs font-bold bg-brand-blue text-white hover:opacity-90 flex items-center gap-1.5">
+              <button type="button" onclick="fetchPlayautoNewOrders()" title="플레이오토 '신규주문' 탭의 주문만 조회 조건으로 세팅해 GPLAN으로 가져옵니다" class="px-4 py-2 rounded-full text-xs font-bold bg-brand-bg border border-brand-border hover:bg-white transition-colors flex items-center gap-1.5">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
                 플레이오토 신규주문 탭 가져오기
               </button>
