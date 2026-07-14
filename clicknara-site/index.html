@@ -2132,10 +2132,13 @@ const EV_RESTORE_PRICE_COL = {
 // 원복양식 '기본이미지' 열 override — 지정 사이트만 다른 열 사용(미지정은 기본 H열)
 //  스마트스토어·오늘의집 = BK열
 const EV_RESTORE_IMG_COL = { '스마트스토어': 'BK', '오늘의집': 'BK' };
+// 행사 계산기 표에 참조로 보여줄 사이트별 추가 열(기존세팅값 시트 컬럼 문자).
+//  11번가는 '기존가' 왼쪽에 AQ열 값을 표시.
+const EV_REF_PRICE_COL = { '11번가': 'AQ' };
 // 위 설정들에 쓰인 모든 컬럼 문자(중복 제거)
 const _evFlatCols = obj => { const s = new Set(); Object.values(obj).forEach(v => { if (typeof v === 'string') s.add(v); else Object.values(v).forEach(x => s.add(x)); }); return [...s]; };
 const EV_ALL_IMG_COLS = [...new Set([..._evFlatCols(EV_FORM_IMG_COL), ...Object.values(EV_RESTORE_IMG_COL)])];
-const EV_ALL_PRICE_COLS = _evFlatCols(EV_RESTORE_PRICE_COL);
+const EV_ALL_PRICE_COLS = [...new Set([..._evFlatCols(EV_RESTORE_PRICE_COL), ..._evFlatCols(EV_REF_PRICE_COL)])];
 function _evLoad() {
   let o = null;
   try { o = JSON.parse(localStorage.getItem(EV_KEY) || 'null'); } catch (_) {}
@@ -2311,6 +2314,14 @@ function _evSheetPromo(model){
   const rec=_evSheetMap.get(_evNormCode(model)); if(!rec) return null;
   return (rec.promoK != null) ? Number(rec.promoK) : null;
 }
+// 행사 계산기 표 참조값 — 사이트별 추가 열(11번가=AQ) 값. 기존세팅값 시트, 모델 매칭. 없으면 null
+function _evSheetRefPrice(model, site){
+  if(!_evSheetMap) return null;
+  const col = EV_REF_PRICE_COL[site]; if(!col) return null;
+  const rec=_evSheetMap.get(_evNormCode(model)); if(!rec) return null;
+  const v = rec.priceCols && rec.priceCols[col];
+  return (v!=null && v!=='') ? Number(v) : null;
+}
 // 이미지 양식 상품명 — 기존세팅값 시트 L열(모델 매칭). 없으면 빈값
 function _evSheetName(model){
   if(!_evSheetMap) return '';
@@ -2363,7 +2374,7 @@ async function _evFetchCsv(gid){
   }
   throw new Error('시트 데이터를 불러오지 못했습니다(CORS/프록시). ' + lastErr);
 }
-const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v13';   // v13: 이베이 지마켓 원복양식 판매가 T→S열
+const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v14';   // v14: 11번가 계산기 표 AQ열 참조값 추가 파싱
 function _evSheetCacheLoad(){
   try{ const c=JSON.parse(localStorage.getItem(EV_SHEET_CACHE_KEY)||'null'); if(Array.isArray(c)&&c.length) return new Map(c); }catch(_){}
   return null;
@@ -2725,20 +2736,26 @@ function renderEventCalc() {
       </tr>`; }).join('');
   } else {
     if (!_evSheetFetched && !_evSheetLoading) _evLoadSheetData();   // 프로모션(K열) 매칭용 시트 로드
-    const heads = ['모델명','기존가','노출가','등재가','선택쿠폰할인액','1차할인액','카드할인액','최종혜택가','Cat수수료','쿠폰수수료','선택쿠폰셀러부담','카드셀러부담','ESM+정산예상','프로모션','최종체감가','비고',''];
-    if (thRow) thRow.innerHTML = checkTh + heads.map((h,i)=>`<th class="px-2 py-2.5 font-bold border border-brand-border ${i===0?'text-left':'text-right'} ${i===heads.length-1?'text-center':''} ${i===3?'bg-yellow-200 text-brand-black':''}">${h}</th>`).join('');
+    // 11번가만 '기존가' 왼쪽에 AQ열(기존세팅값 시트) 참조 컬럼 추가
+    const is11st = ev.name === '11번가';
+    const heads = ['모델명', ...(is11st?['AQ']:[]), '기존가','노출가','등재가','선택쿠폰할인액','1차할인액','카드할인액','최종혜택가','Cat수수료','쿠폰수수료','선택쿠폰셀러부담','카드셀러부담','ESM+정산예상','프로모션','최종체감가','비고',''];
+    if (thRow) thRow.innerHTML = checkTh + heads.map((h,i)=>`<th class="px-2 py-2.5 font-bold border border-brand-border ${i===0?'text-left':'text-right'} ${i===heads.length-1?'text-center':''} ${h==='등재가'?'bg-yellow-200 text-brand-black':''}">${h}</th>`).join('');
     const cell = v => `<td class="px-2 py-1 text-right tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(v)}</td>`;
     const cellHi = v => `<td class="px-2 py-1 text-right font-extrabold tabular-nums border border-brand-border bg-yellow-100 text-brand-black">${_evFmt(v)}</td>`;
     // 빈 표여도 입력 가능한 빈 행 1개를 띄움 → 모델명 칸 클릭 후 Ctrl+V 로 붙여넣기 가능
     const rowsToRender = ev.rows.length ? ev.rows : [{ id:'__blank0__', model:'', orig:0, disp:0, promo:0 }];
-    const _emptyHint = ev.rows.length ? '' : `<tr><td colspan="18" class="px-3 py-2 text-center text-xs text-brand-gray border border-brand-border bg-brand-bg/40">아래 <b>모델명</b> 칸을 클릭하고 엑셀(모델명·기존가·노출가)을 복사해 <b>Ctrl+V</b> 로 붙여넣으세요. 상단 쿠폰·카드 비율 기준으로 등재가·혜택가가 자동 계산됩니다.</td></tr>`;
+    const _emptyHint = ev.rows.length ? '' : `<tr><td colspan="${heads.length + 1}" class="px-3 py-2 text-center text-xs text-brand-gray border border-brand-border bg-brand-bg/40">아래 <b>모델명</b> 칸을 클릭하고 엑셀(모델명·기존가·노출가)을 복사해 <b>Ctrl+V</b> 로 붙여넣으세요. 상단 쿠폰·카드 비율 기준으로 등재가·혜택가가 자동 계산됩니다.</td></tr>`;
     tbody.innerHTML = _emptyHint + rowsToRender.map((row, i) => {
       // 프로모션 — 기존세팅값 시트 K열(모델 매칭) 우선, 없으면 직접 입력값
       const _sheetPromo = _evSheetPromo(row.model);
       const _effPromo = (_sheetPromo != null && _sheetPromo !== 0) ? _sheetPromo : _evNum(row.promo);
       const c = _evCalcRow({ ...row, promo: _effPromo }, ev.rates);
+      // 11번가: 기존가 왼쪽 AQ열 참조값 셀
+      const _refAQ = is11st ? _evSheetRefPrice(row.model, ev.name) : null;
+      const _aqCell = is11st ? `<td class="px-2 py-1 text-right tabular-nums border border-brand-border bg-brand-bg/30" title="기존세팅값 시트 AQ열">${_refAQ!=null?_evFmt(_refAQ):(_evSheetMap?'-':'…')}</td>` : '';
       return `<tr class="hover:bg-brand-bg/40 ${_evSel.has(row.id)?'ev-row-selected':''}">${cbCell(row)}
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" list="ev-model-list" value="${_evEsc(row.model||'')}" onpaste="evPaste(event,${i},'model')" onchange="evEditRow(${i},'model',this.value)" class="${inp} text-left font-semibold min-w-[150px]" autocomplete="off"></td>
+        ${_aqCell}
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${row.orig?_evFmt(row.orig):''}" onpaste="evPaste(event,${i},'orig')" onchange="evEditRow(${i},'orig',this.value)" class="${inp} text-right w-full"></td>
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${row.disp?_evFmt(row.disp):''}" onpaste="evPaste(event,${i},'disp')" onchange="evEditRow(${i},'disp',this.value)" class="${inp} text-right w-full"></td>
         ${cellHi(c.listing)}
