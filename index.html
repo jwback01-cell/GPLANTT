@@ -12384,7 +12384,7 @@ function renderTodoList() {
       const regHtml = item.createdAt ? `<span class="text-xs font-medium text-brand-gray">등록 ${escHtml(_fmtTodoReg(item.createdAt))}</span>` : '';
       // 상세 내용(memo)이 있으면 '상세' 배지 표시
       const memoHtml = (item.memo && String(item.memo).trim())
-        ? `<span class="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style="background:rgba(19,62,135,0.10);color:#133E87" title="상세 내용 있음 — 클릭하여 확인"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/></svg>상세</span>`
+        ? `<span class="flex items-center gap-1 text-xs font-extrabold px-2 py-0.5 rounded-full text-white" style="background:#EC4899" title="상세 내용 있음 — 클릭하여 확인"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/></svg>상세</span>`
         : '';
       return `
         <div class="todo-row flex items-center justify-between p-4 md:p-5 border border-brand-border rounded-[24px] hover:bg-brand-bg transition-all group" data-id="${item.id}" data-accent="${item.accent}">
