@@ -1722,9 +1722,65 @@ function _loLoadFile(file, which) {
       info.classList.remove('hidden');
       info.textContent = `${file.name} — ${Math.max(0, rows.length - 1)}행`;
       document.getElementById('lo-process-btn').disabled = !(_loA && _loB);
-    } catch (err) { alert('엑셀을 읽지 못했습니다: ' + (err.message || err)); }
+    } catch (err) {
+      const msg = String((err && (err.message || err)) || '');
+      // 암호(비밀번호)로 잠긴 엑셀 → 복호화 불가. 암호 제거 방법 안내 모달 표시
+      if (/password|encrypt|protected/i.test(msg)) {
+        _loShowPwHelp(file.name, which);
+      } else {
+        alert('엑셀을 읽지 못했습니다: ' + msg);
+      }
+    }
   };
   reader.readAsArrayBuffer(file);
+}
+// 암호 걸린 엑셀 안내 — 파일 → 정보 → 암호 제거 방법을 단계별로 표시
+function _loShowPwHelp(fileName, which) {
+  const label = which === 'A' ? '엑셀 A (롯데온 정산)' : '엑셀 B (이카운트 매출이익)';
+  const old = document.getElementById('lo-pw-help-modal');
+  if (old) old.remove();
+  const m = document.createElement('div');
+  m.id = 'lo-pw-help-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML = `
+    <div style="background:white;border-radius:16px;max-width:520px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;">
+      <div style="padding:18px 22px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:22px;">🔒</span>
+        <div>
+          <div style="font-weight:bold;font-size:16px;color:#111;">암호(비밀번호)가 걸린 엑셀입니다</div>
+          <div style="color:#888;font-size:12px;margin-top:3px;">${_evEsc ? _evEsc(fileName) : fileName} · ${label}</div>
+        </div>
+      </div>
+      <div style="padding:18px 22px;font-size:13px;line-height:1.7;color:#333;">
+        <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px 14px;color:#B91C1C;font-weight:600;margin-bottom:16px;">
+          이 파일은 암호로 잠겨 있어 그대로 읽을 수 없습니다.<br>
+          아래 방법으로 <b>암호를 제거하고 다시 저장</b>한 뒤 업로드하세요.
+        </div>
+        <div style="font-weight:bold;color:#111;margin-bottom:6px;">방법 1 · 파일 → 정보</div>
+        <ol style="margin:0 0 16px 18px;padding:0;">
+          <li>엑셀에서 이 파일을 <b>열기</b> (열 때 암호 입력)</li>
+          <li>상단 메뉴 <b>파일 → 정보</b> 클릭</li>
+          <li><b>통합 문서 보호 → 암호 설정</b> 클릭</li>
+          <li>암호 입력칸을 <b>비우고(전부 삭제)</b> 확인</li>
+          <li><b>Ctrl+S</b> 로 저장</li>
+        </ol>
+        <div style="font-weight:bold;color:#111;margin-bottom:6px;">방법 2 · 다른 이름으로 저장</div>
+        <ol style="margin:0 0 4px 18px;padding:0;">
+          <li>엑셀에서 파일 열기 (암호 입력)</li>
+          <li><b>파일 → 다른 이름으로 저장</b> → 저장 창에서 <b>도구 → 일반 옵션</b></li>
+          <li><b>열기 암호</b> 칸을 비우고 확인 → 저장</li>
+        </ol>
+        <div style="color:#888;font-size:12px;margin-top:14px;">
+          ※ 롯데온/이카운트에서 <b>암호 없이 내려받는 옵션</b>이 있으면 그걸로 받아도 됩니다.<br>
+          암호를 없앤 파일을 다시 이 화면에 올리면 정상 비교됩니다.
+        </div>
+      </div>
+      <div style="padding:14px 22px;border-top:1px solid #eee;display:flex;justify-content:flex-end;">
+        <button onclick="document.getElementById('lo-pw-help-modal').remove()" style="padding:9px 24px;border-radius:14px;border:none;background:#1A1A1A;color:white;cursor:pointer;font-size:13px;font-weight:bold;">확인</button>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
 }
 // 헤더행 자동 탐지(주문번호 포함 행) + 헤더 비면 윗줄(그룹헤더)로 보완
 function _loHeaderRow(rows){ for(let i=0;i<Math.min(rows.length,20);i++){ if((rows[i]||[]).some(c=>/주문\s*번호/.test(String(c)))) return i; } return 0; }
