@@ -2012,9 +2012,9 @@ function navigate(page) {
   if (page === 'event') { try { renderEventCalc(); } catch(_) {} }
   if (page === 'pricecompare') {
     try {
+      _pcRenderCatalogs();
       const k = _pcGetKeys();
       if (k) { const a = document.getElementById('pc-cid'), b = document.getElementById('pc-csec'); if (a && !a.value) a.value = k.id; if (b && !b.value) b.value = k.secret; }
-      setTimeout(() => { document.getElementById('pc-q')?.focus(); }, 50);
     } catch(_) {}
   }
 }
@@ -3443,8 +3443,23 @@ function _pcHtml() {
   return `
   <div class="max-w-[1400px] mx-auto px-4 md:px-8 py-8">
     <h1 class="text-[1.8rem] md:text-[2.25rem] font-bold tracking-tight mb-2">가격비교 🔍</h1>
-    <p class="text-brand-gray text-base md:text-[1.1rem] mb-6">네이버쇼핑에서 상품(모델명)을 검색해 <b>판매몰과 가격</b>을 낮은 순으로 비교합니다.</p>
+    <p class="text-brand-gray text-base md:text-[1.1rem] mb-6">자주 보는 상품의 <b>카탈로그 번호</b>를 미리 저장해두고, 한 번에 <b>네이버 가격비교</b>를 열어 판매몰·가격을 확인합니다.</p>
+
+    <!-- 저장된 상품(카탈로그) -->
     <div class="bg-white rounded-3xl panel p-6 mb-6">
+      <div class="font-bold text-[15px] mb-1">📌 저장된 상품 (카탈로그)</div>
+      <div class="text-xs text-brand-gray mb-3">네이버 상품 URL(search.shopping.naver.com/catalog/<b>숫자</b>)의 숫자 또는 URL 전체를 붙여넣고 추가하세요.</div>
+      <div class="flex flex-wrap items-center gap-2 mb-4">
+        <input id="pc-add-label" type="text" placeholder="상품명 (예: MSI G242L850 모니터)" class="flex-1 min-w-[200px] px-4 py-2.5 rounded-full border border-brand-border text-sm focus:outline-none focus:border-brand-black" onkeydown="if(event.key==='Enter')_pcAddCatalog()">
+        <input id="pc-add-cat" type="text" placeholder="카탈로그 번호 또는 URL" class="flex-1 min-w-[200px] px-4 py-2.5 rounded-full border border-brand-border text-sm focus:outline-none focus:border-brand-black" onkeydown="if(event.key==='Enter')_pcAddCatalog()">
+        <button onclick="_pcAddCatalog()" class="px-5 py-2.5 rounded-full bg-brand-blue text-white text-sm font-bold hover:opacity-90">+ 추가</button>
+      </div>
+      <div id="pc-catalog-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
+    </div>
+
+    <!-- 직접 검색 (모델명으로 판매몰·가격) -->
+    <div class="bg-white rounded-3xl panel p-6 mb-6">
+      <div class="font-bold text-[15px] mb-3">🔎 모델명으로 직접 검색 (앱 안에서 가격 보기)</div>
       <div class="flex flex-wrap items-center gap-2">
         <input id="pc-q" type="text" placeholder="상품명 또는 모델명 (예: G242L850)" class="flex-1 min-w-[240px] px-4 py-3 rounded-full border border-brand-border focus:outline-none focus:border-brand-black" onkeydown="if(event.key==='Enter')_pcSearch()">
         <button onclick="_pcSearch()" class="px-6 py-3 rounded-full bg-brand-black text-white font-bold hover:bg-[#333]">검색</button>
@@ -3490,6 +3505,57 @@ function _pcSaveKeys() {
   try { localStorage.setItem('cn_naver_openapi', JSON.stringify({ id, secret })); } catch (_) {}
   const st = document.getElementById('pc-status'); if (st) st.textContent = '✅ API 키 저장됨 — 이제 검색하세요.';
   document.getElementById('pc-keybox')?.classList.add('hidden');
+}
+// ── 저장된 카탈로그 목록 (cn_ 접두사 → 클라우드 동기화) ──
+const PC_CAT_KEY = 'cn_pricecompare_catalogs';
+function _pcLoadCatalogs() { try { const a = JSON.parse(localStorage.getItem(PC_CAT_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (_) { return []; } }
+function _pcSaveCatalogs(a) { try { localStorage.setItem(PC_CAT_KEY, JSON.stringify(a)); } catch (_) {} }
+// URL이든 숫자든 카탈로그 번호(연속된 숫자)만 추출
+function _pcExtractCatId(v) {
+  const s = String(v || '').trim();
+  const m = s.match(/catalog\/(\d{5,})/i) || s.match(/(\d{6,})/);
+  return m ? m[1] : '';
+}
+function _pcAddCatalog() {
+  const labelEl = document.getElementById('pc-add-label');
+  const catEl = document.getElementById('pc-add-cat');
+  const label = (labelEl?.value || '').trim();
+  const cat = _pcExtractCatId(catEl?.value || '');
+  if (!cat) { alert('카탈로그 번호 또는 네이버 상품 URL을 입력하세요.\n예: 55097071594 또는 search.shopping.naver.com/catalog/55097071594'); return; }
+  const list = _pcLoadCatalogs();
+  if (list.some(x => x.cat === cat)) { alert('이미 저장된 카탈로그 번호입니다.'); return; }
+  list.unshift({ id: 'c' + Date.now().toString(36) + Math.floor(Math.random() * 1e4), label: label || ('상품 ' + cat), cat });
+  _pcSaveCatalogs(list);
+  if (labelEl) labelEl.value = '';
+  if (catEl) catEl.value = '';
+  _pcRenderCatalogs();
+}
+function _pcDelCatalog(id) {
+  _pcSaveCatalogs(_pcLoadCatalogs().filter(x => x.id !== id));
+  _pcRenderCatalogs();
+}
+function _pcOpenCatalog(cat) { try { window.open('https://search.shopping.naver.com/catalog/' + encodeURIComponent(cat), '_blank', 'noopener'); } catch (_) {} }
+function _pcViewCatalog(id) {
+  const it = _pcLoadCatalogs().find(x => x.id === id); if (!it) return;
+  const qEl = document.getElementById('pc-q');
+  if (qEl) { qEl.value = it.label || it.cat; }
+  _pcSearch();
+  try { document.getElementById('pc-summary')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+}
+function _pcRenderCatalogs() {
+  const wrap = document.getElementById('pc-catalog-list'); if (!wrap) return;
+  const list = _pcLoadCatalogs();
+  if (!list.length) { wrap.innerHTML = '<div class="col-span-full text-sm text-brand-gray py-6 text-center bg-brand-bg/40 rounded-2xl border border-dashed border-brand-border">아직 저장된 상품이 없습니다. 위에 카탈로그 번호(또는 URL)를 추가하세요.</div>'; return; }
+  wrap.innerHTML = list.map(it => `
+    <div class="rounded-2xl border border-brand-border p-4 flex flex-col gap-2 hover:shadow-md transition-shadow">
+      <div class="font-bold text-[14px] leading-snug">${_evEsc(it.label || '')}</div>
+      <div class="text-xs text-brand-gray">카탈로그 #${_evEsc(it.cat)}</div>
+      <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+        <button onclick="_pcOpenCatalog('${_evEsc(it.cat)}')" class="px-3 py-1.5 rounded-full bg-[#03C75A] text-white text-xs font-bold hover:opacity-90" title="네이버 가격비교 페이지 열기 (판매처 전체)">네이버 가격비교 ↗</button>
+        <button onclick="_pcViewCatalog('${it.id}')" class="px-3 py-1.5 rounded-full border border-brand-border text-xs font-bold text-brand-blue hover:bg-brand-bg" title="앱 안에서 가격 보기(모델명 검색)">앱에서 가격</button>
+        <button onclick="_pcDelCatalog('${it.id}')" class="ml-auto px-2 py-1.5 rounded-full text-brand-gray hover:text-brand-pink text-xs font-bold" title="삭제">✕</button>
+      </div>
+    </div>`).join('');
 }
 async function _pcSearch() {
   const q = (document.getElementById('pc-q')?.value || '').trim();
