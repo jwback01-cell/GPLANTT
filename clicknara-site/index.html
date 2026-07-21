@@ -3443,7 +3443,7 @@ function _pcHtml() {
   return `
   <div class="max-w-[1400px] mx-auto px-4 md:px-8 py-8">
     <h1 class="text-[1.8rem] md:text-[2.25rem] font-bold tracking-tight mb-2">가격비교 🔍</h1>
-    <p class="text-brand-gray text-base md:text-[1.1rem] mb-6">자주 보는 상품의 <b>카탈로그 번호</b>를 미리 저장해두고, <b>판매처 가져오기</b>로 앱 안에서 판매몰·가격을 확인합니다. (GPLAN 퀵수집 확장 필요 — 네이버 서버 차단을 실제 브라우저로 우회)</p>
+    <p class="text-brand-gray text-base md:text-[1.1rem] mb-6">자주 보는 상품의 <b>카탈로그 번호</b>를 미리 저장해두고, <b>판매처 가져오기</b>로 앱 안에서 판매몰·가격을 확인합니다. (전용 <b>"네이버 가격비교 수집" 확장</b> 필요 — 네이버 서버 차단을 실제 브라우저로 우회)</p>
 
     <!-- 저장된 상품(카탈로그) -->
     <div class="bg-white rounded-3xl panel p-6 mb-6">
@@ -3557,14 +3557,14 @@ function _pcExtGetVendors(cat, label) {
   let acked = false, done = false;
   const onMsg = (e) => {
     if (e.source !== window) return;
-    const d = e.data; if (!d || d.source !== 'gplan-ext' || d.reqId !== reqId) return;
-    if (d.type === 'NAVER_CATALOG_ACK') { acked = true; return; }
-    if (d.type === 'NAVER_CATALOG_RESULT') {
+    const d = e.data; if (!d || d.source !== 'nsprice-ext' || d.reqId !== reqId) return;
+    if (d.type === 'NSPRICE_ACK') { acked = true; return; }
+    if (d.type === 'NSPRICE_RESULT') {
       done = true; window.removeEventListener('message', onMsg);
       const r = d.result || {};
       if (!r.ok || !(r.items && r.items.length)) {
         if (st) st.innerHTML = '<span class="text-brand-pink font-semibold">판매처를 가져오지 못했습니다' + (r.error ? ': ' + _evEsc(String(r.error)) : '') + '</span><br>'
-          + '<span class="text-xs text-brand-gray">GPLAN 퀵수집 확장(1.4.0+)이 설치·새로고침됐는지 확인하세요. 그래도 실패하면 네이버 페이지에서 F12 콘솔의 <b>[네이버쇼핑]</b> 로그를 알려주세요.</span>';
+          + '<span class="text-xs text-brand-gray">"네이버 가격비교 수집" 확장이 설치·새로고침됐는지 확인하세요. 그래도 실패하면 네이버 페이지에서 F12 콘솔의 <b>[네이버가격비교]</b> 로그를 알려주세요.</span>';
         return;
       }
       const items = r.items.map(v => ({ mallName: v.mall, price: v.price, title: (r.title || label || ''), link: v.link }));
@@ -3573,13 +3573,13 @@ function _pcExtGetVendors(cat, label) {
     }
   };
   window.addEventListener('message', onMsg);
-  try { window.postMessage({ source: 'gplan-page', type: 'GPLAN_FETCH_NAVER_CATALOG', cat, reqId }, '*'); } catch (_) {}
+  try { window.postMessage({ source: 'nsprice-page', type: 'NSPRICE_FETCH', cat, reqId }, '*'); } catch (_) {}
   setTimeout(() => {
     if (done) return;
     window.removeEventListener('message', onMsg);
     if (st) st.innerHTML = acked
       ? '<span class="text-brand-pink">시간 초과 — 네이버 로딩이 느리거나 페이지 구조가 바뀌었을 수 있습니다.</span>'
-      : '<span class="text-brand-pink">확장이 응답하지 않습니다. GPLAN 퀵수집 확장을 설치하고 chrome://extensions에서 새로고침하세요.</span>';
+      : '<span class="text-brand-pink">확장이 응답하지 않습니다. "네이버 가격비교 수집" 확장을 설치하고 chrome://extensions에서 새로고침하세요.</span>';
   }, 35000);
 }
 function _pcRenderCatalogs() {
