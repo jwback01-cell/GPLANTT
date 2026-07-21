@@ -3443,7 +3443,7 @@ function _pcHtml() {
   return `
   <div class="max-w-[1400px] mx-auto px-4 md:px-8 py-8">
     <h1 class="text-[1.8rem] md:text-[2.25rem] font-bold tracking-tight mb-2">가격비교 🔍</h1>
-    <p class="text-brand-gray text-base md:text-[1.1rem] mb-6">자주 보는 상품의 <b>카탈로그 번호</b>를 미리 저장해두고, 한 번에 <b>네이버 가격비교</b>를 열어 판매몰·가격을 확인합니다.</p>
+    <p class="text-brand-gray text-base md:text-[1.1rem] mb-6">자주 보는 상품의 <b>카탈로그 번호</b>를 미리 저장해두고, <b>판매처 가져오기</b>로 앱 안에서 판매몰·가격을 확인합니다. (GPLAN 퀵수집 확장 필요 — 네이버 서버 차단을 실제 브라우저로 우회)</p>
 
     <!-- 저장된 상품(카탈로그) -->
     <div class="bg-white rounded-3xl panel p-6 mb-6">
@@ -3542,6 +3542,46 @@ function _pcViewCatalog(id) {
   _pcSearch();
   try { document.getElementById('pc-summary')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
 }
+// 확장(GPLAN 퀵수집)을 통해 네이버 카탈로그의 판매처·가격을 실제 브라우저로 수집 (서버 차단 우회)
+function _pcExtGetVendorsById(id) {
+  const it = _pcLoadCatalogs().find(x => x.id === id); if (!it) return;
+  _pcExtGetVendors(it.cat, it.label);
+  try { document.getElementById('pc-summary')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+}
+function _pcExtGetVendors(cat, label) {
+  const st = document.getElementById('pc-status');
+  if (st) st.textContent = '확장으로 네이버 카탈로그 판매처를 가져오는 중… (백그라운드 탭이 잠깐 열렸다 닫힙니다)';
+  document.getElementById('pc-result-wrap')?.classList.add('hidden');
+  document.getElementById('pc-summary')?.classList.add('hidden');
+  const reqId = 'nv' + Date.now() + Math.floor(Math.random() * 1e4);
+  let acked = false, done = false;
+  const onMsg = (e) => {
+    if (e.source !== window) return;
+    const d = e.data; if (!d || d.source !== 'gplan-ext' || d.reqId !== reqId) return;
+    if (d.type === 'NAVER_CATALOG_ACK') { acked = true; return; }
+    if (d.type === 'NAVER_CATALOG_RESULT') {
+      done = true; window.removeEventListener('message', onMsg);
+      const r = d.result || {};
+      if (!r.ok || !(r.items && r.items.length)) {
+        if (st) st.innerHTML = '<span class="text-brand-pink font-semibold">판매처를 가져오지 못했습니다' + (r.error ? ': ' + _evEsc(String(r.error)) : '') + '</span><br>'
+          + '<span class="text-xs text-brand-gray">GPLAN 퀵수집 확장(1.4.0+)이 설치·새로고침됐는지 확인하세요. 그래도 실패하면 네이버 페이지에서 F12 콘솔의 <b>[네이버쇼핑]</b> 로그를 알려주세요.</span>';
+        return;
+      }
+      const items = r.items.map(v => ({ mallName: v.mall, price: v.price, title: (r.title || label || ''), link: v.link }));
+      _pcRender(label || r.title || '', items, { source: 'extension' });
+      if (st) st.textContent = `${r.title || label || ''} — 판매처 ${items.length}곳 (확장으로 수집)`;
+    }
+  };
+  window.addEventListener('message', onMsg);
+  try { window.postMessage({ source: 'gplan-page', type: 'GPLAN_FETCH_NAVER_CATALOG', cat, reqId }, '*'); } catch (_) {}
+  setTimeout(() => {
+    if (done) return;
+    window.removeEventListener('message', onMsg);
+    if (st) st.innerHTML = acked
+      ? '<span class="text-brand-pink">시간 초과 — 네이버 로딩이 느리거나 페이지 구조가 바뀌었을 수 있습니다.</span>'
+      : '<span class="text-brand-pink">확장이 응답하지 않습니다. GPLAN 퀵수집 확장을 설치하고 chrome://extensions에서 새로고침하세요.</span>';
+  }, 35000);
+}
 function _pcRenderCatalogs() {
   const wrap = document.getElementById('pc-catalog-list'); if (!wrap) return;
   const list = _pcLoadCatalogs();
@@ -3551,8 +3591,9 @@ function _pcRenderCatalogs() {
       <div class="font-bold text-[14px] leading-snug">${_evEsc(it.label || '')}</div>
       <div class="text-xs text-brand-gray">카탈로그 #${_evEsc(it.cat)}</div>
       <div class="flex items-center gap-1.5 mt-1 flex-wrap">
-        <button onclick="_pcOpenCatalog('${_evEsc(it.cat)}')" class="px-3 py-1.5 rounded-full bg-[#03C75A] text-white text-xs font-bold hover:opacity-90" title="네이버 가격비교 페이지 열기 (판매처 전체)">네이버 가격비교 ↗</button>
-        <button onclick="_pcViewCatalog('${it.id}')" class="px-3 py-1.5 rounded-full border border-brand-border text-xs font-bold text-brand-blue hover:bg-brand-bg" title="앱 안에서 가격 보기(모델명 검색)">앱에서 가격</button>
+        <button onclick="_pcExtGetVendorsById('${it.id}')" class="px-3 py-1.5 rounded-full bg-brand-black text-white text-xs font-bold hover:bg-[#333]" title="확장으로 이 카탈로그의 판매처·가격을 앱 안에서 수집">판매처 가져오기</button>
+        <button onclick="_pcOpenCatalog('${_evEsc(it.cat)}')" class="px-3 py-1.5 rounded-full bg-[#03C75A] text-white text-xs font-bold hover:opacity-90" title="네이버 가격비교 페이지 열기 (판매처 전체)">네이버 ↗</button>
+        <button onclick="_pcViewCatalog('${it.id}')" class="px-3 py-1.5 rounded-full border border-brand-border text-xs font-bold text-brand-blue hover:bg-brand-bg" title="모델명으로 Open API 검색">모델검색</button>
         <button onclick="_pcDelCatalog('${it.id}')" class="ml-auto px-2 py-1.5 rounded-full text-brand-gray hover:text-brand-pink text-xs font-bold" title="삭제">✕</button>
       </div>
     </div>`).join('');
