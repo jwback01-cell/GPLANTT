@@ -1685,7 +1685,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── Navigation ──────────────────────────────
-const PAGES = ['login','dashboard','event','clicknara','coupang','refine','process','lotteon'];
+const PAGES = ['login','dashboard','event','clicknara','coupang','refine','process','lotteon','pricecompare'];
 const currentPage = { value: 'login' };
 
 // ───── 롯데온 데이터 가공 (A 롯데온 정산 ↔ B 이카운트 매출이익, 주문번호 매칭) ─────
@@ -2010,6 +2010,13 @@ function navigate(page) {
   }
   try { document.querySelectorAll('.ev-submenu').forEach(s => s.classList.toggle('hidden', page !== 'event')); } catch(_) {}
   if (page === 'event') { try { renderEventCalc(); } catch(_) {} }
+  if (page === 'pricecompare') {
+    try {
+      const k = _pcGetKeys();
+      if (k) { const a = document.getElementById('pc-cid'), b = document.getElementById('pc-csec'); if (a && !a.value) a.value = k.id; if (b && !b.value) b.value = k.secret; }
+      setTimeout(() => { document.getElementById('pc-q')?.focus(); }, 50);
+    } catch(_) {}
+  }
 }
 
 function updateNavItems(activePage) {
@@ -3429,6 +3436,135 @@ function evDownloadExcel(){
       sub.querySelectorAll('.ev-sub').forEach(link => { link.onclick = (e) => { e.preventDefault(); if (link.dataset.evSettings === '1') evGoSettings(); else evGoSite(link.dataset.evSite); }; });
     });
   } catch (e) { console.warn('[event page init]', e); }
+})();
+
+// ── 가격비교 (네이버쇼핑 판매몰·가격 비교) ──────────────────────────
+function _pcHtml() {
+  return `
+  <div class="max-w-[1400px] mx-auto px-4 md:px-8 py-8">
+    <h1 class="text-[1.8rem] md:text-[2.25rem] font-bold tracking-tight mb-2">가격비교 🔍</h1>
+    <p class="text-brand-gray text-base md:text-[1.1rem] mb-6">네이버쇼핑에서 상품(모델명)을 검색해 <b>판매몰과 가격</b>을 낮은 순으로 비교합니다.</p>
+    <div class="bg-white rounded-3xl panel p-6 mb-6">
+      <div class="flex flex-wrap items-center gap-2">
+        <input id="pc-q" type="text" placeholder="상품명 또는 모델명 (예: G242L850)" class="flex-1 min-w-[240px] px-4 py-3 rounded-full border border-brand-border focus:outline-none focus:border-brand-black" onkeydown="if(event.key==='Enter')_pcSearch()">
+        <button onclick="_pcSearch()" class="px-6 py-3 rounded-full bg-brand-black text-white font-bold hover:bg-[#333]">검색</button>
+        <button onclick="document.getElementById('pc-keybox').classList.toggle('hidden')" class="px-4 py-3 rounded-full border border-brand-border text-sm font-bold text-brand-gray hover:bg-brand-bg" title="네이버 Open API 키 설정">🔑 API 키</button>
+      </div>
+      <div id="pc-keybox" class="hidden mt-4 p-4 rounded-2xl bg-brand-bg/60 border border-brand-border">
+        <div class="text-xs text-brand-gray mb-2">네이버쇼핑이 직접 조회(스크래핑)를 차단하므로 <b>네이버 Open API 키</b>가 필요합니다. (<a href="https://developers.naver.com/apps/#/register" target="_blank" class="text-brand-blue hover:underline">developers.naver.com</a> 에서 앱 등록 → <b>검색</b> API 추가 → Client ID/Secret)</div>
+        <div class="flex flex-wrap items-center gap-2">
+          <input id="pc-cid" type="text" placeholder="Client ID" class="flex-1 min-w-[180px] px-3 py-2 rounded-lg border border-brand-border text-sm focus:outline-none focus:border-brand-black">
+          <input id="pc-csec" type="password" placeholder="Client Secret" class="flex-1 min-w-[180px] px-3 py-2 rounded-lg border border-brand-border text-sm focus:outline-none focus:border-brand-black">
+          <button onclick="_pcSaveKeys()" class="px-4 py-2 rounded-lg bg-brand-blue text-white text-sm font-bold hover:opacity-90">키 저장</button>
+        </div>
+      </div>
+      <div id="pc-status" class="text-sm text-brand-gray mt-3"></div>
+    </div>
+    <div id="pc-summary" class="hidden grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"></div>
+    <div id="pc-result-wrap" class="hidden bg-white rounded-3xl panel overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-brand-bg text-brand-gray"><tr>
+            <th class="px-4 py-3 text-left font-bold">순위</th>
+            <th class="px-4 py-3 text-left font-bold">판매몰</th>
+            <th class="px-4 py-3 text-right font-bold">가격</th>
+            <th class="px-4 py-3 text-left font-bold">상품명</th>
+            <th class="px-4 py-3 text-center font-bold">링크</th>
+          </tr></thead>
+          <tbody id="pc-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+// 네이버 Open API 키 — cn_ 접두사로 저장(클라우드 동기화). 없으면 GPAGO의 kw_naver_api 폴백
+function _pcGetKeys() {
+  try { const k = JSON.parse(localStorage.getItem('cn_naver_openapi') || 'null'); if (k && k.id && k.secret) return { id: k.id, secret: k.secret }; } catch (_) {}
+  try { const k = JSON.parse(localStorage.getItem('kw_naver_api') || 'null'); if (k) { const id = k.clientId || k.client_id || k.id; const secret = k.clientSecret || k.client_secret || k.secret; if (id && secret) return { id, secret }; } } catch (_) {}
+  return null;
+}
+function _pcSaveKeys() {
+  const id = (document.getElementById('pc-cid')?.value || '').trim();
+  const secret = (document.getElementById('pc-csec')?.value || '').trim();
+  if (!id || !secret) { alert('Client ID와 Client Secret을 모두 입력하세요.'); return; }
+  try { localStorage.setItem('cn_naver_openapi', JSON.stringify({ id, secret })); } catch (_) {}
+  const st = document.getElementById('pc-status'); if (st) st.textContent = '✅ API 키 저장됨 — 이제 검색하세요.';
+  document.getElementById('pc-keybox')?.classList.add('hidden');
+}
+async function _pcSearch() {
+  const q = (document.getElementById('pc-q')?.value || '').trim();
+  const st = document.getElementById('pc-status');
+  if (!q) { if (st) st.textContent = '상품명 또는 모델명을 입력하세요.'; return; }
+  if (st) st.textContent = '네이버쇼핑에서 가격비교 데이터를 가져오는 중…';
+  document.getElementById('pc-result-wrap')?.classList.add('hidden');
+  document.getElementById('pc-summary')?.classList.add('hidden');
+  try {
+    // Open API 키를 헤더로 전달 (스크래핑이 차단(418)될 때 서버가 공식 API로 폴백)
+    const headers = {};
+    const keys = _pcGetKeys();
+    if (keys) { headers['X-Naver-Client-Id'] = keys.id; headers['X-Naver-Client-Secret'] = keys.secret; }
+    const res = await fetch('/api/naver-shop?query=' + encodeURIComponent(q) + '&display=40', { headers });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      if (res.status === 502 && !keys) { throw new Error('네이버가 직접 조회를 차단했습니다. 상단 "🔑 API 키"에서 네이버 Open API Client ID/Secret을 등록해 주세요.'); }
+      throw new Error(e.hint || e.error || ('HTTP ' + res.status));
+    }
+    const data = await res.json();
+    const items = (data.items || []).filter(it => Number(it.price) > 0);
+    if (!items.length) { if (st) st.textContent = '검색 결과가 없습니다.'; return; }
+    _pcRender(q, items, data);
+    if (st) st.textContent = `총 ${items.length}개 판매처 · 출처: ${data.source === 'openapi' ? '네이버 Open API' : '네이버쇼핑'}`;
+  } catch (err) {
+    if (st) st.innerHTML = '<span class="text-brand-pink font-semibold">가져오기 실패: ' + _evEsc(String(err.message || err)) + '</span><br>'
+      + '<span class="text-xs text-brand-gray">로컬 서버(server.py)가 실행 중이어야 하며, 네이버가 일시 차단했다면 잠시 후 다시 시도하세요.</span>';
+  }
+}
+function _pcRender(q, items, data) {
+  items = items.slice().sort((a, b) => Number(a.price) - Number(b.price));
+  const fmt = n => Number(n || 0).toLocaleString('ko-KR');
+  const lo = items[0], hi = items[items.length - 1];
+  const avg = Math.round(items.reduce((s, it) => s + Number(it.price || 0), 0) / items.length);
+  const malls = new Set(items.map(it => it.mallName).filter(Boolean));
+  const card = (label, val, color) => `<div class="bg-white rounded-2xl panel p-4"><div class="text-xs text-brand-gray font-bold mb-1">${label}</div><div class="text-xl font-extrabold" style="color:${color || '#111'}">${val}</div></div>`;
+  const sum = document.getElementById('pc-summary');
+  sum.innerHTML = card('최저가', fmt(lo.price) + '원', '#00A046') + card('최고가', fmt(hi.price) + '원', '#E91E63') + card('평균가', fmt(avg) + '원') + card('판매처 수', malls.size + '곳');
+  sum.classList.remove('hidden');
+  const tb = document.getElementById('pc-tbody');
+  tb.innerHTML = items.map((it, i) => `
+    <tr class="border-t border-brand-border hover:bg-brand-bg/40">
+      <td class="px-4 py-2.5 ${i === 0 ? 'font-extrabold text-brand-green' : ''}">${i + 1}</td>
+      <td class="px-4 py-2.5 font-semibold">${_evEsc(it.mallName || '-')}</td>
+      <td class="px-4 py-2.5 text-right font-bold tabular-nums ${i === 0 ? 'text-brand-green' : ''}">${fmt(it.price)}원</td>
+      <td class="px-4 py-2.5 text-brand-gray">${_evEsc(it.title || '')}</td>
+      <td class="px-4 py-2.5 text-center">${it.link ? `<a href="${_evEsc(it.link)}" target="_blank" rel="noopener" class="text-brand-blue hover:underline text-xs font-bold">보기</a>` : '-'}</td>
+    </tr>`).join('');
+  document.getElementById('pc-result-wrap').classList.remove('hidden');
+}
+// 가격비교 페이지(대시보드 복제) + 사이드바 메뉴 주입 — 반드시 event 초기화 뒤에 실행돼야 함
+(function _initPriceComparePage() {
+  try {
+    const dash = document.getElementById('page-dashboard');
+    if (dash && !document.getElementById('page-pricecompare')) {
+      const pc = dash.cloneNode(true);
+      pc.id = 'page-pricecompare';
+      pc.classList.remove('active');
+      pc.querySelectorAll('[id]').forEach(el => { if (el.id && el.id !== 'page-pricecompare') el.id = el.id + '-pc'; });
+      const main = pc.querySelector('main');
+      if (main) main.innerHTML = _pcHtml();
+      dash.parentNode.appendChild(pc);
+    }
+    document.querySelectorAll('.sidebar nav').forEach(nav => {
+      if (nav.querySelector('[data-page="pricecompare"]')) return;
+      const anchor = nav.querySelector('[data-page="lotteon"]') || nav.querySelector('[data-page="dashboard"]');
+      if (!anchor) return;
+      const a = document.createElement('a');
+      a.href = '#'; a.setAttribute('data-page', 'pricecompare');
+      a.className = anchor.className;
+      a.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>가격비교';
+      anchor.insertAdjacentElement('afterend', a);
+      a.onclick = (e) => { e.preventDefault(); navigate('pricecompare'); };
+    });
+  } catch (e) { console.warn('[pricecompare init]', e); }
 })();
 
 // 행사 계산기 — Ctrl+Z 되돌리기 / Ctrl+Y(또는 Ctrl+Shift+Z) 다시실행
