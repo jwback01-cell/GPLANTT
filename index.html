@@ -2314,7 +2314,7 @@ tailwind.config = {
             <br><span class="text-[11px]">새 행을 추가하면 그 시점의 환율이 자동으로 박혀, 시간이 지나도 옛 원가를 정확히 볼 수 있습니다.</span>
           </div>
           <div class="flex items-center gap-2 flex-wrap">
-            <input id="imp-search" type="text" oninput="_impOnSearch(this.value)" placeholder="🔍 제품명·폴더·상품·중판코드 검색" class="px-4 py-2 rounded-full border border-brand-border text-sm focus:outline-none focus:border-brand-black w-[230px]">
+            <input id="imp-search" type="text" oninput="_impOnSearch(this.value)" placeholder="🔍 제품명·폴더·상품·중판코드 (,로 여러 개)" class="px-4 py-2 rounded-full border border-brand-border text-sm focus:outline-none focus:border-brand-black w-[230px]" title="쉼표(,)로 구분해 여러 검색어를 동시에 검색할 수 있습니다. 예) 2606190094,슬라이딩">
             <button onclick="importImpFromImageHost()" class="px-4 py-2 rounded-full bg-brand-blue text-white text-sm font-bold hover:opacity-90 flex items-center gap-1.5" title="이미지호스팅 상품관리의 제품명·상품코드를 가져옵니다">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
               이미지호스팅 상품 가져오기
@@ -10429,9 +10429,10 @@ function renderImpTab() {
   const tbody = document.getElementById('imp-tbody');
   const empty = document.getElementById('imp-empty');
   // 검색 필터 (제품명/폴더코드/상품코드/중판코드)
-  const term = String(_impSearch || '').trim().toLowerCase();
-  let viewRows = term
-    ? _impState.rows.filter(r => [r.name, r.folder, r.code, r.vendorCode].some(x => String(x || '').toLowerCase().includes(term)))
+  // 쉼표(,)로 여러 검색어 입력 가능 — 각 검색어 중 하나라도 일치하면 표시 (OR)
+  const terms = String(_impSearch || '').toLowerCase().split(',').map(t => t.trim()).filter(Boolean);
+  let viewRows = terms.length
+    ? _impState.rows.filter(r => terms.some(t => [r.name, r.folder, r.code, r.vendorCode].some(x => String(x || '').toLowerCase().includes(t))))
     : _impState.rows;
   if (_impShowSelectedOnly) viewRows = viewRows.filter(r => _impSelected.has(r.id));
   viewRows = _impApplySort(viewRows);   // 헤더 클릭 정렬
