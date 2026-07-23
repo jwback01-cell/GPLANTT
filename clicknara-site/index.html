@@ -3580,7 +3580,7 @@ function _pcExtGetVendors(cat, label) {
     if (st) st.innerHTML = acked
       ? '<span class="text-brand-pink">시간 초과 — 네이버 로딩이 느리거나 페이지 구조가 바뀌었을 수 있습니다.</span>'
       : '<span class="text-brand-pink">확장이 응답하지 않습니다. "네이버 가격비교 수집" 확장을 설치하고 chrome://extensions에서 새로고침하세요.</span>';
-  }, 35000);
+  }, 60000);
 }
 function _pcRenderCatalogs() {
   const wrap = document.getElementById('pc-catalog-list'); if (!wrap) return;
