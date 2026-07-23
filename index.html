@@ -2476,7 +2476,7 @@ tailwind.config = {
     <input id="imp-gc-fee" type="text" inputmode="numeric" placeholder="0" class="w-full mb-3 px-3 py-2 rounded-xl border border-brand-border focus:outline-none focus:border-brand-black text-right">
     <label class="block text-sm font-bold mb-1">총 관세 (원)</label>
     <input id="imp-gc-tax" type="text" inputmode="numeric" placeholder="0" class="w-full mb-3 px-3 py-2 rounded-xl border border-brand-border focus:outline-none focus:border-brand-black text-right">
-    <label class="block text-sm font-bold mb-1">총 물류비 <span class="text-brand-gray font-normal">(위안 ¥ — 환율로 원화 변환되어 배분)</span></label>
+    <label class="block text-sm font-bold mb-1">총 물류비 <span class="text-brand-gray font-normal">(위안 ¥ — 원화 변환 후 수량 비율로 배분)</span></label>
     <input id="imp-gc-logi" type="text" inputmode="decimal" placeholder="예) 16.00" class="w-full mb-3 px-3 py-2 rounded-xl border border-brand-border focus:outline-none focus:border-brand-black text-right">
     <p class="text-[11px] text-brand-gray mb-4">선택한 상품들의 <b>원화 금액 비율</b>로 자동 배분됩니다. (빈칸은 변경하지 않음)</p>
     <div class="flex gap-2 justify-end">
@@ -10666,7 +10666,20 @@ function applyImpGroupCost() {
     if (out.length) out[out.length - 1] += (total - acc);
     return out;
   };
-  const feeAlloc = alloc(totFee), taxAlloc = alloc(totTax), logiAlloc = alloc(totLogi);
+  // 물류비는 수량 비율로 배분 (박스/무게는 수량에 비례하므로)
+  const qtyArr = rows.map(r => Number(r.qty) || 0);
+  const sumQty = qtyArr.reduce((a, b) => a + b, 0);
+  const allocByQty = (total) => {
+    if (total <= 0) return null;
+    let acc = 0;
+    const out = rows.map((r, i) => {
+      const share = sumQty > 0 ? Math.round(total * qtyArr[i] / sumQty) : Math.round(total / rows.length);
+      acc += share; return share;
+    });
+    if (out.length) out[out.length - 1] += (total - acc);
+    return out;
+  };
+  const feeAlloc = alloc(totFee), taxAlloc = alloc(totTax), logiAlloc = allocByQty(totLogi);
   rows.forEach((r, i) => {
     if (vendor) r.vendorCode = vendor;
     if (feeAlloc) r.fee = feeAlloc[i];
@@ -10681,7 +10694,7 @@ function applyImpGroupCost() {
         (totCny > 0 ? `\n· 총 위안화 ¥${totCny.toLocaleString('ko-KR')} → (단가×수량) 비율 배분` : '') +
         (feeAlloc ? `\n· 총 중판비용 ${_impFmt(totFee)}원 (원화 비율 배분)` : '') +
         (taxAlloc ? `\n· 총 관세 ${_impFmt(totTax)}원 (원화 비율 배분)` : '') +
-        (logiAlloc ? `\n· 총 물류비 ¥${logiCny.toLocaleString('ko-KR')} → ${_impFmt(totLogi)}원 (환율 ${_gcRate}원, 원화 비율 배분)` : ''));
+        (logiAlloc ? `\n· 총 물류비 ¥${logiCny.toLocaleString('ko-KR')} → ${_impFmt(totLogi)}원 (환율 ${_gcRate}원, 수량 비율 배분)` : ''));
 }
 
 // ── 수입 저장내역 (단가표 스냅샷) ─────────────────────────────
