@@ -10457,6 +10457,37 @@ function renderImpTab() {
       selAll.indeterminate = !allSel && visIds.some(id => _impSelected.has(id));
     }
   }
+  // ↑/↓ 화살표로 같은 열의 위/아래 행 이동 (엑셀식) — tbody에 1회만 바인딩
+  if (tbody && !tbody._impKeyNavBound) {
+    tbody._impKeyNavBound = true;
+    tbody.addEventListener('keydown', _impTableKeyNav);
+  }
+  // 값 변경 → 재렌더 후에도 이동한 칸의 포커스 복원
+  if (_impPendingFocus && tbody) {
+    const el = tbody.querySelector(`tr[data-id="${_impPendingFocus.id}"] input[data-field="${_impPendingFocus.field}"]`);
+    _impPendingFocus = null;
+    if (el) { el.focus(); try { el.select(); } catch (_) {} }
+  }
+}
+// 수입관리 표 화살표 이동 — 입력 후 ↓ 누르면 아래 행 같은 칸으로 (변경 저장→재렌더 후 포커스 복원)
+let _impPendingFocus = null;
+function _impTableKeyNav(e) {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  const inp = e.target;
+  if (!inp || !inp.matches || !inp.matches('input[data-field]')) return;
+  const field = inp.getAttribute('data-field');
+  const tr = inp.closest('tr');
+  if (!tr) return;
+  const next = e.key === 'ArrowDown' ? tr.nextElementSibling : tr.previousElementSibling;
+  if (!next || !next.getAttribute) return;
+  const nextId = next.getAttribute('data-id');
+  if (!nextId) return;
+  e.preventDefault();   // number input의 증감 스피너 동작 방지
+  _impPendingFocus = { id: nextId, field };
+  const target = next.querySelector(`input[data-field="${field}"]`);
+  if (target) { target.focus(); try { target.select(); } catch (_) {} }
+  // 값이 안 바뀌어 재렌더가 없으면 마커만 자연 해제
+  setTimeout(() => { _impPendingFocus = null; }, 400);
 }
 function _impRecalcAll() {
   _impLoad();
