@@ -10856,12 +10856,16 @@ function saveImpRemit() {
   _impLoad();
   const krw = Number(_impState.krw) || 0, fee = Number(_impState.feeKrw) || 0, cny = Number(_impState.cny) || 0;
   if (!krw && !cny) { alert('저장할 금액을 먼저 입력하세요. (원화·충전위안화)'); return; }
+  const newRate = _impRate();
   _impState.remits.unshift({
     id: 'rm_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-    date: _impTodayStr(), krw, fee, cny, rate: _impRate(),
+    date: _impTodayStr(), krw, fee, cny, rate: newRate,
   });
+  // 저장한(가장 최근) 환율을 모든 행에 즉시 적용 — 행 환율이 옛 값(예: 228)으로 남지 않게
+  if (newRate > 0) (_impState.rows || []).forEach(r => { r.rate = newRate; });
   _impSave();
   renderImpTab();
+  try { if (typeof showAppToast === 'function') showAppToast(`저장됨 — 전체 행에 환율 ${_impFmt(newRate)}원 적용`); } catch (_) {}
 }
 function applyImpRemit(id) {
   _impLoad();
