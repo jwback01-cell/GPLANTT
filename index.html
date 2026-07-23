@@ -2427,6 +2427,7 @@ tailwind.config = {
           <div class="flex items-center justify-between flex-wrap gap-2 px-4 py-3 border-b border-brand-border">
             <h3 id="impsaved-detail-title" class="font-bold"></h3>
             <div class="flex items-center gap-2">
+              <button onclick="if(_impSavedViewId)restoreImpSavedToTable(_impSavedViewId)" class="px-3 py-1.5 rounded-full bg-brand-blue text-white text-xs font-bold hover:opacity-90" title="이 저장 내역의 값(중판코드·위안화·수량·비용)을 수입관리 표로 다시 채웁니다 (상품코드 매칭)">↩ 수입관리로 되돌리기</button>
               <button onclick="if(_impSavedViewId)sendImpSavedToReceiving(_impSavedViewId)" class="px-3 py-1.5 rounded-full bg-brand-black text-white text-xs font-bold hover:opacity-90">입고하기로 보내기</button>
               <button onclick="exportImpSavedExcel()" class="px-3 py-1.5 rounded-full border border-brand-border text-xs font-bold hover:bg-brand-bg">엑셀 다운로드</button>
               <button onclick="closeImpSavedDetail()" class="px-3 py-1.5 rounded-full border border-brand-border text-xs font-bold hover:bg-brand-bg">닫기</button>
@@ -10840,6 +10841,39 @@ function closeImpSavedDetail() {
   _impSavedViewId = null;
   const sec = document.getElementById('impsaved-detail');
   if (sec) sec.classList.add('hidden');
+}
+// 저장 스냅샷의 값을 수입관리 표로 되돌리기 — 상품코드(없으면 제품명) 매칭으로 덮어씀
+function restoreImpSavedToTable(id) {
+  const rec = _impLoadSaved().find(x => x.id === id);
+  if (!rec || !Array.isArray(rec.rows) || !rec.rows.length) { alert('되돌릴 데이터가 없습니다.'); return; }
+  if (!confirm(`"${rec.name}" 의 값 ${rec.rows.length}품목을 수입관리 표로 되돌릴까요?\n같은 상품코드 행의 중판코드·위안화·수량·비용·환율이 이 저장값으로 덮어써집니다.`)) return;
+  _impLoad();
+  const byCode = new Map(), byName = new Map();
+  (_impState.rows || []).forEach(r => {
+    const c = String(r.code || '').trim().toLowerCase();
+    if (c && !byCode.has(c)) byCode.set(c, r);
+    const n = String(r.name || '').trim();
+    if (n && !byName.has(n)) byName.set(n, r);
+  });
+  let done = 0; const misses = [];
+  rec.rows.forEach(s => {
+    const c = String(s.code || '').trim().toLowerCase();
+    const t = (c && byCode.get(c)) || byName.get(String(s.name || '').trim());
+    if (!t) { misses.push(s.code || s.name || '(이름없음)'); return; }
+    if (s.vendorCode) t.vendorCode = s.vendorCode;
+    t.cny = Number(s.cny) || 0;
+    t.qty = Number(s.qty) || 0;
+    t.fee = Number(s.fee) || 0;
+    t.tax = Number(s.tax) || 0;
+    t.logi = Number(s.logi) || 0;
+    if (Number(s.rate)) t.rate = Number(s.rate);
+    done++;
+  });
+  _impSave();
+  try { _goToProdTab('import'); } catch (_) {}
+  try { renderImpTab(); } catch (_) {}
+  alert(`↩️ ${done}개 행을 수입관리로 되돌렸습니다.` +
+        (misses.length ? `\n\n⚠ 매칭 안 됨 ${misses.length}건 (표에 해당 상품코드 행 없음):\n${misses.slice(0, 8).join(', ')}${misses.length > 8 ? ' 외' : ''}` : ''));
 }
 function deleteImpSaved(id) {
   if (!confirm('이 저장내역을 삭제할까요?')) return;
