@@ -10264,7 +10264,17 @@ let _impSearch = '';    // 표 검색어
 let _impSelected = new Set();   // 체크된 행 id (검색/재렌더에도 유지)
 let _impShowSelectedOnly = false;   // 체크한 행만 보기
 let _impSort = { col: null, dir: 'asc' };   // 표 정렬 (헤더 클릭)
-function _impOnSearch(v) { _impSearch = v || ''; renderImpTab(); }
+function _impOnSearch(v) {
+  const next = v || '';
+  // 검색어가 바뀌거나 지워지면 체크 선택도 함께 해제 — 이전 검색에서 체크한 행이 숨은 채 남아
+  // 일괄입력/배분/삭제가 엉뚱한 행에 적용되는 것 방지
+  if (next.trim() !== String(_impSearch || '').trim()) {
+    _impSelected.clear();
+    _impShowSelectedOnly = false;
+  }
+  _impSearch = next;
+  renderImpTab();
+}
 const _IMP_NUM_COLS = new Set(['rate','cny','cnyt','krw','fee','tax','logi','qty','unit','total']);
 function _impSetSort(col) {
   if (_impSort.col === col) _impSort.dir = (_impSort.dir === 'asc') ? 'desc' : 'asc';
