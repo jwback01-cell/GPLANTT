@@ -10552,7 +10552,7 @@ function _impToggleSelectAll(checked) {
     if (checked) _impSelected.add(cb.dataset.id); else _impSelected.delete(cb.dataset.id);
   });
 }
-function _impRowKrw(r) { return (Number(r.cny) || 0) * (Number(r.rate) || 0); }
+function _impRowKrw(r) { return (Number(r.cny) || 0) * (Number(r.qty) || 0) * Math.round(Number(r.rate) || 0); }   // 원화 = 단가 × 수량 × 환율
 function openImpGroupCostModal() {
   _impLoad();
   const ids = _impSelectedIds();
