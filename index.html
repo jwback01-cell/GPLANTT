@@ -2324,7 +2324,7 @@ tailwind.config = {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
               선택 삭제
             </button>
-            <button onclick="openImpGroupCostModal()" class="px-4 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg flex items-center gap-1.5" title="체크한 상품들의 총 중판비용·관세를 원화 금액 비율로 배분">
+            <button onclick="openImpGroupCostModal()" class="px-4 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg flex items-center gap-1.5" title="체크한 상품들의 총 위안화·중판비용·관세·물류비를 비율로 배분">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 7h18"/><path d="M6 12h12"/><path d="M9 17h6"/></svg>
               묶음 비용 배분
             </button>
@@ -2360,6 +2360,7 @@ tailwind.config = {
                   <th onclick="_impSetSort('krw')" data-impsort="krw" class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[110px] cursor-pointer select-none hover:text-brand-blue">원화<span class="imp-sort-ind"></span></th>
                   <th onclick="_impSetSort('fee')" data-impsort="fee" class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[110px] cursor-pointer select-none hover:text-brand-blue">중판비용<span class="imp-sort-ind"></span></th>
                   <th onclick="_impSetSort('tax')" data-impsort="tax" class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[90px] cursor-pointer select-none hover:text-brand-blue">관세<span class="imp-sort-ind"></span></th>
+                  <th onclick="_impSetSort('logi')" data-impsort="logi" class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[100px] cursor-pointer select-none hover:text-brand-blue">물류비<span class="imp-sort-ind"></span></th>
                   <th onclick="_impSetSort('qty')" data-impsort="qty" class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[70px] cursor-pointer select-none hover:text-brand-blue">수량<span class="imp-sort-ind"></span></th>
                   <th onclick="_impSetSort('unit')" data-impsort="unit" class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[90px] cursor-pointer select-none hover:text-brand-blue">1개금액<span class="imp-sort-ind"></span></th>
                   <th onclick="_impSetSort('total')" data-impsort="total" class="px-3 py-3 text-right  font-bold border-b-2 border-brand-border w-[110px] cursor-pointer select-none hover:text-brand-blue">합계<span class="imp-sort-ind"></span></th>
@@ -2376,6 +2377,7 @@ tailwind.config = {
                   <td class="px-3 py-2.5 text-right" id="imp-sum-krw">0</td>
                   <td class="px-3 py-2.5 text-right" id="imp-sum-fee">0</td>
                   <td class="px-3 py-2.5 text-right" id="imp-sum-tax">0</td>
+                  <td class="px-3 py-2.5 text-right" id="imp-sum-logi">0</td>
                   <td class="px-3 py-2.5 text-right" id="imp-sum-qty">0</td>
                   <td class="px-3 py-2.5"></td>
                   <td class="px-3 py-2.5 text-right" id="imp-sum-total">0</td>
@@ -2441,6 +2443,7 @@ tailwind.config = {
                   <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">원화</th>
                   <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">중판비용</th>
                   <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">관세</th>
+                  <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">물류비</th>
                   <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">수량</th>
                   <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">1개금액</th>
                   <th class="px-3 py-2.5 text-right font-bold border-b-2 border-brand-border">합계</th>
@@ -2469,6 +2472,8 @@ tailwind.config = {
     <input id="imp-gc-fee" type="text" inputmode="numeric" placeholder="0" class="w-full mb-3 px-3 py-2 rounded-xl border border-brand-border focus:outline-none focus:border-brand-black text-right">
     <label class="block text-sm font-bold mb-1">총 관세 (원)</label>
     <input id="imp-gc-tax" type="text" inputmode="numeric" placeholder="0" class="w-full mb-3 px-3 py-2 rounded-xl border border-brand-border focus:outline-none focus:border-brand-black text-right">
+    <label class="block text-sm font-bold mb-1">총 물류비 (원)</label>
+    <input id="imp-gc-logi" type="text" inputmode="numeric" placeholder="0" class="w-full mb-3 px-3 py-2 rounded-xl border border-brand-border focus:outline-none focus:border-brand-black text-right">
     <p class="text-[11px] text-brand-gray mb-4">선택한 상품들의 <b>원화 금액 비율</b>로 자동 배분됩니다. (빈칸은 변경하지 않음)</p>
     <div class="flex gap-2 justify-end">
       <button onclick="closeImpGroupCostModal()" class="px-4 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg">취소</button>
@@ -10237,7 +10242,7 @@ let _impSelected = new Set();   // 체크된 행 id (검색/재렌더에도 유�
 let _impShowSelectedOnly = false;   // 체크한 행만 보기
 let _impSort = { col: null, dir: 'asc' };   // 표 정렬 (헤더 클릭)
 function _impOnSearch(v) { _impSearch = v || ''; renderImpTab(); }
-const _IMP_NUM_COLS = new Set(['rate','cny','krw','fee','tax','qty','unit','total']);
+const _IMP_NUM_COLS = new Set(['rate','cny','krw','fee','tax','logi','qty','unit','total']);
 function _impSetSort(col) {
   if (_impSort.col === col) _impSort.dir = (_impSort.dir === 'asc') ? 'desc' : 'asc';
   else { _impSort.col = col; _impSort.dir = 'asc'; }
@@ -10245,11 +10250,11 @@ function _impSetSort(col) {
 }
 function _impSortVal(r, col) {
   const cny = Number(r.cny) || 0, rate = Math.round(Number(r.rate) || 0), krw = cny * rate;
-  const fee = Number(r.fee) || 0, tax = Number(r.tax) || 0, total = krw + fee + tax;
+  const fee = Number(r.fee) || 0, tax = Number(r.tax) || 0, logi = Number(r.logi) || 0, total = krw + fee + tax + logi;
   const qty = Number(r.qty) || 0;
   switch (col) {
     case 'rate': return rate; case 'cny': return cny; case 'krw': return krw;
-    case 'fee': return fee; case 'tax': return tax; case 'qty': return qty;
+    case 'fee': return fee; case 'tax': return tax; case 'logi': return logi; case 'qty': return qty;
     case 'total': return total; case 'unit': return qty > 0 ? total / qty : 0;
     default: return String(r[col] || '');
   }
@@ -10405,17 +10410,18 @@ function renderImpTab() {
   } else {
     if (empty) empty.classList.add('hidden');
     const curRate = _impRate();
-    let sCny = 0, sKrw = 0, sFee = 0, sTax = 0, sTotal = 0, sQty = 0;
+    let sCny = 0, sKrw = 0, sFee = 0, sTax = 0, sLogi = 0, sTotal = 0, sQty = 0;
     tbody.innerHTML = viewRows.map(r => {
       const cny = Number(r.cny) || 0;
       const rowRate = Math.round(Number(r.rate) || 0);   // 행마다 저장된 환율(정수 반올림)
       const krw = cny * rowRate;
       const fee = Number(r.fee) || 0;
       const tax = Number(r.tax) || 0;
-      const total = krw + fee + tax;
+      const logi = Number(r.logi) || 0;
+      const total = krw + fee + tax + logi;
       const qty = Number(r.qty) || 0;
       const unit = qty > 0 ? total / qty : 0;
-      sCny += cny; sKrw += krw; sFee += fee; sTax += tax; sTotal += total; sQty += qty;
+      sCny += cny; sKrw += krw; sFee += fee; sTax += tax; sLogi += logi; sTotal += total; sQty += qty;
       const inp = 'w-full bg-transparent focus:outline-none focus:bg-white border border-transparent hover:border-brand-border rounded px-2 py-1';
       // 환율 표시 — 현재 글로벌 환율과 다르면 주황색으로 구분
       const rateDiff = curRate > 0 && Math.abs(rowRate - curRate) > 0.5;
@@ -10435,6 +10441,7 @@ function renderImpTab() {
         <td class="px-3 py-1 text-right text-sm">${_impFmt(krw)}</td>
         <td class="px-1 py-1"><input type="number" data-field="fee" onpaste="_onImpCellPaste(event,this)" value="${fee || ''}" onchange="_onImpEdit('${r.id}','fee',this.value)" class="${inp} text-sm text-right"></td>
         <td class="px-1 py-1"><input type="number" data-field="tax" onpaste="_onImpCellPaste(event,this)" value="${tax || ''}" onchange="_onImpEdit('${r.id}','tax',this.value)" class="${inp} text-sm text-right"></td>
+        <td class="px-1 py-1"><input type="number" data-field="logi" onpaste="_onImpCellPaste(event,this)" value="${logi || ''}" onchange="_onImpEdit('${r.id}','logi',this.value)" class="${inp} text-sm text-right"></td>
         <td class="px-1 py-1"><input type="number" data-field="qty" onpaste="_onImpCellPaste(event,this)" value="${qty || ''}" onchange="_onImpEdit('${r.id}','qty',this.value)" class="${inp} text-sm text-right"></td>
         <td class="px-3 py-1 text-right text-sm text-brand-pink font-bold">${_impFmt(unit)}</td>
         <td class="px-3 py-1 text-right text-sm font-bold">${_impFmt(total)}</td>
@@ -10446,6 +10453,7 @@ function renderImpTab() {
     set('imp-sum-krw', sKrw);
     set('imp-sum-fee', sFee);
     set('imp-sum-tax', sTax);
+    set('imp-sum-logi', sLogi);
     set('imp-sum-total', sTotal);
     set('imp-sum-qty', sQty);
     // 전체선택 체크박스 상태 — 현재 보이는 행 모두 선택돼 있으면 체크
@@ -10525,6 +10533,7 @@ function openImpGroupCostModal() {
   document.getElementById('imp-gc-cny').value = '';
   document.getElementById('imp-gc-fee').value = '';
   document.getElementById('imp-gc-tax').value = '';
+  document.getElementById('imp-gc-logi').value = '';
   // 중판코드 — 선택 행이 모두 같은 코드면 미리 채움, 아니면 빈칸
   const vendors = new Set(rows.map(r => String(r.vendorCode || '').trim()).filter(Boolean));
   document.getElementById('imp-gc-vendor').value = vendors.size === 1 ? [...vendors][0] : '';
@@ -10540,9 +10549,10 @@ function applyImpGroupCost() {
   const rows = _impState.rows.filter(r => ids.includes(r.id));
   const totFee = _impAmtParse(document.getElementById('imp-gc-fee').value);
   const totTax = _impAmtParse(document.getElementById('imp-gc-tax').value);
+  const totLogi = _impAmtParse(document.getElementById('imp-gc-logi')?.value || '');
   const totCny = parseFloat(String(document.getElementById('imp-gc-cny')?.value || '').replace(/,/g, '')) || 0;
   const vendor = document.getElementById('imp-gc-vendor').value.trim();
-  if (totFee <= 0 && totTax <= 0 && totCny <= 0 && !vendor) { alert('중판코드 / 총 위안화 / 총 중판비용·관세 중 하나를 입력하세요.'); return; }
+  if (totFee <= 0 && totTax <= 0 && totLogi <= 0 && totCny <= 0 && !vendor) { alert('중판코드 / 총 위안화 / 총 중판비용·관세·물류비 중 하나를 입력하세요.'); return; }
 
   // ── 총 위안화 배분: 각 행의 위안화(=1개 단가)×수량 비율로 주문 총액(배송비 포함)을 배분 ──
   //    예) 단가 5×5 + 9×5 + … = 215위안, 총액 231위안(배송 16 포함) → 각 행 위안화가 비율대로 231에 맞춰짐
@@ -10571,11 +10581,12 @@ function applyImpGroupCost() {
     if (out.length) out[out.length - 1] += (total - acc);
     return out;
   };
-  const feeAlloc = alloc(totFee), taxAlloc = alloc(totTax);
+  const feeAlloc = alloc(totFee), taxAlloc = alloc(totTax), logiAlloc = alloc(totLogi);
   rows.forEach((r, i) => {
     if (vendor) r.vendorCode = vendor;
     if (feeAlloc) r.fee = feeAlloc[i];
     if (taxAlloc) r.tax = taxAlloc[i];
+    if (logiAlloc) r.logi = logiAlloc[i];
   });
   _impSave();
   closeImpGroupCostModal();
@@ -10584,7 +10595,8 @@ function applyImpGroupCost() {
         (vendor ? `\n· 중판코드 ${vendor}` : '') +
         (totCny > 0 ? `\n· 총 위안화 ¥${totCny.toLocaleString('ko-KR')} → (단가×수량) 비율 배분` : '') +
         (feeAlloc ? `\n· 총 중판비용 ${_impFmt(totFee)}원 (원화 비율 배분)` : '') +
-        (taxAlloc ? `\n· 총 관세 ${_impFmt(totTax)}원 (원화 비율 배분)` : ''));
+        (taxAlloc ? `\n· 총 관세 ${_impFmt(totTax)}원 (원화 비율 배분)` : '') +
+        (logiAlloc ? `\n· 총 물류비 ${_impFmt(totLogi)}원 (원화 비율 배분)` : ''));
 }
 
 // ── 수입 저장내역 (단가표 스냅샷) ─────────────────────────────
@@ -10613,7 +10625,7 @@ function saveImpSnapshot() {
   _impSavePending = src.map(r => ({
     date: r.date || '', folder: r.folder || '', code: r.code || '', vendorCode: r.vendorCode || '',
     name: r.name || '', cny: Number(r.cny) || 0, rate: Number(r.rate) || 0,
-    fee: Number(r.fee) || 0, tax: Number(r.tax) || 0, qty: Number(r.qty) || 0,
+    fee: Number(r.fee) || 0, tax: Number(r.tax) || 0, logi: Number(r.logi) || 0, qty: Number(r.qty) || 0,
   }));
   const dflt = `${_impTodayStr()} 수입 (${src.length}품목)`;
   document.getElementById('imp-save-info').textContent = checked.length ? `체크한 ${checked.length}개 행을 저장합니다.` : `전체 ${src.length}개 행을 저장합니다.`;
@@ -10639,7 +10651,7 @@ function confirmImpSnapshot() {
   // 저장한 원본 행의 값(중판코드·위안화·중판비용·관세·수량) 비우기 — 제품/코드/날짜·환율은 유지
   _impLoad();
   const idset = new Set(clearIds);
-  _impState.rows.forEach(r => { if (idset.has(r.id)) { r.vendorCode = ''; r.cny = 0; r.fee = 0; r.tax = 0; r.qty = 0; } });
+  _impState.rows.forEach(r => { if (idset.has(r.id)) { r.vendorCode = ''; r.cny = 0; r.fee = 0; r.tax = 0; r.logi = 0; r.qty = 0; } });
   _impSave();
   _impSelected.clear();
   closeImpSaveModal();
@@ -10650,7 +10662,7 @@ function _impSavedTotals(rec) {
   let qty = 0, total = 0;
   (rec.rows || []).forEach(r => {
     const krw = (Number(r.cny) || 0) * (Number(r.rate) || 0);
-    total += krw + (Number(r.fee) || 0) + (Number(r.tax) || 0);
+    total += krw + (Number(r.fee) || 0) + (Number(r.tax) || 0) + (Number(r.logi) || 0);
     qty += Number(r.qty) || 0;
   });
   return { qty, total, count: (rec.rows || []).length };
@@ -10687,12 +10699,12 @@ function viewImpSaved(id) {
   const sec = document.getElementById('impsaved-detail');
   document.getElementById('impsaved-detail-title').textContent = `${rec.name}  ·  ${rec.savedAt}`;
   const tb = document.getElementById('impsaved-detail-tbody');
-  let sCny = 0, sKrw = 0, sFee = 0, sTax = 0, sTot = 0, sQty = 0;
+  let sCny = 0, sKrw = 0, sFee = 0, sTax = 0, sLogi = 0, sTot = 0, sQty = 0;
   tb.innerHTML = (rec.rows || []).map(r => {
     const cny = Number(r.cny) || 0, rate = Math.round(Number(r.rate) || 0), krw = cny * rate;
-    const fee = Number(r.fee) || 0, tax = Number(r.tax) || 0, total = krw + fee + tax;
+    const fee = Number(r.fee) || 0, tax = Number(r.tax) || 0, logi = Number(r.logi) || 0, total = krw + fee + tax + logi;
     const qty = Number(r.qty) || 0, unit = qty > 0 ? total / qty : 0;
-    sCny += cny; sKrw += krw; sFee += fee; sTax += tax; sTot += total; sQty += qty;
+    sCny += cny; sKrw += krw; sFee += fee; sTax += tax; sLogi += logi; sTot += total; sQty += qty;
     return `<tr class="border-b border-brand-border">
       <td class="px-3 py-1.5 text-center text-xs">${_impEsc(r.date)}</td>
       <td class="px-3 py-1.5 text-center text-xs font-mono">${_impEsc(r.folder)}</td>
@@ -10704,6 +10716,7 @@ function viewImpSaved(id) {
       <td class="px-3 py-1.5 text-right text-sm">${_impFmt(krw)}</td>
       <td class="px-3 py-1.5 text-right text-sm">${_impFmt(fee)}</td>
       <td class="px-3 py-1.5 text-right text-sm">${_impFmt(tax)}</td>
+      <td class="px-3 py-1.5 text-right text-sm">${_impFmt(logi)}</td>
       <td class="px-3 py-1.5 text-right text-sm">${qty ? _impFmt(qty) : ''}</td>
       <td class="px-3 py-1.5 text-right text-sm text-brand-pink font-bold">${_impFmt(unit)}</td>
       <td class="px-3 py-1.5 text-right text-sm font-bold">${_impFmt(total)}</td>
@@ -10715,6 +10728,7 @@ function viewImpSaved(id) {
       <td class="px-3 py-2 text-right">${_impFmt(sKrw)}</td>
       <td class="px-3 py-2 text-right">${_impFmt(sFee)}</td>
       <td class="px-3 py-2 text-right">${_impFmt(sTax)}</td>
+      <td class="px-3 py-2 text-right">${_impFmt(sLogi)}</td>
       <td class="px-3 py-2 text-right">${_impFmt(sQty)}</td><td></td>
       <td class="px-3 py-2 text-right">${_impFmt(sTot)}</td>
     </tr>`;
@@ -10736,13 +10750,13 @@ function exportImpSavedExcel() {
   const rec = _impLoadSaved().find(r => r.id === _impSavedViewId);
   if (!rec) { alert('먼저 저장내역을 선택하세요.'); return; }
   if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 로드 실패'); return; }
-  const head = ['입항일','폴더코드','상품코드','제품명','중판코드','환율','위안화','원화','중판비용','관세','수량','1개금액','합계'];
+  const head = ['입항일','폴더코드','상품코드','제품명','중판코드','환율','위안화','원화','중판비용','관세','물류비','수량','1개금액','합계'];
   const aoa = [head];
   (rec.rows || []).forEach(r => {
     const cny = Number(r.cny) || 0, rate = Math.round(Number(r.rate) || 0), krw = cny * rate;
-    const fee = Number(r.fee) || 0, tax = Number(r.tax) || 0, total = krw + fee + tax;
+    const fee = Number(r.fee) || 0, tax = Number(r.tax) || 0, logi = Number(r.logi) || 0, total = krw + fee + tax + logi;
     const qty = Number(r.qty) || 0, unit = qty > 0 ? Math.round(total / qty) : 0;
-    aoa.push([r.date, r.folder, r.code, r.name, r.vendorCode, rate, cny, Math.round(krw), fee, tax, qty, unit, Math.round(total)]);
+    aoa.push([r.date, r.folder, r.code, r.name, r.vendorCode, rate, cny, Math.round(krw), fee, tax, logi, qty, unit, Math.round(total)]);
   });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), '수입단가표');
@@ -10791,7 +10805,7 @@ async function confirmImpReceiving() {
   for (const r of rows) {
     const qty = Number(r.qty) || 0;
     const rate = Math.round(Number(r.rate) || 0);
-    const total = (Number(r.cny) || 0) * rate + (Number(r.fee) || 0) + (Number(r.tax) || 0);
+    const total = (Number(r.cny) || 0) * rate + (Number(r.fee) || 0) + (Number(r.tax) || 0) + (Number(r.logi) || 0);
     const unit = qty > 0 ? Math.round(total / qty) : 0;
     if (qty <= 0 || unit <= 0) { skipped.push(`${r.code || r.name}: 수량/단가 0`); continue; }
     const skuKey = String(r.code || '').trim().toLowerCase();
@@ -11027,7 +11041,7 @@ function _onImpEdit(id, field, val) {
   if (field === 'name' && String(val || '').trim() && _impNameDup(val, id)) {
     alert('이미 등록된 제품명입니다: ' + val); renderImpTab(); return;
   }
-  if (['cny','fee','tax','qty','rate'].includes(field)) r[field] = Number(val) || 0;
+  if (['cny','fee','tax','logi','qty','rate'].includes(field)) r[field] = Number(val) || 0;
   else r[field] = val;
   _impSave();
   renderImpTab();
@@ -11045,7 +11059,7 @@ function addImpRow() {
   }, 30);
 }
 // 엑셀 다중 셀 붙여넣기 — 여러 행 자동 생성 + 컬럼 매핑 (시작 셀 기준 좌→우)
-const _IMP_COLUMN_ORDER = ['folder','code','name','vendorCode','rate','cny','fee','tax','qty'];
+const _IMP_COLUMN_ORDER = ['folder','code','name','vendorCode','rate','cny','fee','tax','logi','qty'];
 function _onImpCellPaste(e, el) {
   const cd = e.clipboardData || window.clipboardData;
   if (!cd) return;
@@ -11064,7 +11078,7 @@ function _onImpCellPaste(e, el) {
   if (!tr) return;
   const startIdx = _impState.rows.findIndex(p => p.id === tr.dataset.id);
   if (startIdx < 0) return;
-  const numFields = new Set(['rate','cny','fee','tax','qty']);
+  const numFields = new Set(['rate','cny','fee','tax','logi','qty']);
   const curRate = Math.round(_impRate());
   let _impPasteDup = 0;
   for (let r = 0; r < matrix.length; r++) {
@@ -11112,17 +11126,18 @@ function deleteSelectedImpRows() {
 async function exportImpExcel() {
   _impLoad();
   _impMigrateRows();
-  const headers = ['입항일','폴더코드','상품코드','제품명','중판코드','환율(1위안)','위안화','원화','중판비용','관세','수량','1개금액','합계'];
+  const headers = ['입항일','폴더코드','상품코드','제품명','중판코드','환율(1위안)','위안화','원화','중판비용','관세','물류비','수량','1개금액','합계'];
   const rows = _impState.rows.map(r => {
     const cny = Number(r.cny) || 0;
     const rowRate = Math.round(Number(r.rate) || 0);
     const krw = cny * rowRate;
     const fee = Number(r.fee) || 0;
     const tax = Number(r.tax) || 0;
-    const total = krw + fee + tax;
+    const logi = Number(r.logi) || 0;
+    const total = krw + fee + tax + logi;
     const qty = Number(r.qty) || 0;
     const unit = qty > 0 ? total / qty : 0;
-    return [r.date, r.folder || '', r.code, r.name, r.vendorCode || '', rowRate, cny, Math.round(krw), fee, tax, qty, Math.round(unit), Math.round(total)];
+    return [r.date, r.folder || '', r.code, r.name, r.vendorCode || '', rowRate, cny, Math.round(krw), fee, tax, logi, qty, Math.round(unit), Math.round(total)];
   });
   const aoa = [
     ['현재 원화', _impState.krw],
