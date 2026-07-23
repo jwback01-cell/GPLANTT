@@ -10523,14 +10523,14 @@ function _impTableKeyNav(e) {
   if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
   const inp = e.target;
   if (!inp || !inp.matches || !inp.matches('input[data-field]')) return;
+  e.preventDefault();   // 항상 증감 스피너 방지 — 마지막 행에서 ↓ 눌러도 값이 -1 되지 않게
   const field = inp.getAttribute('data-field');
   const tr = inp.closest('tr');
   if (!tr) return;
   const next = e.key === 'ArrowDown' ? tr.nextElementSibling : tr.previousElementSibling;
-  if (!next || !next.getAttribute) return;
+  if (!next || !next.getAttribute) return;   // 마지막/첫 행 — 이동 없음 (값 유지)
   const nextId = next.getAttribute('data-id');
   if (!nextId) return;
-  e.preventDefault();   // number input의 증감 스피너 동작 방지
   _impPendingFocus = { id: nextId, field };
   const target = next.querySelector(`input[data-field="${field}"]`);
   if (target) { target.focus(); try { target.select(); } catch (_) {} }
