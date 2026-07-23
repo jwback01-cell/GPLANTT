@@ -2324,6 +2324,7 @@ tailwind.config = {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
               선택 삭제
             </button>
+            <button onclick="openImpBulkModal()" class="px-4 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg flex items-center gap-1.5" title="체크한 상품들에 중판코드·위안화(1개 단가)·수량을 한 번에 입력">✏️ 일괄 입력</button>
             <button onclick="openImpGroupCostModal()" class="px-4 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg flex items-center gap-1.5" title="체크한 상품들의 총 위안화·중판비용·관세·물류비를 비율로 배분">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 7h18"/><path d="M6 12h12"/><path d="M9 17h6"/></svg>
               묶음 비용 배분
@@ -2481,6 +2482,25 @@ tailwind.config = {
     <div class="flex gap-2 justify-end">
       <button onclick="closeImpGroupCostModal()" class="px-4 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg">취소</button>
       <button onclick="applyImpGroupCost()" class="px-4 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333]">배분</button>
+    </div>
+  </div>
+</div>
+
+<!-- 수입관리 일괄 입력 모달 -->
+<div id="imp-bulk-backdrop" class="todo-modal-backdrop" onclick="if(event.target===this)closeImpBulkModal()">
+  <div class="todo-modal" style="max-width:420px;padding:24px;">
+    <h3 class="text-lg font-bold mb-1">일괄 입력 ✏️</h3>
+    <p id="imp-bulk-count" class="text-brand-gray text-sm mb-4"></p>
+    <label class="block text-sm font-bold mb-1">중판코드</label>
+    <input id="imp-bulk-vendor" type="text" placeholder="예) 2606010060" class="w-full mb-3 px-3 py-2 rounded-xl border border-brand-border focus:outline-none focus:border-brand-black font-mono">
+    <label class="block text-sm font-bold mb-1">위안화 <span class="text-brand-gray font-normal">(1개 단가 ¥)</span></label>
+    <input id="imp-bulk-cny" type="text" inputmode="decimal" placeholder="예) 5.00" class="w-full mb-3 px-3 py-2 rounded-xl border border-brand-border focus:outline-none focus:border-brand-black text-right">
+    <label class="block text-sm font-bold mb-1">수량</label>
+    <input id="imp-bulk-qty" type="text" inputmode="numeric" placeholder="예) 5" class="w-full mb-3 px-3 py-2 rounded-xl border border-brand-border focus:outline-none focus:border-brand-black text-right">
+    <p class="text-[11px] text-brand-gray mb-4">체크한 모든 행에 같은 값이 입력됩니다. <b>빈칸은 변경하지 않습니다.</b></p>
+    <div class="flex gap-2 justify-end">
+      <button onclick="closeImpBulkModal()" class="px-4 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg">취소</button>
+      <button onclick="applyImpBulk()" class="px-4 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333]">일괄 적용</button>
     </div>
   </div>
 </div>
@@ -10551,6 +10571,42 @@ function openImpGroupCostModal() {
 }
 function closeImpGroupCostModal() {
   document.getElementById('imp-gc-backdrop').classList.remove('open');
+}
+// ── 일괄 입력 (체크한 행들에 중판코드·위안화 단가·수량 동일 적용) ──
+function openImpBulkModal() {
+  _impLoad();
+  const ids = _impSelectedIds();
+  if (ids.length < 1) { alert('먼저 일괄 입력할 상품의 체크박스를 선택하세요.'); return; }
+  document.getElementById('imp-bulk-count').textContent = `선택 ${ids.length}개 행에 같은 값을 입력합니다.`;
+  document.getElementById('imp-bulk-vendor').value = '';
+  document.getElementById('imp-bulk-cny').value = '';
+  document.getElementById('imp-bulk-qty').value = '';
+  document.getElementById('imp-bulk-backdrop').classList.add('open');
+}
+function closeImpBulkModal() {
+  document.getElementById('imp-bulk-backdrop').classList.remove('open');
+}
+function applyImpBulk() {
+  _impLoad();
+  const ids = _impSelectedIds();
+  if (!ids.length) { closeImpBulkModal(); return; }
+  const vendor = document.getElementById('imp-bulk-vendor').value.trim();
+  const cnyRaw = String(document.getElementById('imp-bulk-cny').value || '').replace(/,/g, '').trim();
+  const qtyRaw = String(document.getElementById('imp-bulk-qty').value || '').replace(/,/g, '').trim();
+  const cny = cnyRaw === '' ? null : (parseFloat(cnyRaw) || 0);
+  const qty = qtyRaw === '' ? null : (parseInt(qtyRaw, 10) || 0);
+  if (!vendor && cny == null && qty == null) { alert('중판코드 / 위안화(단가) / 수량 중 하나 이상 입력하세요.'); return; }
+  const idset = new Set(ids);
+  _impState.rows.forEach(r => {
+    if (!idset.has(r.id)) return;
+    if (vendor) r.vendorCode = vendor;
+    if (cny != null) r.cny = cny;
+    if (qty != null) r.qty = qty;
+  });
+  _impSave();
+  closeImpBulkModal();
+  renderImpTab();
+  try { if (typeof showAppToast === 'function') showAppToast(`✏️ ${ids.length}개 행 일괄 입력 완료`); } catch (_) {}
 }
 function applyImpGroupCost() {
   _impLoad();
