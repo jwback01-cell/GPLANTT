@@ -20261,7 +20261,7 @@ function _extRowToPaOrder(r, shop, defaults, idx) {
 
   // 디버깅 로그 (F12 콘솔에서 확인)
   if (mapping || excelSupply != null) {
-    console.log(`[PA 공급가] "${r.itemName}" | 엑셀=${excelSupply ?? '없음'} / 매핑=${mapping ? (mapping.supply_price ?? '없음') : '매핑없음'} / 상품DB=${mappedProd ? (mappedProd.supply_price ?? '없음') : '상품없음'} / 최종전송=${finalSupply ?? 'null'}`);
+    console.log(`[PA 공급가] "${r.itemName}" | 엑셀=${excelSupply ?? '없음'} / 매핑=${mapping ? (mapping.supply_price ?? '없음') : '매핑없음'} / 상품DB=${mappedProd ? (mappedProd.supply_price ?? '없음') : '상품없음'} / 단가=${finalSupply ?? 'null'} × 수량=${qty} → 전송=${finalSupply != null ? finalSupply * qty : 'null'}`);
   }
 
   // 매출(판매가) — 매칭된 공급가가 있으면 그 값으로, 없으면 다이얼로그 기본값
@@ -20273,7 +20273,9 @@ function _extRowToPaOrder(r, shop, defaults, idx) {
   };
   if (mappedSku && !skipSku) opt.sku_cd = mappedSku;
   // PA /order/add 가이드 — 공급가는 opts.shop_supply_price (Number)
-  if (finalSupply != null) opt.shop_supply_price = finalSupply;
+  //  ⚠ PA의 공급가는 그 주문 건의 '총 공급가' → 단가 × 수량으로 보내야 함
+  //    (예: 단가 14,400 × 수량 2 = 28,800. 단가만 보내면 PA에 14,400으로 올라감)
+  if (finalSupply != null) opt.shop_supply_price = finalSupply * qty;
 
   const body = {
     ord_time      : now,
