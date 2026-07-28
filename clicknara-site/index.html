@@ -2441,8 +2441,12 @@ async function _evFetchCsv(gid){
   throw new Error('시트 데이터를 불러오지 못했습니다(CORS/프록시). ' + lastErr);
 }
 const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v15';   // v15: 이전 지도가(I열)/이전 프로모션 열 파싱
+// 이전 캐시 키들 — 새 버전 캐시가 비어 새로 못 받았을 때라도 값이 사라지지 않게 폴백
+const EV_SHEET_CACHE_KEYS_PREV = ['cn_ev_sheet_cache_v14','cn_ev_sheet_cache_v13'];
 function _evSheetCacheLoad(){
-  try{ const c=JSON.parse(localStorage.getItem(EV_SHEET_CACHE_KEY)||'null'); if(Array.isArray(c)&&c.length) return new Map(c); }catch(_){}
+  for(const k of [EV_SHEET_CACHE_KEY, ...EV_SHEET_CACHE_KEYS_PREV]){
+    try{ const c=JSON.parse(localStorage.getItem(k)||'null'); if(Array.isArray(c)&&c.length) return new Map(c); }catch(_){}
+  }
   return null;
 }
 async function _evLoadSheetData(force){
@@ -2527,14 +2531,16 @@ async function _evLoadSheetData(force){
         }
       }catch(e){ console.warn('[ev-sheet] 파싱 실패', e); }
     }
-    _evSheetFetched = true;
     if(map.size>0){
+      _evSheetFetched = true;
       _evSheetMap = map;
       try{ localStorage.setItem(EV_SHEET_CACHE_KEY, JSON.stringify([...map.entries()])); }catch(_){}
       renderEventCalc();
     } else {
-      console.warn('[ev-sheet] 네트워크 0건 — 캐시 유지(있으면)');
-      if(_evSheetMap) renderEventCalc();   // 캐시라도 있으면 표시
+      // 실패(0건) → _evSheetFetched 를 세우지 않아 다음 렌더에서 재시도. 캐시(이전 버전 포함)라도 표시
+      console.warn('[ev-sheet] 네트워크 0건 — 이전 캐시로 폴백/재시도');
+      if(!_evSheetMap){ const cached=_evSheetCacheLoad(); if(cached) _evSheetMap=cached; }
+      if(_evSheetMap) renderEventCalc();
     }
   } finally { _evSheetLoading = false; }
 }
