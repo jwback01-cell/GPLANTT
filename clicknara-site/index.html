@@ -2815,7 +2815,7 @@ function renderEventCalc() {
     if (!_evSheetFetched && !_evSheetLoading) _evLoadSheetData();   // 프로모션(K열) 매칭용 시트 로드
     // 11번가만 '기존가' 왼쪽에 AQ열(기존세팅값 시트) 참조 컬럼 추가
     const is11st = ev.name === '11번가';
-    const heads = ['모델명', ...(is11st?['AQ']:[]), '기존가','노출가','등재가','선택쿠폰할인액','1차할인액','카드할인액','최종혜택가','Cat수수료','쿠폰수수료','선택쿠폰셀러부담','카드셀러부담','ESM+정산예상','프로모션','최종체감가','비고',''];
+    const heads = ['모델명', ...(is11st?['상품번호']:[]), '기존가','노출가','등재가','선택쿠폰할인액','1차할인액','카드할인액','최종혜택가','Cat수수료','쿠폰수수료','선택쿠폰셀러부담','카드셀러부담','ESM+정산예상','프로모션','최종체감가','비고',''];
     if (thRow) thRow.innerHTML = checkTh + heads.map((h,i)=>`<th class="px-2 py-2.5 font-bold border border-brand-border ${i===0?'text-left':'text-right'} ${i===heads.length-1?'text-center':''} ${h==='등재가'?'bg-yellow-200 text-brand-black':''}">${h}</th>`).join('');
     const cell = v => `<td class="px-2 py-1 text-right tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(v)}</td>`;
     const cellHi = v => `<td class="px-2 py-1 text-right font-extrabold tabular-nums border border-brand-border bg-yellow-100 text-brand-black">${_evFmt(v)}</td>`;
@@ -2829,7 +2829,7 @@ function renderEventCalc() {
       const c = _evCalcRow({ ...row, promo: _effPromo }, ev.rates);
       // 11번가: 기존가 왼쪽 AQ열 참조값 셀
       const _refAQ = is11st ? _evSheetRefPrice(row.model, ev.name) : null;
-      const _aqCell = is11st ? `<td class="px-2 py-1 text-right tabular-nums border border-brand-border bg-brand-bg/30" title="기존세팅값 시트 AQ열">${_refAQ!=null?_evFmt(_refAQ):(_evSheetMap?'-':'…')}</td>` : '';
+      const _aqCell = is11st ? `<td class="px-2 py-1 text-right tabular-nums border border-brand-border bg-brand-bg/30" title="기존세팅값 시트 AQ열(상품번호)">${_refAQ!=null?String(Math.round(_refAQ)):(_evSheetMap?'-':'…')}</td>` : '';
       return `<tr class="hover:bg-brand-bg/40 ${_evSel.has(row.id)?'ev-row-selected':''}">${cbCell(row)}
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" list="ev-model-list" value="${_evEsc(row.model||'')}" onpaste="evPaste(event,${i},'model')" onchange="evEditRow(${i},'model',this.value)" class="${inp} text-left font-semibold min-w-[150px]" autocomplete="off"></td>
         ${_aqCell}
