@@ -2371,10 +2371,11 @@ function _evRestoreImageFor(rec, site){
   }
   return rec.restoreImg || '';
 }
-// 행사 계산기 프로모션 — 기존세팅값 시트 K열(모델=판매자관리코드 매칭). 없으면 null
+// 행사 계산기 프로모션 — '이전 프로모션' 열이 있으면 그 값(이전값), 없으면 K열(현재). 모델=판매자관리코드 매칭
 function _evSheetPromo(model){
   if(!_evSheetMap) return null;
   const rec=_evSheetMap.get(_evNormCode(model)); if(!rec) return null;
+  if(rec.promoPrev != null) return Number(rec.promoPrev);   // 이전 프로모션 우선
   return (rec.promoK != null) ? Number(rec.promoK) : null;
 }
 // 행사 계산기 표 참조값 — 사이트별 추가 열(11번가=AQ) 값. 기존세팅값 시트, 모델 매칭. 없으면 null
@@ -2391,13 +2392,15 @@ function _evSheetName(model){
   const rec=_evSheetMap.get(_evNormCode(model)); if(!rec) return '';
   return (rec.nameL && String(rec.nameL).trim()) || '';
 }
-// 모델명 입력 시 기존세팅값 매칭 — 모델명=L열, 기존가=J열(지도가)로 채움
+// 모델명 입력 시 기존세팅값 매칭 — 모델명=L열, 기존가=이전 지도가(I열) 우선, 없으면 지도가(J열)
 function _evApplyModelLookup(row){
   if(!row || !_evSheetMap) return;
   const rec=_evSheetMap.get(_evNormCode(row.model)); if(!rec) return;
   if(rec.nameL && String(rec.nameL).trim()) row.model = String(rec.nameL).trim();   // 모델명 = L열
-  const j = (rec.priceCols && rec.priceCols['J']!=null) ? Number(rec.priceCols['J']) : (Number(rec.jido)||0);
-  if(j) row.orig = j;                                                                 // 기존가 = J열(지도가)
+  const prev = (rec.jidoPrev != null && Number(rec.jidoPrev) > 0) ? Number(rec.jidoPrev) : null;  // 이전 지도가(I열)
+  const cur  = (rec.priceCols && rec.priceCols['J']!=null) ? Number(rec.priceCols['J']) : (Number(rec.jido)||0);
+  const val = prev != null ? prev : cur;                                             // 기존가 = 이전 지도가 우선
+  if(val) row.orig = val;
 }
 // 모델명 자동완성 목록 — 기존세팅값 시트의 L열(없으면 코드) 값들
 function _evRenderModelDatalist(){
@@ -2437,7 +2440,7 @@ async function _evFetchCsv(gid){
   }
   throw new Error('시트 데이터를 불러오지 못했습니다(CORS/프록시). ' + lastErr);
 }
-const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v14';   // v14: 11번가 계산기 표 AQ열 참조값 추가 파싱
+const EV_SHEET_CACHE_KEY = 'cn_ev_sheet_cache_v15';   // v15: 이전 지도가(I열)/이전 프로모션 열 파싱
 function _evSheetCacheLoad(){
   try{ const c=JSON.parse(localStorage.getItem(EV_SHEET_CACHE_KEY)||'null'); if(Array.isArray(c)&&c.length) return new Map(c); }catch(_){}
   return null;
@@ -2471,7 +2474,10 @@ async function _evLoadSheetData(force){
           gmarket:findL('G마켓'), auction:findL('옥션'), eleven:findL('11번가'), lotte:findL('롯데온'),
           ssg:findL('SSG'),
         };
-        const jidoCol = header.findIndex(h=>h.includes('지도가')&&!h.includes('이전'));   // 지도가(기본가)
+        const jidoCol = header.findIndex(h=>h.includes('지도가')&&!h.includes('이전'));   // 지도가(기본가, 현재)
+        const jidoPrevCol = header.findIndex(h=>h.includes('지도가')&&h.includes('이전'));  // 이전 지도가(I열) — 기존가 이전값
+        // '이전 프로모션'/'이전 쿠폰' 헤더가 있으면 그 열, 없으면 -1 (K열로 폴백)
+        const promoPrevCol = header.findIndex(h=>h.includes('이전')&&(h.includes('프로모션')||h.includes('쿠폰')));
         const imgCol = header.findIndex(h=>h.includes('이미지'));   // 사용자가 추가할 '이미지URL' 열
         // 행사 양식: 사이트별 이미지 열(컬럼 문자 → 인덱스). 예: 쿠팡=BE, 11번가=AS …
         const imgColIdx = {};
@@ -2509,11 +2515,13 @@ async function _evLoadSheetData(force){
             lotte:   cols.lotte  >=0?num(row[cols.lotte])  :0,
             ssg:     cols.ssg    >=0?num(row[cols.ssg])    :0,
             jido:    jidoCol>=0?num(row[jidoCol]):0,   // 지도가(스마트스토어/오늘의집/알리/쿠팡 공통)
+            jidoPrev: jidoPrevCol>=0?num(row[jidoPrevCol]):null,   // 이전 지도가(I열) — 기존가 '이전값'
             imageUrl: imgCol>=0 ? String(row[imgCol]||'').trim() : '',
             imgCols,   // 행사 양식용 — 컬럼문자별 이미지(AS/W/AH/BE…)
             priceCols, // 원복양식용 — 컬럼문자별 판매가/등재가(AO/T/AD/J…)
             restoreImg:   String(row[XLSX.utils.decode_col('H')]||'').trim(),  // 원복양식 기본이미지 = 시트 H열
             promoK:       num(row[XLSX.utils.decode_col('K')]),                // 행사 계산기 프로모션 = 시트 K열
+            promoPrev:    promoPrevCol>=0?num(row[promoPrevCol]):null,         // '이전 프로모션' 열이 있으면 그 값
             nameL:        String(row[XLSX.utils.decode_col('L')]||'').trim(),  // 이미지 양식 상품명 = 시트 L열
           });
         }
