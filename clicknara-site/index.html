@@ -2719,7 +2719,8 @@ function _evCalcHtml() {
         <button onclick="evDownloadExcel()" class="px-3 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg">엑셀 다운로드</button>
         <button id="ev-mode-btn" onclick="evToggleMode()" class="px-3 py-2 rounded-full border border-brand-border text-sm font-bold hover:bg-brand-bg"></button>
         <span id="ev-mode-note" class="text-xs text-brand-gray"></span>
-        <button onclick="evSaveUploadSnapshot()" class="ml-auto px-4 py-2.5 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333]" title="현재 행사(이름·기간·비율·행)를 저장합니다">💾 행사 저장</button>
+        <button id="ev-sheet-refresh-btn" onclick="_evRefreshSheet()" class="ml-auto px-4 py-2.5 rounded-full border border-brand-border text-sm font-bold text-brand-blue hover:bg-brand-bg flex items-center gap-1.5" title="기존세팅값 구글 시트를 최신값으로 다시 불러옵니다. 시트에서 등재가·이미지를 수정했으면 다운로드 전에 한 번 눌러주세요.">🔄 시트 새로고침</button>
+        <button onclick="evSaveUploadSnapshot()" class="px-4 py-2.5 rounded-full bg-brand-black text-white text-sm font-bold hover:bg-[#333]" title="현재 행사(이름·기간·비율·행)를 저장합니다">💾 행사 저장</button>
         <select id="ev-upload-select" onchange="evLoadUploadSnapshot(this.value)" title="저장된 행사 불러오기 (행사이름 · 저장날짜)" class="px-3 py-2.5 rounded-full border border-brand-border text-sm font-bold bg-white max-w-[260px] cursor-pointer"><option value="">💾 저장된 행사</option></select>
         <button onclick="evDeleteUploadSnapshot()" class="px-3 py-2.5 rounded-full border border-brand-border text-sm font-bold text-brand-gray hover:bg-red-50 hover:text-brand-pink hover:border-brand-pink" title="드롭다운에서 선택한 저장 행사 삭제">🗑</button>
         <button onclick="evDownloadPlayauto()" class="px-4 py-2.5 rounded-full bg-brand-blue text-white text-sm font-bold hover:opacity-90 flex items-center gap-1.5" title="모델명(공백·하이픈 제거) + 등재가만 엑셀로 저장">
@@ -3201,6 +3202,23 @@ function _evRenderUploadControls(){
     } else { info.style.display='none'; info.innerHTML=''; }
   }
 }
+// 수동 시트 새로고침 — 기존세팅값 구글 시트를 강제로 다시 받아옴 (다운로드는 이 값을 즉시 사용)
+async function _evRefreshSheet(){
+  const btn = document.getElementById('ev-sheet-refresh-btn');
+  const orig = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled = true; btn.innerHTML = '⏳ 불러오는 중…'; }
+  _evSheetFetched = false; _evSheetLoadedAt = 0;   // 강제 재조회 허용(최근 로드 스킵 우회)
+  try{
+    await _evLoadSheetData(true);
+    const n = _evSheetMap ? _evSheetMap.size : 0;
+    if(btn){ btn.innerHTML = '✅ 최신값 반영됨'; setTimeout(()=>{ btn.innerHTML = orig; btn.disabled=false; }, 1500); }
+    try{ renderEventCalc(); }catch(_){}
+    if(!n) alert('시트를 불러오지 못했습니다. 잠시 후 다시 시도하세요.');
+  }catch(e){
+    if(btn){ btn.innerHTML = orig; btn.disabled=false; }
+    alert('시트 새로고침 실패: ' + (e && e.message || e));
+  }
+}
 // 플레이오토 다운로드 — 모델명(공백·하이픈 제거) + 등재가만
 function evDownloadPlayauto(){
   if(typeof XLSX==='undefined'){ alert('엑셀 라이브러리 로드 실패'); return; }
@@ -3227,7 +3245,7 @@ async function _evFillPlayauto(file){
   if(typeof XLSX==='undefined'){ alert('엑셀 라이브러리 로드 실패'); return; }
   const o=_evLoad(); const ev=_evActive(o);
   // 기존세팅값(상품관리대장) 시트 로드 보장
-  await _evLoadSheetData(true);   // 다운로드 시 항상 시트 최신값 재조회 (방금 채운 이미지/등재가 반영)
+  if(!_evSheetMap) await _evLoadSheetData();   // 이미 받아둔 시트값 사용(즉시). 최신화는 상단 "시트 새로고침"으로
   if(!_evSheetMap){ alert('기존세팅값 시트를 불러오지 못했습니다.\n로컬 파일이면 실행.bat으로 localhost에서 열어주세요.'); return; }
   try{
     const buf=await file.arrayBuffer();
@@ -3288,7 +3306,7 @@ function evAllImgDrop(e){ e.preventDefault(); const z=document.getElementById('e
 function evAllImgUpload(e){ const f=e.target.files&&e.target.files[0]; e.target.value=''; if(f) _evFillAllImage(f); }
 async function _evFillAllImage(file){
   if(typeof XLSX==='undefined'){ alert('엑셀 라이브러리 로드 실패'); return; }
-  await _evLoadSheetData(true);   // 다운로드 시 항상 시트 최신값 재조회 (방금 채운 이미지/등재가 반영)
+  if(!_evSheetMap) await _evLoadSheetData();   // 이미 받아둔 시트값 사용(즉시). 최신화는 상단 "시트 새로고침"으로
   if(!_evSheetMap){ alert('기존세팅값 시트를 불러오지 못했습니다.\n로컬 파일이면 실행.bat으로 localhost에서 열어주세요.'); return; }
   try{
     const buf=await file.arrayBuffer();
@@ -3344,7 +3362,7 @@ async function _evFillEventForm(file){
   const evListingMap = new Map();
   ev.rows.forEach(row=>{ const k=_evNormCode(row.model); if(k) evListingMap.set(k, listingOf(row)); });
   // 사이트별 이미지(기존세팅값 시트) 로드 보장
-  await _evLoadSheetData(true);   // 다운로드 시 항상 시트 최신값 재조회 (방금 채운 이미지/등재가 반영)
+  if(!_evSheetMap) await _evLoadSheetData();   // 이미 받아둔 시트값 사용(즉시). 최신화는 상단 "시트 새로고침"으로
   if(!_evSheetMap){ alert('기존세팅값 시트를 불러오지 못했습니다.\n로컬 파일이면 실행.bat으로 localhost에서 열어주세요.'); return; }
   try{
     const buf=await file.arrayBuffer();
