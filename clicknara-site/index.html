@@ -2447,7 +2447,7 @@ async function _evFetchCsv(gid){
     `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
   ];
   const tries = [
-    `${EV_PROXY_BASE}/api/sheet?gid=${gid}`,   // 자체 프록시(배포 시)
+    `${EV_PROXY_BASE}/api/sheet?gid=${gid}${_cb}`,   // 자체 프록시(배포 시) — 캐시버스터로 최신값
     csv, ...prox(csv),                          // /export 우선(열 정렬 완벽)
     gviz, ...prox(gviz),                        // gviz 폴백
   ];
@@ -2471,7 +2471,11 @@ function _evSheetCacheLoad(){
   return null;
 }
 async function _evLoadSheetData(force){
-  if(_evSheetLoading) return;
+  if(_evSheetLoading){
+    if(!force) return;
+    // 강제 새로고침: 진행 중이던 로드가 끝날 때까지 대기 후 재조회 (다운로드 시 최신값 보장)
+    for(let i=0;i<60 && _evSheetLoading;i++){ await new Promise(r=>setTimeout(r,200)); }
+  }
   if(_evSheetFetched && !force) return;            // 이번 세션에 이미 네트워크 시도함
   if(!_evSheetMap){ const cached=_evSheetCacheLoad(); if(cached){ _evSheetMap=cached; renderEventCalc(); } }  // 캐시 있으면 즉시 표시
   if(typeof XLSX==='undefined') return;
