@@ -2336,11 +2336,13 @@ function _evSheetSiteImage(model, site, chan){
   let val='';
   // 헤더로 찾은 사이트명 키(cols[site]) 우선, 없으면 컬럼 문자(cols[cfg]) 폴백
   if(typeof cfg==='string') val = cols[site] || cols[cfg] || '';
-  else if(cfg){   // 이베이: 지마켓(W)/옥션(AH) — 행 쇼핑몰로 구분
+  else if(cfg){   // 이베이: 지마켓(W)/옥션(AH) — 행 쇼핑몰로 구분. 한쪽이 비면 다른 채널 이미지로 폴백
     const c=String(chan||'');
-    if(c.includes('옥션')) val = cols[cfg['옥션']]||'';
-    else if(c.includes('지마켓')||c.includes('G마켓')||c.includes('지마')) val = cols[cfg['지마켓']]||'';
-    else val = cols[cfg['지마켓']]||cols[cfg['옥션']]||'';   // 채널 불명 시 지마켓 우선
+    const gm = String(cols[cfg['지마켓']]||'').trim();
+    const au = String(cols[cfg['옥션']]||'').trim();
+    if(c.includes('옥션')) val = au || gm;                                   // 옥션 비면 지마켓 이미지 사용
+    else if(c.includes('지마켓')||c.includes('G마켓')||c.includes('지마')) val = gm || au;   // 지마켓 비면 옥션
+    else val = gm || au;                                                     // 채널 불명 시 지마켓 우선
   }
   return (val && String(val).trim()) || rec.imageUrl || '';
 }
