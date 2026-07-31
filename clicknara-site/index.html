@@ -2434,28 +2434,30 @@ function _evRenderModelDatalist(){
 }
 // 로컬 파일(file://)에서 쓸 경우 배포 주소를 넣으면 자체 프록시로 안정 동작. 예: 'https://클릭나라도메인.vercel.app'
 const EV_PROXY_BASE = '';
+// 타임아웃 있는 fetch — 느린 프록시가 오래 멈추지 않게
+function _evFetchT(u, ms){
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), ms || 7000);
+  return fetch(u, { signal: c.signal }).finally(() => clearTimeout(t));
+}
 async function _evFetchCsv(gid){
-  // /export = 링크공유 시 열 정렬 완벽 / gviz = 웹게시만 되어도 동작(빈 열 밀릴 수 있어 헤더탐지로 보정)
-  //  캐시버스터(_t) — 프록시/CDN이 오래된 CSV를 주지 않도록 (시트 방금 수정값 반영)
   const _cb = '&_t=' + Date.now();
+  const api  = `${EV_PROXY_BASE}/api/sheet?gid=${gid}${_cb}`;   // 자체 프록시(로컬/배포) — 가장 빠르고 안정
   const csv  = `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/export?format=csv&gid=${gid}${_cb}`;
   const gviz = `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/gviz/tq?tqx=out:csv&gid=${gid}${_cb}`;
-  // 공개 CORS 프록시 — codetabs(가장 안정) → allorigins → corsproxy 순
   const prox = u => [
     `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(u)}`,
     `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
     `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
   ];
-  const tries = [
-    `${EV_PROXY_BASE}/api/sheet?gid=${gid}${_cb}`,   // 자체 프록시(배포 시) — 캐시버스터로 최신값
-    csv, ...prox(csv),                          // /export 우선(열 정렬 완벽)
-    gviz, ...prox(gviz),                        // gviz 폴백
-  ];
+  // /api/sheet 를 먼저 2회 시도(빠르고 안정) → 그다음 느린 공개 프록시 폴백
+  const tries = [ api, api, csv, ...prox(csv), gviz, ...prox(gviz) ];
   let lastErr = '';
   for(const u of tries){
     try{
-      const r = await fetch(u);
-      if(r.ok){ const t = await r.text(); if(t && t.includes('판매자관리코드')) { console.log('[ev-sheet] 로드 성공:', u.slice(0,60)); return t; } }
+      const isApi = u.includes('/api/sheet');
+      const r = await _evFetchT(u, isApi ? 6000 : 7000);   // 각 시도 최대 6~7초
+      if(r.ok){ const t = await r.text(); if(t && t.includes('판매자관리코드')) { console.log('[ev-sheet] 로드 성공:', u.slice(0,50)); return t; } }
       else lastErr = 'HTTP ' + r.status;
     }catch(e){ lastErr = String(e && e.message || e); }
   }
@@ -2470,11 +2472,15 @@ function _evSheetCacheLoad(){
   }
   return null;
 }
+let _evSheetLoadedAt = 0;   // 마지막 성공 로드 시각 (최근이면 재조회 생략 → 다운로드 빠르게)
 async function _evLoadSheetData(force){
+  // 최근(25초 내) 성공 로드가 있으면 강제여도 재조회 생략 — 연속 다운로드 속도 확보
+  if(force && _evSheetMap && _evSheetLoadedAt && (Date.now() - _evSheetLoadedAt < 25000)) return;
   if(_evSheetLoading){
     if(!force) return;
-    // 강제 새로고침: 진행 중이던 로드가 끝날 때까지 대기 후 재조회 (다운로드 시 최신값 보장)
-    for(let i=0;i<60 && _evSheetLoading;i++){ await new Promise(r=>setTimeout(r,200)); }
+    // 강제 새로고침: 진행 중이던 로드가 끝날 때까지 잠깐 대기(최대 4초) 후 재조회
+    for(let i=0;i<20 && _evSheetLoading;i++){ await new Promise(r=>setTimeout(r,200)); }
+    if(_evSheetMap && _evSheetLoadedAt && (Date.now() - _evSheetLoadedAt < 25000)) return;
   }
   if(_evSheetFetched && !force) return;            // 이번 세션에 이미 네트워크 시도함
   if(!_evSheetMap){ const cached=_evSheetCacheLoad(); if(cached){ _evSheetMap=cached; renderEventCalc(); } }  // 캐시 있으면 즉시 표시
@@ -2559,6 +2565,7 @@ async function _evLoadSheetData(force){
     if(map.size>0){
       _evSheetFetched = true;
       _evSheetMap = map;
+      _evSheetLoadedAt = Date.now();
       try{ localStorage.setItem(EV_SHEET_CACHE_KEY, JSON.stringify([...map.entries()])); }catch(_){}
       renderEventCalc();
     } else {
