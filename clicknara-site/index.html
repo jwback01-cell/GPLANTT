@@ -3373,6 +3373,7 @@ async function _evFillEventForm(file){
       raw[IMG_IDX]=img; imgFilled++;
       out.push(raw); filled++;
     }
+    console.log('[행사양식] 결과 — 채움:', filled, '/ 이미지:', imgFilled, '/ 실패:', fails.size, '/ 엑셀행:', rows.length, '/ 계산기모델:', evListingMap.size, '/ IMG_IDX:', IMG_IDX, 'PRICE_IDX:', PRICE_IDX, fails.size?[...fails.entries()].slice(0,5):'');
     if(fails.size){
       const entries=[...fails.entries()];
       const list=entries.slice(0,60).map(([c,why])=>`• ${c} — ${why}`).join('\n');
