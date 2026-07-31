@@ -2417,8 +2417,10 @@ function _evRenderModelDatalist(){
 const EV_PROXY_BASE = '';
 async function _evFetchCsv(gid){
   // /export = 링크공유 시 열 정렬 완벽 / gviz = 웹게시만 되어도 동작(빈 열 밀릴 수 있어 헤더탐지로 보정)
-  const csv  = `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/export?format=csv&gid=${gid}`;
-  const gviz = `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/gviz/tq?tqx=out:csv&gid=${gid}`;
+  //  캐시버스터(_t) — 프록시/CDN이 오래된 CSV를 주지 않도록 (시트 방금 수정값 반영)
+  const _cb = '&_t=' + Date.now();
+  const csv  = `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/export?format=csv&gid=${gid}${_cb}`;
+  const gviz = `https://docs.google.com/spreadsheets/d/${EV_SHEET_ID}/gviz/tq?tqx=out:csv&gid=${gid}${_cb}`;
   // 공개 CORS 프록시 — codetabs(가장 안정) → allorigins → corsproxy 순
   const prox = u => [
     `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(u)}`,
@@ -3195,7 +3197,7 @@ async function _evFillPlayauto(file){
   if(typeof XLSX==='undefined'){ alert('엑셀 라이브러리 로드 실패'); return; }
   const o=_evLoad(); const ev=_evActive(o);
   // 기존세팅값(상품관리대장) 시트 로드 보장
-  if(!_evSheetMap) await _evLoadSheetData(true);
+  await _evLoadSheetData(true);   // 다운로드 시 항상 시트 최신값 재조회 (방금 채운 이미지/등재가 반영)
   if(!_evSheetMap){ alert('기존세팅값 시트를 불러오지 못했습니다.\n로컬 파일이면 실행.bat으로 localhost에서 열어주세요.'); return; }
   try{
     const buf=await file.arrayBuffer();
@@ -3256,7 +3258,7 @@ function evAllImgDrop(e){ e.preventDefault(); const z=document.getElementById('e
 function evAllImgUpload(e){ const f=e.target.files&&e.target.files[0]; e.target.value=''; if(f) _evFillAllImage(f); }
 async function _evFillAllImage(file){
   if(typeof XLSX==='undefined'){ alert('엑셀 라이브러리 로드 실패'); return; }
-  if(!_evSheetMap) await _evLoadSheetData(true);
+  await _evLoadSheetData(true);   // 다운로드 시 항상 시트 최신값 재조회 (방금 채운 이미지/등재가 반영)
   if(!_evSheetMap){ alert('기존세팅값 시트를 불러오지 못했습니다.\n로컬 파일이면 실행.bat으로 localhost에서 열어주세요.'); return; }
   try{
     const buf=await file.arrayBuffer();
@@ -3311,7 +3313,7 @@ async function _evFillEventForm(file){
   const evListingMap = new Map();
   ev.rows.forEach(row=>{ const k=_evNormCode(row.model); if(k) evListingMap.set(k, listingOf(row)); });
   // 사이트별 이미지(기존세팅값 시트) 로드 보장
-  if(!_evSheetMap) await _evLoadSheetData(true);
+  await _evLoadSheetData(true);   // 다운로드 시 항상 시트 최신값 재조회 (방금 채운 이미지/등재가 반영)
   if(!_evSheetMap){ alert('기존세팅값 시트를 불러오지 못했습니다.\n로컬 파일이면 실행.bat으로 localhost에서 열어주세요.'); return; }
   try{
     const buf=await file.arrayBuffer();
