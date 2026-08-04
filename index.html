@@ -20525,6 +20525,9 @@ async function submitPaNewOrders() {
       resultsWrapPre.classList.remove('hidden');
       resultsWrapPre.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+    // 사용자 요청: 미매핑 주문이 있으면 매핑 화면을 자동으로 즉시 띄운다.
+    //   (openPaProductMapDialog 가 미매핑 품목을 "신규" 초안 행으로 자동 추가함 → 바로 매핑 가능)
+    setTimeout(() => { try { openPaProductMapDialog(); } catch (_) {} }, 250);
     return;
   }
 
