@@ -21402,15 +21402,16 @@ async function runInvoiceOneClickFor(variant) {
   try {
     _invoiceStatus('① 플레이오토 출고관리 주문 수집 중... (' + cfg.label + ')', 'info');
     await fetchInvoiceShipManagementOrders();
-    _invoiceStatus('② 메일에서 송장 엑셀 가져오는 중... (' + cfg.label + ')', 'info');
-    await fetchInvoiceFromMail({ includes: cfg.includes, excludes: cfg.excludes });
-    const input = document.getElementById('invoice-file-input');
-    if (!input || !input.files || !input.files[0]) {
-      _invoiceStatus('메일에서 송장 파일을 가져오지 못했습니다 — 처리 중단.', 'error');
+    _invoiceStatus('② 메일에서 송장 엑셀 가져와 매칭 중... (' + cfg.label + ')', 'info');
+    const mailRes = await fetchInvoiceFromMail({ includes: cfg.includes, excludes: cfg.excludes, processAll: true });
+    if (!mailRes || !mailRes.processedAll || !mailRes.files || !mailRes.files.length) {
+      _invoiceStatus('메일에서 송장 파일을 가져오지 못했습니다 — 처리 중단. (' + cfg.label + ')', 'error');
       return;
     }
-    _invoiceStatus('③ 송장 파일과 주문 매칭 중... (' + cfg.label + ')', 'info');
-    await uploadInvoiceFile();
+    if (!mailRes.matched) {
+      _invoiceStatus('메일 ' + mailRes.files.length + '건은 가져왔으나 매칭된 송장이 없습니다 — 전송 중단. (' + cfg.label + ')', 'warn');
+      return;
+    }
     _invoiceStatus('④ 플레이오토로 송장 전송 중... (' + cfg.label + ')', 'info');
     await sendInvoicesToPlayauto({ skipConfirm: true });
     _invoiceStatus('✅ ' + cfg.label + ' 송장 처리 완료', 'ok');
@@ -21434,18 +21435,18 @@ async function runInvoiceOneClick() {
     // 1) 플레이오토 출고관리 주문 수집
     _invoiceStatus('① 플레이오토 출고관리 주문 수집 중...', 'info');
     await fetchInvoiceShipManagementOrders();
-    // 2) 메일에서 송장 엑셀 자동 가져오기
-    _invoiceStatus('② 메일에서 송장 엑셀 가져오는 중...', 'info');
-    await fetchInvoiceFromMail();
-    // 파일이 input 에 주입되었는지 확인
-    const input = document.getElementById('invoice-file-input');
-    if (!input || !input.files || !input.files[0]) {
+    // 2+3) 메일에서 송장 엑셀 자동 가져오기 + 매칭 — 매칭되는 모든 회신(카테고리별) 전체 처리
+    //   (예: '리빙컴퍼니 발주양식', '그외', '의류', '버즈' 등 여러 회신이 오면 전부 매칭해 누적)
+    _invoiceStatus('② 메일에서 송장 엑셀 가져와 매칭 중...', 'info');
+    const mailRes = await fetchInvoiceFromMail({ processAll: true });
+    if (!mailRes || !mailRes.processedAll || !mailRes.files || !mailRes.files.length) {
       _invoiceStatus('메일에서 송장 파일을 가져오지 못했습니다 — 처리 중단.', 'error');
       return;
     }
-    // 3) 송장 업로드 실행 (매칭)
-    _invoiceStatus('③ 송장 파일과 주문 매칭 중...', 'info');
-    await uploadInvoiceFile();
+    if (!mailRes.matched) {
+      _invoiceStatus(`메일 ${mailRes.files.length}건은 가져왔으나 주문과 매칭된 송장이 없습니다 — 전송 중단. (수령자 전화번호로 대조)`, 'warn');
+      return;
+    }
     // 4) 플레이오토로 송장 전송 (확인창 생략)
     _invoiceStatus('④ 플레이오토로 송장 전송 중...', 'info');
     await sendInvoicesToPlayauto({ skipConfirm: true });
@@ -21511,51 +21512,66 @@ async function fetchInvoiceFromMail(opts) {
         return;
       }
     }
-    if (items.length > 1) {
-      console.log('[송장 메일 가져오기] 최근 ' + items.length + '건 중 가장 최신 1건만 처리합니다:',
-        items.map(it => ({ date: it.date, subject: it.subject, fileName: it.fileName })));
-    }
-    const it = items[0];
-    console.log('[송장 메일 가져오기] 처리 대상:', { date: it.date, subject: it.subject, fileName: it.fileName, fileSize: it.fileSize });
+    // 처리 대상 — 기본(수동 버튼): 최신 1건만 주입. one-click(processAll): 매칭되는 모든 첨부를 순차 매칭.
+    //   ⚠ 벤더는 카테고리별로 회신을 나눠 보냄(리빙컴퍼니/그외/의류/버즈 등). '최신 1건만' 이면 다른 회신의 송장을 놓친다.
+    const processAll = !!(opts && opts.processAll);
+    const targets = processAll ? items.slice() : [items[0]];
+    console.log('[송장 메일 가져오기] 대상 ' + targets.length + '건:', targets.map(t => t.fileName));
 
-    // base64 → Uint8Array → File 객체로 변환 → invoice-file-input 에 주입
-    const binary = atob(it.fileBase64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     const mimeMap = {
       xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       xls:  'application/vnd.ms-excel',
       csv:  'text/csv',
     };
-    const ext = (it.fileName.split('.').pop() || '').toLowerCase();
-    const mime = mimeMap[ext] || 'application/octet-stream';
-    const file = new File([bytes], it.fileName, { type: mime });
-
-    // 파일 input 에 주입 (DataTransfer 사용)
-    const input = document.getElementById('invoice-file-input');
-    if (input) {
-      try {
-        const dt = new DataTransfer();
-        dt.items.add(file);
-        input.files = dt.files;
-      } catch (_) {
-        // DataTransfer 미지원 환경 — 파일명만 표시하고 메모리에 보관
-        input._fetchedFile = file;
+    // base64 첨부 → File → invoice-file-input 에 주입
+    const _injectFile = (it) => {
+      const binary = atob(it.fileBase64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const ext = (it.fileName.split('.').pop() || '').toLowerCase();
+      const mime = mimeMap[ext] || 'application/octet-stream';
+      const file = new File([bytes], it.fileName, { type: mime });
+      const input = document.getElementById('invoice-file-input');
+      if (input) {
+        try { const dt = new DataTransfer(); dt.items.add(file); input.files = dt.files; }
+        catch (_) { input._fetchedFile = file; }  // DataTransfer 미지원 — 메모리 보관
       }
-    }
-    const nameEl = document.getElementById('invoice-file-name');
-    if (nameEl) nameEl.textContent = it.fileName + ' (메일에서 자동 수신)';
+      const nameEl = document.getElementById('invoice-file-name');
+      if (nameEl) nameEl.textContent = it.fileName + ' (메일에서 자동 수신)';
+    };
 
+    if (processAll) {
+      // 매칭되는 모든 회신을 순차 매칭 — uploadInvoiceFile 이 송장기록을 누적 저장하므로 전부 합쳐진다.
+      let totalMatched = 0, totalUnmatched = 0;
+      const doneFiles = [];
+      for (const it of targets) {
+        _injectFile(it);
+        let r = null;
+        try { r = await uploadInvoiceFile(); } catch (e) { console.warn('[송장 메일 가져오기] 매칭 실패:', it.fileName, e); }
+        totalMatched += (r && r.matched) || 0;
+        totalUnmatched += (r && r.unmatched) || 0;
+        doneFiles.push(it.fileName);
+        console.log(`[송장 메일 가져오기] 매칭 — ${it.fileName}: +${(r && r.matched) || 0}건 (누적 ${totalMatched})`);
+      }
+      _invoiceStatus(`✅ 메일 ${targets.length}건 처리 — 총 ${totalMatched}건 매칭${totalUnmatched ? (' · 미매칭 ' + totalUnmatched + '건') : ''}`, totalMatched > 0 ? 'ok' : 'warn');
+      return { matched: totalMatched, unmatched: totalUnmatched, files: doneFiles, processedAll: true };
+    }
+
+    // 기본(수동 버튼) — 최신 1건만 주입 (매칭은 별도 '송장 업로드 실행')
+    const it = targets[0];
+    console.log('[송장 메일 가져오기] 처리 대상:', { date: it.date, subject: it.subject, fileName: it.fileName, fileSize: it.fileSize });
+    _injectFile(it);
     const dateStr = it.date ? new Date(it.date).toLocaleString('ko-KR') : '(시간 정보 없음)';
     _invoiceStatus(`✅ ${it.fileName} 수신 완료 (${dateStr}) — "송장 업로드 실행" 버튼을 눌러 처리하세요.`, 'ok');
 
     const subj = it.subject ? ` · "${it.subject}"` : '';
-    const more = items.length > 1 ? `\n\n(최근 ${items.length}건 발견 — 가장 최신 1건만 적용. 더 보려면 F12 콘솔 확인)` : '';
+    const more = items.length > 1 ? `\n\n(최근 ${items.length}건 발견 — 가장 최신 1건만 적용. 원클릭 송장 처리는 전체를 매칭합니다.)` : '';
     showAppAlert(
       '메일에서 가져오기 완료',
       `발신: ${it.from}\n수신 시각: ${dateStr}${subj}\n파일: ${it.fileName}${more}\n\n파일이 송장 업로드 입력란에 채워졌습니다.\n"송장 업로드 실행" 버튼으로 진행하세요.`,
       'success'
     );
+    return { matched: 0, files: [it.fileName], processedAll: false };
   } catch (e) {
     console.error('[송장 메일 가져오기] 실패:', e);
     _invoiceStatus('메일 가져오기 실패: ' + (e.message || e), 'error');
