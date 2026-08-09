@@ -27051,7 +27051,9 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
 
   // ── 모드별 레이블 / 금액 추출 함수 ──
   const isPurchase = mode === 'purchase';
-  const TXN_HEADER     = isPurchase ? '매입/수금' : '매출/지급';
+  // 라벨 교정(사용자 요청 2026-08-05): 거래원장은 서울리빙(공급처) 기준이라 '그들의 매출 = 우리 매입'.
+  //   따라서 거래원장 금액 컬럼 헤더의 매입/매출 표기를 반대로 찍는다. (값·비교 로직은 그대로 — 라벨만 교정)
+  const TXN_HEADER     = isPurchase ? '매출/지급' : '매입/수금';
   const G_AMOUNT_LABEL = isPurchase ? '공급가(GPLAN)' : '원가(GPLAN)';
   const SOURCE_LABEL   = isPurchase ? '서울리빙(수동) 사이트' : '서울리빙 계열';
   const FIELD_LABEL    = isPurchase ? '단가/매입' : '원가/매출';
