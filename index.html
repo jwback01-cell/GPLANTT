@@ -18062,7 +18062,10 @@ async function runPaMinusCheck() {
   console.log(`[마이너스확인] 주문 펼침: ${_paOrders.length} → ${_expandedOrders.length} (옵션 단위)`);
   _paMinusRows = _expandedOrders.map(o => {
     const r = _paExtractOrderRow(o);
-    return { ...r, _bundleKey: String(o.bundle_no || o.pa_bundle_no || o.uniq || o.shop_ord_no || o.ori_uniq || o.order_no || o.ord_no || ''), shipCostBeforeDedup: r.shipCost };
+    // 합포장 택배비/택배비용 단일화는 '같은 묶음 + 같은 수령자'일 때만 (주소 다르면 별도 배송 → 각각 계산)
+    const _bk = String(o.bundle_no || o.pa_bundle_no || o.uniq || o.shop_ord_no || o.ori_uniq || o.order_no || o.ord_no || '');
+    const _rcv = String(_extReceiverPhone(o) || '').replace(/\D/g, '') || String(o.to_name || o.receiver_name || '').replace(/\s+/g, '');
+    return { ...r, _bundleKey: _bk ? (_bk + '__' + _rcv) : '', shipCostBeforeDedup: r.shipCost };
   });
 
   // 2단계: 묶음(bundle) 안에 SKU가 여러 개면 마진이 가장 높은 1개에만 택배비용 부과
@@ -24550,7 +24553,11 @@ async function savePlayautoOrdersToLedger(silent) {
   // 1단계: 코어 추출 (cost는 null 가능 — 마이너스와 동일)
   const cores = _paOrders.map(o => {
     const r = _paExtractOrderRow(o);
-    r._bundleKey = String(o.bundle_no || o.pa_bundle_no || o.uniq || o.shop_ord_no || o.ori_uniq || o.order_no || o.ord_no || '');
+    // 합포장 택배비 단일화는 '같은 묶음 + 같은 수령자'일 때만 적용 —
+    //   PA가 주소(수령자)가 다른 주문에 같은 bundle_no 를 줘도, 실제로는 별도 배송이므로 택배비를 각각 계산해야 함.
+    const _bk = String(o.bundle_no || o.pa_bundle_no || o.uniq || o.shop_ord_no || o.ori_uniq || o.order_no || o.ord_no || '');
+    const _rcv = String(_extReceiverPhone(o) || '').replace(/\D/g, '') || String(o.to_name || o.receiver_name || '').replace(/\s+/g, '');
+    r._bundleKey = _bk ? (_bk + '__' + _rcv) : '';
     r._shipCostBeforeDedup = r.shipCost;
     r._bundleApplied = false;
     return r;
