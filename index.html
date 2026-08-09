@@ -25020,15 +25020,10 @@ function saveEditedUploadDataRow(idx) {
   const ship     = n('eur-ship');     r.ship     = ship == null ? 0 : ship;
   const shipCost = n('eur-shipCost'); r.shipCost = shipCost == null ? 0 : shipCost;
   const cost     = n('eur-cost');     r.cost     = cost;  // null 허용
-  // 교환 행은 값을 양수로 유지 (반품만 음수). 기존 음수 교환 행도 수정 저장 시 양수로 정규화됨.
+  // 교환 행은 수량/단가/매출/공급가/원가/택배비용 등을 0으로 (재무 영향 없음). 기존 음수 교환 행도 수정 저장 시 0으로 교정됨.
   const _isExchangeRow = (r._claimKind === 'exchange') || (r.template === 'manual-exchange') || /교환/.test(r.site || '');
   if (_isExchangeRow) {
-    r.qty      = Math.abs(Number(r.qty) || 0);
-    r.price    = Math.abs(Number(r.price) || 0);
-    r.supply   = Math.abs(Number(r.supply) || 0);
-    r.ship     = Math.abs(Number(r.ship) || 0);
-    r.shipCost = Math.abs(Number(r.shipCost) || 0);
-    if (r.cost != null) r.cost = Math.abs(Number(r.cost) || 0);
+    r.qty = 0; r.price = 0; r.supply = 0; r.ship = 0; r.shipCost = 0; r.cost = 0;
   }
   // 제주도 추가배송비: 주소에 '제주' 포함이면 택배비용 +3,000 (주문수집 저장 로직과 동일 규칙).
   //   jejuShipApplied 플래그로 중복 가산 방지 — 이미 가산된 행을 다시 저장해도 3,000이 또 붙지 않음.
@@ -26398,9 +26393,9 @@ function _doConvertSelectedToReturn(targetRows, reason, kind) {
         }
       });
     } else {
-      // 교환: 혹시 원본이 음수였어도 양수로 정규화
+      // 교환: 수량/단가/매출/공급가/원가/택배비용 등 값을 0으로 (재무 영향 없음 — 사용자 요청 2026-08-10)
       NEG_FIELDS.forEach(k => {
-        if (clone[k] != null && clone[k] !== '') clone[k] = Math.abs(Number(clone[k]) || 0);
+        if (clone[k] != null && clone[k] !== '') clone[k] = 0;
       });
     }
     // 구매자 귀책일 때 — shipCost 는 그대로(양수) 유지 (우리가 부담)
