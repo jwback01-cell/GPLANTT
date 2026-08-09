@@ -25020,6 +25020,19 @@ function saveEditedUploadDataRow(idx) {
   const ship     = n('eur-ship');     r.ship     = ship == null ? 0 : ship;
   const shipCost = n('eur-shipCost'); r.shipCost = shipCost == null ? 0 : shipCost;
   const cost     = n('eur-cost');     r.cost     = cost;  // null 허용
+  // 제주도 추가배송비: 주소에 '제주' 포함이면 택배비용 +3,000 (주문수집 저장 로직과 동일 규칙).
+  //   jejuShipApplied 플래그로 중복 가산 방지 — 이미 가산된 행을 다시 저장해도 3,000이 또 붙지 않음.
+  //   주소를 제주 밖으로 바꿔 저장하면 가산분(3,000) 원복.
+  {
+    const _isJeju = /제주/.test(r.address || '');
+    if (_isJeju && !r.jejuShipApplied && (Number(r.shipCost) || 0) > 0) {
+      r.shipCost = (Number(r.shipCost) || 0) + 3000;
+      r.jejuShipApplied = true;
+    } else if (!_isJeju && r.jejuShipApplied) {
+      r.shipCost = Math.max(0, (Number(r.shipCost) || 0) - 3000);
+      r.jejuShipApplied = false;
+    }
+  }
   // 마진 재계산: supply + ship − cost − shipCost (cost null 이면 profit 도 null)
   r.profit = (cost == null) ? null
     : (Number(r.supply) || 0) + (Number(r.ship) || 0) - Number(cost) - (Number(r.shipCost) || 0);
@@ -27079,7 +27092,7 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
   };
   // GPLAN 측 금액: sale 모드 = r.cost (원가), purchase 모드 = r.supply (공급가)
   const _amtG = (r) => isPurchase ? (Number(r.supply) || 0) : (Number(r.cost) || 0);
-  const FILE_SUFFIX    = isPurchase ? '_매입' : '';
+  const FILE_SUFFIX    = isPurchase ? '_매출' : '_매입';
 
   // 거래원장 행 → GPLAN 매칭 룩업 (date+recv+name)
   const _normName = s => String(s || '').replace(/\s+/g, '').replace(/[\(\)\[\]\.,_\-\/·]/g, '').toLowerCase();
@@ -27506,7 +27519,7 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
   // 헤더 영역 freeze: summary 4 + groupHeader 1 + columnHeader 1 = 6행 고정
   ws['!freeze'] = { xSplit: 0, ySplit: summaryBlock.length + 2 };
 
-  XLSX.utils.book_append_sheet(wb, ws, isPurchase ? '거래원장 대조 (매입)' : '거래원장 대조');
+  XLSX.utils.book_append_sheet(wb, ws, isPurchase ? '거래원장 대조 (매출)' : '거래원장 대조 (매입)');
 
   // ── 셀 스타일 적용 (xlsx-js-style 동적 로드) ──
   try {
