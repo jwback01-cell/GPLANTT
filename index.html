@@ -26540,6 +26540,11 @@ const _RECONCILE_VENDORS = ['서울리빙', '서울리빙 그외', '서울리빙
 // 매입 모드: 사이트가 '서울리빙(수동)' 인 행을 비교 대상으로 — 거래원장의 매입/수금 컬럼과 매칭
 const _RECONCILE_PURCHASE_SITES = ['서울리빙(수동)'];
 function _normVendor(v) { return String(v || '').replace(/\s+/g, '').trim(); }
+// 매입 대조 대상 사이트 판정 — '서울리빙(수동)' 및 그 변형('서울리빙(수동) (반품-판매자귀책)' 등 반품/교환 행)까지 포함(prefix 매칭)
+function _isPurchaseSite(site) {
+  const s = _normVendor(site);
+  return _RECONCILE_PURCHASE_SITES.some(p => s.startsWith(_normVendor(p)));
+}
 function _normName(s) { return String(s || '').replace(/\s+/g, '').replace(/[\(\)\[\]\.,_\-\/·]/g, '').toLowerCase(); }
 // 수령자 정규화 — 매칭/표시 모두에서 숫자 제거 (예: "류용규1" → "류용규")
 function _normRecv(s) {
@@ -26603,7 +26608,7 @@ function openSeoulLivingReconcile() {
 // 매입 모드 진입 — 사이트가 '서울리빙(수동)' 인 업로드 데이터와 거래원장 매입/수금 컬럼 비교
 function openSeoulLivingReconcilePurchase() {
   const data = _loadUploadData();
-  const eligible = data.filter(r => _RECONCILE_PURCHASE_SITES.some(s => _normVendor(s) === _normVendor(r.site)));
+  const eligible = data.filter(r => _isPurchaseSite(r.site));
   if (!eligible.length) {
     showAppAlert(
       '비교 대상 없음',
@@ -26766,7 +26771,7 @@ function _reconcileCompare(ledgerRows, mode = 'sale') {
   // 모드별 GPLAN 행 필터: 매출 모드 = 거래처 매칭, 매입 모드 = 사이트 매칭
   const targets = data.filter(r => {
     if (mode === 'purchase') {
-      if (!_RECONCILE_PURCHASE_SITES.some(s => _normVendor(s) === _normVendor(r.site))) return false;
+      if (!_isPurchaseSite(r.site)) return false;   // 반품/교환 변형 사이트도 포함(prefix)
     } else {
       if (!_RECONCILE_VENDORS.some(v => _normVendor(v) === _normVendor(r.vendor))) return false;
     }
