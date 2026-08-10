@@ -21500,6 +21500,29 @@ async function fetchInvoiceFromMail(opts) {
       showAppAlert('가져올 메일 없음', '제목에 "CS"가 포함된 메일은 송장 메일이 아니므로 무시됩니다.\n그 외 송장 첨부 메일이 최근 7일 내에 없습니다.', 'info');
       return;
     }
+    // ★ 당일(오늘) 수신 메일만 처리 (사용자 요청) — 며칠 전 회신(옛 날짜 파일)까지 가져오지 않도록.
+    //   메일 수신일 == 오늘(로컬 날짜)인 것만. 오늘 수신이 없으면 파일명 날짜(_YYMMDD)가 오늘인 것으로 폴백.
+    {
+      const _n = new Date();
+      const _yyyy = _n.getFullYear(), _mm = String(_n.getMonth() + 1).padStart(2, '0'), _dd = String(_n.getDate()).padStart(2, '0');
+      const _todayFull = `${_yyyy}-${_mm}-${_dd}`;
+      const _todayYYMMDD = `${String(_yyyy).slice(2)}${_mm}${_dd}`;   // 예: 260810
+      const _recvIsToday = (it) => {
+        const d = it && it.date ? new Date(it.date) : null;
+        if (!d || isNaN(d)) return false;
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` === _todayFull;
+      };
+      const _fileIsToday = (it) => String(it && it.fileName || '').replace(/\D/g, '').includes(_todayYYMMDD);
+      let todayItems = items.filter(_recvIsToday);
+      if (!todayItems.length) todayItems = items.filter(_fileIsToday);   // 수신일 매칭 실패 시 파일명 날짜로 폴백
+      items = todayItems;
+      console.log(`[송장 메일 가져오기] 당일(${_todayFull}) 필터 후: ${items.length}건`, items.map(it => it.fileName));
+      if (!items.length) {
+        _invoiceStatus('오늘 수신된 송장 메일이 없습니다. (당일 날짜만 처리)', 'warn');
+        showAppAlert('가져올 메일 없음', `오늘(${_todayFull}) 날짜로 수신된 송장 첨부 메일이 없습니다.\n\n원클릭은 당일 메일만 처리합니다. 벤더 회신을 기다리거나, 옛 파일은 아래 업로드 영역에 직접 올려 처리하세요.`, 'info');
+        return;
+      }
+    }
     // 클라이언트 측 includes/excludes 필터 (파일 변형 처리용)
     if (includes.length || excludes.length) {
       items = items.filter(it => {
