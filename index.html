@@ -21441,7 +21441,7 @@ async function runInvoiceOneClick() {
     // 2+3) 메일에서 송장 엑셀 자동 가져오기 + 매칭 — 매칭되는 모든 회신(카테고리별) 전체 처리
     //   (예: '리빙컴퍼니 발주양식', '그외', '의류', '버즈' 등 여러 회신이 오면 전부 매칭해 누적)
     _invoiceStatus('② 메일에서 송장 엑셀 가져와 매칭 중...', 'info');
-    // 버즈/에어팟 회신은 제외(불필요·용량 큼 → 속도 저하). 수집된 주문이 다 매칭되면 즉시 중단(내부 early-stop).
+    // 버즈/에어팟 회신은 제외(불필요·용량 큼 → 속도 저하). 오늘 매칭되는 나머지 회신(리빙컴퍼니+그외+의류 등)은 전부 처리.
     const mailRes = await fetchInvoiceFromMail({ processAll: true, excludes: ['거래원장', '버즈', '에어팟'] });
     if (!mailRes || !mailRes.processedAll || !mailRes.files || !mailRes.files.length) {
       _invoiceStatus('메일에서 송장 파일을 가져오지 못했습니다 — 처리 중단.', 'error');
@@ -21571,16 +21571,8 @@ async function fetchInvoiceFromMail(opts) {
       // 매칭되는 모든 회신을 순차 매칭 — uploadInvoiceFile 이 송장기록을 누적 저장하므로 전부 합쳐진다.
       let totalMatched = 0, totalUnmatched = 0;
       const doneFiles = [];
-      const orderCount = Array.isArray(_paOrders) ? _paOrders.length : 0;
-      // 수집된 주문 중 송장이 채워진(전화번호 기준) 실제 건수 — 중복매칭에도 안전
-      const _matchedOrderCount = () => {
-        if (!orderCount) return 0;
-        const recs = _loadInvoiceRecords();
-        const recPhones = new Set(Object.values(recs).filter(r => r && r.invoice_no).map(r => _invNormPhone(r.phone)));
-        let n = 0;
-        for (const o of _paOrders) { const ph = _invNormPhone(_extReceiverPhone(o)); if (ph && recPhones.has(ph)) n++; }
-        return n;
-      };
+      // 오늘 매칭되는 회신은 전부 처리 (리빙컴퍼니 + 그외 + 의류 등). early-stop 없음 —
+      //   메일이 여러 개면 모두 원클릭에 반영되도록(사용자 요청). today-필터가 이미 오늘치로 한정.
       for (const it of targets) {
         _injectFile(it);
         let r = null;
@@ -21589,11 +21581,6 @@ async function fetchInvoiceFromMail(opts) {
         totalUnmatched += (r && r.unmatched) || 0;
         doneFiles.push(it.fileName);
         console.log(`[송장 메일 가져오기] 매칭 — ${it.fileName}: +${(r && r.matched) || 0}건 (누적 ${totalMatched})`);
-        // early-stop: 수집된 주문이 전부 송장매칭되면 나머지 회신은 처리하지 않음(속도↑)
-        if (orderCount && _matchedOrderCount() >= orderCount) {
-          console.log(`[송장 메일 가져오기] 수집 주문 ${orderCount}건 모두 매칭 — 나머지 ${targets.length - doneFiles.length}건 건너뜀`);
-          break;
-        }
       }
       _invoiceStatus(`✅ 메일 ${targets.length}건 처리 — 총 ${totalMatched}건 매칭${totalUnmatched ? (' · 미매칭 ' + totalUnmatched + '건') : ''}`, totalMatched > 0 ? 'ok' : 'warn');
       return { matched: totalMatched, unmatched: totalUnmatched, files: doneFiles, processedAll: true };
