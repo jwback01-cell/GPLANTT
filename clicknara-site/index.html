@@ -2320,7 +2320,9 @@ function evSheetTab(gid, el){
 // ── 기존세팅값 시트에서 각 마켓 등재가 가져오기(계산기 '기존세팅값' 열용) ──
 let _evSheetMap = null, _evSheetLoading = false, _evSheetFetched = false;
 const EV_SHEET_DATA_GIDS = ['98661656', '2085709414'];   // MSI공식몰, 지클릭커
-function _evNormCode(s){ return String(s==null?'':s).replace(/[\s-]/g,'').toUpperCase(); }
+// 모델/판매자관리코드 정규화 — 영문·숫자만 남김(공백·하이픈은 물론 엔대시 –, 전각, 제로폭 등 보이지 않는 특수문자까지 제거).
+//   기존엔 [\s-] 만 제거해서 엑셀에 하이픈 대신 엔대시(–)나 특수문자가 섞인 모델(예: MP273L E14–700)이 매칭 안 되던 문제 해결.
+function _evNormCode(s){ return String(s==null?'':s).replace(/[^0-9a-zA-Z]/g,'').toUpperCase(); }
 function _evSheetListing(model, site){
   if(!_evSheetMap) return null;
   const rec = _evSheetMap.get(_evNormCode(model)); if(!rec) return null;
