@@ -3019,10 +3019,13 @@ async function _evProcessFile(file){
         const model = String(r[cols.model]==null?'':r[cols.model]).trim();
         if(!model || norm(model)==='model') continue;
         if(model.startsWith('*')) continue;   // 섹션 헤더 행(*GAMING MNT, *PRO MNT 등) 제외
+        const get = k => cols[k]>=0 ? _evNum(r[cols[k]]) : 0;
         const orig = cols.orig>=0 ? _evNum(r[cols.orig]) : 0;
         const disp = cols.disp>=0 ? _evNum(r[cols.disp]) : 0;
-        if(!orig && !disp) continue;   // 합계/빈 행 제외
-        const get = k => cols[k]>=0 ? _evNum(r[cols[k]]) : 0;
+        // 기존/행사 SRP 가 둘 다 비어도 등재가·최종혜택가·정산·최종구매가·체감가 중 하나라도 있으면 가져온다.
+        //   (SRP 칸만 빈 모델이 통째로 누락되던 문제 방지 — 예: MP273L E14-700)
+        const _anyVal = orig || disp || get('listing') || get('benefit') || get('settle') || get('finalBuy') || get('feel');
+        if(!_anyVal){ console.log('[행사 업로드] 값 없어 건너뜀:', model); continue; }   // 진짜 빈/합계 행만 제외
         out.push({ id:_evUid(), model,
           channel: cols.channel>=0 ? String(r[cols.channel]||'').trim() : '',
           orig, disp, promo: get('mkt'),
