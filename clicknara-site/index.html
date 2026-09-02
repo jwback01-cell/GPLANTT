@@ -2164,7 +2164,7 @@ async function logout() {
 
 // ════════════════ 행사 정산 계산기 ════════════════
 const EV_KEY = 'cn_events_v1';
-function _evDefaultRates() { return { md: 3, sel: 14, card: 5, cat: 7, cpnFee: 20, seller: 50, capCoupon: 1000000, capCard: 100000 }; }
+function _evDefaultRates() { return { md: 3, sel: 14, card: 5, cat: 7, cpnFee: 20, seller: 50, capCoupon: 1000000, capCard: 100000, membership: 0 }; }
 function _evUid() { return 'ev_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 const EV_SITES = ['11번가', '이베이', '롯데온', '쿠팡', '스마트스토어', '알리익스프레스', '에스에스지', '오늘의집', '전체'];
 // 행사 양식 — 사이트별 '기본이미지' 가져올 기존세팅값 시트의 열(컬럼 문자). 미설정 사이트는 일반 이미지 열로 폴백.
@@ -2287,14 +2287,18 @@ function _evCalcRow(row, r) {
   const first = listing - selCpn;                                      // 1차할인액
   // 카드할인액 = IF(1차할인액>=50000, MIN(ROUNDDOWN(카드%*1차할인액,-1), 한도), 0)
   const cardDc = first >= 50000 ? Math.min(Math.floor(first * card / 10) * 10, cardCap) : 0;
-  const benefit = first - cardDc;                                      // 최종혜택가
+  const benefitBase = first - cardDc;                                  // 카드까지 반영한 혜택가(멤버십 전)
+  // 멤버십할인액 = ROUNDDOWN(최종혜택가 × 멤버십%, -1). 이베이만 rates.membership>0. 정산·셀러부담엔 영향 없음(사용자 지정).
+  const member = (r.membership || 0) / 100;
+  const memberDc = member > 0 ? Math.floor(benefitBase * member / 10) * 10 : 0;
+  const benefit = benefitBase - memberDc;                              // 최종혜택가(멤버십 반영)
   const catFee = Math.round(listing * cat);                            // Cat수수료
   const cpnFee = Math.round(catFee * cpnFeeP);                         // 쿠폰수수료(Cat의 %)
   const selSeller = Math.round(selCpn * sellerP);                      // 선택쿠폰 셀러부담
   const cardSeller = Math.round(cardDc * sellerP);                     // 카드할인 셀러부담
-  const settle = listing - catFee - cpnFee - selSeller - cardSeller;   // ESM+ 정산예상
+  const settle = listing - catFee - cpnFee - selSeller - cardSeller;   // ESM+ 정산예상 (멤버십 영향 없음)
   const feel = benefit - promo;                                        // 최종체감가
-  return { orig, disp, promo, listing, selCpn, first, cardDc, benefit, catFee, cpnFee, selSeller, cardSeller, settle, feel };
+  return { orig, disp, promo, listing, selCpn, first, cardDc, memberDc, benefit, catFee, cpnFee, selSeller, cardSeller, settle, feel };
 }
 // ── 기존세팅값: 구글 시트 임베드 ──
 const EV_SHEET_ID = '12ixpjr9CxQX6aKHGLFfQzB9siGWcBYtt0FXzXP67HgI';
@@ -2710,8 +2714,8 @@ function _evCalcHtml() {
         <input id="ev-period" oninput="evSetField('period',this.value)" placeholder="기간 (예: 7/01~7/05)" class="px-3 py-2 rounded-xl border border-brand-border text-sm w-[180px]">
       </div>
       <div id="ev-rate-bar" class="flex flex-wrap gap-3 text-sm bg-brand-bg rounded-2xl p-3">
-        ${[['md','MD쿠폰%'],['sel','선택쿠폰%(행사)'],['card','카드%'],['cat','Cat수수료%'],['cpnFee','쿠폰수수료(Cat의%)'],['seller','셀러부담%'],['capCoupon','쿠폰한도'],['capCard','카드한도']].map(([k,label])=>`
-          <label class="flex items-center gap-1.5"><span class="text-brand-gray font-semibold whitespace-nowrap">${label}</span>
+        ${[['md','MD쿠폰%'],['sel','선택쿠폰%(행사)'],['card','카드%'],['membership','멤버십%'],['cat','Cat수수료%'],['cpnFee','쿠폰수수료(Cat의%)'],['seller','셀러부담%'],['capCoupon','쿠폰한도'],['capCard','카드한도']].map(([k,label])=>`
+          <label id="ev-rate-lbl-${k}" class="flex items-center gap-1.5"><span class="text-brand-gray font-semibold whitespace-nowrap">${label}</span>
             <input type="number" step="0.1" id="ev-rate-${k}" oninput="evSetRate('${k}',this.value)" class="w-20 px-2 py-1.5 rounded-lg border border-brand-border text-right"></label>
         `).join('')}
       </div>
@@ -2812,6 +2816,8 @@ function renderEventCalc() {
   const perEl = document.getElementById('ev-period'); if (perEl && document.activeElement!==perEl) perEl.value = ev.period || '';
   const titEl = document.getElementById('ev-title'); if (titEl && document.activeElement!==titEl) titEl.value = ev.title || '';
   Object.keys(_evDefaultRates()).forEach(k => { const el = document.getElementById('ev-rate-'+k); if (el && document.activeElement!==el) el.value = ev.rates[k]; });
+  // 멤버십% 입력은 이베이일 때만 표시 (그 외 사이트는 숨김)
+  { const _mlbl = document.getElementById('ev-rate-lbl-membership'); if (_mlbl) _mlbl.style.display = (ev.name === '이베이') ? '' : 'none'; }
   const isImport = ev.viewMode === 'import';
   const rateBar = document.getElementById('ev-rate-bar'); if (rateBar) rateBar.classList.toggle('hidden', isImport);
   const modeBtn = document.getElementById('ev-mode-btn'); if (modeBtn) modeBtn.textContent = isImport ? '계산기 모드로' : '엑셀값 모드로';
@@ -2850,7 +2856,8 @@ function renderEventCalc() {
     if (!_evSheetFetched && !_evSheetLoading) _evLoadSheetData();   // 프로모션(K열) 매칭용 시트 로드
     // 11번가만 '기존가' 왼쪽에 AQ열(기존세팅값 시트) 참조 컬럼 추가
     const is11st = ev.name === '11번가';
-    const heads = ['모델명', ...(is11st?['상품번호']:[]), '기존가','노출가','등재가','선택쿠폰할인액','1차할인액','카드할인액','최종혜택가','Cat수수료','쿠폰수수료','선택쿠폰셀러부담','카드셀러부담','ESM+정산예상','프로모션','최종체감가','비고',''];
+    const isEbay = ev.name === '이베이';   // 이베이만 '멤버십할인액' 열 추가
+    const heads = ['모델명', ...(is11st?['상품번호']:[]), '기존가','노출가','등재가','선택쿠폰할인액','1차할인액','카드할인액', ...(isEbay?['멤버십할인액']:[]), '최종혜택가','Cat수수료','쿠폰수수료','선택쿠폰셀러부담','카드셀러부담','ESM+정산예상','프로모션','최종체감가','비고',''];
     if (thRow) thRow.innerHTML = checkTh + heads.map((h,i)=>`<th class="px-2 py-2.5 font-bold border border-brand-border ${i===0?'text-left':'text-right'} ${i===heads.length-1?'text-center':''} ${h==='등재가'?'bg-yellow-200 text-brand-black':''}">${h}</th>`).join('');
     const cell = v => `<td class="px-2 py-1 text-right tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(v)}</td>`;
     const cellHi = v => `<td class="px-2 py-1 text-right font-extrabold tabular-nums border border-brand-border bg-yellow-100 text-brand-black">${_evFmt(v)}</td>`;
@@ -2874,6 +2881,7 @@ function renderEventCalc() {
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${c.selCpn?_evFmt(c.selCpn):''}" onchange="evEditRow(${i},'selCap',this.value)" class="${inp} text-right w-full" title="선택쿠폰 최대 할인 한도 — 값을 입력하면 그 이하로 제한됩니다(미입력 시 100만)"></td>
         ${cell(c.first)}
         <td class="px-1 py-0.5 border border-brand-border"><input type="text" inputmode="numeric" value="${c.cardDc?_evFmt(c.cardDc):''}" onchange="evEditRow(${i},'cardCap',this.value)" class="${inp} text-right w-full" title="카드 최대 할인 한도 — 값을 입력하면 그 이하로 제한됩니다(미입력 시 10만)"></td>
+        ${isEbay ? `<td class="px-2 py-1 text-right tabular-nums border border-brand-border bg-brand-bg/30" title="멤버십할인액 = 최종혜택가 × 멤버십%">${_evFmt(c.memberDc)}</td>` : ''}
         <td class="px-1 py-0.5 border border-brand-border bg-brand-blue-light/20"><input type="text" inputmode="numeric" value="${c.benefit?_evFmt(c.benefit):''}" onchange="evEditRow(${i},'benefit',this.value)" class="${inp} text-right w-full font-bold text-brand-blue" title="여기에 최종혜택가를 입력하면 노출가가 역산됩니다"></td>
         ${cell(c.catFee)}${cell(c.cpnFee)}${cell(c.selSeller)}${cell(c.cardSeller)}
         <td class="px-2 py-1 text-right font-bold tabular-nums border border-brand-border bg-brand-bg/30">${_evFmt(c.settle)}</td>
@@ -3470,8 +3478,9 @@ async function evDownloadForm(){
 function evDownloadExcel(){
   if(typeof XLSX==='undefined'){ alert('엑셀 라이브러리 로드 실패'); return; }
   const o=_evLoad(); const ev=_evActive(o);
-  const head=['모델명','기존가','노출가','등재가','선택쿠폰할인액','1차할인액','카드할인액','최종혜택가','Cat수수료','쿠폰수수료','선택쿠폰셀러부담','카드셀러부담','ESM+정산예상','프로모션','최종체감가'];
-  const aoa=[head, ...ev.rows.map(row=>{ const c=_evCalcRow(row,ev.rates); return [row.model||'',c.orig,c.disp,c.listing,c.selCpn,c.first,c.cardDc,c.benefit,c.catFee,c.cpnFee,c.selSeller,c.cardSeller,c.settle,c.promo,c.feel]; })];
+  const isEbay = ev.name === '이베이';   // 이베이만 멤버십할인액 열
+  const head=['모델명','기존가','노출가','등재가','선택쿠폰할인액','1차할인액','카드할인액', ...(isEbay?['멤버십할인액']:[]), '최종혜택가','Cat수수료','쿠폰수수료','선택쿠폰셀러부담','카드셀러부담','ESM+정산예상','프로모션','최종체감가'];
+  const aoa=[head, ...ev.rows.map(row=>{ const c=_evCalcRow(row,ev.rates); return [row.model||'',c.orig,c.disp,c.listing,c.selCpn,c.first,c.cardDc, ...(isEbay?[c.memberDc]:[]), c.benefit,c.catFee,c.cpnFee,c.selSeller,c.cardSeller,c.settle,c.promo,c.feel]; })];
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), (ev.name||'행사').slice(0,28));
   XLSX.writeFile(wb, `행사정산_${(ev.name||'행사')}.xlsx`);
 }
