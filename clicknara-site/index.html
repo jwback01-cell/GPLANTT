@@ -2914,10 +2914,11 @@ function evEditRow(i,field,val){
     // 최종혜택가 입력 → 노출가 역산 (최종혜택가 = 등재가×(1-선택)×(1-카드), 노출가 = 등재가×(1-MD))
     const target=_evNum(val);
     if(target>0){
-      const r=e.rates, md=(r.md||0)/100, sel=(r.sel||0)/100, card=(r.card||0)/100;
-      let disp=Math.round(target*(1-md)/(((1-sel)||1)*((1-card)||1)));
+      const r=e.rates, md=(r.md||0)/100, sel=(r.sel||0)/100, card=(r.card||0)/100, member=(r.membership||0)/100;
+      // 초기 추정에 멤버십까지 반영(이베이): 최종혜택가 ≈ 등재가×(1-선택)×(1-카드)×(1-멤버십), 노출가 = 등재가×(1-MD)
+      let disp=Math.round(target*(1-md)/(((1-sel)||1)*((1-card)||1)*((1-member)||1)));
       let best=disp, bd=Infinity;
-      for(let d=Math.max(0,disp-100); d<=disp+100; d++){ const c=_evCalcRow({...row,disp:d}, r); const diff=Math.abs(c.benefit-target); if(diff<bd){ bd=diff; best=d; } if(diff===0) break; }
+      for(let d=Math.max(0,disp-150); d<=disp+150; d++){ const c=_evCalcRow({...row,disp:d}, r); const diff=Math.abs(c.benefit-target); if(diff<bd){ bd=diff; best=d; } if(diff===0) break; }
       row.disp=best;
     }
   } else if(field==='selCap' || field==='cardCap'){
