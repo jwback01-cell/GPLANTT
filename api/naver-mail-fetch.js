@@ -67,6 +67,9 @@ export default async function handler(req, res) {
 
   const results = [];
   let connected = false;
+  let hasMore = false;
+  let totalMatched = 0;
+  let pageSizeUsed = 0;
   try {
     await client.connect();
     connected = true;
@@ -83,12 +86,14 @@ export default async function handler(req, res) {
       }
       // 최신순(큰 UID 부터) 정렬 후 offset~offset+limit 구간만 처리 (페이지네이션)
       const allSorted = uids.slice().sort((a, b) => b - a);
+      totalMatched = allSorted.length;
       const pageSize = Math.max(1, Math.min(50, limit));
       const sortedUids = allSorted.slice(offset, offset + pageSize);
-      const hasMore = offset + sortedUids.length < allSorted.length;
+      pageSizeUsed = sortedUids.length;
+      hasMore = offset + sortedUids.length < allSorted.length;
       if (!sortedUids.length) {
         await safeLogout(client);
-        res.status(200).json({ ok: true, sender, sinceDays: days, count: 0, items: [], hasMore: false, totalMatched: allSorted.length, note: '더 이상 조회할 메일이 없습니다.' });
+        res.status(200).json({ ok: true, sender, sinceDays: days, count: 0, items: [], hasMore: false, totalMatched, note: '더 이상 조회할 메일이 없습니다.' });
         return;
       }
 
@@ -159,7 +164,7 @@ export default async function handler(req, res) {
       lock.release();
     }
     await safeLogout(client);
-    res.status(200).json({ ok: true, sender, sinceDays: days, count: results.length, items: results, hasMore, totalMatched: allSorted.length, offset, pageSize: sortedUids.length });
+    res.status(200).json({ ok: true, sender, sinceDays: days, count: results.length, items: results, hasMore, totalMatched, offset, pageSize: pageSizeUsed });
   } catch (err) {
     console.error('[naver-mail-fetch] 실패:', err);
     if (connected) await safeLogout(client);
