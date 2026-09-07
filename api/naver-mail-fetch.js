@@ -49,6 +49,10 @@ export default async function handler(req, res) {
   const filenamePattern = String(q.filenamePattern || body.filenamePattern || '').trim().toLowerCase();
   const days   = parseInt(q.days || body.days || 7, 10);
   const limit  = parseInt(q.limit || body.limit || 10, 10); // 최대 처리 건수 (응답 크기 보호)
+  // offset: 페이지네이션용 — IMAP 연결(로그인 등) 자체가 수 초 걸려 Vercel 함수 제한시간(10초) 안에
+  //   전체 기간을 한 번에 처리 못 할 수 있음(발신자 필터 없는 조회 등). 프론트가 offset 을 늘려가며
+  //   여러 번 호출해 나눠 처리할 수 있도록 지원. hasMore=true 면 offset+limit 로 다음 페이지 요청.
+  const offset = Math.max(0, parseInt(q.offset || body.offset || 0, 10) || 0);
   const since  = new Date(Date.now() - Math.max(1, Math.min(30, days)) * 24 * 60 * 60 * 1000);
 
   const client = new ImapFlow({
@@ -74,11 +78,19 @@ export default async function handler(req, res) {
       const uids = await client.search(criteria, { uid: true });
       if (!Array.isArray(uids) || uids.length === 0) {
         await safeLogout(client);
-        res.status(200).json({ ok: true, sender, sinceDays: days, count: 0, items: [], note: '조건에 맞는 메일이 없습니다.' });
+        res.status(200).json({ ok: true, sender, sinceDays: days, count: 0, items: [], hasMore: false, totalMatched: 0, note: '조건에 맞는 메일이 없습니다.' });
         return;
       }
-      // 최신순(큰 UID 부터)으로 limit 만큼만 처리
-      const sortedUids = uids.slice().sort((a, b) => b - a).slice(0, Math.max(1, Math.min(50, limit)));
+      // 최신순(큰 UID 부터) 정렬 후 offset~offset+limit 구간만 처리 (페이지네이션)
+      const allSorted = uids.slice().sort((a, b) => b - a);
+      const pageSize = Math.max(1, Math.min(50, limit));
+      const sortedUids = allSorted.slice(offset, offset + pageSize);
+      const hasMore = offset + sortedUids.length < allSorted.length;
+      if (!sortedUids.length) {
+        await safeLogout(client);
+        res.status(200).json({ ok: true, sender, sinceDays: days, count: 0, items: [], hasMore: false, totalMatched: allSorted.length, note: '더 이상 조회할 메일이 없습니다.' });
+        return;
+      }
 
       // 1단계: 가벼운 구조 메타(bodyStructure)만 벌크로 조회 — 첨부 실제 내용은 아직 안 받음.
       //   기존엔 메시지마다 전체 원문(source, 첨부 바이너리 포함)을 개별로 내려받아 파싱했는데,
@@ -147,7 +159,7 @@ export default async function handler(req, res) {
       lock.release();
     }
     await safeLogout(client);
-    res.status(200).json({ ok: true, sender, sinceDays: days, count: results.length, items: results });
+    res.status(200).json({ ok: true, sender, sinceDays: days, count: results.length, items: results, hasMore, totalMatched: allSorted.length, offset, pageSize: sortedUids.length });
   } catch (err) {
     console.error('[naver-mail-fetch] 실패:', err);
     if (connected) await safeLogout(client);
