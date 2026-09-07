@@ -26857,8 +26857,10 @@ function _reconcileCompare(ledgerRows, mode = 'sale') {
   const maxDate = ledgerDates[ledgerDates.length - 1] || '';
   // 모드별 GPLAN 행 필터: 매출 모드 = 거래처 매칭, 매입 모드 = 사이트 매칭
   const targets = data.filter(r => {
+    // 교환은 값이 0원 처리되는 재무 영향 없는 행 — 거래원장 대조에서 완전히 제외(차이/추가로 노출되지 않도록)
+    if (r._claimKind === 'exchange' || r.template === 'manual-exchange' || /교환/.test(String(r.site || ''))) return false;
     if (mode === 'purchase') {
-      if (!_isPurchaseSite(r.site)) return false;   // 반품/교환 변형 사이트도 포함(prefix)
+      if (!_isPurchaseSite(r.site)) return false;   // 반품 변형 사이트도 포함(prefix)
     } else {
       if (!_RECONCILE_VENDORS.some(v => _normVendor(v) === _normVendor(r.vendor))) return false;
     }
@@ -28029,6 +28031,29 @@ try {
     if (_fixed > 0) _saveUploadData(_data);
     localStorage.setItem(_RET_SHIP_FIX_KEY, '1');
     console.log(`[일회성 소급수정] 지플랜+구매자귀책 반품 택배비 부호 보정: ${_fixed}건`);
+  }
+} catch (_) {}
+// 일회성 소급수정: 기존 교환 행(값이 음수/양수로 남아있는 것)을 0원 처리 (사용자 요청 2026-09-08)
+//   교환 처리 로직 자체는 이미 0원 생성으로 바뀌었지만, 그 전에 만들어진 교환 행은 그대로 남아
+//   음수(또는 양수) 값을 갖고 있어 거래원장 대조 등에서 잘못된 차이로 노출됐음.
+try {
+  const _EXCH_ZERO_FIX_KEY = 'gplan_exchange_zero_fix_2026_09_08';
+  if (!localStorage.getItem(_EXCH_ZERO_FIX_KEY) && typeof _loadUploadData === 'function' && typeof _saveUploadData === 'function') {
+    const _data2 = _loadUploadData();
+    let _fixed2 = 0;
+    _data2.forEach(r => {
+      if (!r) return;
+      const isExchangeRow = r._claimKind === 'exchange' || r.template === 'manual-exchange' || /교환/.test(String(r.site || ''));
+      if (!isExchangeRow) return;
+      const already = (Number(r.qty) || 0) === 0 && (Number(r.price) || 0) === 0 && (Number(r.supply) || 0) === 0
+        && (Number(r.ship) || 0) === 0 && (Number(r.shipCost) || 0) === 0 && (Number(r.cost) || 0) === 0 && (Number(r.profit) || 0) === 0;
+      if (already) return;
+      r.qty = 0; r.price = 0; r.supply = 0; r.ship = 0; r.shipCost = 0; r.cost = 0; r.profit = 0;
+      _fixed2++;
+    });
+    if (_fixed2 > 0) _saveUploadData(_data2);
+    localStorage.setItem(_EXCH_ZERO_FIX_KEY, '1');
+    console.log(`[일회성 소급수정] 기존 교환 행 0원 처리: ${_fixed2}건`);
   }
 } catch (_) {}
 try {
