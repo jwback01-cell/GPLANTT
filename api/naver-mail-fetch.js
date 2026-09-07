@@ -80,7 +80,36 @@ export default async function handler(req, res) {
       // 최신순(큰 UID 부터)으로 limit 만큼만 처리
       const sortedUids = uids.slice().sort((a, b) => b - a).slice(0, Math.max(1, Math.min(50, limit)));
 
-      for (const uid of sortedUids) {
+      // 1단계: 가벼운 구조 메타(bodyStructure)만 벌크로 조회 — 첨부 실제 내용은 아직 안 받음.
+      //   기존엔 메시지마다 전체 원문(source, 첨부 바이너리 포함)을 개별로 내려받아 파싱했는데,
+      //   발신자 필터가 없는 호출(외부업체 발주 메일 등)은 최근 N일의 모든 메일을 전부 다운로드하게 돼
+      //   Vercel 함수 제한시간(10초) 안에 못 끝나 504가 발생했다. 구조 조회로 후보만 먼저 좁힌다.
+      const _attNamesOf = (bs, out) => {
+        if (!bs) return out;
+        const fn = (bs.dispositionParameters && bs.dispositionParameters.filename)
+          || (bs.parameters && bs.parameters.name) || '';
+        if (fn) out.push(String(fn));
+        if (Array.isArray(bs.childNodes)) bs.childNodes.forEach(c => _attNamesOf(c, out));
+        return out;
+      };
+      let candidateUids = [];
+      try {
+        for await (const msg of client.fetch(sortedUids, { envelope: true, bodyStructure: true }, { uid: true })) {
+          const names = _attNamesOf(msg.bodyStructure, []);
+          if (!names.some(n => /\.(xlsx|xls|csv)$/i.test(n))) continue;
+          if (filenamePattern) {
+            const pat = filenamePattern.replace(/\s+/g, '');
+            if (!names.some(n => n.toLowerCase().replace(/\s+/g, '').indexOf(pat) !== -1)) continue;
+          }
+          candidateUids.push(msg.uid);
+        }
+      } catch (structErr) {
+        console.warn('[naver-mail-fetch] bodyStructure 조회 실패, 전체 조회로 폴백:', structErr && structErr.message);
+        candidateUids = sortedUids.slice(); // 폴백: 구조 조회가 안 되면 기존 방식대로 전부 시도
+      }
+
+      // 2단계: 조건에 맞는 후보 메일만 실제 원문(+첨부)을 내려받는다.
+      for (const uid of candidateUids) {
         try {
           const msg = await client.fetchOne(uid, { source: true, envelope: true }, { uid: true });
           if (!msg || !msg.source) continue;
