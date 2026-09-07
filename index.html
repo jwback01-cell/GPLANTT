@@ -31750,6 +31750,16 @@ function _groupKeyOfPurchase(r) {
 }
 
 function _buildSalePayload(rows) {
+  // 사용자 요청(2026-09-08): 거래처='올바른' + 사이트='서울리빙(수동)' 인 판매입력 건은
+  //   이카운트 CUST 를 447-64-00180(서울리빙(수동))으로 전송 — 기존 '올바른' 일괄 코드(154-81-01663)의
+  //   예외로 이 조합만 다르게 보냄. 로컬 매출장부 표시(거래처명 '올바른')는 그대로 유지되고
+  //   전송용으로만 여기서 siteCode/vendorCode 를 바꿔치기한다(그룹핑/전표 묶음에도 일관 반영).
+  rows = rows.map(r => {
+    if (String(r.vendor || '').trim() === '올바른' && String(r.site || '').trim() === '서울리빙(수동)') {
+      return { ...r, siteCode: '447-64-00180', vendorCode: '447-64-00180' };
+    }
+    return r;
+  });
   const serOf = _assignSerialsByGroup(rows, _groupKeyOfSale);
   // 진단: 묶음(전표) 개수 vs 행 수
   const groupCount = new Set(rows.map(r => _groupKeyOfSale(r))).size;
