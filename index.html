@@ -31187,8 +31187,14 @@ function _setEcountStatusBar(msg, show) {
   const bar = document.getElementById('ecount-status-bar');
   if (!bar) return;
   if (!show) { bar.classList.add('hidden'); return; }
+  const wasHidden = bar.classList.contains('hidden');
   document.getElementById('ecount-status-msg').textContent = msg;
   bar.classList.remove('hidden');
+  // 미리보기 목록이 길면 상태바가 화면 밖으로 밀려나 "진행 상황이 안 보인다"는 문제 방지 —
+  //   숨김→표시로 처음 전환될 때 한 번 스크롤해 보이게 한다(반복 갱신 시엔 스크롤 안 함).
+  if (wasHidden) {
+    try { bar.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {}
+  }
 }
 const ECOUNT_SESSION_KEY = 'gplan_ecount_session_v1';
 const ECOUNT_SESSION_TTL_MS = 30 * 60 * 1000; // 30분
@@ -32136,7 +32142,20 @@ function closeAppAlert() {
   const modal = document.getElementById('app-alert-modal');
   if (modal) modal.classList.add('hidden');
 }
+// 클릭 즉시 눈에 보이는 피드백 — 미리보기 목록이 길면 아래쪽 상태바가 화면 밖에 있어
+//   "작업이 시작됐는지 안 보인다"는 문제가 있었음(사용자 요청 2026-09-08).
+//   버튼 자체를 바로 비활성화+스피너 표시로 바꿔, 스크롤 위치와 무관하게 클릭한 자리에서 바로 보이게 함.
 async function sendToEcount() {
+  const btn = document.querySelector('button[onclick="sendToEcount()"]');
+  const origHtml = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="animate-pulse">⏳ 전송 중...</span>'; }
+  try {
+    await _sendToEcountImpl();
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+  }
+}
+async function _sendToEcountImpl() {
   // 호출자(원클릭 등)가 결과를 알 수 있도록 window 에 노출 — 매번 초기화
   window._lastEcountSendResult = { aborted: false, prevalidationFailed: false, ok: 0, fail: 0, attempted: false };
   const _markAbort = (reason) => { window._lastEcountSendResult = { ...(window._lastEcountSendResult||{}), aborted: true, abortReason: reason || '' }; };
