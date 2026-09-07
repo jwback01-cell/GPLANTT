@@ -4839,6 +4839,7 @@ tailwind.config = {
                 <button type="button" onclick="setUploadDataDate('yesterday')" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">어제</button>
                 <button type="button" onclick="setUploadDataDate('7days')" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">7일</button>
                 <button type="button" onclick="setUploadDataDate('month')" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">이번 달</button>
+                <button type="button" onclick="setUploadDataDate('lastmonth')" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">지난달</button>
                 <button type="button" onclick="setUploadDataDate('all')" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">전체</button>
               </div>
               <div class="relative">
@@ -25679,6 +25680,10 @@ function setUploadDataDate(mode) {
   else if (mode === 'yesterday') { const v = fmt(new Date(today.getTime() - 86400000)); startEl.value = v; endEl.value = v; }
   else if (mode === '7days') { startEl.value = fmt(new Date(today.getTime() - 6 * 86400000)); endEl.value = fmt(today); }
   else if (mode === 'month') { startEl.value = fmt(new Date(today.getFullYear(), today.getMonth(), 1)); endEl.value = fmt(today); }
+  else if (mode === 'lastmonth') {
+    startEl.value = fmt(new Date(today.getFullYear(), today.getMonth() - 1, 1));
+    endEl.value = fmt(new Date(today.getFullYear(), today.getMonth(), 0));   // 지난달 마지막날(이번달 0일)
+  }
   _uploadDataPage = 1;
   renderUploadData();
 }
