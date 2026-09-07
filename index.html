@@ -26404,10 +26404,15 @@ function _doConvertSelectedToReturn(targetRows, reason, kind) {
 
   const newRows = targetRows.map(orig => {
     const clone = { ...orig };
+    // 지플랜(당사 직접배송) + 구매자귀책 반품: 배송 1회(판매) + 수거 1회(반품) = 실제 배송이 2번 발생하므로
+    //   택배비(ship)는 상쇄시키지 않고 원래 부호(양수) 그대로 유지해 판매+반품 합계가 2배로 합산되게 한다.
+    //   (사용자 요청 2026-09-08. 공급가/원가는 그대로 상쇄, 택배비용은 기존처럼 양수 유지라 영향 없음)
+    const keepShipPositive = !isExchange && !isSeller && String(orig.vendor || '').trim() === '지플랜';
     // 반품만 값을 음수화. 교환은 수량/단가/매출/공급가/원가/택배비용 등을 양수로 유지(사용자 요청 2026-08-10).
     //   (교환 = 판매 차감이 아니므로 값은 그대로, 마진만 0 처리 — 아래 clone.profit)
     if (!isExchange) {
       NEG_FIELDS.forEach(k => {
+        if (k === 'ship' && keepShipPositive) return;   // 지플랜+구매자귀책: 택배비는 음수화하지 않음
         if (clone[k] != null && clone[k] !== '') {
           const n = Number(clone[k]) || 0;
           clone[k] = -Math.abs(n); // 항상 음수
@@ -26422,14 +26427,21 @@ function _doConvertSelectedToReturn(targetRows, reason, kind) {
     // 구매자 귀책일 때 — shipCost 는 그대로(양수) 유지 (우리가 부담)
     // (clone.shipCost 는 ...orig 로 복사된 양수값 그대로)
 
-    // 반품 마진 = 원래 행 마진의 반대부호 (이익금만큼만 차감 → 원본 + 반품 = 0)
-    //   예) 원래 마진 4,720 → 반품 마진 -4,720
-    //   (택배비용 컬럼 부호는 귀책별로 유지되지만, 마진은 항상 이익금만 상쇄)
-    const _origMargin = (orig.profit != null && orig.profit !== '')
-      ? Number(orig.profit)
-      : ((Number(orig.supply) || 0) + (Number(orig.ship) || 0) - (Number(orig.cost) || 0) - (Number(orig.shipCost) || 0));
-    // 반품: 마진 반대부호(원본+반품=0) / 교환: 마진 0
-    clone.profit = isExchange ? 0 : -_origMargin;
+    if (isExchange) {
+      clone.profit = 0;
+    } else if (keepShipPositive) {
+      // 지플랜+구매자귀책: 택배비가 상쇄되지 않으므로 "원본 마진의 반대부호" 대신
+      //   반품행 자체의 실제 필드값으로 마진을 계산한다 (공급가+택배비-원가-택배비용).
+      clone.profit = (clone.cost == null || clone.cost === '') ? null
+        : (Number(clone.supply) || 0) + (Number(clone.ship) || 0) - Number(clone.cost) - (Number(clone.shipCost) || 0);
+    } else {
+      // 반품 마진 = 원래 행 마진의 반대부호 (이익금만큼만 차감 → 원본 + 반품 = 0)
+      //   예) 원래 마진 4,720 → 반품 마진 -4,720
+      const _origMargin = (orig.profit != null && orig.profit !== '')
+        ? Number(orig.profit)
+        : ((Number(orig.supply) || 0) + (Number(orig.ship) || 0) - (Number(orig.cost) || 0) - (Number(orig.shipCost) || 0));
+      clone.profit = -_origMargin;
+    }
 
     // 사이트에 '반품-귀책' / '교환-귀책' 표시
     const origSite = String(orig.site || '').trim();
@@ -27971,6 +27983,33 @@ try {
     localStorage.removeItem('gplan_upload_data_v1');
     localStorage.setItem(_LEDGER_ONESHOT_KEY, '1');
     console.log('[일회성 초기화] 매출 장부 데이터를 모두 삭제했습니다.');
+  }
+} catch (_) {}
+// 일회성 소급수정: 지플랜 + 반품(구매자귀책) 기존 행의 택배비 부호 보정 (사용자 요청 2026-09-08)
+//   지금까지는 반품 처리 시 택배비(ship)도 음수화되어 판매+반품 합계가 0으로 상쇄됐음.
+//   실제로는 배송 1회(판매)+수거 1회(반품), 총 2회 배송이 발생하므로 택배비는 양수로 유지해 합산돼야 함.
+//   (공급가/원가는 그대로 상쇄 유지, 택배비용은 이미 양수 유지 중이라 변경 없음)
+try {
+  const _RET_SHIP_FIX_KEY = 'gplan_ret_ship_fix_gplan_buyer_2026_09_08';
+  if (!localStorage.getItem(_RET_SHIP_FIX_KEY) && typeof _loadUploadData === 'function' && typeof _saveUploadData === 'function') {
+    const _data = _loadUploadData();
+    let _fixed = 0;
+    _data.forEach(r => {
+      if (!r) return;
+      const isGplanVendor = String(r.vendor || '').trim() === '지플랜';
+      const isBuyerReturn = r._claimKind === 'return' && r._returnReason === 'buyer';
+      if (!isGplanVendor || !isBuyerReturn) return;
+      const shipNum = Number(r.ship) || 0;
+      if (shipNum >= 0) return;   // 이미 양수(해당없음/처리됨)면 건드리지 않음
+      r.ship = Math.abs(shipNum);
+      if (r.cost != null && r.cost !== '') {
+        r.profit = (Number(r.supply) || 0) + (Number(r.ship) || 0) - Number(r.cost) - (Number(r.shipCost) || 0);
+      }
+      _fixed++;
+    });
+    if (_fixed > 0) _saveUploadData(_data);
+    localStorage.setItem(_RET_SHIP_FIX_KEY, '1');
+    console.log(`[일회성 소급수정] 지플랜+구매자귀책 반품 택배비 부호 보정: ${_fixed}건`);
   }
 } catch (_) {}
 try {
