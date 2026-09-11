@@ -19297,16 +19297,15 @@ async function fetchReturnFromMail() {
   const origHtml = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="animate-pulse">메일 조회 중...</span>'; }
   try {
-    // 발신자 필터 없이 조회 — 작은 배치(페이지)로 여러 번 나눠 호출한다.
+    // 발신자 필터 없이 조회 — 최신 8건(1페이지)만 확인한다.
     //   한 번에 limit=50 을 요청하면 IMAP 연결 지연 + 구조 조회가 겹쳐 Vercel 함수 제한시간(10초)을
-    //   넘겨 504가 나던 문제 발견 → 배치를 작게 쪼개 우회.
+    //   넘겨 504가 나던 문제가 있었음. 여러 페이지를 순회할 필요 없이(원하는 메일은 항상 최신 것들
+    //   사이에 있음) 1페이지만 빠르게 확인(사용자 요청 2026-09-11) — bodyStructure 정렬 버그도 수정됨.
     const BATCH = 8;
-    const MAX_SCAN = 50; // 기존과 동일한 총 스캔 범위(최근 30일 내 최신 50건)
     let items = [];
     let allItemsSeen = [];
-    let offset = 0;
-    while (offset < MAX_SCAN) {
-      const apiUrl = '/api/naver-mail-fetch?days=30&limit=' + BATCH + '&offset=' + offset + '&sender=&filenamePattern=' + encodeURIComponent('CS');
+    {
+      const apiUrl = '/api/naver-mail-fetch?days=30&limit=' + BATCH + '&offset=0&sender=&filenamePattern=' + encodeURIComponent('CS');
       console.log('[반품 메일 가져오기] 요청 URL:', apiUrl);
       const res = await fetch(apiUrl);
       const data = await res.json().catch(() => ({}));
@@ -19315,13 +19314,9 @@ async function fetchReturnFromMail() {
         const err = data.error || ('HTTP ' + res.status);
         throw new Error(err + (data.hint ? '\n\n' + data.hint : ''));
       }
-      const pageItems = data.items || [];
-      allItemsSeen = allItemsSeen.concat(pageItems);
+      allItemsSeen = data.items || [];
       // 클라이언트 안전망 — 파일명에 'CS' 포함, '발주' 단독은 제외 (CS만 매칭)
-      const matched = pageItems.filter(it => /CS/i.test(String(it.fileName || '')));
-      if (matched.length) { items = matched; break; }
-      if (!data.hasMore) break;
-      offset += (data.pageSize || BATCH);
+      items = allItemsSeen.filter(it => /CS/i.test(String(it.fileName || '')));
     }
     if (items.length === 0) {
       const sampleNames = allItemsSeen.slice(0, 5).map(it => '· ' + (it.fileName || '(이름없음)')).join('\n');
@@ -19420,19 +19415,18 @@ async function fetchExternalOrderFromMail() {
   } catch(_) {}
   _extUploadMsg('메일함에서 "다올 버즈에어팟류" 첨부파일을 조회하고 있습니다...', 'info');
   try {
-    // 발신자 필터 없이 조회 — 작은 배치(페이지)로 여러 번 나눠 호출한다.
+    // 발신자 필터 없이 조회 — 최신 8건(1페이지)만 확인한다.
     //   한 번에 limit=50 을 요청하면 IMAP 연결 자체의 지연(수 초)에 메시지 구조 조회까지 겹쳐
-    //   Vercel 함수 제한시간(10초)을 넘겨 504가 나던 문제 발견 → 배치를 작게 쪼개 우회.
+    //   Vercel 함수 제한시간(10초)을 넘겨 504가 나던 문제가 있었음. 여러 페이지를 순회할 필요 없이
+    //   (원하는 메일은 항상 최신 것들 사이에 있음) 1페이지만 빠르게 확인(사용자 요청 2026-09-11) —
+    //   bodyStructure 결과가 최신순이 아니게 반환되던 정렬 버그도 함께 수정됨.
     const BATCH = 8;
-    const MAX_SCAN = 50; // 기존과 동일한 총 스캔 범위(최근 14일 내 최신 50건)
     const PATTERN  = '다올버즈에어팟류';
     const EXCLUDE  = 'cs';
     let items = [];
     let allItemsSeen = [];
-    let offset = 0;
-    while (offset < MAX_SCAN) {
-      _extUploadMsg(`메일함에서 "다올 버즈에어팟류" 첨부파일을 조회하고 있습니다... (${offset + 1}~${offset + BATCH}번째 메일 확인 중)`, 'info');
-      const apiUrl = '/api/naver-mail-fetch?days=14&limit=' + BATCH + '&offset=' + offset + '&sender=&filenamePattern=' + encodeURIComponent('다올 버즈에어팟류');
+    {
+      const apiUrl = '/api/naver-mail-fetch?days=14&limit=' + BATCH + '&offset=0&sender=&filenamePattern=' + encodeURIComponent('다올 버즈에어팟류');
       console.log('[외부업체 발주 메일 가져오기] 요청 URL:', apiUrl);
       const res = await fetch(apiUrl);
       const data = await res.json().catch(() => ({}));
@@ -19442,19 +19436,15 @@ async function fetchExternalOrderFromMail() {
         const hint = data.hint ? '\n\n' + data.hint : '';
         throw new Error(err + hint);
       }
-      const pageItems = data.items || [];
-      allItemsSeen = allItemsSeen.concat(pageItems);
+      allItemsSeen = data.items || [];
       // 클라이언트 측 안전망 필터링 — API가 패턴 필터를 적용하지 않은 경우 대비
       // '다올 버즈에어팟류' 포함, 단 'CS' 가 포함된 파일은 제외
-      const matched = pageItems.filter(it => {
+      items = allItemsSeen.filter(it => {
         const fn = String(it.fileName || '').toLowerCase().replace(/\s+/g, '');
         if (fn.indexOf(PATTERN) === -1) return false;
         if (fn.indexOf(EXCLUDE) !== -1) return false;
         return true;
       });
-      if (matched.length) { items = matched; break; }
-      if (!data.hasMore) break;
-      offset += (data.pageSize || BATCH);
     }
     console.log('[외부업체 발주 메일 가져오기] 최종 매칭:', items.length + '건', items.map(it => it.fileName));
     if (items.length === 0) {
