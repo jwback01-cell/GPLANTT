@@ -124,6 +124,10 @@ export default async function handler(req, res) {
         console.warn('[naver-mail-fetch] bodyStructure 조회 실패, 전체 조회로 폴백:', structErr && structErr.message);
         candidateUids = sortedUids.slice(); // 폴백: 구조 조회가 안 되면 기존 방식대로 전부 시도
       }
+      // ⚠ IMAP 서버는 벌크 fetch 결과를 요청 순서(최신순)가 아니라 항상 UID 오름차순(오래된 순)으로 반환한다.
+      //   정렬을 안 하면 items[0](호출부가 "가장 최신"으로 취급)이 실제로는 가장 오래된 후보가 되어,
+      //   최신 메일(예: 오늘 도착한 첨부)을 두고 며칠 전 파일을 잘못 가져오는 문제가 있었다.
+      candidateUids.sort((a, b) => b - a);
 
       // 2단계: 조건에 맞는 후보 메일만 실제 원문(+첨부)을 내려받는다.
       for (const uid of candidateUids) {
