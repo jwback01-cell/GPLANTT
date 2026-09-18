@@ -54,6 +54,12 @@ export default async function handler(req, res) {
   //   여러 번 호출해 나눠 처리할 수 있도록 지원. hasMore=true 면 offset+limit 로 다음 페이지 요청.
   const offset = Math.max(0, parseInt(q.offset || body.offset || 0, 10) || 0);
   const since  = new Date(Date.now() - Math.max(1, Math.min(30, days)) * 24 * 60 * 60 * 1000);
+  // uid: 지정하면 검색을 건너뛰고 이 메일 1건만 원문(+첨부)을 내려받는다 — "찾기(가벼움)"와
+  //   "받기(그 1건만)"를 분리해 각 호출이 확실히 제한시간 안에 끝나게 하려는 용도.
+  const targetUid = parseInt(q.uid || body.uid || 0, 10) || 0;
+  // metaOnly: 실제 첨부 내용은 받지 않고 구조(제목/날짜/파일명/크기)만 가볍게 조회 — 빠름.
+  //   프론트는 이걸로 원하는 메일의 uid 를 먼저 찾은 뒤, uid 파라미터로 그 1건만 다시 요청한다.
+  const metaOnly = String(q.metaOnly || body.metaOnly || '') === '1';
 
   const client = new ImapFlow({
     host: 'imap.naver.com',
@@ -75,6 +81,44 @@ export default async function handler(req, res) {
     connected = true;
     const lock = await client.getMailboxLock('INBOX');
     try {
+      // uid 지정 시: 검색 생략하고 그 메일 1건만 원문(+첨부) 다운로드 — "찾기"와 분리된 "받기" 전용 경로.
+      if (targetUid > 0) {
+        let parsed = null;
+        try {
+          const msg = await client.fetchOne(targetUid, { source: true, envelope: true }, { uid: true });
+          if (msg && msg.source) parsed = await simpleParser(msg.source);
+        } catch (uidErr) {
+          console.warn('[naver-mail-fetch] uid 단건 조회 실패 uid=' + targetUid, uidErr && uidErr.message);
+        }
+        const uidResults = [];
+        if (parsed) {
+          const attachments = (parsed.attachments || []).filter(a => {
+            if (!a || !a.filename) return false;
+            if (!/\.(xlsx|xls|csv)$/i.test(a.filename)) return false;
+            if (filenamePattern) {
+              const fn = a.filename.toLowerCase().replace(/\s+/g, '');
+              const pat = filenamePattern.replace(/\s+/g, '');
+              if (fn.indexOf(pat) === -1) return false;
+            }
+            return true;
+          });
+          for (const att of attachments) {
+            uidResults.push({
+              uid: targetUid,
+              messageId: parsed.messageId || '',
+              from: (parsed.from && parsed.from.text) || sender,
+              subject: parsed.subject || '',
+              date: (parsed.date && parsed.date.toISOString()) || '',
+              fileName: att.filename,
+              fileSize: att.size || (att.content && att.content.length) || 0,
+              fileBase64: att.content.toString('base64'),
+            });
+          }
+        }
+        await safeLogout(client);
+        res.status(200).json({ ok: true, sender, sinceDays: days, count: uidResults.length, items: uidResults, hasMore: false, totalMatched: uidResults.length });
+        return;
+      }
       // 검색: from(있을 때만) + since
       // imapflow.search() 는 기본적으로 sequence 번호 반환 — uid 옵션으로 UID 반환
       const criteria = sender ? { from: sender, since } : { since };
@@ -101,24 +145,27 @@ export default async function handler(req, res) {
       //   기존엔 메시지마다 전체 원문(source, 첨부 바이너리 포함)을 개별로 내려받아 파싱했는데,
       //   발신자 필터가 없는 호출(외부업체 발주 메일 등)은 최근 N일의 모든 메일을 전부 다운로드하게 돼
       //   Vercel 함수 제한시간(10초) 안에 못 끝나 504가 발생했다. 구조 조회로 후보만 먼저 좁힌다.
-      const _attNamesOf = (bs, out) => {
+      const _attsOf = (bs, out) => {
         if (!bs) return out;
         const fn = (bs.dispositionParameters && bs.dispositionParameters.filename)
           || (bs.parameters && bs.parameters.name) || '';
-        if (fn) out.push(String(fn));
-        if (Array.isArray(bs.childNodes)) bs.childNodes.forEach(c => _attNamesOf(c, out));
+        if (fn) out.push({ name: String(fn), size: Number(bs.size) || 0 });
+        if (Array.isArray(bs.childNodes)) bs.childNodes.forEach(c => _attsOf(c, out));
         return out;
       };
       let candidateUids = [];
+      const metaByUid = new Map(); // uid → { envelope, atts: [{name,size}] } — metaOnly 응답 조립용
       try {
         for await (const msg of client.fetch(sortedUids, { envelope: true, bodyStructure: true }, { uid: true })) {
-          const names = _attNamesOf(msg.bodyStructure, []);
+          const atts = _attsOf(msg.bodyStructure, []);
+          const names = atts.map(a => a.name);
           if (!names.some(n => /\.(xlsx|xls|csv)$/i.test(n))) continue;
           if (filenamePattern) {
             const pat = filenamePattern.replace(/\s+/g, '');
             if (!names.some(n => n.toLowerCase().replace(/\s+/g, '').indexOf(pat) !== -1)) continue;
           }
           candidateUids.push(msg.uid);
+          metaByUid.set(msg.uid, { envelope: msg.envelope, atts });
         }
       } catch (structErr) {
         console.warn('[naver-mail-fetch] bodyStructure 조회 실패, 전체 조회로 폴백:', structErr && structErr.message);
@@ -128,6 +175,35 @@ export default async function handler(req, res) {
       //   정렬을 안 하면 items[0](호출부가 "가장 최신"으로 취급)이 실제로는 가장 오래된 후보가 되어,
       //   최신 메일(예: 오늘 도착한 첨부)을 두고 며칠 전 파일을 잘못 가져오는 문제가 있었다.
       candidateUids.sort((a, b) => b - a);
+
+      // metaOnly: 실제 첨부 내용(fileBase64)은 받지 않고 구조 정보만으로 응답 — 훨씬 빠름.
+      //   프론트는 이 결과에서 원하는 uid 를 골라 uid 파라미터로 그 1건만 다시 요청해 내용을 받는다.
+      if (metaOnly) {
+        for (const uid of candidateUids) {
+          const meta = metaByUid.get(uid);
+          if (!meta) continue;
+          const env = meta.envelope || {};
+          for (const att of meta.atts) {
+            if (!/\.(xlsx|xls|csv)$/i.test(att.name)) continue;
+            if (filenamePattern) {
+              const fn = att.name.toLowerCase().replace(/\s+/g, '');
+              const pat = filenamePattern.replace(/\s+/g, '');
+              if (fn.indexOf(pat) === -1) continue;
+            }
+            results.push({
+              uid,
+              from: (env.from && env.from[0] && (env.from[0].name ? `"${env.from[0].name}" <${env.from[0].address}>` : env.from[0].address)) || sender,
+              subject: env.subject || '',
+              date: env.date ? new Date(env.date).toISOString() : '',
+              fileName: att.name,
+              fileSize: att.size,
+            });
+          }
+        }
+        await safeLogout(client);
+        res.status(200).json({ ok: true, sender, sinceDays: days, count: results.length, items: results, hasMore, totalMatched, offset, pageSize: pageSizeUsed });
+        return;
+      }
 
       // 2단계: 조건에 맞는 후보 메일만 실제 원문(+첨부)을 내려받는다.
       //   ⚠ 벌크 client.fetch 로 바꿔봤으나 실측 결과 개선이 없었음(오히려 근소하게 느려짐) —
