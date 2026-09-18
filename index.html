@@ -21492,8 +21492,9 @@ async function fetchInvoiceFromMail(opts) {
   try {
     // limit=30 은 서울코리아가 하루에도 여러 통(리빙컴퍼니/그외/의류/CS/버즈 등)을 보내는 날
     // 구조조회+원문다운로드가 겹쳐 Vercel 함수 제한시간(10초)을 넘겨 504가 나던 원인이었음.
-    // 오늘자 메일은 항상 이 발신자의 가장 최근 것들 사이에 있으므로 8건이면 충분(사용자 요청 2026-09-16).
-    const res = await fetch('/api/naver-mail-fetch?sender=seoulbjs@naver.com&days=7&limit=8');
+    // 실측 결과 limit=8도 8.7초로 한도에 거의 다 채워 여전히 위험 → limit=5로 더 축소(사용자 요청 2026-09-16).
+    // 오늘자 메일은 항상 이 발신자의 가장 최근 것들 사이에 있으므로 5건으로도 충분.
+    const res = await fetch('/api/naver-mail-fetch?sender=seoulbjs@naver.com&days=7&limit=5');
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const err = data.error || ('HTTP ' + res.status);

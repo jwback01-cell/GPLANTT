@@ -129,39 +129,54 @@ export default async function handler(req, res) {
       //   최신 메일(예: 오늘 도착한 첨부)을 두고 며칠 전 파일을 잘못 가져오는 문제가 있었다.
       candidateUids.sort((a, b) => b - a);
 
-      // 2단계: 조건에 맞는 후보 메일만 실제 원문(+첨부)을 내려받는다.
-      for (const uid of candidateUids) {
-        try {
-          const msg = await client.fetchOne(uid, { source: true, envelope: true }, { uid: true });
+      // 2단계: 조건에 맞는 후보 메일만 실제 원문(+첨부)을 벌크로 내려받는다.
+      //   개별 fetchOne 을 후보 수만큼 반복하면 그만큼 왕복(round-trip)이 늘어 시간이 걸림 —
+      //   client.fetch 로 한 번의 명령에 묶어 요청해 왕복 횟수를 줄인다.
+      const parsedByUid = new Map();
+      try {
+        for await (const msg of client.fetch(candidateUids, { source: true, envelope: true }, { uid: true })) {
           if (!msg || !msg.source) continue;
-          const parsed = await simpleParser(msg.source);
-          const attachments = (parsed.attachments || []).filter(a => {
-            if (!a || !a.filename) return false;
-            if (!/\.(xlsx|xls|csv)$/i.test(a.filename)) return false;
-            // 파일명 패턴 필터 (대소문자 무시 + 공백 무시 부분문자열)
-            if (filenamePattern) {
-              const fn = a.filename.toLowerCase().replace(/\s+/g, '');
-              const pat = filenamePattern.replace(/\s+/g, '');
-              if (fn.indexOf(pat) === -1) return false;
-            }
-            return true;
-          });
-          if (!attachments.length) continue;
-          for (const att of attachments) {
-            results.push({
-              uid,
-              messageId: parsed.messageId || '',
-              from: (parsed.from && parsed.from.text) || sender,
-              subject: parsed.subject || '',
-              date: (parsed.date && parsed.date.toISOString()) || '',
-              fileName: att.filename,
-              fileSize: att.size || (att.content && att.content.length) || 0,
-              fileBase64: att.content.toString('base64'),
-            });
+          try { parsedByUid.set(msg.uid, await simpleParser(msg.source)); }
+          catch (parseErr) { console.warn('[naver-mail-fetch] 파싱 실패 uid=' + msg.uid, parseErr && parseErr.message); }
+        }
+      } catch (bulkErr) {
+        console.warn('[naver-mail-fetch] 벌크 원문 조회 실패, 개별 조회로 폴백:', bulkErr && bulkErr.message);
+        for (const uid of candidateUids) {
+          try {
+            const msg = await client.fetchOne(uid, { source: true, envelope: true }, { uid: true });
+            if (msg && msg.source) parsedByUid.set(uid, await simpleParser(msg.source));
+          } catch (perMsgErr) {
+            console.warn('[naver-mail-fetch] 단일 메일 처리 실패 uid=' + uid, perMsgErr && perMsgErr.message);
           }
-        } catch (perMsgErr) {
-          console.warn('[naver-mail-fetch] 단일 메일 처리 실패 uid=' + uid, perMsgErr && perMsgErr.message);
-          // 한 건 실패는 무시하고 계속
+        }
+      }
+      // candidateUids 순서(최신순)대로 결과 조립 — 벌크 fetch 도 UID 오름차순으로 반환되므로 재정렬 필요.
+      for (const uid of candidateUids) {
+        const parsed = parsedByUid.get(uid);
+        if (!parsed) continue;
+        const attachments = (parsed.attachments || []).filter(a => {
+          if (!a || !a.filename) return false;
+          if (!/\.(xlsx|xls|csv)$/i.test(a.filename)) return false;
+          // 파일명 패턴 필터 (대소문자 무시 + 공백 무시 부분문자열)
+          if (filenamePattern) {
+            const fn = a.filename.toLowerCase().replace(/\s+/g, '');
+            const pat = filenamePattern.replace(/\s+/g, '');
+            if (fn.indexOf(pat) === -1) return false;
+          }
+          return true;
+        });
+        if (!attachments.length) continue;
+        for (const att of attachments) {
+          results.push({
+            uid,
+            messageId: parsed.messageId || '',
+            from: (parsed.from && parsed.from.text) || sender,
+            subject: parsed.subject || '',
+            date: (parsed.date && parsed.date.toISOString()) || '',
+            fileName: att.filename,
+            fileSize: att.size || (att.content && att.content.length) || 0,
+            fileBase64: att.content.toString('base64'),
+          });
         }
       }
     } finally {
