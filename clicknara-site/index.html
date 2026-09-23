@@ -3280,7 +3280,7 @@ async function _evFillPlayauto(file){
       const raw=(rows[r]||[]);
       if(!raw.length || raw.join('').toString().trim()==='') continue;   // 빈 행 제외
       const origCode=String(raw[CODE_IDX]==null?'':raw[CODE_IDX]).trim();
-      const code=origCode.replace(/[\s-]/g,'').toUpperCase();
+      const code=_evNormCode(origCode);   // 공용 정규화(특수문자·엔대시 등도 제거) — 사이트별 업로드 핸들러 간 중복 로직 통일
       if(!code){ out.push(raw); continue; }   // 판매자관리코드 없는 행은 그대로 유지(대상 아님)
       const rec=_evSheetMap.get(code);   // A열 == 시트 G열 매칭
       // 코드가 있는데 시트에 매칭값이 없으면 → 오류(다운로드 취소)
@@ -3341,7 +3341,7 @@ async function _evFillAllImage(file){
       const raw=(rows[r]||[]);
       if(!raw.length || raw.join('').toString().trim()===''){ continue; }
       const origCode=String(raw[CODE_IDX]==null?'':raw[CODE_IDX]).trim();
-      const code=origCode.replace(/[\s-]/g,'').toUpperCase();
+      const code=_evNormCode(origCode);   // 공용 정규화(특수문자·엔대시 등도 제거) — 사이트별 업로드 핸들러 간 중복 로직 통일
       if(!code){ out.push(raw); continue; }
       const rec=_evSheetMap.get(code);
       if(!rec){ if(!fails.has(origCode)) fails.set(origCode, '기존세팅값 시트에 매칭값 없음'); out.push(raw); continue; }
@@ -3399,7 +3399,7 @@ async function _evFillEventForm(file){
       const raw=(rows[r]||[]);
       if(!raw.length || raw.join('').toString().trim()==='') continue;   // 빈 행
       const origCode=String(raw[codeIdx]==null?'':raw[codeIdx]).trim();
-      const code=origCode.replace(/[\s-]/g,'').toUpperCase();
+      const code=_evNormCode(origCode);   // 공용 정규화(특수문자·엔대시 등도 제거) — 사이트별 업로드 핸들러 간 중복 로직 통일
       if(!code) continue;
       if(!evListingMap.has(code)) continue;   // 이 행사 계산기에 없는 상품은 제외
       const chan = mallIdx>=0 ? String(raw[mallIdx]||'') : '';
