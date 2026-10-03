@@ -17787,6 +17787,17 @@ function _paShipCostFromProductMgmt(skuCode) {
   }
 }
 
+// 지플랜 거래처 택배비용 기간별 단가 — 2026-10-01 주문분부터 1,970원 → 2,500원
+//   (상품관리에는 1,970원이 그대로 등록돼 있으므로 주문일자 기준으로 매출 반영 시점에 치환)
+const _GPLAN_SHIP_COST_OLD = 1970, _GPLAN_SHIP_COST_NEW = 2500, _GPLAN_SHIP_COST_FROM = '2026-10-01';
+function _gplanShipCostByDate(cost, vendor, date) {
+  const c = Number(cost) || 0;
+  if (c !== _GPLAN_SHIP_COST_OLD) return cost;
+  if (!/지플랜/.test(String(vendor || ''))) return cost;
+  if (String(date || '').slice(0, 10) < _GPLAN_SHIP_COST_FROM) return cost;
+  return _GPLAN_SHIP_COST_NEW;
+}
+
 // SSG 계열 쇼핑몰 판정 (SSG, SSG.COM, 쓱닷컴 등) — 공급가 VAT 보정용
 function _paIsSsgShop(name) {
   if (!name) return false;
@@ -17839,7 +17850,8 @@ function _paExtractOrderRow(o) {
   // 매칭 실패 시 0 (사용자가 상품관리에 SKU와 택배비용을 등록해야 표시됨)
   const skuCode = _paGetSkuCode(o, prod);
   const lookedUp = _paShipCostFromProductMgmt(skuCode);
-  const shipCost = lookedUp != null ? lookedUp : 0;
+  const _rowDate = _paPickDate(o, dateFields);
+  const shipCost = lookedUp != null ? _gplanShipCostByDate(lookedUp, String(o.depot_name || '').trim() || shopName, _rowDate) : 0;
   // SKU상품명: results_prod.prod_name → o.prod_list[].prod_name → o.prod_name → 쇼핑몰 상품명 폴백
   const skuItemName = _paGetSkuName(o, prod)
     || _paPickField(o, ['shop_sale_name', 'item_name', 'productName', 'goods_name']);
@@ -25190,7 +25202,8 @@ async function rematchUploadDataShipCosts() {
     if (r.itemCode && r.skuCode !== r.itemCode) r.skuCode = r.itemCode;
     candidates++;
 
-    const newCost = (typeof _paShipCostFromProductMgmt === 'function') ? _paShipCostFromProductMgmt(matchCode) : null;
+    let newCost = (typeof _paShipCostFromProductMgmt === 'function') ? _paShipCostFromProductMgmt(matchCode) : null;
+    if (newCost != null) newCost = _gplanShipCostByDate(newCost, r.vendor || r.depotName, r.date);
     const newMatched = (newCost != null);
     const oldCost = Number(r.shipCost) || 0;
     const oldMatched = r.shipCostMatched;
