@@ -4,7 +4,7 @@
   "description": "GPLAN — 내부 운영 관리 도구",
   "private": true,
   "engines": {
-    "node": "20.x"
+    "node": "24.x"
   },
   "dependencies": {
     "imapflow": "^1.0.171",
