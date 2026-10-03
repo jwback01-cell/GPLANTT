@@ -17851,7 +17851,7 @@ function _paExtractOrderRow(o) {
   const skuCode = _paGetSkuCode(o, prod);
   const lookedUp = _paShipCostFromProductMgmt(skuCode);
   const _rowDate = _paPickDate(o, dateFields);
-  const shipCost = lookedUp != null ? _gplanShipCostByDate(lookedUp, String(o.depot_name || '').trim() || shopName, _rowDate) : 0;
+  const shipCost = lookedUp != null ? _gplanShipCostByDate(lookedUp, (typeof _extDepotName === 'function' ? _extDepotName(o) : String(o.depot_name || '').trim()) || shopName, _rowDate) : 0;
   // SKU상품명: results_prod.prod_name → o.prod_list[].prod_name → o.prod_name → 쇼핑몰 상품명 폴백
   const skuItemName = _paGetSkuName(o, prod)
     || _paPickField(o, ['shop_sale_name', 'item_name', 'productName', 'goods_name']);
