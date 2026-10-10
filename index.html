@@ -23008,6 +23008,9 @@ async function dashboardOneClickEcount(mode) {
     // 대시보드에서 직접 선택한 날짜(기간) 사용
     const ds = document.getElementById('dashboard-pa-date-start');
     const de = document.getElementById('dashboard-pa-date-end');
+    if ((ds && ds.validity && ds.validity.badInput) || (de && de.validity && de.validity.badInput)) {
+      setStatus('존재하지 않는 날짜가 입력되어 있습니다(예: 4월 31일). 날짜를 다시 선택하세요.', 'text-brand-pink'); return;
+    }
     let sv = (ds && ds.value) || '';
     let ev = (de && de.value) || '';
     if (!sv && !ev) { setStatus('전송할 날짜를 선택하세요.', 'text-brand-pink'); return; }
@@ -23060,6 +23063,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const de = document.getElementById('dashboard-pa-date-end');
     if (ds && !ds.value) ds.value = today;
     if (de && !de.value) de.value = today;
+    // 존재하지 않는 날짜(예: 4월 31일)를 직접 입력하면 브라우저는 화면에는 표시하지만 값은 빈 문자열이 됨
+    //  → 포커스를 벗어날 때 잘못된 날짜면 오늘로 되돌리고 안내
+    [ds, de].forEach(el => {
+      if (!el) return;
+      el.addEventListener('blur', () => {
+        if (el.validity && el.validity.badInput) {
+          el.value = today;
+          if (typeof showAppAlert === 'function') showAppAlert('존재하지 않는 날짜', '입력한 날짜는 달력에 없는 날짜입니다(예: 4월 31일).
+올바른 날짜를 다시 선택해 주세요.', 'warn');
+        }
+      });
+    });
   } catch (_) {}
 });
 
