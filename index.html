@@ -55,7 +55,9 @@ tailwind.config = {
 }
 </script>
 <style>
-.gp-date-nopicker::-webkit-calendar-picker-indicator{display:none;}
+/* 모든 날짜 입력 공통: 기본 달력 아이콘(Tab 정지점) 제거 → 입력창 오른쪽에 같은 모양의 아이콘을 배경으로 표시, 클릭 시 달력 열기(JS) */
+input[type="date"]::-webkit-calendar-picker-indicator{display:none;}
+input[type="date"]{padding-right:1.9rem !important;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%231a1a1a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .6rem center;background-size:13px 13px;}
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body {
@@ -771,9 +773,9 @@ tailwind.config = {
           </div>
           <div class="flex gap-2 shrink-0 items-center flex-wrap justify-end">
             <div class="flex items-center gap-1.5 bg-brand-bg rounded-full px-2 py-1 border border-brand-border">
-              <div class="relative"><input id="dashboard-pa-date-start" type="date" min="2000-01-01" max="9999-12-31" class="gp-date-nopicker bg-white rounded-full pl-2.5 pr-7 py-1.5 text-xs font-semibold border border-brand-border outline-none focus:border-brand-black"><button type="button" tabindex="-1" onclick="try{document.getElementById('dashboard-pa-date-start').showPicker()}catch(_){}" title="달력 열기" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-brand-black hover:opacity-70"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></button></div>
+              <input id="dashboard-pa-date-start" type="date" class="bg-white rounded-full px-2.5 py-1.5 text-xs font-semibold border border-brand-border outline-none focus:border-brand-black">
               <span class="text-xs text-brand-gray">~</span>
-              <div class="relative"><input id="dashboard-pa-date-end" type="date" min="2000-01-01" max="9999-12-31" class="gp-date-nopicker bg-white rounded-full pl-2.5 pr-7 py-1.5 text-xs font-semibold border border-brand-border outline-none focus:border-brand-black"><button type="button" tabindex="-1" onclick="try{document.getElementById('dashboard-pa-date-end').showPicker()}catch(_){}" title="달력 열기" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-brand-black hover:opacity-70"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></button></div>
+              <input id="dashboard-pa-date-end" type="date" class="bg-white rounded-full px-2.5 py-1.5 text-xs font-semibold border border-brand-border outline-none focus:border-brand-black">
               <button onclick="dashboardOneClickEcount('custom')" id="dashboard-pa-custom-btn" class="px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-brand-black hover:opacity-90 transition-opacity whitespace-nowrap flex items-center gap-1.5">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                 선택일 저장
@@ -23031,7 +23033,7 @@ async function dashboardOneClickEcount(mode) {
     // 대시보드에서 직접 선택한 날짜(기간) 사용
     const ds = document.getElementById('dashboard-pa-date-start');
     const de = document.getElementById('dashboard-pa-date-end');
-    try { if (ds && ds._fixBadDate) ds._fixBadDate(); if (de && de._fixBadDate) de._fixBadDate(); } catch (_) {}
+    try { if (window._gpFixDate) { if (ds) window._gpFixDate(ds); if (de) window._gpFixDate(de); } } catch (_) {}
     let sv = (ds && ds.value) || '';
     let ev = (de && de.value) || '';
     if (!sv && !ev) { setStatus('전송할 날짜를 선택하세요.', 'text-brand-pink'); return; }
@@ -23084,45 +23086,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const de = document.getElementById('dashboard-pa-date-end');
     if (ds && !ds.value) ds.value = today;
     if (de && !de.value) de.value = today;
-    // 존재하지 않는 날짜(예: 4월 31일)를 직접 입력하면 브라우저는 화면에는 표시하지만 값은 빈 문자열이 됨
-    //  → 팝업 없이 직전 유효 날짜의 '해당 월 마지막 날'로 자동 보정 (4월 31일 → 4월 30일)
-    //  (브라우저가 잘못 입력된 값을 알려주지 않으므로, 마지막으로 유효했던 연·월을 기준으로 보정)
-    const _dim = (y, m) => new Date(y, m, 0).getDate();
-    const _ymd = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    // 잘못된 날짜가 된 순간, 마지막으로 정상이던 날짜(L)와 방금 누른 숫자키로 '월을 바꿨는지/일을 바꿨는지' 추정해 그 달 마지막 날로 보정
-    const _fix = el => {
-      if (!el.validity || !el.validity.badInput) return;
-      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(el._lastGood || today) || /^(\d{4})-(\d{2})-(\d{2})/.exec(today);
-      const y = +m[1], mo = +m[2], d = +m[3];
-      const k = el._keys || [];
-      const last1 = k.length ? +k[k.length - 1] : NaN;
-      const last2 = k.length > 1 ? +(k[k.length - 2] + k[k.length - 1]) : NaN;
-      let res = null;
-      // ① 월을 바꾼 경우 (예: 10-31 에서 월을 04 로 → 4월은 30일까지)
-      for (const v of [last2, last1]) {
-        if (!res && v >= 1 && v <= 12 && d > _dim(y, v)) res = _ymd(y, v, _dim(y, v));
-      }
-      // ② 일을 바꾼 경우 (예: 4월에서 일을 31 로)
-      for (const v of [last2, last1]) {
-        if (!res && v >= 1 && v <= 31 && v > _dim(y, mo)) res = _ymd(y, mo, _dim(y, mo));
-      }
-      // ③ 추정 실패(연도 변경 등) — 기존 월의 마지막 날로 안전 보정
-      if (!res) res = _ymd(y, mo, Math.min(d, _dim(y, mo)));
-      el.value = res;
-      el._lastGood = res;
-      el._keys = [];
-    };
-    [ds, de].forEach(el => {
-      if (!el) return;
-      el._lastGood = el.value || today;
-      el._keys = [];
-      const track = () => { if (el.value) el._lastGood = el.value; else _fix(el); };
-      el.addEventListener('keydown', e => { if (/^[0-9]$/.test(e.key)) { el._keys.push(e.key); if (el._keys.length > 2) el._keys.shift(); } });
-      el.addEventListener('input', track);
-      el.addEventListener('change', track);
-      el.addEventListener('blur', () => _fix(el));
-      el._fixBadDate = () => _fix(el);
-    });
   } catch (_) {}
 });
 
@@ -34263,6 +34226,74 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch((e) => console.warn('[PWA] SW 등록 실패', e));
   });
 }
+</script>
+<script>
+// ── 모든 날짜 입력(input[type=date]) 공통 동작 ─────────────────────────────
+//  ① 연도는 4자리까지만 (max 미지정 시 9999-12-31 부여 → 4자리 입력하면 월로 자동 이동)
+//  ② 존재하지 않는 날짜(4월 31일 등)는 팝업 없이 해당 월 마지막 날로 자동 보정
+//  ③ 일(日)에서 Tab → 바로 다음 입력으로 이동 (기본 달력 아이콘 Tab 정지점 제거, 오른쪽 아이콘 클릭 시 달력 열기)
+(function gpDateInputs() {
+  const pad = n => String(n).padStart(2, '0');
+  const dim = (y, m) => new Date(y, m, 0).getDate();
+  const ymd = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
+  const todayStr = () => { const t = new Date(); return ymd(t.getFullYear(), t.getMonth() + 1, t.getDate()); };
+  const isDate = el => el && el.tagName === 'INPUT' && el.type === 'date';
+  function prep(el) {
+    if (!isDate(el)) return;
+    if (!el.hasAttribute('max')) el.setAttribute('max', '9999-12-31');
+    if (el._lastGood == null) el._lastGood = el.value || '';
+    if (!el._keys) el._keys = [];
+  }
+  function fix(el) {
+    if (!isDate(el) || !el.validity || !el.validity.badInput) return false;
+    const mm = /^(\d{4})-(\d{2})-(\d{2})/.exec(el._lastGood || '') || /^(\d{4})-(\d{2})-(\d{2})/.exec(todayStr());
+    const y = +mm[1], mo = +mm[2], d = +mm[3];
+    const k = el._keys || [];
+    const last1 = k.length ? +k[k.length - 1] : NaN;
+    const last2 = k.length > 1 ? +(k[k.length - 2] + k[k.length - 1]) : NaN;
+    let res = null;
+    // 월을 바꿔서 없는 날짜가 된 경우 (예: 10-31 에서 월을 04 로 → 04-30)
+    for (const v of [last2, last1]) if (!res && v >= 1 && v <= 12 && d > dim(y, v)) res = ymd(y, v, dim(y, v));
+    // 일을 바꿔서 없는 날짜가 된 경우 (예: 4월에서 일을 31 로 → 04-30)
+    for (const v of [last2, last1]) if (!res && v >= 1 && v <= 31 && v > dim(y, mo)) res = ymd(y, mo, dim(y, mo));
+    // 추정 실패 — 기존 월의 마지막 날 이내로 보정
+    if (!res) res = ymd(y, mo, Math.min(d, dim(y, mo)));
+    el.value = res;
+    el._lastGood = res;
+    el._keys = [];
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  }
+  window._gpFixDate = fix;
+  document.addEventListener('focusin', e => { prep(e.target); if (isDate(e.target) && e.target.value) e.target._lastGood = e.target.value; }, true);
+  document.addEventListener('keydown', e => {
+    const el = e.target;
+    if (!isDate(el)) return;
+    prep(el);
+    if (/^[0-9]$/.test(e.key)) { el._keys.push(e.key); if (el._keys.length > 2) el._keys.shift(); }
+  }, true);
+  const track = e => {
+    const el = e.target;
+    if (!isDate(el)) return;
+    prep(el);
+    if (el.value) el._lastGood = el.value; else fix(el);
+  };
+  document.addEventListener('input', track, true);
+  document.addEventListener('change', track, true);
+  document.addEventListener('focusout', e => { if (isDate(e.target)) { prep(e.target); fix(e.target); } }, true);
+  // 오른쪽 아이콘 영역 클릭 → 달력 열기
+  document.addEventListener('click', e => {
+    const el = e.target;
+    if (!isDate(el) || el.disabled || el.readOnly) return;
+    const r = el.getBoundingClientRect();
+    if (e.clientX >= r.right - 30) { try { el.showPicker(); } catch (_) {} }
+  }, true);
+  // 이미 있는/나중에 생기는 날짜 입력 모두 준비
+  const scan = root => { try { (root.querySelectorAll ? root.querySelectorAll('input[type="date"]') : []).forEach(prep); } catch (_) {} };
+  scan(document);
+  new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1) { if (isDate(n)) prep(n); else scan(n); } })))
+    .observe(document.documentElement, { childList: true, subtree: true });
+})();
 </script>
 </body>
 </html>
