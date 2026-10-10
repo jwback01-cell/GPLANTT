@@ -770,9 +770,9 @@ tailwind.config = {
           </div>
           <div class="flex gap-2 shrink-0 items-center flex-wrap justify-end">
             <div class="flex items-center gap-1.5 bg-brand-bg rounded-full px-2 py-1 border border-brand-border">
-              <input id="dashboard-pa-date-start" type="date" class="bg-white rounded-full px-2.5 py-1.5 text-xs font-semibold border border-brand-border outline-none focus:border-brand-black">
+              <input id="dashboard-pa-date-start" type="date" min="2000-01-01" max="9999-12-31" class="bg-white rounded-full px-2.5 py-1.5 text-xs font-semibold border border-brand-border outline-none focus:border-brand-black">
               <span class="text-xs text-brand-gray">~</span>
-              <input id="dashboard-pa-date-end" type="date" class="bg-white rounded-full px-2.5 py-1.5 text-xs font-semibold border border-brand-border outline-none focus:border-brand-black">
+              <input id="dashboard-pa-date-end" type="date" min="2000-01-01" max="9999-12-31" class="bg-white rounded-full px-2.5 py-1.5 text-xs font-semibold border border-brand-border outline-none focus:border-brand-black">
               <button onclick="dashboardOneClickEcount('custom')" id="dashboard-pa-custom-btn" class="px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-brand-black hover:opacity-90 transition-opacity whitespace-nowrap flex items-center gap-1.5">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                 선택일 저장
