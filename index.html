@@ -23069,19 +23069,37 @@ document.addEventListener('DOMContentLoaded', () => {
     // 존재하지 않는 날짜(예: 4월 31일)를 직접 입력하면 브라우저는 화면에는 표시하지만 값은 빈 문자열이 됨
     //  → 팝업 없이 직전 유효 날짜의 '해당 월 마지막 날'로 자동 보정 (4월 31일 → 4월 30일)
     //  (브라우저가 잘못 입력된 값을 알려주지 않으므로, 마지막으로 유효했던 연·월을 기준으로 보정)
+    const _dim = (y, m) => new Date(y, m, 0).getDate();
+    const _ymd = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    // 잘못된 날짜가 된 순간, 마지막으로 정상이던 날짜(L)와 방금 누른 숫자키로 '월을 바꿨는지/일을 바꿨는지' 추정해 그 달 마지막 날로 보정
     const _fix = el => {
       if (!el.validity || !el.validity.badInput) return;
-      const base = el._lastGood || today;
-      const m = /^(\d{4})-(\d{2})/.exec(base);
-      const y = m ? +m[1] : new Date().getFullYear(), mo = m ? +m[2] : (new Date().getMonth() + 1);
-      const last = new Date(y, mo, 0).getDate();
-      el.value = `${y}-${String(mo).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
-      el._lastGood = el.value;
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(el._lastGood || today) || /^(\d{4})-(\d{2})-(\d{2})/.exec(today);
+      const y = +m[1], mo = +m[2], d = +m[3];
+      const k = el._keys || [];
+      const last1 = k.length ? +k[k.length - 1] : NaN;
+      const last2 = k.length > 1 ? +(k[k.length - 2] + k[k.length - 1]) : NaN;
+      let res = null;
+      // ① 월을 바꾼 경우 (예: 10-31 에서 월을 04 로 → 4월은 30일까지)
+      for (const v of [last2, last1]) {
+        if (!res && v >= 1 && v <= 12 && d > _dim(y, v)) res = _ymd(y, v, _dim(y, v));
+      }
+      // ② 일을 바꾼 경우 (예: 4월에서 일을 31 로)
+      for (const v of [last2, last1]) {
+        if (!res && v >= 1 && v <= 31 && v > _dim(y, mo)) res = _ymd(y, mo, _dim(y, mo));
+      }
+      // ③ 추정 실패(연도 변경 등) — 기존 월의 마지막 날로 안전 보정
+      if (!res) res = _ymd(y, mo, Math.min(d, _dim(y, mo)));
+      el.value = res;
+      el._lastGood = res;
+      el._keys = [];
     };
     [ds, de].forEach(el => {
       if (!el) return;
       el._lastGood = el.value || today;
+      el._keys = [];
       const track = () => { if (el.value) el._lastGood = el.value; else _fix(el); };
+      el.addEventListener('keydown', e => { if (/^[0-9]$/.test(e.key)) { el._keys.push(e.key); if (el._keys.length > 2) el._keys.shift(); } });
       el.addEventListener('input', track);
       el.addEventListener('change', track);
       el.addEventListener('blur', () => _fix(el));
