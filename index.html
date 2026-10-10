@@ -5774,10 +5774,11 @@ function hideLoginMessages() {
 }
 
 async function handleLoginAfterAuth() {
-  await loadTodosFromDB();
-  await loadProductsFromDB();
+  // 각 단계가 실패(네트워크 지연/오류)해도 대시보드 진입은 반드시 진행 — 안 그러면 세션이 있어도 로그인 화면에 머묾
+  try { await loadTodosFromDB(); } catch (e) { console.warn('[login] loadTodosFromDB 실패', e); }
+  try { await loadProductsFromDB(); } catch (e) { console.warn('[login] loadProductsFromDB 실패', e); }
   // 클라우드 데이터를 로컬에 PULL (다른 PC에서 입력한 업로드/송장/이카운트/키워드 데이터 가져오기)
-  await gplanCloudPullAll();
+  try { await gplanCloudPullAll(); } catch (e) { console.warn('[login] gplanCloudPullAll 실패', e); }
   navigate('dashboard');
   // PULL 후에 화면 다시 그리기 (업로드 데이터 등)
   try { if (typeof renderUploadData === 'function') renderUploadData(); } catch(_) {}
@@ -14704,9 +14705,13 @@ renderDashboardTodos();
 
 // 자동 로그인 (Supabase 세션 확인)
 (async function checkSession() {
-  const { data: { session } } = await _supabase.auth.getSession();
-  if (session) {
-    await handleLoginAfterAuth();
+  // 일시적 네트워크 오류로 세션 갱신이 실패해도 바로 로그아웃 처럼 보이지 않도록 최대 3회 재시도
+  for (let i = 0; i < 3; i++) {
+    try {
+      const { data: { session } } = await _supabase.auth.getSession();
+      if (session) { await handleLoginAfterAuth(); return; }
+    } catch (e) { console.warn('[auto-login] 세션 확인 실패', i + 1, e); }
+    await new Promise(r => setTimeout(r, 1500));
   }
 })();
 
