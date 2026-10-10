@@ -23075,8 +23075,7 @@ document.addEventListener('DOMContentLoaded', () => {
       el.addEventListener('blur', () => {
         if (el.validity && el.validity.badInput) {
           el.value = today;
-          if (typeof showAppAlert === 'function') showAppAlert('존재하지 않는 날짜', '입력한 날짜는 달력에 없는 날짜입니다(예: 4월 31일).
-올바른 날짜를 다시 선택해 주세요.', 'warn');
+          if (typeof showAppAlert === 'function') showAppAlert('존재하지 않는 날짜', '입력한 날짜는 달력에 없는 날짜입니다(예: 4월 31일). 올바른 날짜를 다시 선택해 주세요.', 'warn');
         }
       });
     });
