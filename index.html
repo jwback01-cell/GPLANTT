@@ -26535,10 +26535,11 @@ function _doConvertSelectedToReturn(targetRows, reason, kind) {
 
     if (isExchange) {
       clone.profit = 0;
-      // 지플랜 교환(판매자귀책): 택배비용 5,000원 추가 (마진 -5,000)
+      // 지플랜 교환(판매자귀책): 택배비용 5,000원 + 택배비 1,000원 추가 (마진 -4,000)
       if (_isGplanExchSeller && !clone._skipExtra) {
         clone.shipCost = 5000;
-        clone.profit = -5000;
+        clone.ship = 1000;      // 택배비 +1,000원 추가 (마진 +1,000)
+        clone.profit = -5000 + 1000;
       }
     } else {
       // 반품 마진 = 원래 행 마진의 반대부호 (이익금만큼만 차감 → 원본 + 반품 = 0)
