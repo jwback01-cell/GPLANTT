@@ -4889,6 +4889,7 @@ input[type="date"]{padding-right:1.9rem !important;background-image:url("data:im
                 </div>
               </div>
               <button onclick="exportUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold hover:bg-brand-bg">엑셀 내보내기</button>
+              <button type="button" onclick="cleanupDuplicateUploadRows()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-gray hover:bg-brand-bg" title="수령자명이 마스킹되어 중복 저장된 주문을 찾아 정리">중복 정리</button>
               <button id="upload-data-delete-btn" onclick="deleteSelectedUploadData()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-pink hover:bg-brand-bg">선택 삭제 <span id="upload-data-sel-count" class="ml-1 text-xs text-brand-gray" style="display:inline-block;min-width:3.4em;text-align:left;font-variant-numeric:tabular-nums">(0)</span></button>
             </div>
           </div>
@@ -24825,9 +24826,9 @@ async function savePlayautoOrdersToLedger(silent) {
   //   (같은 매출/기간을 여러 번 수집·저장해도 재고가 중복 차감되지 않도록)
   //   lineUid = 라인 단위(주문 건별) 고유키. 없으면(구 데이터) bundleKey 로 폴백.
   //   구 데이터(lineUid 없이 bundleKey 로만 저장된 행)와 새 행(lineUid 있음)은 키가 달라 중복 저장되던 문제 보정:
-  //   기존 행이 lineUid 없이 저장돼 있으면 bundleKey+SKU 로도 비교한다.
+  //   기존 행이 lineUid 없이 저장돼 있으면 bundleKey+SKU 로도 비교한다. (bundleKey 뒤쪽 수령자/연락처 부분은 마스킹(오진*)으로 달라질 수 있어 제외)
   const _rowKey = r => (String(r.lineUid || r.bundleKey || '').trim() + '||' + String(r.itemCode || '').trim().toLowerCase());
-  const _legacyKey = r => (String(r.bundleKey || '').trim() + '||' + String(r.itemCode || '').trim().toLowerCase());
+  const _legacyKey = r => (String(r.bundleKey || '').split('__')[0].trim() + '||' + String(r.itemCode || '').trim().toLowerCase());
   const _existKeys = new Set((existing || []).map(_rowKey).filter(k => k !== '||'));
   const _existLegacy = new Set((existing || []).filter(x => x && !x.lineUid && x.bundleKey && !x._isReturn).map(_legacyKey));
   const newRows = [];
@@ -30722,7 +30723,7 @@ function confirmUpload() {
     // ★ 중복 차감 방지 — 라인 고유키(lineUid)+SKU 가 이미 저장된 행은 재저장/재차감 안 함. (없으면 bundleKey 폴백)
     //   (주문번호 없는 수동 행은 키가 '||' 라 그대로 통과 — 무회귀)
     const _rowKey = r => (String(r.lineUid || r.bundleKey || '').trim() + '||' + String(r.itemCode || '').trim().toLowerCase());
-    const _legacyKey = r => (String(r.bundleKey || '').trim() + '||' + String(r.itemCode || '').trim().toLowerCase());
+    const _legacyKey = r => (String(r.bundleKey || '').split('__')[0].trim() + '||' + String(r.itemCode || '').trim().toLowerCase());
     const _existKeys = new Set((existing || []).map(_rowKey).filter(k => k !== '||'));
     const _existLegacy = new Set((existing || []).filter(x => x && !x.lineUid && x.bundleKey && !x._isReturn).map(_legacyKey));
     toSave = toSave.filter(r => { const k = _rowKey(r); if (k !== '||' && _existKeys.has(k)) return false; if (r.bundleKey && _existLegacy.has(_legacyKey(r))) return false; if (k !== '||') _existKeys.add(k); return true; });
@@ -34463,6 +34464,72 @@ if ('serviceWorker' in navigator) {
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render); else render();
 })();
+
+// ── 업로드 데이터 중복 정리 ─────────────────────────────────────────────
+//  같은 주문이 다시 수집·저장되며(수령자명이 오진영 → 오진* 처럼 마스킹되어 키가 달라짐) 생긴 중복 행을 찾아 삭제하고 재고를 복구한다.
+//  중복 판정: (A) 같은 주문번호(lineUid, 또는 bundleKey 의 수령자 앞부분)+SKU  또는
+//            (B) 같은 매출일·SKU·수량·단가·공급가 + 수령자명이 같거나 마스킹(*)으로 앞글자가 일치  — 단, 저장일시가 서로 다른 것만.
+//  가장 먼저 저장된 1건은 남기고 나머지를 삭제 (반품/교환 행은 제외).
+function _findDuplicateUploadRows(data) {
+  const isTarget = r => r && !r._isReturn && !r._claimKind && !/^(jet-|manual-return|manual-exchange)/.test(String(r.template || '')) && String(r.itemCode || '').trim();
+  const sku = r => String(r.itemCode || '').trim().toLowerCase();
+  const rcvOk = (a, b) => {
+    a = String(a || '').replace(/\s+/g, ''); b = String(b || '').replace(/\s+/g, '');
+    if (!a || !b) return false;
+    if (a === b) return true;
+    const pa = a.replace(/\*+/g, ''), pb = b.replace(/\*+/g, '');
+    if (a.includes('*') && b.startsWith(pa) && pa) return true;
+    if (b.includes('*') && a.startsWith(pb) && pb) return true;
+    return false;
+  };
+  const items = [];
+  data.forEach((r, i) => { if (isTarget(r)) items.push({ r, i }); });
+  items.sort((x, y) => String(x.r.savedAt || '').localeCompare(String(y.r.savedAt || '')) || x.i - y.i);
+  const keep = [], dups = [];
+  for (const it of items) {
+    const r = it.r;
+    const lu = String(r.lineUid || '').trim();
+    const bk = String(r.bundleKey || '').split('__')[0].trim();
+    const match = keep.find(k => {
+      const q = k.r;
+      if (String(q.savedAt || '') === String(r.savedAt || '')) return false;   // 같은 저장 배치는 별개 라인
+      if (sku(q) !== sku(r)) return false;
+      const qlu = String(q.lineUid || '').trim();
+      if (lu && qlu && lu === qlu) return true;                                  // (A) 라인 고유키 동일
+      const qbk = String(q.bundleKey || '').split('__')[0].trim();
+      if (bk && qbk && bk === qbk && !(lu && qlu)) return true;                  // (A) 구 데이터: 주문번호 동일
+      return String(q.date || '') === String(r.date || '') && Number(q.qty) === Number(r.qty)
+        && Number(q.price) === Number(r.price) && Number(q.supply) === Number(r.supply)
+        && rcvOk(q.receiver, r.receiver);                                        // (B)
+    });
+    if (match) dups.push({ ...it, of: match }); else keep.push(it);
+  }
+  return dups;
+}
+
+function cleanupDuplicateUploadRows() {
+  const data = _loadUploadData();
+  const dups = _findDuplicateUploadRows(data);
+  if (!dups.length) { showAppAlert('중복 없음', '중복 저장된 주문을 찾지 못했습니다.', 'success'); return; }
+  const lines = dups.slice(0, 15).map(d => `• ${d.r.date} ${d.r.receiver || ''} ${String(d.r.itemName || d.r.itemCode).slice(0, 18)} ×${d.r.qty}  (저장 ${d.r.savedAt || '-'} ← 원본 ${d.of.r.savedAt || '-'})`).join('\n');
+  const more = dups.length > 15 ? `\n… 외 ${dups.length - 15}건` : '';
+  showAppConfirm(
+    `중복 의심 ${dups.length}건을 삭제할까요?`,
+    `가장 먼저 저장된 1건은 남기고 나중에 저장된 중복을 삭제합니다.\n삭제되는 행의 재고 차감은 자동으로 복구(+)됩니다.\n\n${lines}${more}`,
+    async () => {
+      const rm = new Set(dups.map(d => d.i));
+      const removed = data.filter((_, i) => rm.has(i));
+      _saveUploadData(data.filter((_, i) => !rm.has(i)));
+      syncLedgerFromUploadData();
+      let stockRes = { updated: 0, totalDelta: 0 };
+      try { stockRes = await _applyStockFromUploadRows(removed, +1); } catch (e) { console.warn('[중복정리] 재고 복구 실패', e); }
+      if (typeof renderUploadData === 'function') renderUploadData();
+      showAppAlert('중복 정리 완료', `${removed.length}건 삭제` + (stockRes.updated > 0 ? `\n📦 재고 복구: ${stockRes.updated}개 SKU (총 +${stockRes.totalDelta})` : ''), 'success');
+    },
+    { type: 'danger', confirmText: '삭제', confirmStyle: 'danger' }
+  );
+}
+window.cleanupDuplicateUploadRows = cleanupDuplicateUploadRows;
 </script>
 </body>
 </html>
