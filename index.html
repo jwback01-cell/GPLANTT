@@ -34304,17 +34304,16 @@ if ('serviceWorker' in navigator) {
 })();
 
 // ── 상단 메뉴 탭바 (플레이오토처럼 열었던 메뉴를 탭으로 유지) ──────────────
-//  사이드바 메뉴/하위메뉴를 열면 탭이 생기고, 탭 클릭으로 전환 / × 로 닫기. 열린 탭은 gplan_ 키로 저장(클라우드 동기화 대상).
+//  사이드바 메뉴/하위메뉴를 열면 탭이 생기고, 탭 클릭으로 전환 / × 로 닫기. 열린 탭은 저장하지 않아 새로고침하면 초기화된다.
 (function () {
-  const KEY = 'gplan_open_menu_tabs_v1';
+  try { localStorage.removeItem('gplan_open_menu_tabs_v1'); } catch (_) {}   // 이전 버전이 저장해 둔 탭 정리
   const SUB_ATTRS = [['paTab','data-pa-tab'],['todoTab','data-todo-tab'],['prodTab','data-prod-tab'],['uploadTab','data-upload-tab'],['ledgerTab','data-ledger-tab']];
   let tabs = [];            // { key, label, title, kind:'page'|'sub', page, attr, val }
   let activeKey = null;
   const HAS_SUB = { playauto: 1, todo: 1, products: 1, upload: 1, ledger: 1 };   // 하위메뉴가 있는 대메뉴는 탭 제외
-  try { const s = JSON.parse(localStorage.getItem(KEY) || '[]'); if (Array.isArray(s)) tabs = s.filter(t => t && t.key && t.label && !(t.kind === 'page' && HAS_SUB[t.page])); } catch (_) {}
 
   const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(tabs)); } catch (_) {} };
+  const save = () => {};   // 새로고침하면 열었던 탭은 초기화 (저장 안 함)
   const pageLabel = p => {
     const el = document.querySelector('.nav-item[data-page="' + p + '"]');
     return el ? el.textContent.replace(/\s+/g, ' ').trim() : p;
