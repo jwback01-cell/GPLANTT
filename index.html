@@ -34310,7 +34310,8 @@ if ('serviceWorker' in navigator) {
   const SUB_ATTRS = [['paTab','data-pa-tab'],['todoTab','data-todo-tab'],['prodTab','data-prod-tab'],['uploadTab','data-upload-tab'],['ledgerTab','data-ledger-tab']];
   let tabs = [];            // { key, label, title, kind:'page'|'sub', page, attr, val }
   let activeKey = null;
-  try { const s = JSON.parse(localStorage.getItem(KEY) || '[]'); if (Array.isArray(s)) tabs = s.filter(t => t && t.key && t.label); } catch (_) {}
+  const HAS_SUB = { playauto: 1, todo: 1, products: 1, upload: 1, ledger: 1 };   // 하위메뉴가 있는 대메뉴는 탭 제외
+  try { const s = JSON.parse(localStorage.getItem(KEY) || '[]'); if (Array.isArray(s)) tabs = s.filter(t => t && t.key && t.label && !(t.kind === 'page' && HAS_SUB[t.page])); } catch (_) {}
 
   const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(tabs)); } catch (_) {} };
@@ -34378,13 +34379,13 @@ if ('serviceWorker' in navigator) {
   window.navigate = function (page) {
     const r = _origNavigate.apply(this, arguments);
     if (page && page !== 'login') {
-      const key = 'page=' + page;
-      if (!tabs.find(x => x.key === key) || activeKey !== key) {
-        // 이미 같은 페이지의 하위메뉴 탭이 활성이면 그대로 둔다 (하위메뉴 클릭 → navigate 호출 순서 대응)
+      if (HAS_SUB[page]) {
+        // 대메뉴(하위메뉴 보유)는 탭을 만들지 않음 — 같은 페이지의 하위메뉴 탭이 활성이 아니면 활성 표시만 해제
         const cur = tabs.find(x => x.key === activeKey);
-        if (!(cur && cur.kind === 'sub' && cur.page === page && !tabs.find(x => x.key === key))) {
-          addTab({ key, label: pageLabel(page), kind: 'page', page });
-        }
+        if (!(cur && cur.kind === 'sub' && cur.page === page)) { activeKey = null; render(); }
+      } else {
+        const key = 'page=' + page;
+        if (activeKey !== key) addTab({ key, label: pageLabel(page), kind: 'page', page });
       }
     }
     return r;
@@ -34399,10 +34400,7 @@ if ('serviceWorker' in navigator) {
       const page = ({ paTab: 'playauto', todoTab: 'todo', prodTab: 'products', uploadTab: 'upload', ledgerTab: 'ledger' })[ds];
       const label = el.textContent.replace(/\s+/g, ' ').trim();
       const key = attr + '=' + val;
-      // 방금 열린 같은 페이지의 상위 메뉴 탭은 이 하위메뉴 탭으로 대체
-      const cur = tabs.find(x => x.key === activeKey);
-      const replaceKey = (cur && cur.kind === 'page' && cur.page === page) ? cur.key : null;
-      addTab({ key, label, title: pageLabel(page) + ' › ' + label, kind: 'sub', page, attr, val }, replaceKey);
+      addTab({ key, label, title: pageLabel(page) + ' › ' + label, kind: 'sub', page, attr, val });
       return;
     }
   });
