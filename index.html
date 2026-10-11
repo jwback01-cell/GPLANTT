@@ -26478,15 +26478,18 @@ function _doConvertSelectedToReturn(targetRows, reason, kind) {
 
   const newRows = targetRows.map(orig => {
     const clone = { ...orig };
-    // 지플랜(당사 직접배송) + 구매자귀책 반품: 배송 1회(판매) + 수거 1회(반품) = 실제 배송이 2번 발생하므로
-    //   택배비(ship)는 상쇄시키지 않고 원래 부호(양수) 그대로 유지해 판매+반품 합계가 2배로 합산되게 한다.
-    //   (사용자 요청 2026-09-08. 공급가/원가는 그대로 상쇄, 택배비용은 기존처럼 양수 유지라 영향 없음)
-    const keepShipPositive = !isExchange && !isSeller && String(orig.vendor || '').trim() === '지플랜';
+    // 지플랜 거래처 반품 전용 규칙 (사용자 요청 2026-10-11): 모든 값은 정상 음수화(마진 = 원본 마진 반대부호)하고
+    //   반품 택배비용(shipCost)만 추가 가산한다.
+    //   - 구매자귀책: 사이트 무관 +1,000원
+    //   - 판매자귀책: 스마트스토어 +1,000원 / 그 외 사이트 +5,000원
+    const isGplanReturn = !isExchange && String(orig.vendor || '').trim() === '지플랜';
+    const gplanExtraShip = !isGplanReturn ? 0
+      : (!isSeller ? 1000 : (/스마트스토어/.test(String(orig.site || '')) ? 1000 : 5000));
+    const negFields = isGplanReturn ? ['qty','price','supply','ship','shipCost','cost','shipFee'] : NEG_FIELDS;
     // 반품만 값을 음수화. 교환은 수량/단가/매출/공급가/원가/택배비용 등을 양수로 유지(사용자 요청 2026-08-10).
     //   (교환 = 판매 차감이 아니므로 값은 그대로, 마진만 0 처리 — 아래 clone.profit)
     if (!isExchange) {
-      NEG_FIELDS.forEach(k => {
-        if (k === 'ship' && keepShipPositive) return;   // 지플랜+구매자귀책: 택배비는 음수화하지 않음
+      negFields.forEach(k => {
         if (clone[k] != null && clone[k] !== '') {
           const n = Number(clone[k]) || 0;
           clone[k] = -Math.abs(n); // 항상 음수
@@ -26503,11 +26506,6 @@ function _doConvertSelectedToReturn(targetRows, reason, kind) {
 
     if (isExchange) {
       clone.profit = 0;
-    } else if (keepShipPositive) {
-      // 지플랜+구매자귀책: 택배비가 상쇄되지 않으므로 "원본 마진의 반대부호" 대신
-      //   반품행 자체의 실제 필드값으로 마진을 계산한다 (공급가+택배비-원가-택배비용).
-      clone.profit = (clone.cost == null || clone.cost === '') ? null
-        : (Number(clone.supply) || 0) + (Number(clone.ship) || 0) - Number(clone.cost) - (Number(clone.shipCost) || 0);
     } else {
       // 반품 마진 = 원래 행 마진의 반대부호 (이익금만큼만 차감 → 원본 + 반품 = 0)
       //   예) 원래 마진 4,720 → 반품 마진 -4,720
@@ -26515,6 +26513,11 @@ function _doConvertSelectedToReturn(targetRows, reason, kind) {
         ? Number(orig.profit)
         : ((Number(orig.supply) || 0) + (Number(orig.ship) || 0) - (Number(orig.cost) || 0) - (Number(orig.shipCost) || 0));
       clone.profit = -_origMargin;
+      if (gplanExtraShip) {
+        // 지플랜: 반품 택배비용 가산 → 택배비용 필드와 마진에 반영
+        clone.shipCost = (Number(clone.shipCost) || 0) + gplanExtraShip;
+        clone.profit -= gplanExtraShip;
+      }
     }
 
     // 사이트에 '반품-귀책' / '교환-귀책' 표시
