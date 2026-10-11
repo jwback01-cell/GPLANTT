@@ -26477,9 +26477,19 @@ function _doConvertSelectedToReturn(targetRows, reason, kind) {
     : ['qty','price','supply','ship','cost','shipFee'];
 
   // 묶음 주문(같은 bundleKey)은 1건에만 추가 택배비 적용 — 이미 처리된 반품/교환 행도 포함해 확인
+  //   묶음 키(bundleKey)가 비어있는 구 데이터는 '원본 매출일 + 수령자 + 원본 저장일시' 로 같은 묶음을 추정한다.
+  const _bundleId = r => {
+    const bk = String(r.bundleKey || '').trim();
+    if (bk) return 'b:' + bk;
+    const fromDate = r._returnFromDate != null && r._returnFromDate !== '' ? r._returnFromDate : r.date;
+    const fromSaved = r._returnFrom != null && r._returnFrom !== '' ? r._returnFrom : r.savedAt;
+    const rcv = String(r.receiver || '').trim();
+    if (!rcv || !fromDate) return '';
+    return 'f:' + [fromDate, rcv, fromSaved].join('|');
+  };
   const _extraUsed = new Set();
   try {
-    _loadUploadData().forEach(r => { if (r && r._gplanExtra && r.bundleKey) _extraUsed.add(String(r.bundleKey)); });
+    _loadUploadData().forEach(r => { if (r && r._gplanExtra) { const id = _bundleId(r); if (id) _extraUsed.add(id); } });
   } catch (_) {}
   const newRows = targetRows.map(orig => {
     const clone = { ...orig };
@@ -26494,7 +26504,7 @@ function _doConvertSelectedToReturn(targetRows, reason, kind) {
     let gplanAddShipCost = !isGplanReturn ? 0 : ((isSeller && !_gplanSS) ? 5000 : 0);
     const _isGplanExchSeller = isExchange && isSeller && String(orig.vendor || '').trim() === '지플랜';
     if (gplanAddShip || gplanAddShipCost || _isGplanExchSeller) {
-      const _bk = String(orig.bundleKey || '').trim();
+      const _bk = _bundleId(orig);
       if (_bk && _extraUsed.has(_bk)) { gplanAddShip = 0; gplanAddShipCost = 0; clone._skipExtra = true; }
       else { if (_bk) _extraUsed.add(_bk); clone._gplanExtra = true; }
     }
