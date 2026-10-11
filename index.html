@@ -19487,7 +19487,17 @@ async function fetchExternalOrderFromMail() {
     console.log('[외부업체 발주 메일 가져오기] 최종 매칭:', items.length + '건', items.map(it => it.fileName));
     // CS 발주서 알림 — 일반 발주서와 같은 날 도착했거나(일반 없으면 오늘) CS 발주서가 있으면 팝업으로 알려준다.
     const _ymd = d => { const x = d ? new Date(d) : null; return (!x || isNaN(x)) ? '' : `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`; };
-    const _csBase = items.length ? _ymd(items[0].date) : _ymd(new Date());
+    // ★ 당일(오늘) 수신 메일만 처리 — 수신일이 오늘인 것만, 없으면 파일명 날짜(_YYMMDD)가 오늘인 것으로 폴백
+    const _todayFull = _ymd(new Date());
+    const _todayYYMMDD = _todayFull.replace(/-/g, '').slice(2);
+    const _isToday = it => _ymd(it.date) === _todayFull;
+    const _fileIsToday = it => String(it.fileName || '').replace(/\D/g, '').includes(_todayYYMMDD);
+    {
+      let t = items.filter(_isToday);
+      if (!t.length) t = items.filter(_fileIsToday);
+      items = t;
+    }
+    const _csBase = _todayFull;
     const csItems = allItemsSeen.filter(it => /cs/i.test(String(it.fileName || '').replace(/\s+/g, '')) && _ymd(it.date) === _csBase);
     const _notifyCs = () => {
       if (!csItems.length) return;
@@ -19498,11 +19508,12 @@ async function fetchExternalOrderFromMail() {
         'warn');
     };
     if (items.length === 0) {
-      _extUploadMsg('❌ 파일명에 "다올 버즈에어팟류" 가 포함되고 "CS" 가 없는 첨부를 최근 14일 메일에서 찾지 못했습니다.', 'error');
+      _extUploadMsg('❌ 오늘 수신된 "다올 버즈에어팟류" 발주서(CS 제외)를 찾지 못했습니다. (당일 주문만 처리)', 'error');
       const sampleNames = allItemsSeen.slice(0, 5).map(it => '· ' + (it.fileName || '(이름없음)')).join('\n');
       const sampleNote = sampleNames ? `\n\n조회된 다른 첨부 (예시):\n${sampleNames}` : '';
       if (csItems.length) { _notifyCs(); return; }
-      showAppAlert('가져올 메일 없음', `파일명에 "다올 버즈에어팟류" 가 포함되고 "CS" 가 없는 엑셀 첨부 메일이 최근 14일 내에 없습니다.${sampleNote}`, 'info');
+      showAppAlert('가져올 메일 없음', `오늘(${_todayFull}) 수신된 "다올 버즈에어팟류" 발주서(CS 제외)가 없습니다.
+당일 주문만 가져옵니다.${sampleNote}`, 'info');
       return;
     }
     if (items.length > 1) {
