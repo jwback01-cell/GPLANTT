@@ -18855,8 +18855,8 @@ async function downloadSeoulLiving(mode, actionType) {
     const labelTag  = isTestMail ? '🧪 테스트 메일' : '📧 메일 발송';
 
     // ★ 세트 상품이 아닌데 주소가 같은 주문이 2건 이상이면 실제 메일 발송 차단 (합배송/중복 주문 확인 필요)
-    //   (엑셀 다운로드·테스트 메일은 그대로 가능)
-    if (actionType === 'email') {
+    //   (실제·테스트 메일 모두 차단, 엑셀 다운로드는 가능)
+    if (actionType === 'email' || actionType === 'test-email') {
       const _normAddr = a => String(a || '').replace(/[^0-9A-Za-z가-힣]/g, '').toLowerCase();
       const _byAddr = new Map();
       _plainOrders.forEach(x => { const k = _normAddr(x.addr); if (!k) return; if (!_byAddr.has(k)) _byAddr.set(k, []); _byAddr.get(k).push(x); });
