@@ -6960,7 +6960,7 @@ async function _deleteSelectedStockMoves() {
       const reverseDelta = -sumDelta;   // 편집수정 -6 → +6
       for (const mem of members) {
         const prev = Number(mem.stock || 0);
-        const newStock = Math.max(0, prev + reverseDelta);
+        const newStock = prev + reverseDelta;
         try {
           const { error } = await _supabase.from('products').update({ stock: newStock }).eq('id', mem.id);
           if (error) { console.error('[이력삭제 복구] 실패:', mem.sku, error); continue; }
@@ -25373,7 +25373,7 @@ async function _applyStockFromUploadRows(rows, direction, opts) {
   let updated = 0;
   for (const [, g] of byGroup) {
     const oldStock = Number(g.primary.stock || 0);
-    const newStock = Math.max(0, oldStock + g.totalDelta);
+    const newStock = oldStock + g.totalDelta;
     for (const m of g.members) {
       try {
         const memberPrev = Number(m.stock || 0);
