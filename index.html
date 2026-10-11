@@ -26508,8 +26508,8 @@ function _doConvertSelectedToReturn(targetRows, reason, kind) {
     const _gplanSS = /스마트스토어/.test(String(orig.site || ''));
     let gplanAddShip     = !isGplanReturn ? 0 : ((!isSeller || _gplanSS) ? 1000 : 0);
     let gplanAddShipCost = !isGplanReturn ? 0 : ((isSeller && !_gplanSS) ? 5000 : 0);
-    const _isGplanExchSeller = isExchange && isSeller && String(orig.vendor || '').trim() === '지플랜';
-    if (gplanAddShip || gplanAddShipCost || _isGplanExchSeller) {
+    const _isGplanExch = isExchange && String(orig.vendor || '').trim() === '지플랜';
+    if (gplanAddShip || gplanAddShipCost || _isGplanExch) {
       const _bk = _bundleId(orig);
       if (_bk && _extraUsed.has(_bk)) { gplanAddShip = 0; gplanAddShipCost = 0; clone._skipExtra = true; }
       else { if (_bk) _extraUsed.add(_bk); clone._gplanExtra = true; }
@@ -26535,11 +26535,10 @@ function _doConvertSelectedToReturn(targetRows, reason, kind) {
 
     if (isExchange) {
       clone.profit = 0;
-      // 지플랜 교환(판매자귀책): 택배비용 5,000원 + 택배비 1,000원 추가 (마진 -4,000)
-      if (_isGplanExchSeller && !clone._skipExtra) {
-        clone.shipCost = 5000;
-        clone.ship = 1000;      // 택배비 +1,000원 추가 (마진 +1,000)
-        clone.profit = -5000 + 1000;
+      // 지플랜 교환: 판매자귀책 = 택배비용 5,000원 추가 (마진 -5,000) / 구매자귀책 = 택배비 1,000원 추가 (마진 +1,000)
+      if (_isGplanExch && !clone._skipExtra) {
+        if (isSeller) { clone.shipCost = 5000; clone.profit = -5000; }
+        else { clone.ship = 1000; clone.profit = 1000; }
       }
     } else {
       // 반품 마진 = 원래 행 마진의 반대부호 (이익금만큼만 차감 → 원본 + 반품 = 0)
