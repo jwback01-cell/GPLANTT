@@ -19485,10 +19485,23 @@ async function fetchExternalOrderFromMail() {
       });
     }
     console.log('[외부업체 발주 메일 가져오기] 최종 매칭:', items.length + '건', items.map(it => it.fileName));
+    // CS 발주서 알림 — 일반 발주서와 같은 날 도착했거나(일반 없으면 오늘) CS 발주서가 있으면 팝업으로 알려준다.
+    const _ymd = d => { const x = d ? new Date(d) : null; return (!x || isNaN(x)) ? '' : `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`; };
+    const _csBase = items.length ? _ymd(items[0].date) : _ymd(new Date());
+    const csItems = allItemsSeen.filter(it => /cs/i.test(String(it.fileName || '').replace(/\s+/g, '')) && _ymd(it.date) === _csBase);
+    const _notifyCs = () => {
+      if (!csItems.length) return;
+      const names = csItems.map(it => '· ' + (it.fileName || '(이름없음)')).join('\n');
+      showAppAlert('CS 발주서가 있습니다',
+        `CS 발주서가 도착해 있습니다. (${_csBase})\n\n${names}\n\n` +
+        (items.length ? '일반 발주서만 자동으로 가져왔습니다. CS 발주서는 별도로 확인해 주세요.' : '일반 발주서는 없고 CS 발주서만 있습니다. CS 발주서는 자동으로 가져오지 않으니 별도로 확인해 주세요.'),
+        'warn');
+    };
     if (items.length === 0) {
       _extUploadMsg('❌ 파일명에 "다올 버즈에어팟류" 가 포함되고 "CS" 가 없는 첨부를 최근 14일 메일에서 찾지 못했습니다.', 'error');
       const sampleNames = allItemsSeen.slice(0, 5).map(it => '· ' + (it.fileName || '(이름없음)')).join('\n');
       const sampleNote = sampleNames ? `\n\n조회된 다른 첨부 (예시):\n${sampleNames}` : '';
+      if (csItems.length) { _notifyCs(); return; }
       showAppAlert('가져올 메일 없음', `파일명에 "다올 버즈에어팟류" 가 포함되고 "CS" 가 없는 엑셀 첨부 메일이 최근 14일 내에 없습니다.${sampleNote}`, 'info');
       return;
     }
@@ -19516,6 +19529,7 @@ async function fetchExternalOrderFromMail() {
     _extUploadMsg(`✅ ${it.fileName} 수신 — 자동으로 업로드 처리합니다... (${dateStr})`, 'info');
     // 기존 파일 처리 함수에 그대로 전달
     _processExternalOrderFile(file);
+    _notifyCs();
   } catch (e) {
     console.error('[외부업체 발주 메일 가져오기] 실패:', e);
     _extUploadMsg('메일 가져오기 실패: ' + (e.message || e), 'error');
