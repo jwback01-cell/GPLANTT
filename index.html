@@ -34297,6 +34297,136 @@ if ('serviceWorker' in navigator) {
   new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1) { if (isDate(n)) prep(n); else scan(n); } })))
     .observe(document.documentElement, { childList: true, subtree: true });
 })();
+
+// ── 상단 메뉴 탭바 (플레이오토처럼 열었던 메뉴를 탭으로 유지) ──────────────
+//  사이드바 메뉴/하위메뉴를 열면 탭이 생기고, 탭 클릭으로 전환 / × 로 닫기. 열린 탭은 gplan_ 키로 저장(클라우드 동기화 대상).
+(function () {
+  const KEY = 'gplan_open_menu_tabs_v1';
+  const SUB_ATTRS = [['paTab','data-pa-tab'],['todoTab','data-todo-tab'],['prodTab','data-prod-tab'],['uploadTab','data-upload-tab'],['ledgerTab','data-ledger-tab']];
+  let tabs = [];            // { key, label, title, kind:'page'|'sub', page, attr, val }
+  let activeKey = null;
+  try { const s = JSON.parse(localStorage.getItem(KEY) || '[]'); if (Array.isArray(s)) tabs = s.filter(t => t && t.key && t.label); } catch (_) {}
+
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(tabs)); } catch (_) {} };
+  const pageLabel = p => {
+    const el = document.querySelector('.nav-item[data-page="' + p + '"]');
+    return el ? el.textContent.replace(/\s+/g, ' ').trim() : p;
+  };
+
+  function injectBars() {
+    document.querySelectorAll('.page').forEach(pg => {
+      if (pg.id === 'page-login' || pg.querySelector(':scope > .gplan-tabbar')) return;
+      const header = pg.querySelector(':scope > header');
+      if (!header) return;
+      const bar = document.createElement('div');
+      bar.className = 'gplan-tabbar';
+      header.insertAdjacentElement('afterend', bar);
+    });
+  }
+
+  function render() {
+    injectBars();
+    const html = tabs.map(t =>
+      `<div class="gplan-tab${t.key === activeKey ? ' active' : ''}" data-tabkey="${esc(t.key)}" title="${esc(t.title || t.label)}">` +
+      `<span class="gplan-tab-label">${esc(t.label)}</span>` +
+      `<button type="button" class="gplan-tab-x" data-tabclose="${esc(t.key)}" title="탭 닫기">×</button></div>`
+    ).join('');
+    document.querySelectorAll('.gplan-tabbar').forEach(b => { b.innerHTML = html; b.style.display = tabs.length ? '' : 'none'; });
+    const act = document.querySelector('.page.active .gplan-tab.active');
+    if (act && act.scrollIntoView) { try { act.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {} }
+  }
+
+  function addTab(t, replaceKey) {
+    const exist = tabs.find(x => x.key === t.key);
+    if (!exist) {
+      const ri = replaceKey ? tabs.findIndex(x => x.key === replaceKey) : -1;
+      if (ri >= 0) tabs[ri] = t; else tabs.push(t);
+    }
+    activeKey = t.key;
+    save(); render();
+  }
+
+  function openTab(t) {
+    if (t.kind === 'page') {
+      if (typeof window.navigate === 'function') window.navigate(t.page);
+    } else {
+      const el = document.querySelector('[' + t.attr + '="' + t.val + '"]');
+      if (el) el.click(); else if (typeof window.navigate === 'function') window.navigate(t.page);
+    }
+  }
+
+  function closeTab(key) {
+    const i = tabs.findIndex(x => x.key === key);
+    if (i < 0) return;
+    tabs.splice(i, 1);
+    save();
+    if (key === activeKey) {
+      const next = tabs[Math.min(i, tabs.length - 1)];
+      if (next) { activeKey = next.key; render(); openTab(next); }
+      else { activeKey = null; render(); if (typeof window.navigate === 'function') window.navigate('dashboard'); }
+    } else render();
+  }
+
+  // navigate 래핑 — 어떤 경로로 페이지가 열려도 탭 등록
+  const _origNavigate = window.navigate;
+  window.navigate = function (page) {
+    const r = _origNavigate.apply(this, arguments);
+    if (page && page !== 'login') {
+      const key = 'page=' + page;
+      if (!tabs.find(x => x.key === key) || activeKey !== key) {
+        // 이미 같은 페이지의 하위메뉴 탭이 활성이면 그대로 둔다 (하위메뉴 클릭 → navigate 호출 순서 대응)
+        const cur = tabs.find(x => x.key === activeKey);
+        if (!(cur && cur.kind === 'sub' && cur.page === page && !tabs.find(x => x.key === key))) {
+          addTab({ key, label: pageLabel(page), kind: 'page', page });
+        }
+      }
+    }
+    return r;
+  };
+
+  // 하위메뉴 클릭 → 탭 등록 (기존 위임 핸들러 이후 버블 단계에서 실행)
+  document.addEventListener('click', e => {
+    for (const [ds, attr] of SUB_ATTRS) {
+      const el = e.target.closest('[' + attr + ']');
+      if (!el) continue;
+      const val = el.dataset[ds];
+      const page = ({ paTab: 'playauto', todoTab: 'todo', prodTab: 'products', uploadTab: 'upload', ledgerTab: 'ledger' })[ds];
+      const label = el.textContent.replace(/\s+/g, ' ').trim();
+      const key = attr + '=' + val;
+      // 방금 열린 같은 페이지의 상위 메뉴 탭은 이 하위메뉴 탭으로 대체
+      const cur = tabs.find(x => x.key === activeKey);
+      const replaceKey = (cur && cur.kind === 'page' && cur.page === page) ? cur.key : null;
+      addTab({ key, label, title: pageLabel(page) + ' › ' + label, kind: 'sub', page, attr, val }, replaceKey);
+      return;
+    }
+  });
+
+  // 탭 바 클릭
+  document.addEventListener('click', e => {
+    const x = e.target.closest('[data-tabclose]');
+    if (x) { e.stopPropagation(); closeTab(x.getAttribute('data-tabclose')); return; }
+    const tabEl = e.target.closest('.gplan-tab');
+    if (!tabEl) return;
+    const t = tabs.find(v => v.key === tabEl.getAttribute('data-tabkey'));
+    if (!t) return;
+    activeKey = t.key; render(); openTab(t);
+  });
+
+  const css = document.createElement('style');
+  css.textContent =
+    '.gplan-tabbar{display:flex;gap:4px;align-items:flex-end;padding:0 16px;margin-top:2px;overflow-x:auto;flex-shrink:0;border-bottom:1px solid #E5E5EA;scrollbar-width:thin}' +
+    '@media(min-width:768px){.gplan-tabbar{padding:0 24px}}' +
+    '.gplan-tab{display:flex;align-items:center;gap:6px;padding:7px 8px 7px 14px;font-size:13px;font-weight:600;color:#8E8E93;background:#F2F2F7;border:1px solid #E5E5EA;border-bottom:none;border-radius:10px 10px 0 0;cursor:pointer;white-space:nowrap;margin-bottom:-1px;user-select:none}' +
+    '.gplan-tab:hover{color:#1A1A1A;background:#EAEAF0}' +
+    '.gplan-tab.active{color:#1A1A1A;font-weight:800;background:#fff;border-bottom:1px solid #fff}' +
+    '.gplan-tab.active .gplan-tab-label{box-shadow:inset 0 -2px 0 #00C853}' +
+    '.gplan-tab-x{border:0;background:transparent;color:#aaa;font-size:15px;line-height:1;width:18px;height:18px;border-radius:50%;cursor:pointer;padding:0}' +
+    '.gplan-tab-x:hover{background:#ddd;color:#1A1A1A}';
+  document.head.appendChild(css);
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render); else render();
+})();
 </script>
 </body>
 </html>
