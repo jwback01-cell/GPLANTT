@@ -60,6 +60,8 @@ export default async function handler(req, res) {
   // metaOnly: 실제 첨부 내용은 받지 않고 구조(제목/날짜/파일명/크기)만 가볍게 조회 — 빠름.
   //   프론트는 이걸로 원하는 메일의 uid 를 먼저 찾은 뒤, uid 파라미터로 그 1건만 다시 요청한다.
   const metaOnly = String(q.metaOnly || body.metaOnly || '') === '1';
+  // markSeenOnly: uid 메일을 '읽음' 처리만 한다 (원문/첨부 다운로드 없음) — 원클릭 송장 처리 후 메일을 읽음으로 표시하는 용도.
+  const markSeenOnly = String(q.markSeenOnly || body.markSeenOnly || '') === '1';
 
   const client = new ImapFlow({
     host: 'imap.naver.com',
@@ -82,6 +84,14 @@ export default async function handler(req, res) {
     const lock = await client.getMailboxLock('INBOX');
     try {
       // uid 지정 시: 검색 생략하고 그 메일 1건만 원문(+첨부) 다운로드 — "찾기"와 분리된 "받기" 전용 경로.
+      if (targetUid > 0 && markSeenOnly) {
+        let marked = false;
+        try { marked = !!(await client.messageFlagsAdd(targetUid, ['\\Seen'], { uid: true })); }
+        catch (flagErr) { console.warn('[naver-mail-fetch] 읽음 처리 실패 uid=' + targetUid, flagErr && flagErr.message); }
+        await safeLogout(client);
+        res.status(200).json({ ok: true, uid: targetUid, markedSeen: marked });
+        return;
+      }
       if (targetUid > 0) {
         let parsed = null;
         try {

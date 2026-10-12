@@ -21690,7 +21690,15 @@ async function fetchInvoiceFromMail(opts) {
         }
         _injectFile(full);
         let r = null;
-        try { r = await uploadInvoiceFile(); } catch (e) { console.warn('[송장 메일 가져오기] 매칭 실패:', it.fileName, e); }
+        let _upOk = true;
+        try { r = await uploadInvoiceFile(); } catch (e) { _upOk = false; console.warn('[송장 메일 가져오기] 매칭 실패:', it.fileName, e); }
+        // 처리 완료된 메일은 네이버 메일에서 '읽음' 처리 (백그라운드 — 실패해도 송장 처리에는 영향 없음)
+        if (_upOk && it.uid) {
+          fetch('/api/naver-mail-fetch?uid=' + encodeURIComponent(it.uid) + '&markSeenOnly=1')
+            .then(r2 => r2.json().catch(() => ({})))
+            .then(d => console.log('[송장 메일 가져오기] 읽음 처리:', it.fileName, d && d.markedSeen ? '완료' : '실패/미확인'))
+            .catch(e => console.warn('[송장 메일 가져오기] 읽음 처리 실패:', e));
+        }
         totalMatched += (r && r.matched) || 0;
         totalUnmatched += (r && r.unmatched) || 0;
         doneFiles.push(it.fileName);
