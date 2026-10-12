@@ -26613,6 +26613,7 @@ function _doConvertSelectedToReturn(targetRows, reason, kind) {
     clone._returnReason = reason; // 'buyer' | 'seller'
     clone._returnFrom = orig.savedAt || '';
     clone._returnFromDate = orig.date || ''; // 원본 매출일 보관 (역추적)
+    clone._retKey = `udret-${Date.now()}-${Math.random().toString(36).slice(2,9)}`;   // 반품 데이터 행과 연결 (삭제 동기화용)
     clone.date = todayDate;                  // 날짜 = 반품 처리한 오늘 날짜
     clone.savedAt = savedAt;
     return clone;
@@ -26645,7 +26646,7 @@ function _doConvertSelectedToReturn(targetRows, reason, kind) {
         _uploadedAt: _now.toISOString(),
         _fromUpload: true,
         _claimKind : isExchange ? 'exchange' : 'return',
-        _key       : `udret-${_ts}-${k}-${Math.random().toString(36).slice(2,7)}`,
+        _key       : (newRows[k] && newRows[k]._retKey) || `udret-${_ts}-${k}-${Math.random().toString(36).slice(2,7)}`,
       });
     });
     if (typeof _saveReturns === 'function') _saveReturns(returns);
@@ -26670,6 +26671,37 @@ function _doConvertSelectedToReturn(targetRows, reason, kind) {
     { type: 'success' });
 }
 
+// 업로드 데이터의 반품/교환 행을 삭제할 때 — 반품 데이터(소메뉴)에 같이 남은 항목도 함께 삭제
+//   연결키(_retKey)가 있으면 정확히 매칭, 구 데이터(키 없음)는 수령자·상품명·출고일·처리사항으로 추정 매칭.
+function _removeReturnEntriesForUploadRows(removedRows) {
+  try {
+    const claimRows = (removedRows || []).filter(r => r && r._isReturn);
+    if (!claimRows.length || typeof _loadReturns !== 'function' || typeof _saveReturns !== 'function') return 0;
+    let returns = _loadReturns() || [];
+    const before = returns.length;
+    const used = new Set();
+    claimRows.forEach(r => {
+      let idx = -1;
+      if (r._retKey) idx = returns.findIndex((x, i) => !used.has(i) && x && x._key === r._retKey);
+      if (idx < 0) {
+        const kind = r._claimKind === 'exchange' ? '교환' : '반품';
+        const reason = r._returnReason === 'seller' ? '판매자귀책' : '구매자귀책';
+        const action = `${kind}(${reason})`;
+        idx = returns.findIndex((x, i) => !used.has(i) && x && x._fromUpload
+          && String(x.recvName || '') === String(r.receiver || '')
+          && String(x.itemName || '') === String(r.itemName || '')
+          && String(x.outDate || '') === String(r._returnFromDate || '')
+          && String(x.action || '') === action);
+      }
+      if (idx >= 0) used.add(idx);
+    });
+    if (!used.size) return 0;
+    returns = returns.filter((_, i) => !used.has(i));
+    _saveReturns(returns);
+    if (typeof renderReturnData === 'function') renderReturnData();
+    return before - returns.length;
+  } catch (e) { console.warn('[반품데이터 동기 삭제 실패]', e); return 0; }
+}
 async function deleteSelectedUploadData() {
   // 일반 행 선택 (data-idx 기반)
   const checkedRows = Array.from(document.querySelectorAll('.upload-data-cb:checked'));
@@ -26720,6 +26752,7 @@ async function deleteSelectedUploadData() {
       _saveUploadData(next);
       syncLedgerFromUploadData();
       const stockRes = await _applyStockFromUploadRows(removed, +1);
+      _removeReturnEntriesForUploadRows(removed);
       renderUploadData();
       if (stockRes.updated > 0) {
         showAppAlert('삭제 완료', `${totalToDelete}건 삭제 완료\n📦 재고 복구: ${stockRes.updated}개 SKU (총 ${stockRes.totalDelta}개 증가)`, 'success');
