@@ -21543,8 +21543,13 @@ async function runInvoiceOneClick() {
     }
     // 4) 플레이오토로 송장 전송 (확인창 생략)
     _invoiceStatus('④ 플레이오토로 송장 전송 중...', 'info');
-    await sendInvoicesToPlayauto({ skipConfirm: true });
-    _invoiceStatus('✅ 원클릭 송장 처리 완료 (수집 → 메일 → 매칭 → 전송)', 'ok');
+    const sendRes = await sendInvoicesToPlayauto({ skipConfirm: true });
+    if (sendRes && (sendRes.fail > 0 || sendRes.unknown > 0)) {
+      const why = [...new Set(sendRes.failMsgs || [])].slice(0, 2).join(' / ');
+      _invoiceStatus(`⚠ 송장 전송 결과 확인 필요 — 성공 ${sendRes.ok} / 실패 ${sendRes.fail}${sendRes.unknown ? ' / 응답불명 ' + sendRes.unknown : ''}${why ? ' (' + why + ')' : ''}. 아래 [전송 로그]를 확인하세요.`, 'warn');
+    } else {
+      _invoiceStatus('✅ 원클릭 송장 처리 완료 (수집 → 메일 → 매칭 → 전송)', 'ok');
+    }
   } catch (e) {
     console.error('[원클릭 송장 처리] 실패:', e);
     _invoiceStatus('처리 실패: ' + (e.message || e), 'error');
@@ -22554,7 +22559,8 @@ async function _doSendInvoicesToPlayauto(btn, targets, userEndpoint, fallbackCar
     ...INVOICE_ENDPOINT_CANDIDATES.filter(c => c.path !== userEndpoint),
   ];
 
-  let ok = 0, fail = 0;
+  let ok = 0, fail = 0, unknown = 0;
+  const failMsgs = [];
   let res = null;
   let succeededSpec = null;
   let lastErr = null;
@@ -22583,6 +22589,7 @@ async function _doSendInvoicesToPlayauto(btn, targets, userEndpoint, fallbackCar
 
   if (!succeededSpec) {
     fail = targets.length;
+    failMsgs.push(String(lastErr && lastErr.message || '전송 실패'));
     _invLog('❌ 모든 엔드포인트 후보 실패 — 마지막 에러: ' + (lastErr && lastErr.message || '(unknown)'));
   } else {
     _invLog(`✅ 성공한 엔드포인트: ${succeededSpec.method} ${succeededSpec.path}`);
@@ -22599,6 +22606,7 @@ async function _doSendInvoicesToPlayauto(btn, targets, userEndpoint, fallbackCar
           _invLog('  ✅ bundle_no=' + bn + ' → ' + (r.setInvoiceResult || '성공') + (r.addWorkResult ? ' · 작업=' + r.addWorkResult : ''));
         } else {
           fail++;
+          failMsgs.push((r.setInvoiceMessage || r.setInvoiceResult || '실패') + (r.addWorkMessage ? ' · ' + r.addWorkMessage : ''));
           _invLog('  ❌ bundle_no=' + bn + ' → ' + (r.setInvoiceMessage || r.setInvoiceResult || '실패') + (r.addWorkMessage ? ' · ' + r.addWorkMessage : ''));
         }
       });
@@ -22606,9 +22614,9 @@ async function _doSendInvoicesToPlayauto(btn, targets, userEndpoint, fallbackCar
       fail = targets.length;
       _invLog('❌ 응답이 에러 형식: ' + JSON.stringify(res).slice(0, 300));
     } else {
-      // 응답 형식 불명 — 그래도 전체 성공으로 간주
-      ok = targets.length;
-      _invLog('ℹ️ 응답 형식이 문서와 다르지만 에러는 아님 — 전체 성공으로 간주');
+      // 응답 형식 불명 — 성공으로 단정하지 않고 '확인 필요'로 표시 (플레이오토 출고관리에서 송장 등록 여부 확인)
+      unknown = targets.length;
+      _invLog('⚠️ 응답 형식이 문서와 다르거나 결과 목록이 비어 있습니다 — 성공을 확인할 수 없습니다. 플레이오토에서 송장 등록 여부를 확인하세요.');
     }
     // 성공한 엔드포인트를 hidden input 에 저장해서 다음 시도부터는 즉시 사용
     try {
@@ -22620,14 +22628,17 @@ async function _doSendInvoicesToPlayauto(btn, targets, userEndpoint, fallbackCar
     } catch(_) {}
   }
 
-  const tone = fail === 0 ? 'ok' : (ok > 0 ? 'warn' : 'error');
-  _invSendStatus('전송 완료 · 성공 ' + ok + '건 / 실패 ' + fail + '건', tone);
+  const tone = (fail === 0 && unknown === 0) ? 'ok' : (ok > 0 ? 'warn' : (unknown > 0 && fail === 0 ? 'warn' : 'error'));
+  const _failSummary = failMsgs.length ? [...new Set(failMsgs)].slice(0, 3).join(' / ') : '';
+  _invSendStatus('전송 결과 · 성공 ' + ok + '건 / 실패 ' + fail + '건' + (unknown ? ' / 확인 필요 ' + unknown + '건' : '') + (_failSummary ? ' — ' + _failSummary : ''), tone);
   _invLog('=== 완료: 성공 ' + ok + ' / 실패 ' + fail + ' ===');
   if (btn) { btn.disabled = false; btn.innerHTML = orig; }
   // 전송 로그 박스로 스크롤 + 결과 alert (사용자가 화면 아래쪽 status를 못 보고 지나치는 것 방지)
   try { document.getElementById('pa-inv-send-log-box')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(_) {}
-  const resultType = fail === 0 ? 'success' : (ok > 0 ? 'warning' : 'danger');
-  showAppAlert('송장 전송 완료', `성공 ${ok}건 / 실패 ${fail}건\n\n자세한 내역은 화면 아래의 [전송 로그] 를 확인하세요.`, { type: resultType });
+  const resultType = (fail === 0 && unknown === 0) ? 'success' : (ok > 0 ? 'warning' : 'danger');
+  const _title = (fail === 0 && unknown === 0) ? '송장 전송 완료' : '송장 전송 — 확인 필요';
+  showAppAlert(_title, `성공 ${ok}건 / 실패 ${fail}건` + (unknown ? ` / 확인 필요 ${unknown}건` : '') + (_failSummary ? `\n사유: ${_failSummary}` : '') + `\n\n자세한 내역은 화면 아래의 [전송 로그] 를 확인하세요.`, { type: resultType });
+  return { ok, fail, unknown, failMsgs };
 }
 
 // 이카운트 연동 내부 서브탭 전환 (데이터 전송 / 매핑 / 이카운트 연동)
