@@ -22248,17 +22248,20 @@ function _invNormCarrier(name) {
 function _findCarrierByName(name) {
   if (!name || !Array.isArray(_paCarriers) || !_paCarriers.length) return null;
   const target = _invNormCarrier(name);
-  if (!target) return null;
   const getN = c => String(c.carrier_name || c.name || c.carrierName || '').trim();
-  // 1) 정확 일치
-  let hit = _paCarriers.find(c => _invNormCarrier(getN(c)) === target);
-  if (hit) return hit;
-  // 2) 부분 일치 (로젠 ↔ 로젠택배)
-  hit = _paCarriers.find(c => {
-    const n = _invNormCarrier(getN(c));
-    return n && (n.includes(target) || target.includes(n));
-  });
-  if (hit) return hit;
+  let hit = null;
+  // ※ '대한통운' 처럼 정규화하면 빈 문자열이 되는 이름은 1·2단계를 건너뛰고 3단계(원본 부분일치)로 처리
+  if (target) {
+    // 1) 정확 일치
+    hit = _paCarriers.find(c => _invNormCarrier(getN(c)) === target);
+    if (hit) return hit;
+    // 2) 부분 일치 (로젠 ↔ 로젠택배)
+    hit = _paCarriers.find(c => {
+      const n = _invNormCarrier(getN(c));
+      return n && (n.includes(target) || target.includes(n));
+    });
+    if (hit) return hit;
+  }
   // 3) 원본 문자열로 부분 매칭 (정규화해도 다른 경우 대비)
   hit = _paCarriers.find(c => {
     const n = getN(c);
@@ -22596,11 +22599,13 @@ async function _doSendInvoicesToPlayauto(btn, targets, userEndpoint, fallbackCar
     _invLog('📥 응답: ' + JSON.stringify(res).slice(0, 500));
     // 응답 형식: { result: [{bundle_no, setInvoiceResult:"성공"/"실패", setInvoiceMessage, work_no, addWorkResult, addWorkMessage}, ...] }
     // 또는 { update_list: [...], work_result: [...] } — aff_no에 따라 다름
-    const list = (res && (res.result || res.update_list)) || [];
+    // (실제 응답은 [{bundle_no, result:'성공'|'실패', error_code, messages:[]}] 형태의 배열로도 온다)
+    const list = Array.isArray(res) ? res : ((res && (res.result || res.update_list)) || []);
     if (Array.isArray(list) && list.length) {
       list.forEach(r => {
         const bn = r.bundle_no || '';
-        const okThis = r.setInvoiceResult === '성공' || r.result === true || r.setInvoiceResult === true;
+        const okThis = r.setInvoiceResult === '성공' || r.result === true || r.setInvoiceResult === true || r.result === '성공';
+        if (!okThis && Array.isArray(r.messages) && r.messages.length) r.setInvoiceMessage = r.setInvoiceMessage || (r.error_code ? r.error_code + ': ' : '') + r.messages.join(' / ');
         if (okThis) {
           ok++;
           _invLog('  ✅ bundle_no=' + bn + ' → ' + (r.setInvoiceResult || '성공') + (r.addWorkResult ? ' · 작업=' + r.addWorkResult : ''));
