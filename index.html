@@ -23135,6 +23135,8 @@ async function dashboardOneClickEcount(mode) {
   try {
     // 장부 입력 전용 — 수집 + 매출장부 저장만, 이카운트 전송은 안 함
     const result = await fetchSaveAndSendToEcount({ skipEcount: true });
+    // 저장 직후 대시보드 KPI(이번 달 총매출/순이익/주별 실적) 즉시 갱신
+    try { syncLedgerFromUploadData(); syncDashboardRevenue(); if (typeof renderWeeklyBars === 'function') renderWeeklyBars(); } catch (_) {}
     if (result && result.ok) {
       setStatus(`장부 저장 완료 (${result.ledgerCount || 0}건). 이카운트 전송은 [장부 업로드 → 업로드 데이터]에서 진행하세요.`, 'text-brand-green');
     } else {
