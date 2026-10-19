@@ -19557,6 +19557,13 @@ async function fetchExternalOrderFromMail() {
     _extUploadMsg(`✅ ${it.fileName} 수신 — 자동으로 업로드 처리합니다... (${dateStr})`, 'info');
     // 기존 파일 처리 함수에 그대로 전달
     _processExternalOrderFile(file);
+    // 가져온 메일은 네이버 메일에서 '읽음' 처리 (백그라운드 — 실패해도 업로드 처리에는 영향 없음)
+    if (it.uid) {
+      fetch('/api/naver-mail-fetch?uid=' + encodeURIComponent(it.uid) + '&markSeenOnly=1')
+        .then(r2 => r2.json().catch(() => ({})))
+        .then(d => console.log('[외부업체 발주 메일 가져오기] 읽음 처리:', it.fileName, d && d.markedSeen ? '완료' : '실패/미확인'))
+        .catch(e => console.warn('[외부업체 발주 메일 가져오기] 읽음 처리 실패:', e));
+    }
     _notifyCs();
   } catch (e) {
     console.error('[외부업체 발주 메일 가져오기] 실패:', e);
