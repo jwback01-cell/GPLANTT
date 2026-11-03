@@ -33221,7 +33221,7 @@ function _paAssertOk(res, label) {
 // 구조: 상품-레벨 메타(prod_name 등)는 탑 레벨, SKU/변형-레벨(sku_cd, depots 등)은 opt[] 내부
 async function _paAddStockSku(p, depot) {
   // 안전재고는 실재고를 초과할 수 없음 (PA API 제약)
-  const stock = Number(p.stock || 0);
+  const stock = 9999;   // 플레이오토로 신규 등록 시 재고는 항상 9999개로 고정
   let safe = Number(p.safety_stock || 0);
   if (safe > stock) safe = stock;
   const sku = String(p.sku || '').trim();
