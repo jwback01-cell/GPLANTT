@@ -21543,7 +21543,18 @@ async function runInvoiceOneClick() {
   try {
     // 1) 플레이오토 출고관리 주문 수집
     _invoiceStatus('① 플레이오토 출고관리 주문 수집 중...', 'info');
-    await fetchInvoiceShipManagementOrders();
+    let _ordersOk = await fetchInvoiceShipManagementOrders();
+    if (_ordersOk === false) {
+      // 일시적 오류(플레이오토 API 장애 등)면 잠시 후 1회 재시도
+      _invoiceStatus('① 주문 수집 실패 — 5초 후 한 번 더 시도합니다...', 'warn');
+      await new Promise(r => setTimeout(r, 5000));
+      _ordersOk = await fetchInvoiceShipManagementOrders();
+    }
+    if (_ordersOk === false) {
+      // 오래된(이전 수집) 주문으로 메일 송장을 매칭하지 않도록 중단
+      _invoiceStatus('❌ 플레이오토 주문 수집에 실패해 처리를 중단했습니다. (수집된 주문이 아니라 이전 데이터로 메일을 매칭하면 "미매칭"이 나옵니다) 잠시 후 다시 눌러주세요.', 'error');
+      return;
+    }
     // 2+3) 메일에서 송장 엑셀 자동 가져오기 + 매칭 — 매칭되는 모든 회신(카테고리별) 전체 처리
     //   (예: '리빙컴퍼니 발주양식', '그외', '의류', '버즈' 등 여러 회신이 오면 전부 매칭해 누적)
     _invoiceStatus('② 메일에서 송장 엑셀 가져와 매칭 중...', 'info');
@@ -22094,7 +22105,7 @@ async function fetchInvoiceShipManagementOrders() {
   if (endEl) endEl.value = _fmtYmd(today);
   const dtSelect = document.getElementById('pa-inv-date-type');
   if (dtSelect) dtSelect.value = 'wdate';
-  await fetchInvoiceTabOrders();
+  return await fetchInvoiceTabOrders();
 }
 
 async function fetchInvoiceTabOrders() {
@@ -22192,8 +22203,10 @@ async function fetchInvoiceTabOrders() {
     }
     renderInvoiceCollectedOrders();
     refreshInvoiceSendCount();
+    return true;
   } catch (err) {
     setSt('❌ ' + (err && err.message || err), 'text-brand-pink');
+    return false;
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = orig; }
   }
@@ -22775,6 +22788,13 @@ async function _paFetch(path, opts = {}, _retry = 0) {
     const err = await r.json().catch(() => ({}));
     const errMsg = (typeof err.error === 'string') ? err.error
       : (err.error && err.error.message) || (err.message) || JSON.stringify(err).slice(0, 300) || `HTTP ${r.status}`;
+    // 일시적 장애(5xx / "An error occurred with your deployment" 등)는 읽기 전용 호출에 한해 최대 2회 재시도 (쓰기 호출은 중복 방지 위해 재시도 안 함)
+    const _readOnly = String(opts.method || 'GET').toUpperCase() === 'GET' || path === '/orders';
+    const _transient = r.status >= 500 || /error occurred with your deployment|FUNCTION_INVOCATION|temporar|timed? ?out|ECONNRESET|socket hang up/i.test(String(errMsg));
+    if (_readOnly && _transient && _retry < 2) {
+      await new Promise(res => setTimeout(res, 1500 * (_retry + 1)));
+      return _paFetch(path, opts, _retry + 1);
+    }
     throw new Error(errMsg);
   } catch (e) {
     if (!String(e.message || '').includes('Failed to fetch')) throw e;
