@@ -1152,7 +1152,7 @@ input[type="date"]{padding-right:1.9rem !important;background-image:url("data:im
         <!-- 캘린더 그리드 -->
         <div id="events-calendar-grid" class="grid grid-cols-7 gap-1"></div>
         <!-- 안내 -->
-        <div class="mt-4 text-xs text-brand-gray text-center">행사 카드를 클릭하면 상세 정보를 보거나 편집할 수 있어요. 빈 셀을 클릭하면 해당 날짜로 새 행사를 추가합니다.</div>
+        <div class="mt-4 text-xs text-brand-gray text-center">행사 카드를 클릭하면 상세 정보를 보거나 편집할 수 있고, 끌어서(드래그) 다른 날짜로 이동할 수 있어요. 빈 셀을 클릭하면 해당 날짜로 새 행사를 추가합니다.</div>
       </div>
 
       <!-- 행사 추가/편집 모달 -->
@@ -15004,6 +15004,7 @@ function renderEventsCalendar() {
     weekDiv.className = 'ev-week';
     weekDiv.style.cssText = `display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:28px repeat(${maxLanes},26px) 1fr;gap:4px;min-height:130px;`;
 
+    const _dayCells = [];   // 드래그 앤 드롭 하이라이트용
     // 각 일자 셀 (전체 행 차지)
     week.forEach((cell, idx) => {
       const isToday = cell.key === today;
@@ -15020,6 +15021,7 @@ function renderEventsCalendar() {
         <span style="font-size:13px;font-weight:700;color:${dayNumColor};">${cell.date.getDate()}</span>
         ${isToday ? '<span style="font-size:9px;font-weight:900;color:#fff;background:#1A1A1A;border-radius:999px;padding:2px 6px;">TODAY</span>' : ''}
       </div>`;
+      _dayCells.push(dayCell);
       weekDiv.appendChild(dayCell);
     });
 
@@ -15039,13 +15041,86 @@ function renderEventsCalendar() {
       bar.style.cssText = `grid-column:${colStart}/${colEnd};grid-row:${row};background:${c.bg};color:${c.fg};border-radius:${radiusL} ${radiusR} ${radiusR} ${radiusL};${borderL}${borderR}padding:3px 8px;font-size:11px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:space-between;gap:6px;cursor:pointer;overflow:hidden;white-space:nowrap;margin:0 6px;z-index:2;position:relative;box-sizing:border-box;`;
       bar.title = t.ev.title || '';
       bar.onclick = (e) => { e.stopPropagation(); openEditEventModal(t.ev.id); };
+      // 드래그 앤 드롭으로 행사 이동 (기간 유지, 잡은 위치 기준)
+      bar.draggable = true;
+      bar.style.cursor = 'grab';
+      bar.addEventListener('dragstart', (e) => {
+        const rect = weekDiv.getBoundingClientRect();
+        const col = Math.max(0, Math.min(6, Math.floor((e.clientX - rect.left) / (rect.width / 7))));
+        const grabbed = week[col].key;
+        const evStart = t.ev.dateStart || t.ev.dateEnd;
+        window._evDrag = { id: t.ev.id, offsetDays: _evDaysBetween(evStart, grabbed) };
+        try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', t.ev.id); } catch (_) {}
+        setTimeout(() => { bar.style.opacity = '0.45'; }, 0);
+      });
+      bar.addEventListener('dragend', () => {
+        bar.style.opacity = '';
+        window._evDrag = null;
+        document.querySelectorAll('.ev-week > div').forEach(d => { d.style.outline = ''; });
+      });
       // 제목 (첫 주에만 보임) — 시작/종료선은 막대 자체의 border 로 표현
       bar.textContent = t.showTitle ? (t.ev.title || '') : '';
       weekDiv.appendChild(bar);
     });
 
+    // 드롭 대상 일자 계산 + 하이라이트
+    const _colAt = (e) => {
+      const rect = weekDiv.getBoundingClientRect();
+      return Math.max(0, Math.min(6, Math.floor((e.clientX - rect.left) / (rect.width / 7))));
+    };
+    weekDiv.addEventListener('dragover', (e) => {
+      if (!window._evDrag) return;
+      e.preventDefault();
+      try { e.dataTransfer.dropEffect = 'move'; } catch (_) {}
+      const col = _colAt(e);
+      document.querySelectorAll('.ev-week > div').forEach(d => { d.style.outline = ''; });
+      if (_dayCells[col]) _dayCells[col].style.outline = '2px dashed #2196F3';
+    });
+    weekDiv.addEventListener('drop', (e) => {
+      const drag = window._evDrag;
+      if (!drag) return;
+      e.preventDefault();
+      document.querySelectorAll('.ev-week > div').forEach(d => { d.style.outline = ''; });
+      const target = week[_colAt(e)].key;
+      _evMoveEvent(drag.id, _evAddDays(target, -drag.offsetDays));
+      window._evDrag = null;
+    });
+
     grid.appendChild(weekDiv);
   });
+}
+
+// 날짜 계산 헬퍼 + 행사 이동(드래그 앤 드롭)
+function _evParseKey(k) { const m = String(k || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
+function _evDaysBetween(a, b) {
+  const da = _evParseKey(a), db = _evParseKey(b);
+  if (!da || !db) return 0;
+  return Math.round((db - da) / 86400000);
+}
+function _evAddDays(k, n) {
+  const d = _evParseKey(k);
+  if (!d) return k;
+  d.setDate(d.getDate() + n);
+  return _evDateKey(d);
+}
+function _evMoveEvent(id, newStart) {
+  const events = _loadEvents();
+  const idx = events.findIndex(e => e.id === id);
+  if (idx < 0 || !newStart) return;
+  const ev = events[idx];
+  const oldStart = ev.dateStart || ev.dateEnd;
+  const oldEnd = ev.dateEnd || ev.dateStart;
+  const dur = Math.max(0, _evDaysBetween(oldStart, oldEnd));
+  const newEnd = _evAddDays(newStart, dur);
+  if (newStart === oldStart) return;
+  ev.dateStart = newStart;
+  ev.dateEnd = newEnd;
+  // 제목에 날짜(MM.DD-MM.DD)가 포함된 상품은 사이트/이름이 있을 때 재조립
+  try { if (ev.site && ev.name && typeof _evComposeTitle === 'function') ev.title = _evComposeTitle(ev.site, ev.name, newStart, newEnd); } catch (_) {}
+  ev.updatedAt = new Date().toISOString();
+  _saveEvents(events);
+  renderEventsCalendar();
+  try { if (typeof renderCalendar === "function") renderCalendar(); } catch (_) {}
 }
 
 // 날짜를 MM.DD 로 포매팅
