@@ -21709,6 +21709,7 @@ async function fetchInvoiceFromMail(opts) {
       // 매칭되는 모든 회신을 순차 매칭 — uploadInvoiceFile 이 송장기록을 누적 저장하므로 전부 합쳐진다.
       let totalMatched = 0, totalUnmatched = 0;
       const doneFiles = [];
+      window._invBatchMode = true; window._invInvalidCollected = [];
       // 오늘 매칭되는 회신은 전부 처리 (리빙컴퍼니 + 그외 + 의류 등). early-stop 없음 —
       //   메일이 여러 개면 모두 원클릭에 반영되도록(사용자 요청). today-필터가 이미 오늘치로 한정.
       for (const it of targets) {
@@ -21736,6 +21737,8 @@ async function fetchInvoiceFromMail(opts) {
         doneFiles.push(it.fileName);
         console.log(`[송장 메일 가져오기] 매칭 — ${it.fileName}: +${(r && r.matched) || 0}건 (누적 ${totalMatched})`);
       }
+      window._invBatchMode = false;
+      try { _showInvoiceInvalidPopup(); } catch (_) {}
       _invoiceStatus(`✅ 메일 ${targets.length}건 처리 — 총 ${totalMatched}건 매칭${totalUnmatched ? (' · 미매칭 ' + totalUnmatched + '건') : ''}`, totalMatched > 0 ? 'ok' : 'warn');
       return { matched: totalMatched, unmatched: totalUnmatched, files: doneFiles, processedAll: true };
     }
@@ -22024,6 +22027,11 @@ async function uploadInvoiceFile() {
       if (invalidInvoice > 0) parts.push('🚫 송장번호 텍스트(제외) ' + invalidInvoice + '건');
       _invoiceStatus(parts.join(' · ') + ' · 저장 완료 (메모리 + 로컬저장소)', matched > 0 ? 'ok' : 'warn');
       _renderInvoiceResult(matchedRows, unmatchedRows, noInvoice, invalidRows);
+      // 송장번호 칸에 품절/단종 등 텍스트가 적힌 행 — 팝업으로 알림 (일괄 처리(원클릭)에서는 모아서 끝에 한 번만)
+      try {
+        window._invInvalidCollected = (window._invInvalidCollected || []).concat(invalidRows.map(x => ({ name: x.name, product: x.product, text: x.invoiceNo, file: (file && file.name) || '' })));
+        if (!window._invBatchMode) _showInvoiceInvalidPopup();
+      } catch (_) {}
       resolve({ matched, unmatched, noInvoice, invalidInvoice });
     } catch (err) {
       _invoiceStatus('파일을 읽을 수 없습니다: ' + (err && err.message || err), 'error');
@@ -22036,6 +22044,20 @@ async function uploadInvoiceFile() {
   };
   reader.readAsArrayBuffer(file);
   });
+}
+
+// 송장번호 대신 품절/단종 등 텍스트가 적힌 행을 모아 팝업으로 알린다 (호출 후 목록 초기화)
+function _showInvoiceInvalidPopup() {
+  const list = window._invInvalidCollected || [];
+  window._invInvalidCollected = [];
+  if (!list.length) return;
+  const seen = new Set(); const uniq = [];
+  list.forEach(x => { const k = [x.name, x.product, x.text].join('|'); if (!seen.has(k)) { seen.add(k); uniq.push(x); } });
+  const lines = uniq.slice(0, 15).map(x => '• ' + (x.name || '(이름 없음)') + ' · ' + String(x.product || '').slice(0, 30) + '\n    → "' + x.text + '"').join('\n');
+  const more = uniq.length > 15 ? '\n… 외 ' + (uniq.length - 15) + '건' : '';
+  showAppAlert('송장번호가 아닌 항목이 있습니다 (' + uniq.length + '건)',
+    '엑셀의 송장번호(K열) 칸에 숫자가 아닌 내용(품절, 단종 등)이 있어 플레이오토 전송에서 제외됩니다.\n\n' + lines + more + '\n\n해당 주문은 송장 등록되지 않았으니 별도로 확인해 주세요.',
+    { type: 'warning' });
 }
 
 function _renderInvoiceResult(matchedRows, unmatchedRows, noInvoice, invalidRows) {
