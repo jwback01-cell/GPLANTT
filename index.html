@@ -4867,12 +4867,11 @@ input[type="date"]{padding-right:1.9rem !important;background-image:url("data:im
               <div class="relative">
                 <button type="button" onclick="_toggleMenu('upload-monthend-menu')" class="px-4 py-2 rounded-full border border-brand-border bg-white text-sm font-bold text-brand-blue hover:bg-brand-bg flex items-center gap-1.5" title="거래원장 대조 / 매입 대조 / 이카운트 전송">📅 월마감<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>
                 <div id="upload-monthend-menu" class="ud-dropdown-menu hidden absolute z-50 mt-1 left-0 bg-white border border-brand-border rounded-2xl shadow-xl p-1.5 w-56">
-                  <button onclick="_closeMenu('upload-monthend-menu');openSeoulLivingReconcilePurchase()" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold text-brand-blue hover:bg-brand-bg">🔍 거래원장 대조 (매출)</button>
-                  <button onclick="_closeMenu('upload-monthend-menu');openSeoulLivingReconcile()" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold text-brand-blue hover:bg-brand-bg">🔍 거래원장 대조 (매입)</button>
+                  <button onclick="_closeMenu('upload-monthend-menu');openSeoulLivingReconcileBoth()" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold text-brand-blue hover:bg-brand-bg" title="거래원장 엑셀 1개를 올리면 매입/매출 시트가 나뉜 엑셀 1개로 다운로드">🔍 거래원장 대조 (매입+매출)</button>
                   <button onclick="_closeMenu('upload-monthend-menu');goEcountFromUploadData()" class="w-full text-left px-3 py-2 rounded-lg text-sm font-bold text-brand-black hover:bg-brand-bg">📤 이카운트로 전송</button>
                 </div>
               </div>
-              <input type="file" id="reconcile-file-input" accept=".xlsx,.xls,.csv" class="hidden" onchange="_reconcileFileChosen(event)">
+              <input type="file" id="reconcile-file-input" accept=".xlsx,.xls,.csv" class="hidden" onchange="_reconcileFileChosenBoth(event)">
               <input type="file" id="reconcile-purchase-file-input" accept=".xlsx,.xls,.csv" class="hidden" onchange="_reconcileFileChosenPurchase(event)">
               <button onclick="openManualUploadModal()" class="px-4 py-2 rounded-full bg-brand-black text-white text-sm font-bold hover:-translate-y-0.5 transition-transform shadow-md">+ 수기 등록</button>
               <div class="relative">
@@ -27512,7 +27511,7 @@ function _reconcileExportExcel() {
 
 // 결과 객체 + 파일명을 받아 엑셀 생성/다운로드 — 모달/직접 호출 양쪽에서 재사용
 // mode: 'sale' = 매출 비교 (거래원장 매출/지급 ↔ GPLAN 원가), 'purchase' = 매입 비교 (매입/수금 ↔ GPLAN 단가)
-async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale') {
+async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale', _sharedWb = null) {
   const { matched, matchedSame, onlyLedger, onlyGplan, ledgerCount, gplanCount, minDate, maxDate, gplanShipByDate, gplanByDateRecv } = resultObj;
   const _shipByDate = gplanShipByDate || {};
   const _gByGroup = gplanByDateRecv || {};
@@ -27938,7 +27937,7 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
   ];
 
   const data = [...summaryBlock, groupHeader, header, ...rows, ...extraSection];
-  const wb = XLSX.utils.book_new();
+  const wb = _sharedWb || XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
 
   // 컬럼 폭 (총 11개)
@@ -28106,7 +28105,60 @@ async function _reconcileExportExcelFromResult(resultObj, srcFile, mode = 'sale'
   const today = new Date();
   const stamp = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
   const outName = `GPLAN_거래원장대조${FILE_SUFFIX}_${stamp}.xlsx`;
+  if (_sharedWb) return wb;   // 매입+매출 통합 다운로드: 호출 측에서 한 번에 저장
   XLSX.writeFile(wb, outName);
+}
+
+// 거래원장 1개 → 매입 시트 + 매출 시트가 들어간 엑셀 1개
+function openSeoulLivingReconcileBoth() {
+  const data = _loadUploadData();
+  const okSale = data.some(r => _RECONCILE_VENDORS.some(v => _normVendor(v) === _normVendor(r.vendor)));
+  const okPur = data.some(r => _isPurchaseSite(r.site));
+  if (!okSale && !okPur) {
+    showAppAlert('비교 대상 없음', '업로드 데이터에 거래처 "서울리빙 / 서울리빙 그외 / 서울리빙 의류" 또는 사이트 "서울리빙(수동)" 인 행이 없습니다.', 'warn');
+    return;
+  }
+  const fi = document.getElementById('reconcile-file-input');
+  if (fi) { fi.value = ''; fi.click(); }
+}
+function _reconcileFileChosenBoth(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const wbIn = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      const parseAll = (mode) => {
+        const rows = [];
+        for (const sn of wbIn.SheetNames) {
+          const arr = XLSX.utils.sheet_to_json(wbIn.Sheets[sn], { header: 1, defval: '', raw: false });
+          rows.push(..._reconcileParseSheet(arr, mode));
+        }
+        return rows;
+      };
+      const wbOut = XLSX.utils.book_new();
+      const done = [], skipped = [];
+      for (const [mode, label] of [['sale', '매입'], ['purchase', '매출']]) {
+        const rows = parseAll(mode);
+        if (!rows.length) { skipped.push(label); continue; }
+        const result = _reconcileCompare(rows, mode);
+        await _reconcileExportExcelFromResult(result, file.name, mode, wbOut);
+        done.push(label);
+      }
+      if (!done.length) {
+        showAppAlert('인식 실패', '거래원장 형식의 행을 찾지 못했습니다. (필요 컬럼: 거래일자 / 품명 / 수량 / 단가 / 매입·매출)', 'error');
+        return;
+      }
+      const t = new Date();
+      const stamp = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+      XLSX.writeFile(wbOut, `GPLAN_거래원장대조_${stamp}.xlsx`);
+      if (skipped.length) showAppAlert('일부 시트 생략', `${skipped.join(', ')} 행이 거래원장에서 인식되지 않아 해당 시트는 만들지 않았습니다.`, 'warn');
+    } catch (err) {
+      console.error('[거래원장 대조 통합] 실패:', err);
+      showAppAlert('파일 읽기 실패', err.message || String(err), 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 // ── 업로드 데이터 수기 등록 ─────────────────────────────────────
