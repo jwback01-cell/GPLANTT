@@ -23061,7 +23061,12 @@ async function _paRefreshShops(silent) {
 
 async function testPlayautoConn() {
   try {
+    // _paRefreshShops 는 오류를 삼켜 빈 배열을 돌려주므로(→ "연결 성공 0개" 오표시) 직접 호출해 오류를 그대로 표시
+    const _raw = await _paFetch('/shops');
     const shops = await _paRefreshShops(true);
+    if (_raw && typeof _raw === 'object' && _raw.error_code && String(_raw.error_code) !== '200' && String(_raw.error_code) !== '0') {
+      throw new Error(String(_raw.error_code) + ' ' + ((_raw.messages || []).join(' ') || ''));
+    }
     _updatePaBadge(true);
     showAppAlert('연결 성공', `${shops.length}개 쇼핑몰이 연동되어 있습니다.`, 'success');
     _renderPaShops(shops);

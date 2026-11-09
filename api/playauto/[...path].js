@@ -39,6 +39,14 @@ async function getToken(apiKey, authKey, force = false) {
   return token;
 }
 
+// PlayAuto 본문 오류 감지: {error_code: 'e1403'|401..., messages:[...]} (error_code 0/200 은 정상)
+function _paBodyError(d) {
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return null;
+  const c = d.error_code;
+  if (c == null || c === '' || c === 0 || c === '0' || c === 200 || c === '200') return null;
+  return String(c) + ': ' + (Array.isArray(d.messages) ? d.messages.join(' ') : (d.message || ''));
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
@@ -188,7 +196,7 @@ export default async function handler(req, res) {
       if (!token) break;
       for (const [prefix, name] of [['Token ', 'Token'], ['Bearer ', 'Bearer'], ['', 'raw']]) {
         result = await doRequest(prefix + token, pass === 1 ? name + '#refreshed' : name);
-        if (result.status >= 200 && result.status < 300) {
+        if (result.status >= 200 && result.status < 300 && !_paBodyError(result.data)) {
           _setDiagHeaders(diag);
           return res.status(result.status).json(result.data);
         }
@@ -201,14 +209,19 @@ export default async function handler(req, res) {
     _setDiagHeaders({ traceId, version: diag.version, tokenLen: diag.tokenLen, attemptStatuses: diag.attempts.map(a => ({ name: a.name, status: a.status })) });
 
     // 실패(4xx/5xx) 응답에는 진단전문(_paProxyDiag) 포함 — 프런트엔드 캡처 버튼이 사용
-    const finalStatus = result ? result.status : 500;
+    let finalStatus = result ? result.status : 500;
+    // PlayAuto 는 오류도 HTTP 200 + {error_code, messages} 로 주는 경우가 있다 → 성공으로 오인되지 않게 오류로 변환
+    const _bodyErr = result ? _paBodyError(result.data) : null;
+    if (_bodyErr && finalStatus < 400) finalStatus = 403;
     let finalBody;
     if (result && result.data && typeof result.data === 'object' && !Array.isArray(result.data)) {
       finalBody = { ...result.data, _paProxyDiag: diag };
     } else {
       finalBody = { upstreamData: result ? result.data : null, _paProxyDiag: diag };
     }
-    if (finalStatus === 401 || finalStatus === 403) {
+    if (/e1403|허용되지 않은 IP/.test(String(diag.tokenError || '') + String(_bodyErr || ''))) {
+      finalBody.error = '플레이오토가 이 서버의 IP를 허용하지 않습니다 (e1403: 허용되지 않은 IP). 플레이오토 API 설정의 허용 IP 제한을 해제하거나, 고정 IP 서버를 등록해야 합니다.';
+    } else if (finalStatus === 401 || finalStatus === 403) {
       // 화면에 'Forbidden' 만 보이면 원인을 알기 어려워 시도 결과를 함께 표시
       finalBody.error = 'Forbidden - PlayAuto 인증 실패 (API Key / 솔루션 인증키 확인 필요) [' + diag.attempts.map(x => x.name + ' ' + x.status).join(', ') + (diag.tokenError ? ' | 토큰발급: ' + diag.tokenError : '') + ']';
     }
