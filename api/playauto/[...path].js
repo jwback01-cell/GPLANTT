@@ -18,7 +18,11 @@ async function issueToken(apiKey, authKey) {
     body: JSON.stringify({ authentication_key: authKey }),
   });
   const text = await r.text();
-  if (!r.ok) throw new Error(`/auth HTTP ${r.status}: ${text.slice(0, 300)}`);
+  if (!r.ok) {
+    // x-amzn-ErrorType: ForbiddenException = API Gateway 가 x-api-key 자체를 거부(키 오류/비활성) — 앱 레벨 오류(e1403 등)와 구분
+    const et = r.headers.get('x-amzn-errortype') || '';
+    throw new Error(`/auth HTTP ${r.status}${et ? ' [' + et + ']' : ''}: ${text.slice(0, 300)}`);
+  }
   let data;
   try { data = JSON.parse(text); } catch { throw new Error('/auth 응답 파싱 실패: ' + text.slice(0, 200)); }
   const item = Array.isArray(data) ? data[0] : data;
@@ -219,8 +223,19 @@ export default async function handler(req, res) {
     } else {
       finalBody = { upstreamData: result ? result.data : null, _paProxyDiag: diag };
     }
+    // 실패 시 이 서버가 플레이오토에 접속하는 실제 IP 를 함께 알려 허용 IP 목록과 대조할 수 있게 한다
+    try {
+      const ac = new AbortController(); const tm = setTimeout(() => ac.abort(), 3000);
+      const ir = await fetch('https://api.ipify.org?format=json', { signal: ac.signal });
+      clearTimeout(tm);
+      diag.egressIp = (await ir.json()).ip;
+    } catch (_) {}
+    diag.region = process.env.VERCEL_REGION || '';
+    const _ipInfo = diag.egressIp ? ` [서버 접속 IP: ${diag.egressIp}${diag.region ? ' / 리전 ' + diag.region : ''}]` : '';
     if (/e1403|허용되지 않은 IP/.test(String(diag.tokenError || '') + String(_bodyErr || ''))) {
-      finalBody.error = '플레이오토가 이 서버의 IP를 허용하지 않습니다 (e1403: 허용되지 않은 IP). 플레이오토 API 설정의 허용 IP 제한을 해제하거나, 고정 IP 서버를 등록해야 합니다.';
+      finalBody.error = '플레이오토 e1403: 허용되지 않은 IP 입니다. (API 키는 통과, 접속 IP 가 허용 목록에 없음)' + _ipInfo;
+    } else if (/ForbiddenException/.test(String(diag.tokenError || ''))) {
+      finalBody.error = '플레이오토 게이트웨이가 API Key 를 거부했습니다 (ForbiddenException — 키 오류/비활성/만료). ' + (diag.tokenError || '') + _ipInfo;
     } else if (finalStatus === 401 || finalStatus === 403) {
       // 화면에 'Forbidden' 만 보이면 원인을 알기 어려워 시도 결과를 함께 표시
       finalBody.error = 'Forbidden - PlayAuto 인증 실패 (API Key / 솔루션 인증키 확인 필요) [' + diag.attempts.map(x => x.name + ' ' + x.status).join(', ') + (diag.tokenError ? ' | 토큰발급: ' + diag.tokenError : '') + ']';
