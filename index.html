@@ -4435,10 +4435,11 @@ input[type="date"]{padding-right:1.9rem !important;background-image:url("data:im
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                 📥 메일에서 자동 가져오기
               </button>
-              <button onclick="downloadExternalUploadTemplate()" class="px-4 py-2 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg flex items-center gap-1.5">
+              <button onclick="downloadExternalUploadTemplate()" title="업로드된 외부업체 주문을 플레이오토 '주문 엑셀 업로드'에 바로 올릴 수 있는 양식으로 다운로드 (업로드 전이면 빈 양식)" class="px-4 py-2 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg flex items-center gap-1.5">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 업로드 양식 다운로드
               </button>
+              <button onclick="downloadExternalOrderSourceTemplate()" title="외부업체 발주서(받는분성명·송장번호 등 14열) 업로드용 빈 양식" class="px-3 py-2 rounded-full border border-brand-border bg-white text-xs text-brand-gray hover:bg-brand-bg">외부업체 원본 양식</button>
               <button onclick="clearExternalOrderUpload()" id="ext-upload-clear-btn" class="hidden px-4 py-2 rounded-full border border-brand-border bg-white text-xs font-bold text-brand-pink hover:bg-brand-bg">업로드 데이터 삭제</button>
               <button onclick="exportExternalOrderUpload()" id="ext-upload-export-btn" class="hidden px-4 py-2 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">엑셀로 다시 내보내기</button>
             </div>
@@ -19421,7 +19422,21 @@ function _extUploadMsg(text, tone) {
   el.classList.remove('hidden');
 }
 
+// 플레이오토 "주문 엑셀 업로드"에 바로 올릴 수 있는 양식 (업로드된 데이터가 있으면 채워서, 없으면 예시 1행)
 function downloadExternalUploadTemplate() {
+  const payload = _loadExternalOrderUpload();
+  if (payload && payload.rows && payload.rows.length) { downloadPaOfficialTemplate(); return; }
+  const ex = ['AUTO','홍길동','010-0000-0000','010-0000-0000','홍길동','010-0000-0000','12345','서울특별시 강남구 테헤란로 1 101호','부재시 문앞','','[1개] 상품명 예시',1,10000,10000,'선결제',3000];
+  const ws = XLSX.utils.aoa_to_sheet([PA_TEMPLATE_COLS, ex]);
+  ws['!cols'] = [{wch:14},{wch:10},{wch:16},{wch:16},{wch:10},{wch:16},{wch:8},{wch:40},{wch:30},{wch:14},{wch:40},{wch:8},{wch:10},{wch:10},{wch:10},{wch:8}];
+  ws[XLSX.utils.encode_cell({ r: 1, c: 6 })] = { t: 's', v: '12345', z: '@' };
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '주문등록');
+  XLSX.writeFile(wb, '플레이오토_신규주문_업로드_양식.xlsx');
+}
+
+// 외부업체 발주서 원본 양식 (이 페이지에 업로드하는 용도)
+function downloadExternalOrderSourceTemplate() {
   const example = ['이영임','','010-8732-9448','서울코리아','010-8732-9448','13805','경기 과천시 희망2길 11 2층 201호',1,12900,'[1개] *리서스 세탁 종이세제 시트 40매, 3개','3종x40매','신용','',''];
   const ws = XLSX.utils.aoa_to_sheet([EXT_UPLOAD_COLS, example]);
   ws['!cols'] = [{wch:10},{wch:14},{wch:16},{wch:18},{wch:18},{wch:10},{wch:40},{wch:6},{wch:10},{wch:40},{wch:12},{wch:10},{wch:12},{wch:16}];
