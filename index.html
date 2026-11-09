@@ -20208,6 +20208,32 @@ const PA_TEMPLATE_COLS = [
   '수령자명','수령자휴대폰번호','우편번호','주소','배송메세지',
   '쇼핑몰 상품코드','온라인 상품명','주문수량','금액','공급가','배송방법','배송비'
 ];
+// 외부업체 주문 행의 공급가(개당) 조회: 엑셀 값 → 상품 매핑 공급가 → 매핑 연결 상품 → 상품 관리 상품명 매칭
+function _extResolveSupply(r) {
+  if (r.supply != null && Number(r.supply) > 0) return { v: Number(r.supply), src: '엑셀' };
+  const mapping = (typeof _paFindProductMapping === 'function') ? _paFindProductMapping(r.itemName) : null;
+  const prods = (typeof _allProducts !== 'undefined' && Array.isArray(_allProducts)) ? _allProducts : [];
+  if (mapping) {
+    if (Number(mapping.supply_price) > 0) return { v: Number(mapping.supply_price), src: '매핑' };
+    let p = null;
+    if (mapping.product_id != null && mapping.product_id !== '') p = prods.find(x => String(x.id) === String(mapping.product_id));
+    if (!p && mapping.sku_cd) p = prods.find(x => String(x.sku || '').trim() === String(mapping.sku_cd).trim());
+    if (!p && mapping.product_name) p = prods.find(x => String(x.name || '').trim() === String(mapping.product_name).trim());
+    if (p && Number(p.supply_price) > 0) return { v: Number(p.supply_price), src: '매핑상품' };
+  }
+  // 상품 관리 상품명과 직접 매칭 ([1개]·* 같은 접두어 제거, 긴 이름 우선)
+  const clean = String(r.itemName || '').replace(/\[[^\]]*\]/g, '').replace(/\*/g, '');
+  const nm = _paNormMatch(clean);
+  if (nm) {
+    const cand = prods
+      .filter(p => Number(p.supply_price) > 0)
+      .map(p => ({ p, n: _paNormMatch(p.name) }))
+      .filter(x => x.n && (nm === x.n || nm.indexOf(x.n) !== -1 || (x.n.length >= 6 && x.n.indexOf(nm) !== -1)))
+      .sort((a, b) => b.n.length - a.n.length);
+    if (cand.length) return { v: Number(cand[0].p.supply_price), src: '상품관리' };
+  }
+  return { v: 0, src: '' };
+}
 function downloadPaOfficialTemplate() {
   const payload = _loadExternalOrderUpload();
   if (!payload || !payload.rows || !payload.rows.length) {
@@ -20223,8 +20249,7 @@ function downloadPaOfficialTemplate() {
     // 매핑 조회 — 공급가 폴백용
     const mapping = (typeof _paFindProductMapping === 'function') ? _paFindProductMapping(r.itemName) : null;
     // 공급가 우선순위: (1) 엑셀의 공급가 → (2) 매핑 공급가
-    let supply = (r.supply != null && Number(r.supply) > 0) ? Number(r.supply) : 0;
-    if (!supply && mapping && Number(mapping.supply_price) > 0) supply = Number(mapping.supply_price);
+    const supply = _extResolveSupply(r).v;
     const qty = Math.max(1, Number(r.qty) || 1);
     const amount = supply * qty; // 금액 = 공급가 × 주문수량
 
