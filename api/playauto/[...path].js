@@ -169,30 +169,29 @@ export default async function handler(req, res) {
 
     let result;
 
-    // 시도 1: Token <token>
-    if (token) {
-      result = await doRequest(`Token ${token}`, 'Token');
-      if (result.status >= 200 && result.status < 300) {
-        _setDiagHeaders(diag);
-        return res.status(result.status).json(result.data);
+    // 시도 1~3: Token / Bearer / raw 스키마. 전부 401/403 이면 캐시된 토큰이 만료·무효화된 것일 수 있어(예: 다른 곳에서 새 토큰 발급,
+    //   서버리스 인스턴스 메모리에 23시간 캐시) 토큰을 강제로 재발급해 한 번 더 시도한다.
+    //   (기존에는 마지막 'no-auth' 시도의 일반 메시지 "Forbidden" 만 화면에 나와 원인을 알기 어려웠다.)
+    for (let pass = 0; pass < 2; pass++) {
+      if (pass === 1) {
+        const authFail = diag.attempts.length > 0 && diag.attempts.every(x => x.status === 401 || x.status === 403);
+        if (!token || !authFail) break;
+        try {
+          token = await getToken(apiKey, authKey, true);
+          diag.tokenRefreshed = true;
+          diag.tokenLen = token.length;
+        } catch (e) {
+          diag.tokenRefreshError = String(e.message || e).slice(0, 300);
+          break;
+        }
       }
-    }
-
-    // 시도 2: Bearer <token>
-    if (token) {
-      result = await doRequest(`Bearer ${token}`, 'Bearer');
-      if (result.status >= 200 && result.status < 300) {
-        _setDiagHeaders(diag);
-        return res.status(result.status).json(result.data);
-      }
-    }
-
-    // 시도 3: 그냥 <token> (스키마 없음)
-    if (token) {
-      result = await doRequest(token, 'raw');
-      if (result.status >= 200 && result.status < 300) {
-        _setDiagHeaders(diag);
-        return res.status(result.status).json(result.data);
+      if (!token) break;
+      for (const [prefix, name] of [['Token ', 'Token'], ['Bearer ', 'Bearer'], ['', 'raw']]) {
+        result = await doRequest(prefix + token, pass === 1 ? name + '#refreshed' : name);
+        if (result.status >= 200 && result.status < 300) {
+          _setDiagHeaders(diag);
+          return res.status(result.status).json(result.data);
+        }
       }
     }
 
@@ -208,6 +207,10 @@ export default async function handler(req, res) {
       finalBody = { ...result.data, _paProxyDiag: diag };
     } else {
       finalBody = { upstreamData: result ? result.data : null, _paProxyDiag: diag };
+    }
+    if (finalStatus === 401 || finalStatus === 403) {
+      // 화면에 'Forbidden' 만 보이면 원인을 알기 어려워 시도 결과를 함께 표시
+      finalBody.error = 'Forbidden - PlayAuto 인증 실패 (API Key / 솔루션 인증키 확인 필요) [' + diag.attempts.map(x => x.name + ' ' + x.status).join(', ') + (diag.tokenError ? ' | 토큰발급: ' + diag.tokenError : '') + ']';
     }
     res.status(finalStatus).json(finalBody);
   } catch (e) {
