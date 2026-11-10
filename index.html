@@ -15830,13 +15830,15 @@ function _doEventsExport() {
     return;
   }
 
-  // 사이트순 정렬 → 같은 사이트 안에서는 시작일 오름차순
+  // 일자순 정렬 — 시작일 → 종료일 → (같은 날짜면) 사이트명 순
   visible.sort((a, b) => {
-    const siteA = String(a.site || a.category || '');
-    const siteB = String(b.site || b.category || '');
-    const s = siteA.localeCompare(siteB, 'ko');
-    if (s !== 0) return s;
-    return String(a.dateStart || '').localeCompare(String(b.dateStart || ''));
+    const sa = String(a.dateStart || a.dateEnd || '');
+    const sb = String(b.dateStart || b.dateEnd || '');
+    if (sa !== sb) return sa.localeCompare(sb);
+    const ea = String(a.dateEnd || a.dateStart || '');
+    const eb = String(b.dateEnd || b.dateStart || '');
+    if (ea !== eb) return ea.localeCompare(eb);
+    return String(a.site || a.category || '').localeCompare(String(b.site || b.category || ''), 'ko');
   });
 
   // 각 행사 = 제목 + 줄바꿈 + 행사 제품 메모, 행사 사이는 빈 줄
