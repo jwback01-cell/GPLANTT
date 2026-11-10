@@ -3828,6 +3828,9 @@ input[type="date"]{padding-right:1.9rem !important;background-image:url("data:im
               <input id="ecount-range-start" type="date" class="bg-brand-bg rounded-xl px-3 py-1.5 text-sm font-bold border border-brand-border outline-none cursor-pointer">
               <span class="text-brand-gray font-bold">~</span>
               <input id="ecount-range-end" type="date" class="bg-brand-bg rounded-xl px-3 py-1.5 text-sm font-bold border border-brand-border outline-none cursor-pointer">
+              <button type="button" onclick="setEcountRangeMonth(-2)" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">전전달</button>
+              <button type="button" onclick="setEcountRangeMonth(-1)" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">지난달</button>
+              <button type="button" onclick="setEcountRangeMonth(0)" class="px-3 py-1.5 rounded-full border border-brand-border bg-white text-xs font-bold hover:bg-brand-bg">이번달</button>
             </div>
             <div class="flex flex-wrap gap-2">
               <label class="flex items-center gap-2 px-3 py-2 rounded-full border border-brand-border bg-brand-bg text-sm font-bold cursor-pointer"><input type="checkbox" class="ecount-item" value="sale" checked>판매입력 (매출)</label>
@@ -32087,6 +32090,18 @@ function _collectEcountRows() {
   });
   return out;
 }
+// 전송 기간 빠른 선택 — offset: 0=이번달, -1=지난달, -2=전전달 (1일 ~ 말일)
+function setEcountRangeMonth(offset) {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  const last = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
+  const f = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const s = document.getElementById('ecount-range-start');
+  const e = document.getElementById('ecount-range-end');
+  if (s) s.value = f(first);
+  if (e) e.value = f(last);
+}
+
 function previewEcountTransfer() {
   const items = Array.from(document.querySelectorAll('.ecount-item:checked')).map(c => c.value);
   const all = _collectEcountRows();
