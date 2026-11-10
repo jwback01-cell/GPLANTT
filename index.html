@@ -22897,11 +22897,63 @@ function savePlayautoKey() {
   showAppAlert('저장 완료', '플레이오토 API 설정이 저장되었습니다.', { type: 'success' });
 }
 
+// ── 플레이오토 API 를 "이 PC 의 크롬 확장" 으로 직접 호출 (플레이오토가 등록 IP 만 허용 → Vercel 유동 IP 는 e1403) ──
+// GPLAN 퀵수집 확장 v1.5.0+ 가 설치돼 있으면 서버 프록시 대신 확장 경유. 없으면 기존 프록시로 폴백.
+let _paExtState = { ok: null, at: 0 };
+let _paExtSeq = 0;
+const _paExtPending = {};
+window.addEventListener('message', (e) => {
+  if (e.source !== window) return;
+  const d = e.data;
+  if (!d || d.source !== 'gplan-ext') return;
+  if (d.type === 'PA_API_PONG') _paExtState = { ok: true, at: Date.now() };
+  if (d.type === 'PA_API_RESULT' && _paExtPending[d.id]) { const f = _paExtPending[d.id]; delete _paExtPending[d.id]; f(d.resp); }
+});
+function _paExtAvailable() {
+  if (_paExtState.ok === true) return Promise.resolve(true);
+  if (_paExtState.ok === false && Date.now() - _paExtState.at < 10000) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    let iv = null, tm = null;
+    const fin = (v) => { clearInterval(iv); clearTimeout(tm); if (!v) _paExtState = { ok: false, at: Date.now() }; resolve(v); };
+    iv = setInterval(() => { if (_paExtState.ok === true) fin(true); }, 40);
+    tm = setTimeout(() => fin(_paExtState.ok === true), 900);
+    try { window.postMessage({ source: 'gplan-page', type: 'GPLAN_PA_API_PING' }, '*'); } catch (_) {}
+  });
+}
+function _paExtCall(path, opts, key, auth) {
+  return new Promise((resolve) => {
+    const id = 'pa' + (++_paExtSeq) + '_' + Date.now();
+    const tm = setTimeout(() => { delete _paExtPending[id]; resolve({ ok: false, error: '확장 응답 시간 초과 (60초)' }); }, 60000);
+    _paExtPending[id] = (resp) => { clearTimeout(tm); resolve(resp); };
+    try {
+      window.postMessage({ source: 'gplan-page', type: 'GPLAN_PA_API', id,
+        payload: { key, auth, path, method: (opts && opts.method) || 'GET', body: (opts && opts.body) != null ? opts.body : null } }, '*');
+    } catch (e) { clearTimeout(tm); delete _paExtPending[id]; resolve({ ok: false, error: String((e && e.message) || e) }); }
+  });
+}
+
 async function _paFetch(path, opts = {}, _retry = 0) {
   const key = _loadPaKey();
   const auth = _loadPaAuth();
   if (!key) throw new Error('API Key가 등록되지 않았습니다.');
   if (!auth) throw new Error('솔루션 인증키가 등록되지 않았습니다.');
+
+  // 확장(이 PC)으로 직접 호출 — 확장이 설치돼 있으면 항상 우선
+  if (await _paExtAvailable()) {
+    const x = await _paExtCall(path, opts, key, auth);
+    if (x && x.ok && x.status >= 200 && x.status < 300 && !x.error) return x.data;
+    const _ro = String(opts.method || 'GET').toUpperCase() === 'GET' || path === '/orders';
+    if (x && x.ok && x.status === 429 && _retry < 5) {
+      const ra = parseFloat(x.retryAfter);
+      await new Promise(res => setTimeout(res, ra > 0 ? Math.min(ra * 1000, 10000) : Math.min(1000 * Math.pow(2, _retry), 8000)));
+      return _paFetch(path, opts, _retry + 1);
+    }
+    if (x && x.ok && x.status >= 500 && _ro && _retry < 2) {
+      await new Promise(res => setTimeout(res, 1500 * (_retry + 1)));
+      return _paFetch(path, opts, _retry + 1);
+    }
+    throw new Error((x && x.error) || '확장 호출 실패');
+  }
 
   // 429(Too Many Requests) 시 대기 시간 계산: Retry-After 헤더 우선, 없으면 지수 백오프(1s, 2s, 4s, 8s, 8s)
   const _wait429 = (resp) => {
