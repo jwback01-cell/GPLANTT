@@ -32339,7 +32339,16 @@ function _buildSalePayload(rows) {
     lineNo++;
     // r.price 는 VAT 포함 라인 합계 (이미 qty 가 반영된 값) — 단가는 합계/qty 로 환산
     const _q = Math.max(1, Number(r.qty) || 1);
-    const _priceTotalInc = Number(r.price) || 0;
+    let _priceTotalInc = Number(r.price) || 0;
+    // 서울리빙(수동) 수기 주문은 판매가가 "개당 금액"으로 저장돼 있음(공급가와 동일값) → 수량>1 이면 라인 합계로 환산
+    //   (예: 리서스 세탁 종이세제 3개 × 2 = 25,800 인데 12,900 으로 전송되던 문제)
+    //   이미 합계(price ≥ 공급가×수량)로 저장된 행은 그대로 둔다.
+    try {
+      const _sp = Number(r.supply) || 0;
+      if (_q > 1 && _sp > 0 && _isPurchaseSite(r.site) && Math.abs(_priceTotalInc - _sp) < 1) {
+        _priceTotalInc = _priceTotalInc * _q;
+      }
+    } catch (_) {}
     const _priceTotalEx = Math.round(_priceTotalInc / 1.1);
     const _priceUnitEx  = Math.round(_priceTotalInc / 1.1 / _q);
     const _vatTotal     = Math.round(_priceTotalInc) - _priceTotalEx;
