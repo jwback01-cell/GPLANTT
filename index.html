@@ -20841,11 +20841,7 @@ async function submitPaNewOrders() {
     const body = _extRowToPaOrder(row, shop, defaults, i);
     let entry = { row, req: body, idx: i };
     try {
-      const res = await fetch(fullPath, {
-        method: 'POST',
-        headers: { 'x-pa-key': key, 'x-pa-auth': auth, 'Content-Type': 'application/json; charset=UTF-8', 'Accept': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      const res = await _paRawRequest(path, { method: 'POST', body: JSON.stringify(body) });
       const text = await res.text();
       let data; try { data = JSON.parse(text); } catch(_) { data = text; }
       entry.http = res.status;
@@ -22934,6 +22930,27 @@ function _paExtCall(path, opts, key, auth) {
       window.postMessage({ source: 'gplan-page', type: 'GPLAN_PA_API', id,
         payload: { key, auth, path, method: (opts && opts.method) || 'GET', body: (opts && opts.body) != null ? opts.body : null } }, '*');
     } catch (e) { clearTimeout(tm); delete _paExtPending[id]; resolve({ ok: false, error: String((e && e.message) || e) }); }
+  });
+}
+
+// 원본 응답이 필요한 호출(신규주문 업로드 등)용 — fetch Response 와 비슷한 {ok,status,text()} 를 돌려준다.
+// 확장(이 PC)이 있으면 확장으로(허용 IP 제한 우회), 없으면 서버 프록시로 호출.
+async function _paRawRequest(path, opts) {
+  const key = _loadPaKey(), auth = _loadPaAuth();
+  if (await _paExtAvailable()) {
+    const x = await _paExtCall(path, opts, key, auth);
+    if (x && x.ok) {
+      const okRes = x.status >= 200 && x.status < 300 && !x.error;
+      return { ok: okRes, status: x.status, text: async () => JSON.stringify(x.data == null ? {} : x.data) };
+    }
+    // 확장 단계 실패(e1403 등) — 기존 응답 해석 로직이 읽을 수 있게 error_code/messages 형태로 변환
+    const body = JSON.stringify({ error_code: (x && x.ipBlocked) ? 'e1403' : 'ext_error', messages: [(x && x.error) || '확장 호출 실패'] });
+    return { ok: false, status: 403, text: async () => body };
+  }
+  return fetch('/api/playauto' + (path.startsWith('/') ? path : '/' + path), {
+    method: (opts && opts.method) || 'GET',
+    headers: { 'x-pa-key': key, 'x-pa-auth': auth, 'Content-Type': 'application/json; charset=UTF-8', 'Accept': 'application/json' },
+    body: opts && opts.body,
   });
 }
 
