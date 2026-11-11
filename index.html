@@ -33500,6 +33500,20 @@ async function executeSendToPlayauto() {
   }, 700);
 }
 
+// PA 재고(SKU) 목록 조회 본문 — 등록일 기간을 명시하지 않으면 최근 등록분만 내려오는 문제가 있어 전체 기간(2000-01-01~오늘) 지정
+function _paStockListBody(start, limit) {
+  const t = new Date();
+  const ymd = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+  return {
+    start, limit,
+    orderbyType: 'DESC', orderbyColumn: 'wdate',
+    search_key: 'all', search_word: '', search_type: 'partial',
+    date_type: 'wdate',
+    sdate: '2000-01-01 00:00:00',
+    edate: ymd + ' 23:59:59',
+  };
+}
+
 // 플레이오토에 등록된 모든 SKU 코드 조회 (페이지네이션)
 async function _paFetchAllStockSkus() {
   const all = [];
@@ -33507,12 +33521,7 @@ async function _paFetchAllStockSkus() {
   let start = 0;
   // 안전장치: 최대 50페이지(2.5만개)
   for (let page = 0; page < 50; page++) {
-    const body = {
-      start, limit,
-      orderbyType: 'DESC', orderbyColumn: 'wdate',
-      search_key: 'all', search_word: '', search_type: 'partial',
-      date_type: 'wdate'
-    };
+    const body = _paStockListBody(start, limit);
     const res = await _paFetch('/stock/list/v1.2', { method: 'POST', body: JSON.stringify(body) });
     const rows = _paUnwrap(res);
     if (!rows.length) break;
@@ -34100,14 +34109,10 @@ async function fetchPlayautoProducts() {
     let start = 0, page = 0;
     while (page < 50) {
       _paUpdateProgress(all.length, all.length + limit, '', `${page+1}페이지 조회 중`);
-      const body = {
-        start, limit,
-        orderbyType: 'DESC', orderbyColumn: 'wdate',
-        search_key: 'all', search_word: '', search_type: 'partial',
-        date_type: 'wdate'
-      };
+      const body = _paStockListBody(start, limit);
       const res = await _paFetch('/stock/list/v1.2', { method: 'POST', body: JSON.stringify(body) });
       const rows = _paUnwrap(res);
+      console.log(`[PA 상품 가져오기] ${page+1}페이지: ${rows.length}건 (start=${start}) · 응답 키:`, res && typeof res === 'object' ? Object.keys(res) : typeof res);
       if (!rows.length) break;
       all.push(...rows);
       if (rows.length < limit) break;
