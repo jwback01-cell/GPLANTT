@@ -24333,23 +24333,31 @@ async function exportPaClaims() {
 
   const data = [
     ['받는분성명','받는분기타연락처','업체명(필수기입)','받는분연락처','우편번호','받는분주소','수량','상품명','운임TYPE','지불조건','출고번호','배송메세지','출고일','처리사항','내용'],
-    ...targetRows.map(o => [
-      String(o.to_name || o.receiver || ''),
-      String(o.to_htel2 || o.to_htel || ''),
-      '지플랜',
-      String(o.to_htel || o.to_tel || ''),
-      String(o.to_zipcd || ''),
-      addrOf(o),
-      _claimGet(o, 'qty'),
-      _claimGet(o, 'skuName') || _claimGet(o, 'itemName'),  // SKU상품명 우선, 없으면 상품명 폴백
-      '',                                  // 운임TYPE
-      deliveryOf(o),                       // 지불조건 위치 — 사용자 양식상 택배사
-      invoiceOf(o),                        // 출고번호 — 송장번호
-      shipMemoOf(o),                       // 배송메세지
-      sendDateOf(o),                       // 출고일 MM/DD
-      actionOf(o),                         // 처리사항 (예: "단순변심 교환")
-      _claimGet(o, 'reason'),              // 내용 — 클레임 사유 상세
-    ]),
+    ...targetRows.flatMap(o => {
+      const mk = (qty, name) => [
+        String(o.to_name || o.receiver || ''),
+        String(o.to_htel2 || o.to_htel || ''),
+        '지플랜',
+        String(o.to_htel || o.to_tel || ''),
+        String(o.to_zipcd || ''),
+        addrOf(o),
+        qty,
+        name,
+        '',                                  // 운임TYPE
+        deliveryOf(o),                       // 지불조건 위치 — 사용자 양식상 택배사
+        invoiceOf(o),                        // 출고번호 — 송장번호
+        shipMemoOf(o),                       // 배송메세지
+        sendDateOf(o),                       // 출고일 MM/DD
+        actionOf(o),                         // 처리사항 (예: "단순변심 교환")
+        _claimGet(o, 'reason'),              // 내용 — 클레임 사유 상세
+      ];
+      const nm = _claimGet(o, 'skuName') || _claimGet(o, 'itemName');  // SKU상품명 우선, 없으면 상품명 폴백
+      // 세트상품이면 구성품 행으로 분해 (발주양식과 동일)
+      const comps = _csExpandSet(nm, _claimGet(o, 'qty'), _claimGet(o, 'sku'))
+        || _csExpandSet(_claimGet(o, 'itemName'), _claimGet(o, 'qty'), '');
+      if (comps) return comps.map(c => mk(c.qty, c.name));
+      return [mk(_claimGet(o, 'qty'), nm)];
+    }),
   ];
 
   const wb = XLSX.utils.book_new();
@@ -26899,6 +26907,7 @@ function _doConvertSelectedToReturn(targetRows, reason, kind) {
         shipMemo   : orig.msg || orig.shipMsg || '',                        // 배송메세지
         qty        : Math.abs(Number(orig.qty) || 1),
         itemName   : orig.itemName || '',
+        sku        : orig.itemCode || orig.skuCode || '',   // 세트 분해(CS발주서) 시 코드 매칭용
         orderNo    : orig.invoiceNo || orig.invoice || orig.inv_no || orig.tracking_no || orig.orderNo || orig.shopOrdNo || '',  // 출고번호(운송장번호)
         outDate    : orig.date || todayDate,
         action     : `${actionLabel}(${reasonLabel})`,
@@ -29693,6 +29702,44 @@ function _renderReturnsKpi(all, filtered) {
   }
 }
 
+// ── CS발주서용 세트상품 분해 ───────────────────────────────────────────
+// 리빙컴퍼니 발주양식과 동일: 상품관리 → 세트상품에 등록된 세트는 구성품(SKU × 수량 × 주문수량)으로 펼치고,
+// 수량이 2 이상이면 상품명 앞에 "[N개]" 를 붙인다. 세트가 아니면 null (호출부가 원래 행 그대로 사용).
+function _csExpandSet(itemName, qty, sku) {
+  try {
+    const sets = (typeof _loadSetProducts === 'function') ? (_loadSetProducts() || []) : [];
+    if (!sets.length) return null;
+    const nz = x => String(x || '').replace(/\s+/g, '').toLowerCase();
+    const code = nz(sku), name = nz(itemName);
+    let set = null;
+    for (const st of sets) {
+      if (!st || !Array.isArray(st.items) || !st.items.length) continue;
+      if (code && st.code && nz(st.code) === code) { set = st; break; }
+    }
+    if (!set && name) {
+      for (const st of sets) {
+        if (!st || !Array.isArray(st.items) || !st.items.length || !st.name) continue;
+        if (nz(st.name) === name) { set = st; break; }
+      }
+    }
+    if (!set) return null;
+    const prods = (typeof _allProducts !== 'undefined' && Array.isArray(_allProducts)) ? _allProducts : [];
+    const bySku = new Map();
+    prods.forEach(p => { if (p && p.sku) bySku.set(String(p.sku).trim(), p); });
+    const orderQty = Math.max(1, Number(qty) || 1);
+    const out = [];
+    set.items.forEach(it => {
+      const cs = String((it && it.sku) || '').trim();
+      const cq = (Number(it && it.qty) || 0) * orderQty;
+      if (cq <= 0 || !cs) return;
+      const cp = bySku.get(cs);
+      const cn = cp && cp.name ? cp.name : cs;
+      out.push({ qty: cq, name: cq >= 2 ? `[${cq}개]${cn}` : cn });
+    });
+    return out.length ? out : null;
+  } catch (_) { return null; }
+}
+
 async function exportReturnData() {
   const all = _loadReturns();
   if (!all.length) { showAppAlert('내보낼 데이터 없음', '저장된 반품 데이터가 없습니다.', 'info'); return; }
@@ -29711,23 +29758,29 @@ async function exportReturnData() {
   // 클레임 관리와 동일한 양식 (15열)
   const data = [
     ['받는분성명','받는분기타연락처','업체명(필수기입)','받는분연락처','우편번호','받는분주소','수량','상품명','운임TYPE','지불조건','출고번호','배송메세지','출고일','처리사항','내용'],
-    ...target.map(r => [
-      String(r.recvName || ''),
-      String(r.phoneEtc || ''),
-      '지플랜',
-      String(r.phone || ''),
-      String(r.zip || ''),
-      String(r.addr || ''),
-      Number(r.qty) || 0,
-      String(r.itemName || ''),
-      String(r.shipType || ''),
-      String(r.payType || ''),
-      String(r.orderNo || ''),
-      String(r.shipMemo || ''),
-      fmtMD(_normReturnOutDate(r.outDate) || r.outDate || ''),
-      String(r.action || ''),
-      String(r.detail || ''),
-    ]),
+    ...target.flatMap(r => {
+      const mk = (qty, name) => [
+        String(r.recvName || ''),
+        String(r.phoneEtc || ''),
+        '지플랜',
+        String(r.phone || ''),
+        String(r.zip || ''),
+        String(r.addr || ''),
+        qty,
+        name,
+        String(r.shipType || ''),
+        String(r.payType || ''),
+        String(r.orderNo || ''),
+        String(r.shipMemo || ''),
+        fmtMD(_normReturnOutDate(r.outDate) || r.outDate || ''),
+        String(r.action || ''),
+        String(r.detail || ''),
+      ];
+      // 세트상품이면 구성품 행으로 분해 (발주양식과 동일)
+      const comps = _csExpandSet(r.itemName, r.qty, r.sku || r.itemCode);
+      if (comps) return comps.map(c => mk(c.qty, c.name));
+      return [mk(Number(r.qty) || 0, String(r.itemName || ''))];
+    }),
   ];
 
   const wb = XLSX.utils.book_new();
