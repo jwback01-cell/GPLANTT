@@ -760,6 +760,30 @@ input[type="date"]{padding-right:1.9rem !important;background-image:url("data:im
         </div>
       </section>
 
+      <!-- 오늘 매출 / 순이익 (장부 입력 저장 시 갱신) -->
+      <section class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+        <div onclick="navigate('ledger')" class="bg-white p-5 md:p-7 rounded-3xl panel hover:-translate-y-1 transition-transform duration-300 cursor-pointer">
+          <div class="flex items-center justify-between mb-4">
+            <span class="font-semibold text-[1.1rem]">오늘 매출</span>
+            <span id="dashboard-today-label" class="text-xs text-brand-gray font-semibold">-</span>
+          </div>
+          <div class="flex items-end justify-between">
+            <div id="dashboard-today-revenue" class="text-[1.8rem] md:text-[2rem] font-bold tracking-tight">0</div>
+            <div id="dashboard-today-count" class="text-brand-pink font-semibold text-sm bg-brand-pink-light/60 px-2.5 py-1 rounded-lg">0건</div>
+          </div>
+        </div>
+        <div onclick="navigate('ledger')" class="bg-white p-5 md:p-7 rounded-3xl panel hover:-translate-y-1 transition-transform duration-300 cursor-pointer">
+          <div class="flex items-center justify-between mb-4">
+            <span class="font-semibold text-[1.1rem]">오늘 순이익</span>
+            <span class="text-xs text-brand-gray font-semibold">광고비 차감 전</span>
+          </div>
+          <div class="flex items-end justify-between">
+            <div id="dashboard-today-profit" class="text-[1.8rem] md:text-[2rem] font-bold tracking-tight">0</div>
+            <div id="dashboard-today-profit-rate" class="text-brand-blue font-semibold text-sm bg-brand-blue-light/60 px-2.5 py-1 rounded-lg">수익률 -</div>
+          </div>
+        </div>
+      </section>
+
       <!-- 원클릭: PA 주문 수집 → 장부 저장 → 이카운트 전송 -->
       <section class="bg-white rounded-3xl panel p-5 md:p-7">
         <div class="flex flex-col md:flex-row md:items-center gap-4">
@@ -5871,8 +5895,31 @@ document.getElementById('pw-toggle').addEventListener('click', function() {
   inp.type = inp.type === 'password' ? 'text' : 'password';
 });
 
+// ── 오늘 매출 / 순이익 카드 (업로드 데이터 = 장부 입력 저장분 기준, 일별 요약과 동일 산식) ──
+function syncDashboardToday() {
+  try {
+    const t = new Date();
+    const ymd = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+    const days = (typeof _buildDailyDataFromUploadData === 'function') ? _buildDailyDataFromUploadData(ymd, ymd) : [];
+    const d = days[0] || null;
+    const fmt = n => Number(n || 0).toLocaleString('ko-KR');
+    const setText = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+    setText('dashboard-today-label', ymd);
+    setText('dashboard-today-revenue', fmt(d ? d.sales : 0));
+    setText('dashboard-today-count', (d ? d.count : 0) + '건');
+    if (d && d._hasProfit) {
+      setText('dashboard-today-profit', fmt(d.profit));
+      setText('dashboard-today-profit-rate', '수익률 ' + (d.sales > 0 ? ((d.profit / d.sales) * 100).toFixed(1) : '0') + '%');
+    } else {
+      setText('dashboard-today-profit', d ? '원가 미입력' : '0');
+      setText('dashboard-today-profit-rate', '수익률 -');
+    }
+  } catch (e) { console.warn('[오늘 카드]', e); }
+}
+
 // ── Bar chart animation ──────────────────────
 function syncDashboardRevenue() {
+  syncDashboardToday();
   const data = _buildMonthlyDataFromEntries() || [];
   // 실제 데이터가 없으면 모든 KPI를 0/- 으로 초기화하고 종료
   if (data.length === 0) {
