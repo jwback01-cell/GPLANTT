@@ -15892,11 +15892,21 @@ function _doEventsExport() {
   });
 
   // 각 행사 = 제목 + 줄바꿈 + 행사 제품 메모, 행사 사이는 빈 줄
-  const text = visible.map(ev => {
+  // 마켓(사이트)별로 묶어서 출력 — 마켓 안에서는 위에서 정렬한 일자순 유지
+  const _evText = ev => {
     const title = ev.title || '';
     const products = (ev.products || '').trim();
     return products ? `${title}\n${products}` : title;
-  }).join('\n\n');
+  };
+  const byMarket = new Map();
+  visible.forEach(ev => {
+    const k = String(ev.site || ev.category || '기타').trim() || '기타';
+    if (!byMarket.has(k)) byMarket.set(k, []);
+    byMarket.get(k).push(ev);
+  });
+  const text = [...byMarket.keys()].sort((a, b) => a.localeCompare(b, 'ko')).map(k =>
+    `■ ${k}\n\n` + byMarket.get(k).map(_evText).join('\n\n')
+  ).join('\n\n\n');
 
   // 파일명 — "행사내역_3월08일-4월10일.txt" 형식
   const _toMD = (yyyymmdd) => {
